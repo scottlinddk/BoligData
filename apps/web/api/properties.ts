@@ -4,9 +4,9 @@ import type {
   SortDirection,
   SortField,
 } from "../../../packages/shared/src/types/api";
-import { applyCors } from "./middleware/cors";
-import { getAnonClient } from "./lib/supabase";
-import { searchProperties } from "./lib/search";
+import { applyCors } from "../server/middleware/cors";
+import { getAnonClient } from "../server/lib/supabase";
+import { searchProperties } from "../server/lib/search";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "../middleware/cors";
-import { getAnonClient } from "../lib/supabase";
-import { rowToEnrichment, rowToProperty } from "../lib/row-mappers";
+import { applyCors } from "../../server/middleware/cors";
+import { getAnonClient } from "../../server/lib/supabase";
+import { rowToEnrichment, rowToProperty } from "../../server/lib/row-mappers";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

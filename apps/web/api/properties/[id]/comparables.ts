@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "../../middleware/cors";
-import { getAnonClient } from "../../lib/supabase";
-import { getComparables } from "../../lib/comparables";
+import { applyCors } from "../../../server/middleware/cors";
+import { getAnonClient } from "../../../server/lib/supabase";
+import { getComparables } from "../../../server/lib/comparables";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

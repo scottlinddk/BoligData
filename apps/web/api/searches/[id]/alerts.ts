@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { UpdateAlertBody } from "../../../../../packages/shared/src/types/api";
-import { applyCors } from "../../middleware/cors";
-import { requireUser } from "../../middleware/auth";
-import { getAnonClient } from "../../lib/supabase";
-import { rowToSearch } from "../../lib/row-mappers";
+import { applyCors } from "../../../server/middleware/cors";
+import { requireUser } from "../../../server/middleware/auth";
+import { getAnonClient } from "../../../server/lib/supabase";
+import { rowToSearch } from "../../../server/lib/row-mappers";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

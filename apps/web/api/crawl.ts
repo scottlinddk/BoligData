@@ -1,16 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "./middleware/cors";
-import { getServiceRoleClient } from "./lib/supabase";
-import { fetchBoligsidenListings } from "./lib/crawl/boligsiden";
-import { fetchBoligaListings } from "./lib/crawl/boliga";
-import { enrichProperty } from "./lib/crawl/enrich";
+import { applyCors } from "../server/middleware/cors";
+import { getServiceRoleClient } from "../server/lib/supabase";
+import { fetchBoligsidenListings } from "../server/lib/crawl/boligsiden";
+import { fetchBoligaListings } from "../server/lib/crawl/boliga";
+import { enrichProperty } from "../server/lib/crawl/enrich";
 
 /**
  * Daily ingest entry point, triggered by .github/workflows/crawl.yml.
  * Requires SUPABASE_SERVICE_ROLE_KEY and CRON_SECRET to be set in the
  * Vercel project's environment variables (manual step — no MCP tool sets
  * these). With CRAWL_MOCK_MODE=true (the default), it upserts the fixture
- * listings under lib/crawl/fixtures/ instead of scraping live sites.
+ * listings under server/lib/crawl/fixtures/ instead of scraping live sites.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

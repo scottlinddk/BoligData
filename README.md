@@ -32,7 +32,7 @@ The committed `apps/web/.env.production` holds the real (non-secret) Supabase UR
 
 ## Data ingest status
 
-`apps/web/api/lib/crawl/{boligsiden,boliga,enrich}.ts` are built as clean interfaces behind a `CRAWL_MOCK_MODE` flag. Real scraping of Boligsiden/Boliga and real BBR/OIS/Vejdirektoratet API clients are **not implemented yet** — mock mode reads from local fixtures so the rest of the app (search, map, detail, comparables) is fully demoable against seeded data.
+`apps/web/server/lib/crawl/{boligsiden,boliga,enrich}.ts` are built as clean interfaces behind a `CRAWL_MOCK_MODE` flag. Real scraping of Boligsiden/Boliga and real BBR/OIS/Vejdirektoratet API clients are **not implemented yet** — mock mode reads from local fixtures so the rest of the app (search, map, detail, comparables) is fully demoable against seeded data.
 
 ## Manual follow-up steps (cannot be done via this session's tooling)
 
