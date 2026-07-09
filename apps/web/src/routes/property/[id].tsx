@@ -60,6 +60,20 @@ export function PropertyDetailPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} />
+        {comparablesQuery.isLoading && (
+          <p className="p-3 text-slate-500 dark:text-slate-400">{t("comparables.loading")}</p>
+        )}
+        {comparablesQuery.isError && (
+          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <p className="text-red-600 dark:text-red-400">{t("comparables.error")}</p>
+            <button
+              onClick={() => comparablesQuery.refetch()}
+              className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        )}
         {comparablesQuery.data && (
           <ComparablesPanel
             soldPriceHistory={enrichment?.soldPriceHistory ?? []}
