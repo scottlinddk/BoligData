@@ -3,6 +3,7 @@ import type { UpdateAlertBody } from "../../../../../packages/shared/src/types/a
 import { applyCors } from "../../../server/middleware/cors.js";
 import { requireUser } from "../../../server/middleware/auth.js";
 import { getAnonClient } from "../../../server/lib/supabase.js";
+import { sendError } from "../../../server/lib/http-helpers.js";
 import { rowToSearch } from "../../../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -23,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const client = getAnonClient(auth.jwt);
+  res.setHeader("Cache-Control", "no-store");
   const { data, error } = await client
     .from("searches")
     .update({ alert_frequency: body.alertFrequency })
@@ -32,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single();
 
   if (error || !data) {
-    res.status(404).json({ error: error?.message ?? "Search not found" });
+    sendError(res, 404, "Search not found", error ?? undefined);
     return;
   }
 

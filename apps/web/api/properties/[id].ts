@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyCors } from "../../server/middleware/cors.js";
 import { getAnonClient } from "../../server/lib/supabase.js";
+import { isUuid, sendError, setPublicCache } from "../../server/lib/http-helpers.js";
 import { rowToEnrichment, rowToProperty } from "../../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -10,32 +11,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const id = req.query.id as string;
+  const id = req.query.id;
+  if (!isUuid(id)) {
+    sendError(res, 400, "Invalid property id");
+    return;
+  }
 
   try {
     const client = getAnonClient();
-    const { data: propertyRow, error: propertyError } = await client
-      .from("properties")
-      .select("*")
-      .eq("id", id)
-      .single();
+    const [propertyResult, enrichmentResult] = await Promise.all([
+      client.from("properties").select("*").eq("id", id).single(),
+      client.from("enrichments").select("*").eq("property_id", id).maybeSingle(),
+    ]);
 
-    if (propertyError || !propertyRow) {
-      res.status(404).json({ error: "Property not found" });
+    if (propertyResult.error || !propertyResult.data) {
+      sendError(res, 404, "Property not found");
       return;
     }
 
-    const { data: enrichmentRow } = await client
-      .from("enrichments")
-      .select("*")
-      .eq("property_id", id)
-      .maybeSingle();
-
+    setPublicCache(res, 300, 3600);
     res.status(200).json({
-      property: rowToProperty(propertyRow),
-      enrichment: enrichmentRow ? rowToEnrichment(enrichmentRow) : null,
+      property: rowToProperty(propertyResult.data),
+      enrichment: enrichmentResult.data ? rowToEnrichment(enrichmentResult.data) : null,
     });
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    sendError(res, 500, "Failed to load property", err);
   }
 }

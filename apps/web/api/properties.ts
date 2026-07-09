@@ -6,6 +6,7 @@ import type {
 } from "../../../packages/shared/src/types/api.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { getAnonClient } from "../server/lib/supabase.js";
+import { sendError, setPublicCache } from "../server/lib/http-helpers.js";
 import { searchProperties } from "../server/lib/search.js";
 
 function str(v: unknown): string | undefined {
@@ -47,8 +48,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const client = getAnonClient();
     const result = await searchProperties(client, parseQuery(req));
+    setPublicCache(res, 300, 3600);
     res.status(200).json(result);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    sendError(res, 500, "Failed to search properties", err);
   }
 }
