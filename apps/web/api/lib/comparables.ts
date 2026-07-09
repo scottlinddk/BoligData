@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ComparableEntry,
   ComparablesResponse,
-} from "../../../../packages/shared/src/types/api";
-import { haversineMeters, rowToProperty } from "./row-mappers";
+} from "../../../../packages/shared/src/types/api.js";
+import { haversineMeters, rowToProperty } from "./row-mappers.js";
 
 const CANDIDATE_LIMIT = 20;
 const RESULT_LIMIT = 5;

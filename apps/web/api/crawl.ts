@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "./middleware/cors";
-import { getServiceRoleClient } from "./lib/supabase";
-import { fetchBoligsidenListings } from "./lib/crawl/boligsiden";
-import { fetchBoligaListings } from "./lib/crawl/boliga";
-import { enrichProperty } from "./lib/crawl/enrich";
+import { applyCors } from "./middleware/cors.js";
+import { getServiceRoleClient } from "./lib/supabase.js";
+import { fetchBoligsidenListings } from "./lib/crawl/boligsiden.js";
+import { fetchBoligaListings } from "./lib/crawl/boliga.js";
+import { enrichProperty } from "./lib/crawl/enrich.js";
 
 /**
  * Daily ingest entry point, triggered by .github/workflows/crawl.yml.

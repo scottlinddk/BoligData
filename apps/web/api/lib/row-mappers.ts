@@ -2,7 +2,7 @@ import type {
   Enrichment,
   Property,
   SavedSearch,
-} from "../../../../packages/shared/src/types/index";
+} from "../../../../packages/shared/src/types/index.js";
 
 export function rowToProperty(row: Record<string, any>): Property {
   return {
