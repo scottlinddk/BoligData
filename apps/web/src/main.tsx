@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { I18nProvider } from "@/i18n/i18n";
+import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
 import { AuthGuard } from "@/components/auth-guard";
 import { SearchPage } from "@/routes/search";
@@ -14,7 +16,7 @@ import "./index.css";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <Header />
       <main>{children}</main>
     </div>
@@ -43,8 +45,12 @@ const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </I18nProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

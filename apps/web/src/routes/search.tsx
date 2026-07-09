@@ -6,8 +6,10 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { FilterSidebar } from "@/components/filter-sidebar";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyMap } from "@/components/property-map";
+import { useI18n } from "@/i18n/i18n";
 
 export function SearchPage() {
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = parseFilters(searchParams);
   const [offset, setOffset] = useState(0);
@@ -27,12 +29,12 @@ export function SearchPage() {
       <FilterSidebar filters={filters} onChange={handleFilterChange} />
 
       <div className="flex flex-1 flex-col gap-4">
-        <div className="h-72 overflow-hidden rounded-lg border border-slate-200">
+        <div className="h-72 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
           <PropertyMap properties={properties} />
         </div>
 
-        {isLoading && <p className="text-slate-500">Loading properties...</p>}
-        {isError && <p className="text-red-600">Failed to load properties.</p>}
+        {isLoading && <p className="text-slate-500 dark:text-slate-400">{t("search.loading")}</p>}
+        {isError && <p className="text-red-600 dark:text-red-400">{t("search.error")}</p>}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {properties.map((property) => (
@@ -40,24 +42,30 @@ export function SearchPage() {
           ))}
         </div>
 
-        <div className="flex items-center justify-between text-sm text-slate-500">
+        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
           <span>
-            {total > 0 ? `${offset + 1}-${Math.min(offset + DEFAULT_PAGE_SIZE, total)} of ${total}` : "No results"}
+            {total > 0
+              ? t("search.range", {
+                  from: offset + 1,
+                  to: Math.min(offset + DEFAULT_PAGE_SIZE, total),
+                  total,
+                })
+              : t("search.noResults")}
           </span>
           <div className="flex gap-2">
             <button
               disabled={offset === 0}
               onClick={() => setOffset(Math.max(0, offset - DEFAULT_PAGE_SIZE))}
-              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40"
+              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40 dark:border-slate-700"
             >
-              Previous
+              {t("search.previous")}
             </button>
             <button
               disabled={offset + DEFAULT_PAGE_SIZE >= total}
               onClick={() => setOffset(offset + DEFAULT_PAGE_SIZE)}
-              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40"
+              className="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40 dark:border-slate-700"
             >
-              Next
+              {t("search.next")}
             </button>
           </div>
         </div>

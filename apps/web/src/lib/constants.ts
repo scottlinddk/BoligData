@@ -5,11 +5,17 @@ export const DEFAULT_MAP_ZOOM = 11;
 
 export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
-export const SORT_OPTIONS: { value: string; label: string }[] = [
-  { value: "listingDate:desc", label: "Newest first" },
-  { value: "pricePerSqm:asc", label: "Price/sqm (low to high)" },
-  { value: "pricePerSqm:desc", label: "Price/sqm (high to low)" },
-  { value: "price:asc", label: "Price (low to high)" },
-  { value: "price:desc", label: "Price (high to low)" },
-  { value: "daysOnMarket:asc", label: "Days on market" },
-];
+/**
+ * Sort option values. Each value doubles as a translation key suffix
+ * (`sort.<value>`) so labels are resolved through i18n at render time.
+ */
+export const SORT_OPTIONS = [
+  "listingDate:desc",
+  "pricePerSqm:asc",
+  "pricePerSqm:desc",
+  "price:asc",
+  "price:desc",
+  "daysOnMarket:asc",
+] as const;
+
+export type SortOptionValue = (typeof SORT_OPTIONS)[number];

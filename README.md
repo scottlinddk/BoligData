@@ -1,10 +1,14 @@
-# DanBolig Research
+# BoligData
 
-Research and due-diligence dashboard for Danish property investors and advisors. Ingests listings, enriches with BBR/OIS/public reference data, and surfaces a structured due-diligence checklist per property.
+**BoligData** (Danish) / **BoligDataResearch** (English) — a research and due-diligence dashboard for Danish property investors and advisors. Ingests listings, enriches with BBR/OIS/public reference data, and surfaces a structured due-diligence checklist per property.
+
+The UI is fully bilingual (Danish default, English) and ships with light and dark themes; both preferences persist in `localStorage`.
 
 ## Stack
 
 - Frontend: React 19 + TypeScript + Vite, React Router v7 (data router mode), TanStack Query v5, MapLibre GL + OpenFreeMap tiles, Tailwind CSS.
+- i18n: lightweight in-house dictionary + context provider (`apps/web/src/i18n`), no runtime dependency.
+- Theming: Tailwind `class` dark mode with a context provider (`apps/web/src/theme`); an inline bootstrap in `index.html` applies the stored theme before first paint to avoid flashes.
 - Backend: Vercel serverless functions (`apps/web/api`), Node.js.
 - Database: Supabase (PostgreSQL + PostGIS), Supabase Auth.
 - Ingest: GitHub Actions daily cron -> `/api/crawl`.

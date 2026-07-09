@@ -7,3 +7,12 @@ body,
 #root {
   height: 100%;
 }
+
+/* Let native form controls, scrollbars and the map follow the active theme. */
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
