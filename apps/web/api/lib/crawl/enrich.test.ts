@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { enrichProperty } from "./enrich";
-import type { RawListing } from "./types";
+import { enrichProperty } from "./enrich.js";
+import type { RawListing } from "./types.js";
 
 const listing: RawListing = {
   address: "Testvej 1",

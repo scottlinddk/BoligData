@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   SearchPropertiesQuery,
   SearchPropertiesResponse,
-} from "../../../../packages/shared/src/types/api";
-import { rowToProperty } from "./row-mappers";
+} from "../../../../packages/shared/src/types/api.js";
+import { rowToProperty } from "./row-mappers.js";
 
 const SORT_COLUMNS: Record<string, string> = {
   listingDate: "listing_date",

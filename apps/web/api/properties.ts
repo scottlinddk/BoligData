@@ -3,10 +3,10 @@ import type {
   SearchPropertiesQuery,
   SortDirection,
   SortField,
-} from "../../../packages/shared/src/types/api";
-import { applyCors } from "./middleware/cors";
-import { getAnonClient } from "./lib/supabase";
-import { searchProperties } from "./lib/search";
+} from "../../../packages/shared/src/types/api.js";
+import { applyCors } from "./middleware/cors.js";
+import { getAnonClient } from "./lib/supabase.js";
+import { searchProperties } from "./lib/search.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
