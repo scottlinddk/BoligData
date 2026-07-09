@@ -1,0 +1,19 @@
+name: Daily property crawl
+
+on:
+  schedule:
+    # 03:00 UTC daily — off-peak, well before the Danish business day starts.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/crawl
+        run: |
+          curl --fail-with-body -X POST "${VERCEL_URL}/api/crawl" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
