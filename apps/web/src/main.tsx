@@ -41,7 +41,17 @@ const router = createBrowserRouter([
   { path: "/auth/reset-password", element: <Layout><ResetPasswordPage /></Layout> },
 ]);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Listing data only changes on the daily crawl — no need to refetch
+      // aggressively or on every window focus.
+      staleTime: 5 * 60 * 1000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

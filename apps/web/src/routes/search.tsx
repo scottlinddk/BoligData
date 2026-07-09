@@ -14,7 +14,7 @@ export function SearchPage() {
   const filters = parseFilters(searchParams);
   const [offset, setOffset] = useState(0);
 
-  const { data, isLoading, isError } = usePropertySearch(filters, offset);
+  const { data, isLoading, isError, refetch } = usePropertySearch(filters, offset);
 
   function handleFilterChange(patch: Partial<FiltersWithSort>) {
     setOffset(0);
@@ -34,7 +34,17 @@ export function SearchPage() {
         </div>
 
         {isLoading && <p className="text-slate-500 dark:text-slate-400">{t("search.loading")}</p>}
-        {isError && <p className="text-red-600 dark:text-red-400">{t("search.error")}</p>}
+        {isError && (
+          <div className="flex items-center gap-3">
+            <p className="text-red-600 dark:text-red-400">{t("search.error")}</p>
+            <button
+              onClick={() => refetch()}
+              className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
+            >
+              {t("common.retry")}
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {properties.map((property) => (

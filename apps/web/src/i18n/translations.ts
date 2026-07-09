@@ -21,6 +21,8 @@ const da = {
   "controls.theme.toLight": "Skift til lyst tema",
   "controls.theme.toDark": "Skift til mørkt tema",
 
+  "common.retry": "Prøv igen",
+
   "search.loading": "Indlæser boliger...",
   "search.error": "Kunne ikke indlæse boliger.",
   "search.noResults": "Ingen resultater",
@@ -81,6 +83,8 @@ const da = {
   "dueDiligence.soil.warning": "Området har en registreret markering for jordforurening.",
   "dueDiligence.soil.ok": "Ingen markering for jordforurening registreret.",
 
+  "comparables.loading": "Indlæser sammenlignelige boliger...",
+  "comparables.error": "Kunne ikke indlæse sammenlignelige boliger.",
   "comparables.soldHistory": "Historik for salgspriser",
   "comparables.noHistory": "Ingen prishistorik tilgængelig.",
   "comparables.onePoint": "Kun ét datapunkt registreret.",
@@ -137,6 +141,8 @@ const en: Translations = {
   "controls.language": "Language",
   "controls.theme.toLight": "Switch to light theme",
   "controls.theme.toDark": "Switch to dark theme",
+
+  "common.retry": "Try again",
 
   "search.loading": "Loading properties...",
   "search.error": "Failed to load properties.",
@@ -198,6 +204,8 @@ const en: Translations = {
   "dueDiligence.soil.warning": "Area has a recorded soil contamination flag.",
   "dueDiligence.soil.ok": "No soil contamination flag on record.",
 
+  "comparables.loading": "Loading comparables...",
+  "comparables.error": "Failed to load comparables.",
   "comparables.soldHistory": "Sold price history",
   "comparables.noHistory": "No price history available.",
   "comparables.onePoint": "Only one data point on record.",
