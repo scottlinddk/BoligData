@@ -27,29 +27,6 @@ const MAX_ERRORS_REPORTED = 10;
 const API_BASE = process.env.BOLIGA_API_BASE ?? "https://api.boliga.dk/api/v2/search/results";
 
 /**
- * Boliga's WAF returns 403 to requests that don't look like they come from
- * boliga.dk's own frontend (confirmed live 2026-07-10: the polite
- * CRAWLER_USER_AGENT is rejected from datacenter IPs while Boligsiden accepts
- * it). Mimic the headers the site's SPA sends with its own fetch calls. If
- * the block is by IP rather than fingerprint these won't help — the 403 will
- * still show up in the crawl report.
- */
-const BROWSER_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "application/json, text/plain, */*",
-  "Accept-Language": "da-DK,da;q=0.9,en-US;q=0.8,en;q=0.7",
-  Referer: "https://www.boliga.dk/",
-  Origin: "https://www.boliga.dk",
-  "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"Windows"',
-  "Sec-Fetch-Dest": "empty",
-  "Sec-Fetch-Mode": "cors",
-  "Sec-Fetch-Site": "same-site",
-};
-
-/**
  * Boliga propertyType codes → our CHECK-constrained enum
  * (001_init_schema.sql). Unknown codes fall back to "other", so a wrong
  * guess degrades data quality but never fails an upsert.
@@ -168,7 +145,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
 
     let body: BoligaPage;
     try {
-      body = await fetchJson<BoligaPage>(url, { headers: BROWSER_HEADERS });
+      body = await fetchJson<BoligaPage>(url);
     } catch (err) {
       logError("crawl.boliga.page_failed", err, { page });
       stats.errors.push(
