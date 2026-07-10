@@ -5,8 +5,8 @@ import type {
   RiskFlags,
   SchoolTransportInfo,
   SoldPriceEntry,
-} from "../../../../../packages/shared/src/types/index";
-import type { RawListing } from "./types";
+} from "../../../../../packages/shared/src/types/index.js";
+import type { RawListing } from "./types.js";
 
 const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 

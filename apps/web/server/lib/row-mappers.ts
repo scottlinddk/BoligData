@@ -3,7 +3,7 @@ import type {
   Property,
   PropertySummary,
   SavedSearch,
-} from "../../../../packages/shared/src/types/index";
+} from "../../../../packages/shared/src/types/index.js";
 
 export function rowToPropertySummary(row: Record<string, any>): PropertySummary {
   return { id: row.id, address: row.address };

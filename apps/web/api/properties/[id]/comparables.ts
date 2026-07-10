@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "../../../server/middleware/cors";
-import { requireUser } from "../../../server/middleware/auth";
-import { getAnonClient } from "../../../server/lib/supabase";
-import { isUuid, sendError } from "../../../server/lib/http-helpers";
-import { getComparables } from "../../../server/lib/comparables";
+import { applyCors } from "../../../server/middleware/cors.js";
+import { requireUser } from "../../../server/middleware/auth.js";
+import { getAnonClient } from "../../../server/lib/supabase.js";
+import { isUuid, sendError } from "../../../server/lib/http-helpers.js";
+import { getComparables } from "../../../server/lib/comparables.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

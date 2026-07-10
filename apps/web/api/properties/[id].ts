@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "../../server/middleware/cors";
-import { requireUser } from "../../server/middleware/auth";
-import { getAnonClient } from "../../server/lib/supabase";
-import { isUuid, sendError } from "../../server/lib/http-helpers";
-import { rowToEnrichment, rowToProperty } from "../../server/lib/row-mappers";
+import { applyCors } from "../../server/middleware/cors.js";
+import { requireUser } from "../../server/middleware/auth.js";
+import { getAnonClient } from "../../server/lib/supabase.js";
+import { isUuid, sendError } from "../../server/lib/http-helpers.js";
+import { rowToEnrichment, rowToProperty } from "../../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

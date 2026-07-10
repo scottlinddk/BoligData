@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyCors } from "../server/middleware/cors";
-import { getServiceRoleClient } from "../server/lib/supabase";
-import { runIngest } from "../server/lib/crawl/ingest";
-import { logError } from "../server/lib/crawl/log";
+import { applyCors } from "../server/middleware/cors.js";
+import { getServiceRoleClient } from "../server/lib/supabase.js";
+import { runIngest } from "../server/lib/crawl/ingest.js";
+import { logError } from "../server/lib/crawl/log.js";
 
 /**
  * Daily ingest entry point, triggered by .github/workflows/crawl.yml.

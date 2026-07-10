@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { CreateSearchBody } from "../../../packages/shared/src/types/api";
-import { applyCors } from "../server/middleware/cors";
-import { requireUser } from "../server/middleware/auth";
-import { getAnonClient } from "../server/lib/supabase";
-import { sendError } from "../server/lib/http-helpers";
-import { rowToSearch } from "../server/lib/row-mappers";
+import type { CreateSearchBody } from "../../../packages/shared/src/types/api.js";
+import { applyCors } from "../server/middleware/cors.js";
+import { requireUser } from "../server/middleware/auth.js";
+import { getAnonClient } from "../server/lib/supabase.js";
+import { sendError } from "../server/lib/http-helpers.js";
+import { rowToSearch } from "../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;

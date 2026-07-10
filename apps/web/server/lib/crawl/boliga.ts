@@ -1,6 +1,6 @@
-import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types";
-import { envInt, fetchJson, sleep } from "./http";
-import { logError, logEvent } from "./log";
+import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
+import { envInt, fetchJson, sleep } from "./http.js";
+import { logError, logEvent } from "./log.js";
 import {
   asFiniteNumber,
   asIsoDate,
@@ -12,8 +12,8 @@ import {
   filterByZipRange,
   getZipRange,
   isDanishCoordinate,
-} from "./map-utils";
-import fixtures from "./fixtures/boliga.sample.json";
+} from "./map-utils.js";
+import fixtures from "./fixtures/boliga.sample.json" with { type: "json" };
 
 const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 const MAX_ERRORS_REPORTED = 10;

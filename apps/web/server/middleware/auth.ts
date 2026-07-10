@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAnonClient } from "../lib/supabase";
+import { getAnonClient } from "../lib/supabase.js";
 
 export function extractJwt(req: VercelRequest): string | undefined {
   const header = req.headers.authorization;

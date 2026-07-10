@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ListingSource, RawListing, SourceCrawlResult } from "./types";
-import { fetchBoligsidenListings } from "./boligsiden";
-import { fetchBoligaListings } from "./boliga";
-import { enrichProperty } from "./enrich";
-import { listingContentHash } from "./map-utils";
-import { logError, logEvent } from "./log";
+import type { ListingSource, RawListing, SourceCrawlResult } from "./types.js";
+import { fetchBoligsidenListings } from "./boligsiden.js";
+import { fetchBoligaListings } from "./boliga.js";
+import { enrichProperty } from "./enrich.js";
+import { listingContentHash } from "./map-utils.js";
+import { logError, logEvent } from "./log.js";
 
 const CHUNK_SIZE = 500;
 const MAX_ERRORS_REPORTED = 10;

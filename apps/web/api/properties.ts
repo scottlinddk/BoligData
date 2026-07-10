@@ -3,12 +3,12 @@ import type {
   SearchPropertiesQuery,
   SortDirection,
   SortField,
-} from "../../../packages/shared/src/types/api";
-import { applyCors } from "../server/middleware/cors";
-import { getOptionalUser } from "../server/middleware/auth";
-import { getAnonClient } from "../server/lib/supabase";
-import { sendError, setPublicCache } from "../server/lib/http-helpers";
-import { searchProperties } from "../server/lib/search";
+} from "../../../packages/shared/src/types/api.js";
+import { applyCors } from "../server/middleware/cors.js";
+import { getOptionalUser } from "../server/middleware/auth.js";
+import { getAnonClient } from "../server/lib/supabase.js";
+import { sendError, setPublicCache } from "../server/lib/http-helpers.js";
+import { searchProperties } from "../server/lib/search.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
