@@ -3,6 +3,7 @@ import type { CreateSearchBody } from "../../../packages/shared/src/types/api.js
 import { applyCors } from "../server/middleware/cors.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
+import { sendError } from "../server/lib/http-helpers.js";
 import { rowToSearch } from "../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -11,6 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await requireUser(req, res);
   if (!auth) return;
   const client = getAnonClient(auth.jwt);
+  res.setHeader("Cache-Control", "no-store");
 
   if (req.method === "GET") {
     const { data, error } = await client
@@ -18,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
-      res.status(500).json({ error: error.message });
+      sendError(res, 500, "Failed to load saved searches", error);
       return;
     }
     res.status(200).json((data ?? []).map(rowToSearch));
@@ -42,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("*")
       .single();
     if (error) {
-      res.status(500).json({ error: error.message });
+      sendError(res, 500, "Failed to save search", error);
       return;
     }
     res.status(201).json(rowToSearch(data));

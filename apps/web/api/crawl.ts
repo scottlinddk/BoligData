@@ -1,16 +1,22 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyCors } from "../server/middleware/cors.js";
 import { getServiceRoleClient } from "../server/lib/supabase.js";
-import { fetchBoligsidenListings } from "../server/lib/crawl/boligsiden.js";
-import { fetchBoligaListings } from "../server/lib/crawl/boliga.js";
-import { enrichProperty } from "../server/lib/crawl/enrich.js";
+import { runIngest } from "../server/lib/crawl/ingest.js";
+import { logError } from "../server/lib/crawl/log.js";
 
 /**
  * Daily ingest entry point, triggered by .github/workflows/crawl.yml.
  * Requires SUPABASE_SERVICE_ROLE_KEY and CRON_SECRET to be set in the
- * Vercel project's environment variables (manual step — no MCP tool sets
- * these). With CRAWL_MOCK_MODE=true (the default), it upserts the fixture
- * listings under lib/crawl/fixtures/ instead of scraping live sites.
+ * Vercel project's environment variables. With CRAWL_MOCK_MODE=true (the
+ * default), it upserts the fixture listings under server/lib/crawl/fixtures/
+ * instead of calling the live Boliga/Boligsiden APIs.
+ *
+ * Response contract (relied on by the workflow's `curl --fail-with-body`):
+ * - 200 { ok: true, reports }  — every source fetched and ingested cleanly
+ * - 502 { ok: false, reports } — a source failed or DB writes errored; data
+ *   that did land stays landed, and the GitHub Action goes red with the
+ *   per-source reports in its log
+ * - 500 { error }              — unexpected crash before/around the ingest
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -26,34 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  res.setHeader("Cache-Control", "no-store");
+
   try {
-    const [boligsidenListings, boligaListings] = await Promise.all([
-      fetchBoligsidenListings(),
-      fetchBoligaListings(),
-    ]);
-    const listings = [...boligsidenListings, ...boligaListings];
-
-    const client = getServiceRoleClient();
-    let upserted = 0;
-
-    for (const listing of listings) {
-      const { data: property, error } = await client
-        .from("properties")
-        .upsert(listing, { onConflict: "listing_source,external_id" })
-        .select("id")
-        .single();
-
-      if (error || !property) continue;
-      upserted += 1;
-
-      const enrichment = await enrichProperty(listing);
-      await client
-        .from("enrichments")
-        .upsert({ property_id: property.id, ...enrichment }, { onConflict: "property_id" });
-    }
-
-    res.status(200).json({ upserted, total: listings.length });
+    const result = await runIngest(getServiceRoleClient());
+    res.status(result.ok ? 200 : 502).json(result);
   } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Crawl failed" });
+    logError("crawl.crashed", err);
+    res.status(500).json({ error: "Crawl failed" });
   }
 }

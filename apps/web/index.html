@@ -3,7 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DanBolig Research</title>
+    <title>BoligData</title>
+    <script>
+      // Apply the persisted (or system) theme and language before React mounts
+      // to avoid a flash of the wrong theme / lang attribute.
+      (function () {
+        try {
+          var storedTheme = localStorage.getItem("boligdata.theme");
+          var theme =
+            storedTheme === "light" || storedTheme === "dark"
+              ? storedTheme
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.classList.toggle("dark", theme === "dark");
+
+          var storedLang = localStorage.getItem("boligdata.lang");
+          document.documentElement.lang =
+            storedLang === "da" || storedLang === "en" ? storedLang : "da";
+        } catch (e) {
+          /* localStorage unavailable — fall back to markup defaults. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

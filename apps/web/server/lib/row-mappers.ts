@@ -1,8 +1,13 @@
 import type {
   Enrichment,
   Property,
+  PropertySummary,
   SavedSearch,
 } from "../../../../packages/shared/src/types/index.js";
+
+export function rowToPropertySummary(row: Record<string, any>): PropertySummary {
+  return { id: row.id, address: row.address };
+}
 
 export function rowToProperty(row: Record<string, any>): Property {
   return {
