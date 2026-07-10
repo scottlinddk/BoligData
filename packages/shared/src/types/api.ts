@@ -2,6 +2,7 @@ import type {
   AlertFrequency,
   Property,
   PropertyFilters,
+  PropertySummary,
   SortDirection,
   SortField,
 } from "./index";
@@ -16,10 +17,17 @@ export interface SearchPropertiesQuery extends Partial<PropertyFilters> {
 }
 
 export interface SearchPropertiesResponse {
+  /** Whether the request carried a valid session — determines which of the two arrays below is populated. */
+  authenticated: boolean;
+  /** Full listing data. Populated only when authenticated is true. */
   properties: Property[];
+  /** Address-only listing data. Populated only when authenticated is false. */
+  summaries: PropertySummary[];
   total: number;
   limit: number;
   offset: number;
+  page: number;
+  totalPages: number;
 }
 
 export interface PropertyDetailResponse {

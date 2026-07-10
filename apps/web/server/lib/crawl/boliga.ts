@@ -9,6 +9,8 @@ import {
   asPositiveNumber,
   asStringArray,
   dedupeByExternalId,
+  filterByZipRange,
+  getZipRange,
   isDanishCoordinate,
 } from "./map-utils";
 import fixtures from "./fixtures/boliga.sample.json";
@@ -105,8 +107,14 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     errors: [],
   };
 
+  const zipRange = getZipRange();
+
   if (MOCK_MODE) {
-    return { listings: fixtures as RawListing[], stats };
+    const all = fixtures as RawListing[];
+    const { kept, excluded } = filterByZipRange(all, zipRange);
+    stats.recordsSeen = all.length;
+    stats.recordsSkipped = excluded;
+    return { listings: kept, stats };
   }
 
   const pageSize = envInt("CRAWL_PAGE_SIZE", 100, 1, 500);
@@ -129,6 +137,10 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
       sort: "daysForSale-a", // newest listings first
     });
     if (municipalityCodes.length > 0) params.set("municipality", municipalityCodes.join(","));
+    // Best-effort server-side narrowing (undocumented param name, may be a
+    // no-op) — filterByZipRange() below is the source of truth either way.
+    params.set("zipcodeFrom", String(zipRange.min));
+    params.set("zipcodeTo", String(zipRange.max));
     const url = `${API_BASE}?${params}`;
 
     let body: BoligaPage;
@@ -164,6 +176,9 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     if (pageCount === null && results.length < pageSize) break;
   }
 
-  logEvent("crawl.boliga.fetched", { ...stats, listings: listings.length });
-  return { listings: dedupeByExternalId(listings), stats };
+  const { kept, excluded } = filterByZipRange(listings, zipRange);
+  stats.recordsSkipped += excluded;
+
+  logEvent("crawl.boliga.fetched", { ...stats, listings: kept.length });
+  return { listings: dedupeByExternalId(kept), stats };
 }

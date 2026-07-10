@@ -38,9 +38,20 @@ The committed `apps/web/.env.production` holds the real (non-secret) Supabase UR
 
 Real Boliga and Boligsiden clients live in `apps/web/server/lib/crawl/{boliga,boligsiden}.ts`, behind the `CRAWL_MOCK_MODE` flag (default `true`, which reads local fixtures so the app stays demoable against seeded data). Instead of HTML scraping, they call the **unofficial JSON APIs** that boliga.dk's and boligsiden.dk's own frontends use — far more reliable than parsing markup, but unauthenticated and undocumented, so field shapes may drift. The clients defend against that: per-record mapping skips and counts malformed entries, requests have timeouts and retry with backoff (honoring `Retry-After`), pagination is capped (`CRAWL_MAX_PAGES` / `CRAWL_MAX_LISTINGS`), and pages are fetched with a polite delay.
 
+**Postal code (postnummer) scope**: both clients only keep listings whose postal code falls within `CRAWL_ZIP_MIN`-`CRAWL_ZIP_MAX` (`server/lib/crawl/map-utils.ts`, `getZipRange`/`filterByZipRange`), defaulting to **9000-9900** (North Jutland). The filter runs client-side after mapping — correct regardless of whether the upstream API's own zip params (best-effort, sent to Boliga's search endpoint) do anything — so widening or narrowing coverage later is just an env var change, no code change or redeploy of logic required.
+
 The ingest orchestrator (`apps/web/server/lib/crawl/ingest.ts`, exposed as `/api/crawl`) isolates the two sources (`Promise.allSettled`), batch-upserts properties in chunks, and only re-enriches listings that are new or changed — each listing's payload is fingerprinted into `properties.content_hash` (migration 005). The endpoint returns per-source reports and responds `502` on partial failure so the daily GitHub Action (`crawl.yml`) goes red with the report in its log.
 
 Enrichment (`enrich.ts`) is still **mock-only**: real Datafordeler (BBR/DAR), OIS, and Vejdirektoratet clients await credentials.
+
+## Search access levels
+
+`GET /api/properties` (`apps/web/server/lib/search.ts`) returns different shapes depending on whether the request carries a valid Supabase session (`Authorization: Bearer <jwt>`):
+
+- **Anonymous**: only `summaries: { id, address }[]` plus the paged `total`/`limit`/`offset`/`page`/`totalPages` — enough to see how many listings match a filter and their address, nothing else. This is enforced by selecting fewer columns server-side (`search.ts`), not just hidden in the UI.
+- **Signed in**: the full `properties: Property[]` array (price, sqm, images, agent, etc.), same as before.
+
+Page size is caller-configurable (`limit`/`offset` query params, exposed in the UI as a page-size selector) up to `SEARCH_MAX_PAGE_SIZE` (default 100), which can be raised or lowered later via env var alone.
 
 ## Manual follow-up steps (cannot be done via this session's tooling)
 
