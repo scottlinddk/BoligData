@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import type { ApiErrorResponse } from "../../../../packages/shared/src/types/api";
+import type { ApiErrorResponse } from "../../../../packages/shared/src/types/api.js";
 
 /**
  * Responds with a generic, client-safe error message (ApiErrorResponse shape)

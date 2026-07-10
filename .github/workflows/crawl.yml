@@ -10,10 +10,65 @@ jobs:
   crawl:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger /api/crawl
+      - name: Trigger /api/crawl and report results
         run: |
-          curl --fail-with-body -X POST "${VERCEL_URL}/api/crawl" \
-            -H "Authorization: Bearer ${CRON_SECRET}"
+          set -uo pipefail
+
+          headers=(-H "Authorization: Bearer ${CRON_SECRET}")
+          if [ -n "${BYPASS_SECRET}" ]; then
+            # Vercel Deployment Protection blocks unauthenticated requests with a
+            # redirect to a login page instead of reaching the handler. This header
+            # bypasses that when the project has protection enabled. Generate it in
+            # the Vercel dashboard: Project Settings -> Deployment Protection ->
+            # Protection Bypass for Automation.
+            headers+=(-H "x-vercel-protection-bypass: ${BYPASS_SECRET}" -H "x-vercel-set-bypass-cookie: true")
+          fi
+
+          http_code=$(curl -sS -X POST "${VERCEL_URL}/api/crawl" "${headers[@]}" \
+            -o response.json -w '%{http_code}')
+          curl_status=$?
+
+          if [ "$curl_status" -ne 0 ]; then
+            echo "::error::curl failed to reach ${VERCEL_URL}/api/crawl (exit $curl_status)."
+            exit 1
+          fi
+
+          echo "HTTP status: $http_code"
+
+          if ! jq empty response.json 2>/dev/null; then
+            echo "::error::Response body was not JSON — the request likely never reached the crawl handler."
+            echo "This usually means Vercel Deployment Protection redirected the request to a login page."
+            echo "Set the VERCEL_AUTOMATION_BYPASS_SECRET repo secret, or disable protection for this deployment."
+            echo "--- raw response ---"
+            cat response.json
+            exit 1
+          fi
+
+          if ! jq -e '.reports' response.json > /dev/null 2>&1; then
+            echo "::error::Response has no \"reports\" field (unexpected shape, or a 500 { error } crash response)."
+            echo "--- raw response ---"
+            cat response.json
+            exit 1
+          fi
+
+          echo ""
+          echo "== Crawl summary =="
+          jq -r '
+            .reports[] |
+            "[\(.source)] found=\(.fetched) new=\(.created) updated=\(.upserted - .created) enriched=\(.enriched) skippedInvalid=\(.skippedInvalid) dbErrors=\(.dbErrors) ok=\(.ok)" +
+            (if (.errors | length) > 0 then "\n  errors: " + (.errors | join("; ")) else "" end)
+          ' response.json
+          echo ""
+          jq -r '
+            "TOTAL: found=\([.reports[].fetched] | add) new=\([.reports[].created] | add) updated=\(([.reports[].upserted] | add) - ([.reports[].created] | add)) ok=\(.ok)"
+          ' response.json
+
+          ok=$(jq -r '.ok' response.json)
+          if [ "$http_code" != "200" ] || [ "$ok" != "true" ]; then
+            echo "::error::Crawl reported failure (HTTP $http_code, ok=$ok) — see per-source errors above."
+            exit 1
+          fi
         env:
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

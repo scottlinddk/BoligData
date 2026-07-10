@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { RawListing } from "./types";
-import { envInt } from "./http";
+import type { RawListing } from "./types.js";
+import { envInt } from "./http.js";
 
 /**
  * Guards shared by the Boliga/Boligsiden record mappers. The upstream JSON
