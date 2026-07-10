@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RawListing } from "./types";
+import { envInt } from "./http";
 
 /**
  * Guards shared by the Boliga/Boligsiden record mappers. The upstream JSON
@@ -79,4 +80,36 @@ export function dedupeByExternalId(listings: RawListing[]): RawListing[] {
   const seen = new Map<string, RawListing>();
   for (const listing of listings) seen.set(listing.external_id, listing);
   return [...seen.values()];
+}
+
+export interface ZipRange {
+  min: number;
+  max: number;
+}
+
+/**
+ * Which Danish postal codes to scrape, read fresh on every call so it can be
+ * changed via env var without a code change. Defaults to 9000-9900 (North
+ * Jutland) per the initial rollout; widen/narrow later by setting
+ * CRAWL_ZIP_MIN / CRAWL_ZIP_MAX.
+ */
+export function getZipRange(): ZipRange {
+  const min = envInt("CRAWL_ZIP_MIN", 9000, 1000, 9999);
+  const max = envInt("CRAWL_ZIP_MAX", 9900, 1000, 9999);
+  return min <= max ? { min, max } : { min: max, max: min };
+}
+
+export function isInZipRange(postalCode: string | null, range: ZipRange): boolean {
+  if (postalCode === null) return false;
+  const zip = Number(postalCode);
+  return Number.isInteger(zip) && zip >= range.min && zip <= range.max;
+}
+
+/** Applies the configured zip range to a batch of already-mapped listings. */
+export function filterByZipRange(
+  listings: RawListing[],
+  range: ZipRange = getZipRange(),
+): { kept: RawListing[]; excluded: number } {
+  const kept = listings.filter((l) => isInZipRange(l.postal_code, range));
+  return { kept, excluded: listings.length - kept.length };
 }

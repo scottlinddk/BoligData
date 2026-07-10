@@ -10,6 +10,12 @@ export type PropertyType =
   | "farm"
   | "other";
 
+/** What an anonymous (not signed-in) search result shows — name only, no price/location/etc. */
+export interface PropertySummary {
+  id: string;
+  address: string;
+}
+
 export interface Property {
   id: string;
   address: string;

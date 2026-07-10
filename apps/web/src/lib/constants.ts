@@ -1,5 +1,11 @@
 export const DEFAULT_PAGE_SIZE = 50;
 
+/**
+ * Page-size choices offered in the UI. The server enforces its own ceiling
+ * (SEARCH_MAX_PAGE_SIZE, default 100) independent of this list.
+ */
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+
 export const DEFAULT_MAP_CENTER: [number, number] = [9.9217, 57.0488]; // Aalborg, [lon, lat]
 export const DEFAULT_MAP_ZOOM = 11;
 

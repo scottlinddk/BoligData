@@ -3,7 +3,7 @@ import type {
   SearchPropertiesQuery,
   SearchPropertiesResponse,
 } from "../../../../packages/shared/src/types/api";
-import { rowToProperty } from "./row-mappers";
+import { rowToProperty, rowToPropertySummary } from "./row-mappers";
 
 const SORT_COLUMNS: Record<string, string> = {
   listingDate: "listing_date",
@@ -11,6 +11,17 @@ const SORT_COLUMNS: Record<string, string> = {
   pricePerSqm: "price_per_sqm",
   daysOnMarket: "listing_date",
 };
+
+export const DEFAULT_PAGE_SIZE = 50;
+
+/**
+ * Ceiling on how many rows a single search request can ask for. Env-backed
+ * so it can be raised/lowered later without a deploy of new code.
+ */
+function maxPageSize(): number {
+  const raw = Number(process.env.SEARCH_MAX_PAGE_SIZE);
+  return Number.isFinite(raw) && raw >= 1 ? Math.trunc(raw) : 100;
+}
 
 // PostgREST's `or()` filter string treats `,`, `(`, `)`, and `.` as syntax —
 // strip them from free-text input so a search term can't inject extra
@@ -28,15 +39,22 @@ function resolveSort(sortField: string, sortDirection: string) {
   return { column, ascending };
 }
 
+/**
+ * Anonymous callers only ever see the listing name (address) plus the total
+ * match count; signing in reveals the full record. This is enforced here
+ * (not just hidden in the UI) by selecting fewer columns for the anon path.
+ */
 export async function searchProperties(
   client: SupabaseClient,
   query: SearchPropertiesQuery,
+  authenticated: boolean,
 ): Promise<SearchPropertiesResponse> {
-  const limit = Math.min(Math.max(query.limit ?? 50, 1), 50);
+  const limit = Math.min(Math.max(query.limit ?? DEFAULT_PAGE_SIZE, 1), maxPageSize());
   const offset = Math.max(query.offset ?? 0, 0);
   const { column, ascending } = resolveSort(query.sortField ?? "listingDate", query.sortDirection ?? "desc");
 
-  let builder = client.from("properties").select("*", { count: "exact" }).eq("status", "active");
+  const columns = authenticated ? "*" : "id, address";
+  let builder = client.from("properties").select(columns, { count: "exact" }).eq("status", "active");
 
   if (query.location) {
     const term = sanitizeForOrFilter(query.location);
@@ -60,10 +78,15 @@ export async function searchProperties(
 
   if (error) throw error;
 
+  const total = count ?? 0;
   return {
-    properties: (data ?? []).map(rowToProperty),
-    total: count ?? 0,
+    authenticated,
+    properties: authenticated ? (data ?? []).map(rowToProperty) : [],
+    summaries: authenticated ? [] : (data ?? []).map(rowToPropertySummary),
+    total,
     limit,
     offset,
+    page: Math.floor(offset / limit) + 1,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   };
 }

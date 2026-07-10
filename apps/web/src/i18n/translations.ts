@@ -29,6 +29,8 @@ const da = {
   "search.range": "{from}-{to} af {total}",
   "search.previous": "Forrige",
   "search.next": "Næste",
+  "search.pageSize": "Pr. side",
+  "search.signInForDetails": "Log ind for at se pris, m² og andre detaljer for hvert match.",
 
   "filters.location": "Område",
   "filters.locationPlaceholder": "f.eks. Aalborg",
@@ -150,6 +152,8 @@ const en: Translations = {
   "search.range": "{from}-{to} of {total}",
   "search.previous": "Previous",
   "search.next": "Next",
+  "search.pageSize": "Per page",
+  "search.signInForDetails": "Sign in to see price, size, and other details for each match.",
 
   "filters.location": "Location",
   "filters.locationPlaceholder": "e.g. Aalborg",
