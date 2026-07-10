@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runIngest } from "./ingest";
 
@@ -113,5 +113,33 @@ describe("runIngest (mock mode, stubbed DB)", () => {
     expect(totals.enriched).toBe(1);
     expect(totals.skipped).toBe(totals.fetched - 1);
     expect(enrichments.has(firstEnriched!)).toBe(true);
+  });
+});
+
+describe("runIngest (CRAWL_SOURCES)", () => {
+  const original = process.env.CRAWL_SOURCES;
+  afterEach(() => {
+    if (original === undefined) delete process.env.CRAWL_SOURCES;
+    else process.env.CRAWL_SOURCES = original;
+  });
+
+  it("only crawls the requested source when CRAWL_SOURCES is set", async () => {
+    process.env.CRAWL_SOURCES = "boligsiden";
+    const { client } = fakeDb();
+    const result = await runIngest(client);
+
+    expect(result.reports).toHaveLength(1);
+    expect(result.reports[0]!.source).toBe("boligsiden");
+  });
+
+  it("crawls both sources when CRAWL_SOURCES is unset, empty, or unrecognized", async () => {
+    for (const value of [undefined, "", "  ", "not-a-real-source"]) {
+      if (value === undefined) delete process.env.CRAWL_SOURCES;
+      else process.env.CRAWL_SOURCES = value;
+
+      const { client } = fakeDb();
+      const result = await runIngest(client);
+      expect(result.reports.map((r) => r.source).sort()).toEqual(["boliga", "boligsiden"]);
+    }
   });
 });

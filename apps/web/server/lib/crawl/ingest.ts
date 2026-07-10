@@ -8,6 +8,22 @@ import { logError, logEvent } from "./log.js";
 
 const CHUNK_SIZE = 500;
 const MAX_ERRORS_REPORTED = 10;
+const ALL_SOURCES: readonly ListingSource[] = ["boligsiden", "boliga"];
+
+/**
+ * Which sources to crawl, comma-separated (default: both). Exists so a
+ * source that's blocked upstream (e.g. Boliga's WAF 403s every request from
+ * Vercel's datacenter IPs as of 2026-07-10 — see git history for the
+ * attempted-and-failed browser-header workaround) can be disabled without a
+ * code change, instead of the whole run reporting ok=false every night.
+ */
+function enabledSources(): ListingSource[] {
+  const raw = process.env.CRAWL_SOURCES?.trim();
+  if (!raw) return [...ALL_SOURCES];
+  const requested = raw.split(",").map((s) => s.trim().toLowerCase());
+  const enabled = ALL_SOURCES.filter((s) => requested.includes(s));
+  return enabled.length > 0 ? enabled : [...ALL_SOURCES];
+}
 
 export interface IngestSourceReport {
   source: ListingSource;
@@ -203,23 +219,26 @@ async function ingestSource(
   return report;
 }
 
+const FETCHERS: Record<ListingSource, () => Promise<SourceCrawlResult>> = {
+  boligsiden: fetchBoligsidenListings,
+  boliga: fetchBoligaListings,
+};
+
 /**
- * Runs the full ingest: fetch both sources (isolated — one failing doesn't
- * abort the other), batch-upsert properties, and enrich only new/changed
- * listings (see properties.content_hash, migration 005).
+ * Runs the full ingest: fetch the enabled sources (isolated — one failing
+ * doesn't abort the other), batch-upsert properties, and enrich only
+ * new/changed listings (see properties.content_hash, migration 005).
  */
 export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
-  const [boligsiden, boliga] = await Promise.allSettled([
-    fetchBoligsidenListings(),
-    fetchBoligaListings(),
-  ]);
+  const sources = enabledSources();
+  const settled = await Promise.allSettled(sources.map((source) => FETCHERS[source]()));
 
   // Sources ingest sequentially on purpose: bounded memory and a simpler DB
   // contention profile matter more than wall-clock here.
-  const reports = [
-    await ingestSource(client, "boligsiden", boligsiden),
-    await ingestSource(client, "boliga", boliga),
-  ];
+  const reports: IngestSourceReport[] = [];
+  for (let i = 0; i < sources.length; i++) {
+    reports.push(await ingestSource(client, sources[i]!, settled[i]!));
+  }
 
   for (const report of reports) logEvent("crawl.source.done", { ...report });
 
