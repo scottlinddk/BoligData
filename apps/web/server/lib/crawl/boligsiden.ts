@@ -1,5 +1,5 @@
 import type { RawListing } from "./types.js";
-import fixtures from "./fixtures/boligsiden.sample.json" assert { type: "json" };
+import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
 
 const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 
