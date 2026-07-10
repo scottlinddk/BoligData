@@ -29,3 +29,20 @@ export async function requireUser(
   }
   return { userId: data.user.id, jwt };
 }
+
+/**
+ * Like requireUser, but for routes that serve both signed-in and anonymous
+ * callers different data (e.g. property search). Never sends a response —
+ * returns null for "no valid session" so the caller can fall back to the
+ * public shape instead of rejecting the request.
+ */
+export async function getOptionalUser(
+  req: VercelRequest,
+): Promise<{ userId: string; jwt: string } | null> {
+  const jwt = extractJwt(req);
+  if (!jwt) return null;
+  const client = getAnonClient(jwt);
+  const { data, error } = await client.auth.getUser(jwt);
+  if (error || !data.user) return null;
+  return { userId: data.user.id, jwt };
+}

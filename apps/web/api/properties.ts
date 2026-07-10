@@ -5,6 +5,7 @@ import type {
   SortField,
 } from "../../../packages/shared/src/types/api.js";
 import { applyCors } from "../server/middleware/cors.js";
+import { getOptionalUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 import { sendError, setPublicCache } from "../server/lib/http-helpers.js";
 import { searchProperties } from "../server/lib/search.js";
@@ -46,9 +47,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const client = getAnonClient();
-    const result = await searchProperties(client, parseQuery(req));
-    setPublicCache(res, 300, 3600);
+    const user = await getOptionalUser(req);
+    const client = getAnonClient(user?.jwt);
+    const result = await searchProperties(client, parseQuery(req), user !== null);
+    // Signed-in responses carry per-user data and must never be shared by a
+    // CDN across callers; only the anonymous (address-only) shape is safe
+    // to cache publicly by URL.
+    if (user) {
+      res.setHeader("Cache-Control", "private, no-store");
+    } else {
+      setPublicCache(res, 300, 3600);
+    }
     res.status(200).json(result);
   } catch (err) {
     sendError(res, 500, "Failed to search properties", err);
