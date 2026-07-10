@@ -12,6 +12,7 @@ import { DashboardPage } from "@/routes/dashboard";
 import { SignInPage } from "@/routes/auth/signin";
 import { SignUpPage } from "@/routes/auth/signup";
 import { ResetPasswordPage } from "@/routes/auth/reset-password";
+import { UpdatePasswordPage } from "@/routes/auth/update-password";
 import "./index.css";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
   { path: "/auth/signin", element: <Layout><SignInPage /></Layout> },
   { path: "/auth/signup", element: <Layout><SignUpPage /></Layout> },
   { path: "/auth/reset-password", element: <Layout><ResetPasswordPage /></Layout> },
+  { path: "/auth/update-password", element: <Layout><UpdatePasswordPage /></Layout> },
 ]);
 
 const queryClient = new QueryClient({
