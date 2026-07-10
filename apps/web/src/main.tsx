@@ -25,7 +25,16 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 const router = createBrowserRouter([
   { path: "/", element: <Layout><SearchPage /></Layout> },
-  { path: "/property/:id", element: <Layout><PropertyDetailPage /></Layout> },
+  {
+    path: "/property/:id",
+    element: (
+      <Layout>
+        <AuthGuard>
+          <PropertyDetailPage />
+        </AuthGuard>
+      </Layout>
+    ),
+  },
   {
     path: "/dashboard",
     element: (
