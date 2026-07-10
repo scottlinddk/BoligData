@@ -5,7 +5,7 @@ import type {
   PropertySummary,
   SortDirection,
   SortField,
-} from "./index";
+} from "./index.js";
 
 export type { SortDirection, SortField };
 
@@ -32,7 +32,7 @@ export interface SearchPropertiesResponse {
 
 export interface PropertyDetailResponse {
   property: Property;
-  enrichment: import("./index").Enrichment | null;
+  enrichment: import("./index.js").Enrichment | null;
 }
 
 export interface ComparableEntry {
