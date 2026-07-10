@@ -8,7 +8,11 @@ import type {
 } from "../../../../../packages/shared/src/types/index.js";
 import type { RawListing } from "./types.js";
 
-const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
+// Deliberately independent of CRAWL_MOCK_MODE: flipping the *fetchers* live
+// must not drag enrichment into the not-implemented branch below, or a live
+// crawl trial crashes after upserting. Mock enrichment is currently the only
+// implementation; set ENRICH_MOCK_MODE=false only once real clients exist.
+const MOCK_MODE = process.env.ENRICH_MOCK_MODE !== "false";
 
 export interface EnrichmentPayload {
   bbr_data: BbrData;
@@ -33,12 +37,12 @@ function hashSeed(input: string): number {
  * (BBR/DAR), OIS, and Vejdirektoratet API clients are not implemented yet —
  * this deterministically derives plausible-looking mock data from the
  * listing's external_id so results are stable across repeated crawls.
- * Flip CRAWL_MOCK_MODE=false once real clients land behind this interface.
+ * Flip ENRICH_MOCK_MODE=false once real clients land behind this interface.
  */
 export async function enrichProperty(listing: RawListing): Promise<EnrichmentPayload> {
   if (!MOCK_MODE) {
     throw new Error(
-      "Real BBR/OIS/Vejdirektoratet enrichment is not implemented yet. Set CRAWL_MOCK_MODE=true or implement enrichProperty().",
+      "Real BBR/OIS/Vejdirektoratet enrichment is not implemented yet. Unset ENRICH_MOCK_MODE or implement enrichProperty().",
     );
   }
 

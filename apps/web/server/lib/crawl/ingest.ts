@@ -171,12 +171,24 @@ async function ingestSource(
   }
 
   for (const enrichChunk of chunk(toEnrich, CHUNK_SIZE)) {
-    const rows = await Promise.all(
-      enrichChunk.map(async (listing) => ({
-        property_id: propertyIdByExternalId.get(listing.external_id)!,
-        ...(await enrichProperty(listing)),
-      })),
-    );
+    // enrichProperty throwing (e.g. not-implemented real clients, upstream
+    // API failure) must not abort the whole run — properties are already
+    // upserted; a missing enrichment row is healed by the next run's
+    // "unchanged but unenriched" pass above.
+    let rows: Array<{ property_id: string } & Awaited<ReturnType<typeof enrichProperty>>>;
+    try {
+      rows = await Promise.all(
+        enrichChunk.map(async (listing) => ({
+          property_id: propertyIdByExternalId.get(listing.external_id)!,
+          ...(await enrichProperty(listing)),
+        })),
+      );
+    } catch (err) {
+      report.dbErrors += 1;
+      pushError(report, `enrich: ${err instanceof Error ? err.message : String(err)}`);
+      logError("crawl.enrich_failed", err, { source, chunkSize: enrichChunk.length });
+      continue;
+    }
     const { error } = await client.from("enrichments").upsert(rows, { onConflict: "property_id" });
     if (error) {
       report.dbErrors += 1;
