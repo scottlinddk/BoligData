@@ -73,6 +73,14 @@ async function ingestSource(
   report.skippedInvalid = stats.recordsSkipped;
   for (const err of stats.errors) pushError(report, err);
 
+  // A page-fetch error (blocked, drifted API, network failure) makes the
+  // fetcher return a resolved promise with zero listings rather than reject
+  // — otherwise a total upstream failure would look identical to "no new
+  // listings this run" and the daily Action would go green on empty output.
+  if (listings.length === 0 && stats.errors.length > 0) {
+    report.ok = false;
+  }
+
   const now = new Date().toISOString();
   const hashByExternalId = new Map(listings.map((l) => [l.external_id, listingContentHash(l)]));
 
