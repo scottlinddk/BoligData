@@ -126,6 +126,14 @@ const da = {
   "auth.reset.submit": "Send nulstillingslink",
   "auth.reset.submitting": "Sender...",
   "auth.reset.sent": "Hvis der findes en konto for {email}, er der sendt et nulstillingslink.",
+  "auth.updatePassword.title": "Vælg en ny adgangskode",
+  "auth.updatePassword.passwordPlaceholder": "Ny adgangskode (min. 8 tegn)",
+  "auth.updatePassword.submit": "Gem ny adgangskode",
+  "auth.updatePassword.submitting": "Gemmer...",
+  "auth.updatePassword.success": "Din adgangskode er blevet ændret.",
+  "auth.updatePassword.backToSignIn": "Gå til log ind",
+  "auth.updatePassword.invalidLink": "Dette nulstillingslink er ugyldigt eller udløbet.",
+  "auth.updatePassword.requestNewLink": "Anmod om et nyt link",
 } as const;
 
 export type TranslationKey = keyof typeof da;
@@ -249,6 +257,14 @@ const en: Translations = {
   "auth.reset.submit": "Send reset link",
   "auth.reset.submitting": "Sending...",
   "auth.reset.sent": "If an account exists for {email}, a reset link has been sent.",
+  "auth.updatePassword.title": "Choose a new password",
+  "auth.updatePassword.passwordPlaceholder": "New password (min 8 characters)",
+  "auth.updatePassword.submit": "Save new password",
+  "auth.updatePassword.submitting": "Saving...",
+  "auth.updatePassword.success": "Your password has been changed.",
+  "auth.updatePassword.backToSignIn": "Go to sign in",
+  "auth.updatePassword.invalidLink": "This reset link is invalid or has expired.",
+  "auth.updatePassword.requestNewLink": "Request a new link",
 };
 
 export const translations: Record<Language, Translations> = { da, en };
