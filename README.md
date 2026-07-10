@@ -58,6 +58,8 @@ Enrichment (`enrich.ts`) is still **mock-only**: real Datafordeler (BBR/DAR), OI
 
 Page size is caller-configurable (`limit`/`offset` query params, exposed in the UI as a page-size selector) up to `SEARCH_MAX_PAGE_SIZE` (default 100), which can be raised or lowered later via env var alone.
 
+`GET /api/properties/:id` (detail: price, sold-price history, risk flags, BBR data) and `GET /api/properties/:id/comparables` require the same signed-in session — both now 401 without a valid `Authorization: Bearer <jwt>`, and the frontend's `/property/:id` route is wrapped in `AuthGuard` so anonymous visitors are redirected to sign-in before the page ever calls those endpoints. All three authenticated responses are sent with `Cache-Control: private, no-store` so a CDN can never serve one caller's data to another.
+
 ## Manual follow-up steps (cannot be done via this session's tooling)
 
 1. Set `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` in the Vercel project's Environment Variables.

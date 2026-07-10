@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyCors } from "../../server/middleware/cors.js";
+import { requireUser } from "../../server/middleware/auth.js";
 import { getAnonClient } from "../../server/lib/supabase.js";
-import { isUuid, sendError, setPublicCache } from "../../server/lib/http-helpers.js";
+import { isUuid, sendError } from "../../server/lib/http-helpers.js";
 import { rowToEnrichment, rowToProperty } from "../../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -17,8 +18,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Full listing detail (price, sold-price history, risk flags, etc.) is
+  // gated behind sign-in, same as the search endpoint's full property shape.
+  const user = await requireUser(req, res);
+  if (!user) return;
+
   try {
-    const client = getAnonClient();
+    const client = getAnonClient(user.jwt);
     const [propertyResult, enrichmentResult] = await Promise.all([
       client.from("properties").select("*").eq("id", id).single(),
       client.from("enrichments").select("*").eq("property_id", id).maybeSingle(),
@@ -29,7 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    setPublicCache(res, 300, 3600);
+    // Per-user auth response — never let a CDN share it across callers.
+    res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
       property: rowToProperty(propertyResult.data),
       enrichment: enrichmentResult.data ? rowToEnrichment(enrichmentResult.data) : null,
