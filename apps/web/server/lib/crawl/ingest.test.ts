@@ -71,6 +71,7 @@ describe("runIngest (mock mode, stubbed DB)", () => {
       expect(report.ok).toBe(true);
       expect(report.fetched).toBeGreaterThan(0);
       expect(report.upserted).toBe(report.fetched);
+      expect(report.created).toBe(report.fetched);
       expect(report.enriched).toBe(report.fetched);
       expect(report.enrichSkippedUnchanged).toBe(0);
       expect(report.dbErrors).toBe(0);
@@ -87,6 +88,7 @@ describe("runIngest (mock mode, stubbed DB)", () => {
     expect(second.ok).toBe(true);
     for (const report of second.reports) {
       expect(report.upserted).toBe(report.fetched);
+      expect(report.created).toBe(0);
       expect(report.enriched).toBe(0);
       expect(report.enrichSkippedUnchanged).toBe(report.fetched);
     }

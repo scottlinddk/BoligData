@@ -15,6 +15,8 @@ export interface IngestSourceReport {
   ok: boolean;
   fetched: number;
   upserted: number;
+  /** Of `upserted`, how many were brand new rows (not previously in `properties`). */
+  created: number;
   /** Records the fetcher saw but could not map to a valid RawListing. */
   skippedInvalid: number;
   enriched: number;
@@ -51,6 +53,7 @@ async function ingestSource(
     ok: true,
     fetched: 0,
     upserted: 0,
+    created: 0,
     skippedInvalid: 0,
     enriched: 0,
     enrichSkippedUnchanged: 0,
@@ -130,6 +133,7 @@ async function ingestSource(
   for (const listing of listings) {
     if (!propertyIdByExternalId.has(listing.external_id)) continue; // upsert chunk failed
     const before = existing.get(listing.external_id);
+    if (!before) report.created += 1;
     if (!before || before.content_hash !== hashByExternalId.get(listing.external_id)) {
       toEnrich.push(listing);
     } else {
@@ -202,7 +206,9 @@ export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
   const ok = reports.every((r) => r.ok && r.dbErrors === 0);
   logEvent("crawl.done", {
     ok,
+    fetched: reports.reduce((sum, r) => sum + r.fetched, 0),
     upserted: reports.reduce((sum, r) => sum + r.upserted, 0),
+    created: reports.reduce((sum, r) => sum + r.created, 0),
     enriched: reports.reduce((sum, r) => sum + r.enriched, 0),
     skippedUnchanged: reports.reduce((sum, r) => sum + r.enrichSkippedUnchanged, 0),
   });
