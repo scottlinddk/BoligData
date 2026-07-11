@@ -6,10 +6,16 @@ import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyMap } from "@/components/property-map";
 import { useI18n } from "@/i18n/i18n";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { useSavedProperties } from "@/hooks/use-saved-properties";
+import { useToast } from "@/components/toast";
 
 export function PropertyDetailPage() {
   const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const { isSaved, toggle } = useSavedProperties();
+  const { showToast } = useToast();
 
   const detailQuery = useQuery({
     queryKey: ["property", id],
@@ -29,14 +35,46 @@ export function PropertyDetailPage() {
 
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
+  const saved = isSaved(property.id);
+
+  function handleSave() {
+    const nowSaved = toggle(property.id);
+    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"));
+  }
+
+  function handleContactAgent() {
+    showToast(t("detail.contactAgentComingSoon"));
+  }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
-      <h1 className="font-serif text-4xl italic text-ink">{property.address}</h1>
-      <p className="mt-1 text-sm font-semibold text-ink-soft">
-        {property.municipality}
-        {property.postalCode ? ` · ${property.postalCode}` : ""}
-      </p>
+    <div className="mx-auto max-w-5xl px-4 py-6 pb-24 md:pb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-4xl italic text-ink">{property.address}</h1>
+          <p className="mt-1 text-sm font-semibold text-ink-soft">
+            {property.municipality}
+            {property.postalCode ? ` · ${property.postalCode}` : ""}
+          </p>
+        </div>
+        {!isMobile && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="rounded-[9px] border border-border bg-surface px-4 py-2.5 text-sm font-bold text-ink"
+            >
+              {saved ? t("property.saved") : t("property.save")}
+            </button>
+            <button
+              type="button"
+              onClick={handleContactAgent}
+              className="rounded-[9px] bg-brand px-4.5 py-2.5 text-sm font-bold text-white"
+            >
+              {t("detail.contactAgent")}
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Stat label={t("detail.price")} value={formatDkk(property.price)} />
@@ -53,6 +91,21 @@ export function PropertyDetailPage() {
       </div>
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
+
+      <div className="relative mt-6 h-64 overflow-hidden rounded-2xl border border-border bg-surface-alt">
+        {property.imageUrls[0] ? (
+          <img src={property.imageUrls[0]} alt={property.address} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-ink-faint">
+            <span className="font-mono text-[10.5px]">{t("property.noPhoto")}</span>
+          </div>
+        )}
+        {property.imageUrls.length > 1 && (
+          <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold text-white">
+            {property.imageUrls.length}
+          </span>
+        )}
+      </div>
 
       <div className="mt-6 h-64 overflow-hidden rounded-2xl border border-border">
         <PropertyMap properties={[property]} />
@@ -83,6 +136,26 @@ export function PropertyDetailPage() {
 
       {property.agentName && (
         <p className="mt-4 text-xs font-semibold text-ink-faint">{t("detail.listedBy", { name: property.agentName })}</p>
+      )}
+
+      {isMobile && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2.5 border-t border-border bg-surface px-4 py-2.5 shadow-lift">
+          <button
+            type="button"
+            onClick={handleSave}
+            aria-label={saved ? t("property.saved") : t("property.save")}
+            className="w-[46px] shrink-0 rounded-[10px] border border-border bg-surface text-base text-ink"
+          >
+            {saved ? "♥" : "♡"}
+          </button>
+          <button
+            type="button"
+            onClick={handleContactAgent}
+            className="flex-1 rounded-[10px] bg-brand px-3 py-3 text-sm font-bold text-white"
+          >
+            {t("detail.contactAgent")}
+          </button>
+        </div>
       )}
     </div>
   );
