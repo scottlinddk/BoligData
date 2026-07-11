@@ -59,11 +59,11 @@ export function searchProperties(query: SearchPropertiesQuery): Promise<SearchPr
 }
 
 export function getProperty(id: string): Promise<PropertyDetailResponse> {
-  return request(`/properties/${id}`);
+  return request(`/properties?id=${id}`);
 }
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
-  return request(`/properties/${id}/comparables`);
+  return request(`/properties?id=${id}&comparables=true`);
 }
 
 export function listSearches(): Promise<SavedSearch[]> {
