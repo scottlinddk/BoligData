@@ -32,3 +32,30 @@ export function getServiceRoleClient(): SupabaseClient {
   }
   return createClient(SUPABASE_URL, serviceRoleKey, { auth: { persistSession: false } });
 }
+
+// Same issue as auth.ts's AuthGetUser: Vercel's per-function type check
+// resolves @supabase/supabase-js in a mode where the `admin` namespace
+// (only present when the client is built with a service-role key) vanishes
+// from the type, breaking the deploy check even though the call is fine at
+// runtime. Pin the handful of admin methods this project uses to an
+// explicit signature instead of relying on the inferred type.
+interface AuthAdminUser {
+  id: string;
+  email?: string;
+}
+
+interface AuthAdmin {
+  inviteUserByEmail(
+    email: string,
+    options?: { redirectTo?: string },
+  ): Promise<{ data: unknown; error: { message: string } | null }>;
+  listUsers(options?: {
+    perPage?: number;
+  }): Promise<{ data: { users: AuthAdminUser[] }; error: unknown }>;
+  getUserById(id: string): Promise<{ data: { user: AuthAdminUser | null }; error: unknown }>;
+}
+
+/** Only valid on a client from getServiceRoleClient() — the anon client has no `admin` namespace. */
+export function getAuthAdmin(client: SupabaseClient): AuthAdmin {
+  return (client.auth as unknown as { admin: AuthAdmin }).admin;
+}

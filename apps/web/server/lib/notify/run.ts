@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AlertFrequency } from "../../../../../packages/shared/src/types/index.js";
 import { searchProperties } from "../search.js";
+import { getAuthAdmin } from "../supabase.js";
 import { sendAlertEmail } from "./email.js";
 import { logError, logEvent } from "../crawl/log.js";
 
@@ -86,7 +87,7 @@ export async function runNotify(client: SupabaseClient): Promise<NotifyResult> {
         if (notificationsError) logError("notify.notifications_insert_failed", notificationsError, { searchId: search.id });
 
         try {
-          const { data: authUser } = await client.auth.admin.getUserById(search.user_id);
+          const { data: authUser } = await getAuthAdmin(client).getUserById(search.user_id);
           const email = authUser?.user?.email;
           if (!email) throw new Error("No email on file for user");
           await sendAlertEmail(email, search.name, result.properties);

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { CreateInvitationBody } from "../../../../packages/shared/src/types/api.js";
 import { applyCors } from "../../server/middleware/cors.js";
 import { requireRole } from "../../server/middleware/auth.js";
-import { getServiceRoleClient } from "../../server/lib/supabase.js";
+import { getAuthAdmin, getServiceRoleClient } from "../../server/lib/supabase.js";
 import { sendError } from "../../server/lib/http-helpers.js";
 import { rowToInvitation } from "../../server/lib/row-mappers.js";
 
@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const frontendUrl = process.env.FRONTEND_URL;
-    const { error: inviteError } = await client.auth.admin.inviteUserByEmail(email, {
+    const { error: inviteError } = await getAuthAdmin(client).inviteUserByEmail(email, {
       redirectTo: frontendUrl ? `${frontendUrl}/auth/update-password` : undefined,
     });
     if (inviteError) {

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyCors } from "../../server/middleware/cors.js";
 import { requireRole } from "../../server/middleware/auth.js";
-import { getServiceRoleClient } from "../../server/lib/supabase.js";
+import { getAuthAdmin, getServiceRoleClient } from "../../server/lib/supabase.js";
 import { sendError } from "../../server/lib/http-helpers.js";
 import { rowToAdminUser } from "../../server/lib/row-mappers.js";
 
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const [{ data: profiles, error: profilesError }, { data: userList, error: usersError }] =
     await Promise.all([
       client.from("user_profiles").select("*").order("created_at", { ascending: false }),
-      client.auth.admin.listUsers({ perPage: 1000 }),
+      getAuthAdmin(client).listUsers({ perPage: 1000 }),
     ]);
 
   if (profilesError || usersError) {

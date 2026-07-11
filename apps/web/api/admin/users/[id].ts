@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { UpdateAdminUserBody } from "../../../../../packages/shared/src/types/api.js";
 import { applyCors } from "../../../server/middleware/cors.js";
 import { requireRole } from "../../../server/middleware/auth.js";
-import { getServiceRoleClient } from "../../../server/lib/supabase.js";
+import { getAuthAdmin, getServiceRoleClient } from "../../../server/lib/supabase.js";
 import { isUuid, sendError } from "../../../server/lib/http-helpers.js";
 import { rowToAdminUser } from "../../../server/lib/row-mappers.js";
 
@@ -52,6 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: authUser } = await client.auth.admin.getUserById(id);
+  const { data: authUser } = await getAuthAdmin(client).getUserById(id);
   res.status(200).json(rowToAdminUser({ ...data, email: authUser?.user?.email ?? "" }));
 }
