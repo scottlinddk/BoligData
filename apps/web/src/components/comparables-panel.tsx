@@ -19,10 +19,10 @@ export function ComparablesPanel({
   const sortedHistory = [...soldPriceHistory].sort((a, b) => a.soldDate.localeCompare(b.soldDate));
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h3 className="mb-2 font-semibold text-slate-900 dark:text-slate-100">{t("comparables.soldHistory")}</h3>
+    <div className="rounded-2xl border border-border bg-surface p-4">
+      <h3 className="mb-2 text-[15px] font-extrabold text-ink">{t("comparables.soldHistory")}</h3>
       <SparklineChart points={sortedHistory.map((h) => h.pricePerSqm)} />
-      <ul className="mt-2 flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+      <ul className="mt-2 flex flex-col gap-1 text-xs font-medium text-ink-soft">
         {sortedHistory.map((entry) => (
           <li key={entry.soldDate}>
             {t("comparables.historyEntry", {
@@ -34,23 +34,18 @@ export function ComparablesPanel({
         ))}
       </ul>
 
-      <h3 className="mb-2 mt-4 font-semibold text-slate-900 dark:text-slate-100">{t("comparables.title")}</h3>
+      <h3 className="mb-2 mt-4 font-mono text-xs uppercase tracking-widest text-ink">{t("comparables.title")}</h3>
       {neighborhoodAvgPricePerSqm !== null && (
-        <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mb-2 text-xs font-medium text-ink-soft">
           {t("comparables.neighborhoodAvg", { price: formatDkk(neighborhoodAvgPricePerSqm) })}
         </p>
       )}
       <ul className="flex flex-col gap-2">
-        {comparables.length === 0 && (
-          <li className="text-xs text-slate-400 dark:text-slate-500">{t("comparables.none")}</li>
-        )}
+        {comparables.length === 0 && <li className="text-xs font-medium text-ink-faint">{t("comparables.none")}</li>}
         {comparables.map((entry) => (
-          <li
-            key={entry.property.id}
-            className="rounded-md border border-slate-100 px-3 py-2 text-sm dark:border-slate-800"
-          >
-            <div className="font-medium text-slate-800 dark:text-slate-200">{entry.property.address}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
+          <li key={entry.property.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+            <div className="font-bold text-ink">{entry.property.address}</div>
+            <div className="text-xs font-medium text-ink-soft">
               {t("comparables.soldEntry", {
                 date: entry.soldDate,
                 price: formatDkk(entry.price),

@@ -17,7 +17,7 @@ import "./index.css";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-full bg-paper font-sans text-ink">
       <Header />
       <main>{children}</main>
     </div>

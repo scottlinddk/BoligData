@@ -23,22 +23,22 @@ export function PropertyDetailPage() {
     enabled: !!id,
   });
 
-  if (detailQuery.isLoading) return <p className="p-6 text-slate-500 dark:text-slate-400">{t("detail.loading")}</p>;
+  if (detailQuery.isLoading) return <p className="p-6 font-semibold text-ink-soft">{t("detail.loading")}</p>;
   if (detailQuery.isError || !detailQuery.data)
-    return <p className="p-6 text-red-600 dark:text-red-400">{t("detail.notFound")}</p>;
+    return <p className="p-6 font-semibold text-danger">{t("detail.notFound")}</p>;
 
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{property.address}</h1>
-      <p className="text-slate-500 dark:text-slate-400">
+      <h1 className="font-serif text-4xl italic text-ink">{property.address}</h1>
+      <p className="mt-1 text-sm font-semibold text-ink-soft">
         {property.municipality}
         {property.postalCode ? ` · ${property.postalCode}` : ""}
       </p>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Stat label={t("detail.price")} value={formatDkk(property.price)} />
         <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
         <Stat label={t("detail.pricePerSqm")} value={formatDkk(pricePerSqm(property.price, property.sqm))} />
@@ -52,23 +52,21 @@ export function PropertyDetailPage() {
         />
       </div>
 
-      {property.description && <p className="mt-4 text-slate-700 dark:text-slate-300">{property.description}</p>}
+      {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
 
-      <div className="mt-6 h-64 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+      <div className="mt-6 h-64 overflow-hidden rounded-2xl border border-border">
         <PropertyMap properties={[property]} />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} />
-        {comparablesQuery.isLoading && (
-          <p className="p-3 text-slate-500 dark:text-slate-400">{t("comparables.loading")}</p>
-        )}
+        {comparablesQuery.isLoading && <p className="p-3 font-semibold text-ink-soft">{t("comparables.loading")}</p>}
         {comparablesQuery.isError && (
-          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-red-600 dark:text-red-400">{t("comparables.error")}</p>
+          <div className="flex items-center gap-3 rounded-2xl border border-danger-soft bg-danger-soft p-4">
+            <p className="font-semibold text-danger">{t("comparables.error")}</p>
             <button
               onClick={() => comparablesQuery.refetch()}
-              className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
+              className="rounded-lg bg-danger px-3 py-1.5 text-sm font-bold text-white"
             >
               {t("common.retry")}
             </button>
@@ -84,9 +82,7 @@ export function PropertyDetailPage() {
       </div>
 
       {property.agentName && (
-        <p className="mt-4 text-sm text-slate-400 dark:text-slate-500">
-          {t("detail.listedBy", { name: property.agentName })}
-        </p>
+        <p className="mt-4 text-xs font-semibold text-ink-faint">{t("detail.listedBy", { name: property.agentName })}</p>
       )}
     </div>
   );
@@ -94,9 +90,9 @@ export function PropertyDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-      <div className="text-xs uppercase text-slate-400 dark:text-slate-500">{label}</div>
-      <div className="font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+    <div className="rounded-xl border border-border bg-surface p-3">
+      <div className="font-mono text-[9.5px] uppercase tracking-widest text-ink-faint">{label}</div>
+      <div className="mt-0.5 font-serif text-xl text-ink">{value}</div>
     </div>
   );
 }

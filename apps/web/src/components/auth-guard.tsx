@@ -7,7 +7,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const { t } = useI18n();
 
-  if (loading) return <div className="p-8 text-center text-slate-500 dark:text-slate-400">{t("detail.loading")}</div>;
+  if (loading) return <div className="p-8 text-center font-semibold text-ink-soft">{t("detail.loading")}</div>;
   if (!user) return <Navigate to="/auth/signin" replace />;
   return <>{children}</>;
 }

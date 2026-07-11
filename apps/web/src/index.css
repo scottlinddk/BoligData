@@ -11,8 +11,80 @@ body,
 /* Let native form controls, scrollbars and the map follow the active theme. */
 :root {
   color-scheme: light;
+
+  --color-bg: #f2ebdb;
+  --color-surface: #fbf6e8;
+  --color-surface-alt: #e8dfc8;
+  --color-surface-hover: #f8ebc8;
+  --color-border: #d6cbb4;
+  --color-border-strong: #bfb39a;
+  --color-text-primary: #1a1612;
+  --color-text-secondary: #4a4239;
+  --color-text-tertiary: #8b7f6e;
+  --color-brand: #dc4a1e;
+  --color-brand-hover: #bc3a12;
+  --color-brand-soft: #f6ded0;
+  --color-brand-text: #bc3a12;
+  --color-success: #5a6b3a;
+  --color-success-soft: #e4e8d8;
+  --color-success-text: #455328;
+  --color-warning: #7b1f18;
+  --color-warning-soft: #f3dcd4;
+  --color-warning-text: #7b1f18;
+  --color-danger: #7b1f18;
+  --color-danger-soft: #f3dcd4;
+  --color-unknown: #8b7f6e;
+  --color-unknown-soft: #ebe3d0;
+  --color-unknown-text: #4a4239;
+  --shadow-card: none;
+  --shadow-lift: 0 10px 24px rgba(26, 22, 18, 0.16);
 }
 
 :root.dark {
   color-scheme: dark;
+
+  --color-bg: #0f0d0b;
+  --color-surface: #15110d;
+  --color-surface-alt: #1a1714;
+  --color-surface-hover: #221d18;
+  --color-border: #2f2924;
+  --color-border-strong: #3c342c;
+  --color-text-primary: #f2ebdb;
+  --color-text-secondary: #c9bfa8;
+  --color-text-tertiary: #7a7060;
+  --color-brand: #f26a3d;
+  --color-brand-hover: #ff8a5f;
+  --color-brand-soft: #2a1b12;
+  --color-brand-text: #f26a3d;
+  --color-success: #8aa055;
+  --color-success-soft: #1e2318;
+  --color-success-text: #8aa055;
+  --color-warning: #b23a2a;
+  --color-warning-soft: #2a1712;
+  --color-warning-text: #e08268;
+  --color-danger: #b23a2a;
+  --color-danger-soft: #2a1712;
+  --color-unknown: #7a7060;
+  --color-unknown-soft: #1e1a15;
+  --color-unknown-text: #c9bfa8;
+  --shadow-card: none;
+  --shadow-lift: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+body {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.ds-mono {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.ds-display {
+  font-family: "Instrument Serif", "Times New Roman", serif;
+  font-style: italic;
+  letter-spacing: -0.01em;
 }

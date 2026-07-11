@@ -34,9 +34,11 @@ export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
     const map = mapRef.current;
     if (!map) return;
 
+    const brandColor = getComputedStyle(document.documentElement).getPropertyValue("--color-brand").trim();
+
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = properties.map((property) => {
-      const marker = new maplibregl.Marker({ color: "#1d4ed8" })
+      const marker = new maplibregl.Marker({ color: brandColor || "#dc4a1e" })
         .setLngLat([property.lon, property.lat])
         .setPopup(new maplibregl.Popup({ offset: 16 }).setText(property.address))
         .addTo(map);
@@ -45,5 +47,5 @@ export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
     });
   }, [properties, onSelect]);
 
-  return <div ref={containerRef} className="h-full w-full rounded-lg" />;
+  return <div ref={containerRef} className="h-full w-full rounded-2xl" />;
 }

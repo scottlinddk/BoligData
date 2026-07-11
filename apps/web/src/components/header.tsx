@@ -9,26 +9,26 @@ export function Header() {
   const { t } = useI18n();
 
   return (
-    <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link to="/" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-ink">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand text-sm text-white">
+            B
+          </span>
           {t("app.name")}
         </Link>
         <nav className="flex items-center gap-4 text-sm">
-          <Link to="/" className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
+          <Link to="/" className="font-semibold text-ink-soft hover:text-ink">
             {t("nav.search")}
           </Link>
           {user ? (
             <>
-              <Link
-                to="/dashboard"
-                className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-              >
+              <Link to="/dashboard" className="font-semibold text-ink-soft hover:text-ink">
                 {t("nav.dashboard")}
               </Link>
               <button
                 onClick={() => signOut()}
-                className="rounded-md bg-slate-100 px-3 py-1.5 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="rounded-full bg-surface-alt px-4 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-hover"
               >
                 {t("nav.signOut")}
               </button>
@@ -36,7 +36,7 @@ export function Header() {
           ) : (
             <Link
               to="/auth/signin"
-              className="rounded-md bg-brand-600 px-3 py-1.5 text-white hover:bg-brand-700"
+              className="rounded-full bg-brand-soft px-4 py-2 text-sm font-semibold text-brand-text transition hover:-translate-y-px"
             >
               {t("nav.signIn")}
             </Link>
@@ -45,6 +45,9 @@ export function Header() {
           <ThemeToggle />
         </nav>
       </div>
+      <svg width="100%" height="6" viewBox="0 0 1180 6" preserveAspectRatio="none" className="block text-brand opacity-55">
+        <line x1="0" y1="3" x2="1180" y2="3" stroke="currentColor" strokeWidth="1" strokeDasharray="2 8" strokeLinecap="round" />
+      </svg>
     </header>
   );
 }
