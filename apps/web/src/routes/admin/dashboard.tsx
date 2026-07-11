@@ -12,17 +12,27 @@ export function AdminDashboardPage() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-serif text-3xl italic text-ink">{t("admin.dashboard.title")}</h1>
-        <Link
-          to="/admin/users"
-          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-paper"
-        >
-          {t("admin.dashboard.manageUsers")}
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to="/admin/invitations"
+            className="rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-hover"
+          >
+            {t("admin.dashboard.inviteUsers")}
+          </Link>
+          <Link
+            to="/admin/users"
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-paper"
+          >
+            {t("admin.dashboard.manageUsers")}
+          </Link>
+        </div>
       </div>
       {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label={t("admin.dashboard.pendingInvitations")} value={data.pendingInvitations} />
+          <Link to="/admin/invitations">
+            <StatCard label={t("admin.dashboard.pendingInvitations")} value={data.pendingInvitations} />
+          </Link>
           <StatCard label={t("admin.dashboard.promotedListings")} value={data.promotedListings} />
           <StatCard label={t("admin.dashboard.recentApprovals")} value={data.recentApprovals} />
           {Object.entries(data.usersByRole).map(([role, count]) => (

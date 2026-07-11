@@ -162,6 +162,7 @@ const da = {
   "admin.dashboard.recentApprovals": "Godkendelser (7 dage)",
   "admin.dashboard.usersByRole": "Brugere pr. rolle",
   "admin.dashboard.manageUsers": "Administrer brugere",
+  "admin.dashboard.inviteUsers": "Inviter brugere",
 
   "admin.invitations.title": "Invitationer",
   "admin.invitations.email": "E-mail",
@@ -368,6 +369,7 @@ const en: Translations = {
   "admin.dashboard.recentApprovals": "Approvals (7 days)",
   "admin.dashboard.usersByRole": "Users by role",
   "admin.dashboard.manageUsers": "Manage users",
+  "admin.dashboard.inviteUsers": "Invite users",
 
   "admin.invitations.title": "Invitations",
   "admin.invitations.email": "Email",
