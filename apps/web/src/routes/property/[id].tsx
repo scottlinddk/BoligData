@@ -2,8 +2,10 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, getComparables, getProperty } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
+import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ComparablesPanel } from "@/components/comparables-panel";
+import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { useI18n } from "@/i18n/i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -46,6 +48,8 @@ export function PropertyDetailPage() {
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
   const saved = isSaved(property.id);
+  const photos = getPhotos(property.images);
+  const floorplan = getFloorplan(property.images);
 
   async function handleSave() {
     const nowSaved = await toggle(property.id);
@@ -103,19 +107,38 @@ export function PropertyDetailPage() {
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
 
       <div className="relative mt-6 h-64 overflow-hidden rounded-2xl border border-border bg-surface-alt">
-        {property.imageUrls[0] ? (
-          <img src={property.imageUrls[0]} alt={property.address} className="h-full w-full object-cover" />
+        {photos[0] ? (
+          <img
+            src={getImageUrl(photos[0], 1440, 960)}
+            alt={property.address}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-ink-faint">
             <span className="font-mono text-[10.5px]">{t("property.noPhoto")}</span>
           </div>
         )}
-        {property.imageUrls.length > 1 && (
+        {photos.length > 1 && (
           <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold text-white">
-            {property.imageUrls.length}
+            {photos.length}
           </span>
         )}
       </div>
+
+      {floorplan && (
+        <div className="mt-6">
+          <h2 className="font-serif text-xl italic text-ink">{t("detail.floorplan")}</h2>
+          <div className="mt-2.5 overflow-hidden rounded-2xl border border-border bg-surface-alt">
+            <img
+              src={getImageUrl(floorplan, 1440, 960)}
+              alt={t("detail.floorplan")}
+              className="max-h-[600px] w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
+
+      <PropertyGallery images={photos.slice(1)} alt={property.address} />
 
       <div className="mt-6 h-64 overflow-hidden rounded-2xl border border-border">
         <PropertyMap properties={[property]} />

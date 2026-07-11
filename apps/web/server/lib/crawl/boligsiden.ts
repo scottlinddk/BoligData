@@ -1,3 +1,4 @@
+import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
 import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
@@ -56,6 +57,36 @@ function get(obj: unknown, ...path: string[]): unknown {
   return cur;
 }
 
+/**
+ * Boligsiden images carry a `category` (photo/floorplan/...) and an
+ * `imageSources` array of pre-sized variants ({url, width, height}) — we
+ * keep the whole set so the UI can pick the size it needs instead of only
+ * ever seeing one fixed URL.
+ */
+function mapImage(img: unknown): ListingImage | null {
+  const rawSources = get(img, "imageSources");
+  const sources = (Array.isArray(rawSources) ? rawSources : [])
+    .map((s) => {
+      const url = asNonEmptyString(get(s, "url"));
+      const width = asPositiveInt(get(s, "width"));
+      const height = asPositiveInt(get(s, "height"));
+      return url !== null && width !== null && height !== null ? { url, width, height } : null;
+    })
+    .filter((s): s is { url: string; width: number; height: number } => s !== null);
+
+  const url = asNonEmptyString(get(img, "url")) ?? sources[0]?.url ?? null;
+  if (url === null) return null;
+
+  const categoryRaw = asNonEmptyString(get(img, "category"))?.toLowerCase() ?? "";
+  const category: ListingImage["category"] = categoryRaw.includes("floor")
+    ? "floorplan"
+    : categoryRaw === "" || categoryRaw.includes("photo") || categoryRaw.includes("image")
+      ? "photo"
+      : "other";
+
+  return { url, category, sources };
+}
+
 export function mapBoligsidenCase(raw: unknown): RawListing | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -93,10 +124,9 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
 
   const addressType = asNonEmptyString(r.addressType)?.toLowerCase() ?? "";
   const zip = asPositiveInt(get(r, "address", "zipCode")) ?? asPositiveInt(r.zipCode);
-  const images = Array.isArray(r.images) ? r.images : [];
-  const imageUrls = images
-    .map((img) => asNonEmptyString(get(img, "imageSources", "0", "url")) ?? asNonEmptyString(get(img, "url")))
-    .filter((u): u is string => u !== null);
+  const images = (Array.isArray(r.images) ? r.images : [])
+    .map(mapImage)
+    .filter((img): img is ListingImage => img !== null);
 
   return {
     address,
@@ -117,7 +147,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     building_year: asPositiveInt(get(r, "address", "buildYear")) ?? asPositiveInt(r.buildYear),
     property_type: PROPERTY_TYPE_BY_ADDRESS_TYPE[addressType] ?? "other",
     rooms: asPositiveInt(r.numberOfRooms) ?? asPositiveInt(get(r, "address", "numberOfRooms")),
-    image_urls: imageUrls,
+    images,
     description: asNonEmptyString(r.descriptionTitle),
     agent_name: asNonEmptyString(get(r, "realtor", "name")),
   };

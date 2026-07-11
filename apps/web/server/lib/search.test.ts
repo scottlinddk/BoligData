@@ -40,7 +40,7 @@ function toResponseRow(row: FakeRow, columns: string): Record<string, unknown> {
       building_year: null,
       property_type: "other",
       rooms: null,
-      image_urls: [],
+      images: [],
       description: null,
       agent_name: null,
       created_at: nowIso(),

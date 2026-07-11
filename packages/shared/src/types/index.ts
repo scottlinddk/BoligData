@@ -16,6 +16,19 @@ export interface PropertySummary {
   address: string;
 }
 
+/** A single pre-sized image variant a source may provide (e.g. Boligsiden's imageSources). */
+export interface ListingImageSource {
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface ListingImage {
+  url: string; // fallback/original, used when no sized `sources` are available
+  category: "photo" | "floorplan" | "other";
+  sources: ListingImageSource[];
+}
+
 export interface Property {
   id: string;
   address: string;
@@ -32,7 +45,7 @@ export interface Property {
   buildingYear: number | null;
   propertyType: PropertyType;
   rooms: number | null;
-  imageUrls: string[];
+  images: ListingImage[];
   description: string | null;
   agentName: string | null;
   agentUserId: string | null;

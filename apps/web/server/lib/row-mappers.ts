@@ -32,7 +32,7 @@ export function rowToProperty(row: Record<string, any>): Property {
     buildingYear: row.building_year,
     propertyType: row.property_type,
     rooms: row.rooms,
-    imageUrls: row.image_urls ?? [],
+    images: row.images ?? [],
     description: row.description,
     agentName: row.agent_name,
     agentUserId: row.agent_user_id ?? null,

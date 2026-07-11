@@ -14,7 +14,33 @@
     "building_year": 1962,
     "property_type": "apartment",
     "rooms": 3,
-    "image_urls": [],
+    "images": [
+      {
+        "url": "https://picsum.photos/seed/bs-mock-9001-a/1440/960",
+        "category": "photo",
+        "sources": [
+          { "url": "https://picsum.photos/seed/bs-mock-9001-a/300/200", "width": 300, "height": 200 },
+          { "url": "https://picsum.photos/seed/bs-mock-9001-a/700/500", "width": 700, "height": 500 },
+          { "url": "https://picsum.photos/seed/bs-mock-9001-a/1440/960", "width": 1440, "height": 960 }
+        ]
+      },
+      {
+        "url": "https://picsum.photos/seed/bs-mock-9001-b/1440/960",
+        "category": "photo",
+        "sources": [
+          { "url": "https://picsum.photos/seed/bs-mock-9001-b/300/200", "width": 300, "height": 200 },
+          { "url": "https://picsum.photos/seed/bs-mock-9001-b/700/500", "width": 700, "height": 500 },
+          { "url": "https://picsum.photos/seed/bs-mock-9001-b/1440/960", "width": 1440, "height": 960 }
+        ]
+      },
+      {
+        "url": "https://picsum.photos/seed/bs-mock-9001-floorplan/1440/960",
+        "category": "floorplan",
+        "sources": [
+          { "url": "https://picsum.photos/seed/bs-mock-9001-floorplan/1440/960", "width": 1440, "height": 960 }
+        ]
+      }
+    ],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "Nybolig Aalborg"
   },
@@ -33,7 +59,7 @@
     "building_year": 1979,
     "property_type": "villa",
     "rooms": 5,
-    "image_urls": [],
+    "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "Home Aarhus"
   },
@@ -52,7 +78,7 @@
     "building_year": 1934,
     "property_type": "apartment",
     "rooms": 3,
-    "image_urls": [],
+    "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "EDC Amager"
   }

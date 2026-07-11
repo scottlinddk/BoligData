@@ -80,6 +80,11 @@ const da = {
   "detail.renovated": "Renoveret",
   "detail.listedBy": "Udbudt af {name}",
   "detail.empty": "—",
+  "detail.floorplan": "Plantegning",
+  "detail.gallery": "Alle billeder",
+  "detail.galleryClose": "Luk",
+  "detail.galleryPrev": "Forrige",
+  "detail.galleryNext": "Næste",
 
   "dueDiligence.title": "Due diligence-tjekliste",
   "dueDiligence.noData": "Ingen berigelsesdata endnu.",
@@ -290,6 +295,11 @@ const en: Translations = {
   "detail.renovated": "Renovated",
   "detail.listedBy": "Listed by {name}",
   "detail.empty": "—",
+  "detail.floorplan": "Floor plan",
+  "detail.gallery": "All photos",
+  "detail.galleryClose": "Close",
+  "detail.galleryPrev": "Previous",
+  "detail.galleryNext": "Next",
 
   "dueDiligence.title": "Due diligence checklist",
   "dueDiligence.noData": "No enrichment data yet.",

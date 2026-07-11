@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { MouseEvent } from "react";
 import type { Property } from "@shared/types/index";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
+import { getImageUrl, getPhotos } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
@@ -11,7 +12,8 @@ export function PropertyCard({ property }: { property: Property }) {
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
   const daysOnMarket = daysBetween(property.listingDate);
-  const photoUrl = property.imageUrls[0] ?? null;
+  const photos = getPhotos(property.images);
+  const photoUrl = photos[0] ? getImageUrl(photos[0], 300, 200) : null;
   const saved = isSaved(property.id);
 
   async function handleSave(e: MouseEvent) {
@@ -45,9 +47,9 @@ export function PropertyCard({ property }: { property: Property }) {
         >
           {saved ? "♥" : "♡"}
         </button>
-        {property.imageUrls.length > 1 && (
+        {photos.length > 1 && (
           <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white">
-            {property.imageUrls.length}
+            {photos.length}
           </span>
         )}
       </div>

@@ -14,7 +14,7 @@
     "building_year": 1946,
     "property_type": "apartment",
     "rooms": 3,
-    "image_urls": [],
+    "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "EDC Aalborg"
   },
@@ -33,7 +33,7 @@
     "building_year": 1905,
     "property_type": "apartment",
     "rooms": 2,
-    "image_urls": [],
+    "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "Nybolig Aarhus"
   },
@@ -52,7 +52,7 @@
     "building_year": 1988,
     "property_type": "villa",
     "rooms": 6,
-    "image_urls": [],
+    "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
     "agent_name": "Home Bagsværd"
   }

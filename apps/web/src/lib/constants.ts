@@ -9,6 +9,12 @@ export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 export const DEFAULT_MAP_CENTER: [number, number] = [9.9217, 57.0488]; // Aalborg, [lon, lat]
 export const DEFAULT_MAP_ZOOM = 11;
 
+/** SW/NE corners covering the whole of Denmark (incl. Bornholm) — the map's default view. */
+export const DENMARK_BOUNDS: [[number, number], [number, number]] = [
+  [7.6, 54.5],
+  [15.5, 57.8],
+];
+
 export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 /**
