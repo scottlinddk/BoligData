@@ -1,10 +1,17 @@
 import type {
+  AdminUser,
+  AdvisorConnection,
   AlertFrequency,
+  FavoriteProperty,
+  Invitation,
+  ListingApproval,
+  Notification,
   Property,
   PropertyFilters,
   PropertySummary,
   SortDirection,
   SortField,
+  UserRole,
 } from "./index.js";
 
 export type { SortDirection, SortField };
@@ -14,6 +21,8 @@ export interface SearchPropertiesQuery extends Partial<PropertyFilters> {
   sortDirection?: SortDirection;
   limit?: number;
   offset?: number;
+  /** ISO timestamp; only match listings created after this (used by the notification cron). */
+  createdAfter?: string;
 }
 
 export interface SearchPropertiesResponse {
@@ -60,4 +69,64 @@ export interface UpdateAlertBody {
 
 export interface ApiErrorResponse {
   error: string;
+}
+
+export interface CreateInvitationBody {
+  email: string;
+  role: UserRole;
+}
+
+export interface InvitationsResponse {
+  invitations: Invitation[];
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+}
+
+export interface UpdateAdminUserBody {
+  role?: UserRole;
+  organizationName?: string | null;
+}
+
+export interface CreateAdvisorConnectionBody {
+  advisorId: string;
+  userId: string;
+}
+
+export interface AdvisorConnectionsResponse {
+  connections: AdvisorConnection[];
+}
+
+export interface AdminDashboardResponse {
+  pendingInvitations: number;
+  usersByRole: Record<UserRole, number>;
+  promotedListings: number;
+  recentApprovals: number;
+}
+
+export interface FavoritesResponse {
+  favorites: FavoriteProperty[];
+  properties: Property[];
+}
+
+export interface CreateFavoriteBody {
+  propertyId: string;
+}
+
+export interface ApproveListingBody {
+  userId: string;
+  note?: string;
+}
+
+export interface ListingApprovalsResponse {
+  approvals: ListingApproval[];
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+}
+
+export interface AgentListingsResponse {
+  properties: Property[];
 }

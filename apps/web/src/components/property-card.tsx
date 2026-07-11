@@ -14,10 +14,10 @@ export function PropertyCard({ property }: { property: Property }) {
   const photoUrl = property.imageUrls[0] ?? null;
   const saved = isSaved(property.id);
 
-  function handleSave(e: MouseEvent) {
+  async function handleSave(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    const nowSaved = toggle(property.id);
+    const nowSaved = await toggle(property.id);
     showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"));
   }
 

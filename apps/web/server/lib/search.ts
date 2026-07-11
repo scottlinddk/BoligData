@@ -71,6 +71,7 @@ export async function searchProperties(
     cutoff.setDate(cutoff.getDate() - query.maxDaysOnMarket);
     builder = builder.gte("listing_date", cutoff.toISOString().slice(0, 10));
   }
+  if (query.createdAfter) builder = builder.gt("created_at", query.createdAfter);
 
   const { data, count, error } = await builder
     .order(column, { ascending })

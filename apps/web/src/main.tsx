@@ -7,9 +7,16 @@ import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
 import { ToastProvider } from "@/components/toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { RoleGuard } from "@/components/role-guard";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
 import { DashboardPage } from "@/routes/dashboard";
+import { AdminDashboardPage } from "@/routes/admin/dashboard";
+import { AdminInvitationsPage } from "@/routes/admin/invitations";
+import { AdminUsersPage } from "@/routes/admin/users";
+import { AdminAdvisorConnectionsPage } from "@/routes/admin/advisor-connections";
+import { AdvisorPage } from "@/routes/advisor/index";
+import { AgentPage } from "@/routes/agent/index";
 import { SignInPage } from "@/routes/auth/signin";
 import { SignUpPage } from "@/routes/auth/signup";
 import { ResetPasswordPage } from "@/routes/auth/reset-password";
@@ -44,6 +51,66 @@ const router = createBrowserRouter([
         <AuthGuard>
           <DashboardPage />
         </AuthGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/admin",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["admin"]}>
+          <AdminDashboardPage />
+        </RoleGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/admin/invitations",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["admin"]}>
+          <AdminInvitationsPage />
+        </RoleGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/admin/users",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["admin"]}>
+          <AdminUsersPage />
+        </RoleGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/admin/advisor-connections",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["admin"]}>
+          <AdminAdvisorConnectionsPage />
+        </RoleGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/advisor",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["advisor"]}>
+          <AdvisorPage />
+        </RoleGuard>
+      </Layout>
+    ),
+  },
+  {
+    path: "/agent",
+    element: (
+      <Layout>
+        <RoleGuard allowed={["agent"]}>
+          <AgentPage />
+        </RoleGuard>
       </Layout>
     ),
   },

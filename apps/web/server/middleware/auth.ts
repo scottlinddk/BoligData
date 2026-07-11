@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { UserRole } from "../../../../packages/shared/src/types/index.js";
 import { getAnonClient } from "../lib/supabase.js";
 
 // Vercel's per-function type check resolves @supabase/supabase-js in a mode
@@ -58,4 +59,35 @@ export async function getOptionalUser(
   const { data, error } = await getUser(client, jwt);
   if (error || !data.user) return null;
   return { userId: data.user.id, jwt };
+}
+
+/**
+ * Like requireUser, but also resolves the caller's user_profiles.role and
+ * 403s unless it's in `allowed`. An app-level gate on top of RLS — routes
+ * gated by role (admin/advisor/agent features) should call this instead of
+ * requireUser.
+ */
+export async function requireRole(
+  req: VercelRequest,
+  res: VercelResponse,
+  allowed: UserRole[],
+): Promise<{ userId: string; jwt: string; role: UserRole } | null> {
+  const auth = await requireUser(req, res);
+  if (!auth) return null;
+  const client = getAnonClient(auth.jwt);
+  const { data, error } = await client
+    .from("user_profiles")
+    .select("role")
+    .eq("id", auth.userId)
+    .single();
+  if (error || !data) {
+    res.status(403).json({ error: "No profile found for this account" });
+    return null;
+  }
+  const role = data.role as UserRole;
+  if (!allowed.includes(role)) {
+    res.status(403).json({ error: "Insufficient role" });
+    return null;
+  }
+  return { ...auth, role };
 }

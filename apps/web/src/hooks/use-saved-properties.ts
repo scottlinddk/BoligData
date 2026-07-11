@@ -1,42 +1,46 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { addFavorite, listFavorites, removeFavorite } from "@/lib/api";
 
-const STORAGE_KEY = "boligdata.savedProperties";
-
-function readStored(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-/** Client-only favorites list, kept in localStorage (no server-side saved-properties API yet). */
+/** Server-backed favorites (see /api/favorites), so advisors can see connected users' saves. */
 export function useSavedProperties() {
-  const [saved, setSaved] = useState<Set<string>>(readStored);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...saved]));
-  }, [saved]);
+  const favoritesQuery = useQuery({
+    queryKey: ["favorites"],
+    queryFn: listFavorites,
+  });
 
-  const isSaved = useCallback((id: string) => saved.has(id), [saved]);
+  const savedIds = new Set((favoritesQuery.data?.favorites ?? []).map((f) => f.propertyId));
 
-  const toggle = useCallback((id: string): boolean => {
-    let nowSaved = false;
-    setSaved((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        nowSaved = false;
-      } else {
-        next.add(id);
-        nowSaved = true;
+  const addMutation = useMutation({
+    mutationFn: (propertyId: string) => addFavorite({ propertyId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (propertyId: string) => removeFavorite(propertyId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  });
+
+  const isSaved = useCallback((id: string) => savedIds.has(id), [savedIds]);
+
+  const toggle = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (savedIds.has(id)) {
+        await removeMutation.mutateAsync(id);
+        return false;
       }
-      return next;
-    });
-    return nowSaved;
-  }, []);
+      await addMutation.mutateAsync(id);
+      return true;
+    },
+    [savedIds, addMutation, removeMutation],
+  );
 
-  return { isSaved, toggle };
+  return {
+    isSaved,
+    toggle,
+    properties: favoritesQuery.data?.properties ?? [],
+    isLoading: favoritesQuery.isLoading,
+  };
 }

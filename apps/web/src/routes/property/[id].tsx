@@ -37,8 +37,8 @@ export function PropertyDetailPage() {
   const empty = t("detail.empty");
   const saved = isSaved(property.id);
 
-  function handleSave() {
-    const nowSaved = toggle(property.id);
+  async function handleSave() {
+    const nowSaved = await toggle(property.id);
     showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"));
   }
 

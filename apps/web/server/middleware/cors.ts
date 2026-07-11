@@ -8,7 +8,7 @@ const ALLOWED_ORIGIN = process.env.FRONTEND_URL ?? "*";
  */
 export function applyCors(req: VercelRequest, res: VercelResponse): boolean {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   // Public GETs are CDN-cached (see http-helpers.ts); a locked-down origin
   // must not leak between origins via the shared cache.
