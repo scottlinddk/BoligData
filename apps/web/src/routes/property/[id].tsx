@@ -1,6 +1,6 @@
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getComparables, getProperty } from "@/lib/api";
+import { ApiError, getComparables, getProperty } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ComparablesPanel } from "@/components/comparables-panel";
@@ -30,6 +30,16 @@ export function PropertyDetailPage() {
   });
 
   if (detailQuery.isLoading) return <p className="p-6 font-semibold text-ink-soft">{t("detail.loading")}</p>;
+  if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) {
+    return (
+      <p className="p-6 font-semibold text-danger">
+        {t("search.signInForDetails")}{" "}
+        <Link to="/auth/signin" className="underline">
+          {t("nav.signIn")}
+        </Link>
+      </p>
+    );
+  }
   if (detailQuery.isError || !detailQuery.data)
     return <p className="p-6 font-semibold text-danger">{t("detail.notFound")}</p>;
 
