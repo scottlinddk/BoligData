@@ -25,6 +25,12 @@ export function AdminDashboardPage() {
           >
             {t("admin.dashboard.manageUsers")}
           </Link>
+          <Link
+            to="/admin/advisor-connections"
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-paper"
+          >
+            {t("admin.advisorConnections.title")}
+          </Link>
         </div>
       </div>
       {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}

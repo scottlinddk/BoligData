@@ -156,6 +156,9 @@ const da = {
   "nav.advisor": "Rådgiver",
   "nav.agent": "Mægler",
 
+  "roleGuard.loadError": "Kunne ikke indlæse din profil.",
+  "roleGuard.retry": "Prøv igen",
+
   "admin.dashboard.title": "Admin-overblik",
   "admin.dashboard.pendingInvitations": "Afventende invitationer",
   "admin.dashboard.promotedListings": "Fremhævede boliger",
@@ -362,6 +365,9 @@ const en: Translations = {
   "nav.admin": "Admin",
   "nav.advisor": "Advisor",
   "nav.agent": "Agent",
+
+  "roleGuard.loadError": "Couldn't load your profile.",
+  "roleGuard.retry": "Retry",
 
   "admin.dashboard.title": "Admin overview",
   "admin.dashboard.pendingInvitations": "Pending invitations",
