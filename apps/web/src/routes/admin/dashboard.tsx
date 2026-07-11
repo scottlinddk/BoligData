@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { getAdminDashboard } from "@/lib/api";
 import { useI18n } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
@@ -9,7 +10,15 @@ export function AdminDashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("admin.dashboard.title")}</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="font-serif text-3xl italic text-ink">{t("admin.dashboard.title")}</h1>
+        <Link
+          to="/admin/users"
+          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-paper"
+        >
+          {t("admin.dashboard.manageUsers")}
+        </Link>
+      </div>
       {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
       {data && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
