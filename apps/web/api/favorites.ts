@@ -51,5 +51,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // DELETE /api/favorites?propertyId=<uuid> — remove a favorite. (Was
+  // DELETE /api/favorites/:propertyId; folded in here to stay under
+  // Vercel's serverless function count limit.)
+  if (req.method === "DELETE") {
+    const propertyId = req.query.propertyId;
+    if (!isUuid(propertyId)) {
+      sendError(res, 400, "Invalid property id");
+      return;
+    }
+    const { error } = await client
+      .from("favorites")
+      .delete()
+      .eq("user_id", auth.userId)
+      .eq("property_id", propertyId);
+    if (error) {
+      sendError(res, 500, "Failed to remove favorite", error);
+      return;
+    }
+    res.status(204).end();
+    return;
+  }
+
   res.status(405).json({ error: "Method not allowed" });
 }

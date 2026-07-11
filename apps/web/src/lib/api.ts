@@ -66,7 +66,7 @@ export function createSearch(body: CreateSearchBody): Promise<SavedSearch> {
 }
 
 export function updateAlert(searchId: string, body: UpdateAlertBody): Promise<SavedSearch> {
-  return request(`/searches/${searchId}/alerts`, { method: "POST", body: JSON.stringify(body) });
+  return request(`/searches?id=${searchId}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
 export function listFavorites(): Promise<FavoritesResponse> {
@@ -78,7 +78,7 @@ export function addFavorite(body: CreateFavoriteBody): Promise<void> {
 }
 
 export function removeFavorite(propertyId: string): Promise<void> {
-  return request(`/favorites/${propertyId}`, { method: "DELETE" });
+  return request(`/favorites?propertyId=${propertyId}`, { method: "DELETE" });
 }
 
 export function listNotifications(unreadOnly = false): Promise<NotificationsResponse> {
@@ -86,7 +86,7 @@ export function listNotifications(unreadOnly = false): Promise<NotificationsResp
 }
 
 export function markNotificationRead(id: string): Promise<void> {
-  return request(`/notifications/${id}/read`, { method: "PATCH" });
+  return request(`/notifications?id=${id}`, { method: "PATCH" });
 }
 
 // --- Admin ---

@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { CreateSearchBody } from "../../../packages/shared/src/types/api.js";
+import type { CreateSearchBody, UpdateAlertBody } from "../../../packages/shared/src/types/api.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
-import { sendError } from "../server/lib/http-helpers.js";
+import { isUuid, sendError } from "../server/lib/http-helpers.js";
 import { rowToSearch } from "../server/lib/row-mappers.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -48,6 +48,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     res.status(201).json(rowToSearch(data));
+    return;
+  }
+
+  // PATCH /api/searches?id=<uuid> — update a saved search's alert frequency.
+  // (Was POST /api/searches/:id/alerts; folded in here to stay under Vercel's
+  // serverless function count limit.)
+  if (req.method === "PATCH") {
+    const id = req.query.id;
+    if (!isUuid(id)) {
+      sendError(res, 400, "Invalid search id");
+      return;
+    }
+    const body = req.body as UpdateAlertBody;
+    if (!body?.alertFrequency) {
+      res.status(400).json({ error: "alertFrequency is required" });
+      return;
+    }
+    const { data, error } = await client
+      .from("searches")
+      .update({ alert_frequency: body.alertFrequency })
+      .eq("id", id)
+      .eq("user_id", auth.userId)
+      .select("*")
+      .single();
+    if (error || !data) {
+      sendError(res, 404, "Search not found", error ?? undefined);
+      return;
+    }
+    res.status(200).json(rowToSearch(data));
     return;
   }
 
