@@ -164,6 +164,11 @@ const da = {
   "roleGuard.loadError": "Kunne ikke indlæse din profil.",
   "roleGuard.retry": "Prøv igen",
 
+  "errorBoundary.title": "Der gik noget galt.",
+  "errorBoundary.description": "Siden stødte på en uventet fejl. Prøv at genindlæse siden.",
+  "errorBoundary.reload": "Genindlæs siden",
+  "errorBoundary.goHome": "Til forsiden",
+
   "admin.dashboard.title": "Admin-overblik",
   "admin.dashboard.pendingInvitations": "Afventende invitationer",
   "admin.dashboard.promotedListings": "Fremhævede boliger",
@@ -378,6 +383,11 @@ const en: Translations = {
 
   "roleGuard.loadError": "Couldn't load your profile.",
   "roleGuard.retry": "Retry",
+
+  "errorBoundary.title": "Something went wrong.",
+  "errorBoundary.description": "The page hit an unexpected error. Try reloading the page.",
+  "errorBoundary.reload": "Reload page",
+  "errorBoundary.goHome": "Go home",
 
   "admin.dashboard.title": "Admin overview",
   "admin.dashboard.pendingInvitations": "Pending invitations",

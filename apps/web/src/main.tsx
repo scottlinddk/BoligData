@@ -1,13 +1,15 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n";
 import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
 import { ToastProvider } from "@/components/toast";
+import { AuthProvider } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
+import { RouteErrorBoundary } from "@/components/error-boundary";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
 import { DashboardPage } from "@/routes/dashboard";
@@ -23,101 +25,93 @@ import { ResetPasswordPage } from "@/routes/auth/reset-password";
 import { UpdatePasswordPage } from "@/routes/auth/update-password";
 import "./index.css";
 
-function Layout({ children }: { children: React.ReactNode }) {
+function RootLayout() {
   return (
     <div className="min-h-full bg-paper font-sans text-ink">
       <Header />
-      <main>{children}</main>
+      <main>
+        <Outlet />
+      </main>
     </div>
   );
 }
 
 const router = createBrowserRouter([
-  { path: "/", element: <Layout><SearchPage /></Layout> },
   {
-    path: "/property/:id",
-    element: (
-      <Layout>
-        <AuthGuard>
-          <PropertyDetailPage />
-        </AuthGuard>
-      </Layout>
-    ),
+    element: <RootLayout />,
+    errorElement: <RouteErrorBoundary />,
+    children: [
+      { path: "/", element: <SearchPage /> },
+      {
+        path: "/property/:id",
+        element: (
+          <AuthGuard>
+            <PropertyDetailPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/dashboard",
+        element: (
+          <AuthGuard>
+            <DashboardPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/admin",
+        element: (
+          <RoleGuard allowed={["admin"]}>
+            <AdminDashboardPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/admin/invitations",
+        element: (
+          <RoleGuard allowed={["admin"]}>
+            <AdminInvitationsPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/admin/users",
+        element: (
+          <RoleGuard allowed={["admin"]}>
+            <AdminUsersPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/admin/advisor-connections",
+        element: (
+          <RoleGuard allowed={["admin"]}>
+            <AdminAdvisorConnectionsPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/advisor",
+        element: (
+          <RoleGuard allowed={["advisor"]}>
+            <AdvisorPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/agent",
+        element: (
+          <RoleGuard allowed={["agent"]}>
+            <AgentPage />
+          </RoleGuard>
+        ),
+      },
+      { path: "/auth/signin", element: <SignInPage /> },
+      { path: "/auth/signup", element: <SignUpPage /> },
+      { path: "/auth/reset-password", element: <ResetPasswordPage /> },
+      { path: "/auth/update-password", element: <UpdatePasswordPage /> },
+    ],
   },
-  {
-    path: "/dashboard",
-    element: (
-      <Layout>
-        <AuthGuard>
-          <DashboardPage />
-        </AuthGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/admin",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["admin"]}>
-          <AdminDashboardPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/admin/invitations",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["admin"]}>
-          <AdminInvitationsPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/admin/users",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["admin"]}>
-          <AdminUsersPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/admin/advisor-connections",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["admin"]}>
-          <AdminAdvisorConnectionsPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/advisor",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["advisor"]}>
-          <AdvisorPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  {
-    path: "/agent",
-    element: (
-      <Layout>
-        <RoleGuard allowed={["agent"]}>
-          <AgentPage />
-        </RoleGuard>
-      </Layout>
-    ),
-  },
-  { path: "/auth/signin", element: <Layout><SignInPage /></Layout> },
-  { path: "/auth/signup", element: <Layout><SignUpPage /></Layout> },
-  { path: "/auth/reset-password", element: <Layout><ResetPasswordPage /></Layout> },
-  { path: "/auth/update-password", element: <Layout><UpdatePasswordPage /></Layout> },
 ]);
 
 const queryClient = new QueryClient({
@@ -137,9 +131,11 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <I18nProvider>
         <QueryClientProvider client={queryClient}>
-          <ToastProvider>
-            <RouterProvider router={router} />
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <RouterProvider router={router} />
+            </ToastProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </I18nProvider>
     </ThemeProvider>
