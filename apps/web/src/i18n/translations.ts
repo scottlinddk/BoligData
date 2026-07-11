@@ -32,6 +32,7 @@ const da = {
   "search.pageSize": "Pr. side",
   "search.signInForDetails": "Log ind for at se pris, m² og andre detaljer for hvert match.",
 
+  "filters.title": "Filtre",
   "filters.location": "Område",
   "filters.locationPlaceholder": "f.eks. Aalborg",
   "filters.minPrice": "Min. pris",
@@ -163,6 +164,7 @@ const en: Translations = {
   "search.pageSize": "Per page",
   "search.signInForDetails": "Sign in to see price, size, and other details for each match.",
 
+  "filters.title": "Filters",
   "filters.location": "Location",
   "filters.locationPlaceholder": "e.g. Aalborg",
   "filters.minPrice": "Min price",

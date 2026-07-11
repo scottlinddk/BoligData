@@ -55,9 +55,9 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
 }
 
 const STATUS_STYLES: Record<ChecklistItem["status"], string> = {
-  ok: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
-  warning: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
-  unknown: "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+  ok: "bg-success-soft text-success-text border-success-soft",
+  warning: "bg-warning-soft text-warning-text border-warning-soft",
+  unknown: "bg-unknown-soft text-unknown-text border-unknown-soft",
 };
 
 export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | null }) {
@@ -65,16 +65,13 @@ export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | nu
   const items = buildChecklist(riskFlags, t);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h3 className="mb-3 font-semibold text-slate-900 dark:text-slate-100">{t("dueDiligence.title")}</h3>
+    <div className="rounded-2xl border border-border bg-surface p-4">
+      <h3 className="mb-3 text-[15px] font-extrabold text-ink">{t("dueDiligence.title")}</h3>
       <ul className="flex flex-col gap-2">
         {items.map((item) => (
-          <li
-            key={item.label}
-            className={`rounded-md border px-3 py-2 text-sm ${STATUS_STYLES[item.status]}`}
-          >
-            <div className="font-medium">{item.label}</div>
-            <div className="text-xs opacity-80">{item.detail}</div>
+          <li key={item.label} className={`rounded-lg border px-3 py-2 text-sm ${STATUS_STYLES[item.status]}`}>
+            <div className="font-bold">{item.label}</div>
+            <div className="mt-0.5 text-xs opacity-85">{item.detail}</div>
           </li>
         ))}
       </ul>

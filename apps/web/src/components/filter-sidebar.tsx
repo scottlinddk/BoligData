@@ -7,6 +7,10 @@ interface FilterSidebarProps {
   onChange: (patch: Partial<FiltersWithSort>) => void;
 }
 
+const FIELD_LABEL = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft";
+const FIELD_INPUT =
+  "rounded-lg border border-border bg-paper px-2.5 py-2 text-sm font-medium text-ink placeholder:text-ink-faint";
+
 function NumberField({
   label,
   value,
@@ -17,13 +21,13 @@ function NumberField({
   onChange: (value: number | null) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+    <label className={FIELD_LABEL}>
       {label}
       <input
         type="number"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        className={FIELD_INPUT}
       />
     </label>
   );
@@ -33,15 +37,17 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   const { t } = useI18n();
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+    <aside className="flex w-64 shrink-0 flex-col gap-3.5 rounded-2xl border border-border bg-surface p-4.5">
+      <span className="font-mono text-xs uppercase tracking-widest text-ink">{t("filters.title")}</span>
+
+      <label className={FIELD_LABEL}>
         {t("filters.location")}
         <input
           type="text"
           placeholder={t("filters.locationPlaceholder")}
           value={filters.location ?? ""}
           onChange={(e) => onChange({ location: e.target.value || null })}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className={FIELD_INPUT}
         />
       </label>
 
@@ -68,7 +74,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
         onChange={(v) => onChange({ maxDaysOnMarket: v })}
       />
 
-      <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+      <label className={FIELD_LABEL}>
         {t("filters.sortBy")}
         <select
           value={`${filters.sortField}:${filters.sortDirection}`}
@@ -79,7 +85,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
               sortDirection: sortDirection as FiltersWithSort["sortDirection"],
             });
           }}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className={FIELD_INPUT}
         >
           {SORT_OPTIONS.map((value) => (
             <option key={value} value={value}>

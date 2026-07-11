@@ -28,17 +28,15 @@ export function SignUpPage() {
   if (submitted) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-center">
-        <h1 className="mb-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-          {t("auth.signUp.checkEmail")}
-        </h1>
-        <p className="text-slate-600 dark:text-slate-300">{t("auth.signUp.confirmationSent", { email })}</p>
+        <h1 className="mb-2 font-serif text-3xl italic text-ink">{t("auth.signUp.checkEmail")}</h1>
+        <p className="font-medium text-ink-soft">{t("auth.signUp.confirmationSent", { email })}</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("auth.signUp.title")}</h1>
+      <h1 className="mb-6 font-serif text-3xl italic text-ink">{t("auth.signUp.title")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="email"
@@ -46,7 +44,7 @@ export function SignUpPage() {
           placeholder={t("auth.email")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-ink"
         />
         <input
           type="password"
@@ -55,18 +53,18 @@ export function SignUpPage() {
           placeholder={t("auth.signUp.passwordPlaceholder")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-ink"
         />
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm font-semibold text-danger">{error}</p>}
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-brand-600 px-3 py-2 text-white hover:bg-brand-700 disabled:opacity-50"
+          className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover disabled:opacity-50"
         >
           {submitting ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
         </button>
       </form>
-      <div className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+      <div className="mt-4 text-sm font-semibold text-ink-soft">
         {t("auth.signUp.haveAccount")} <Link to="/auth/signin">{t("auth.signIn.title")}</Link>
       </div>
     </div>

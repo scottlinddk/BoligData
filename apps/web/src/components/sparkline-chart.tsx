@@ -10,10 +10,10 @@ export function SparklineChart({ points, width = 240, height = 60 }: SparklineCh
   const { t } = useI18n();
 
   if (points.length === 0) {
-    return <div className="text-xs text-slate-400 dark:text-slate-500">{t("comparables.noHistory")}</div>;
+    return <div className="text-xs font-medium text-ink-faint">{t("comparables.noHistory")}</div>;
   }
   if (points.length === 1) {
-    return <div className="text-xs text-slate-500 dark:text-slate-400">{t("comparables.onePoint")}</div>;
+    return <div className="text-xs font-medium text-ink-soft">{t("comparables.onePoint")}</div>;
   }
 
   const min = Math.min(...points);
@@ -32,7 +32,7 @@ export function SparklineChart({ points, width = 240, height = 60 }: SparklineCh
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="overflow-visible text-brand-600 dark:text-blue-400"
+      className="overflow-visible text-brand"
     >
       <polyline points={coords.join(" ")} fill="none" stroke="currentColor" strokeWidth={2} />
       {coords.map((point, i) => {

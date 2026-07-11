@@ -29,22 +29,22 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="mb-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("dashboard.title")}</h1>
+      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("dashboard.title")}</h1>
 
-      {isLoading && <p className="text-slate-500 dark:text-slate-400">{t("dashboard.loading")}</p>}
+      {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
       {!isLoading && searches.length === 0 && (
-        <p className="text-slate-500 dark:text-slate-400">{t("dashboard.empty")}</p>
+        <p className="font-semibold text-ink-soft">{t("dashboard.empty")}</p>
       )}
 
       <ul className="flex flex-col gap-3">
         {searches.map((search) => (
           <li
             key={search.id}
-            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            className="flex items-center justify-between rounded-2xl border border-border bg-surface p-4"
           >
             <div>
-              <div className="font-medium text-slate-900 dark:text-slate-100">{search.name}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
+              <div className="font-bold text-ink">{search.name}</div>
+              <div className="mt-0.5 text-xs font-semibold text-ink-soft">
                 {t("dashboard.lastAlert", {
                   date: search.lastAlertAt
                     ? new Date(search.lastAlertAt).toLocaleDateString(dateLocale)
@@ -56,7 +56,7 @@ export function DashboardPage() {
               value={search.alertFrequency}
               disabled={pendingId === search.id}
               onChange={(e) => handleAlertChange(search.id, e.target.value as AlertFrequency)}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
             >
               {ALERT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>

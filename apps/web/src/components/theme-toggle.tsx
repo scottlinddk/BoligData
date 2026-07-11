@@ -13,7 +13,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={label}
       title={label}
-      className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+      className="flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-border bg-surface text-ink-soft hover:bg-surface-alt"
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

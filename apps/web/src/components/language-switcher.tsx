@@ -11,7 +11,7 @@ export function LanguageSwitcher() {
         value={language}
         onChange={(e) => setLanguage(e.target.value as Language)}
         aria-label={t("controls.language")}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-ink-soft hover:bg-surface-alt"
       >
         {LANGUAGES.map((lang) => (
           <option key={lang} value={lang}>
