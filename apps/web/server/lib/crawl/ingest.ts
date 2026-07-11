@@ -5,6 +5,7 @@ import { fetchBoligaListings } from "./boliga.js";
 import { enrichProperty } from "./enrich.js";
 import { listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
+import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
 
 const CHUNK_SIZE = 500;
 const MAX_ERRORS_REPORTED = 10;
@@ -38,6 +39,8 @@ export interface IngestSourceReport {
   enriched: number;
   /** Listings whose content_hash was unchanged and enrichment already exists. */
   enrichSkippedUnchanged: number;
+  /** Address/cadastral lookups (id_lokalid/matrikelnr/ejerlav/zone) that failed — the property upsert still proceeds with those fields null. */
+  cadastralLookupFailed: number;
   dbErrors: number;
   errors: string[];
   durationMs: number;
@@ -73,6 +76,7 @@ async function ingestSource(
     skippedInvalid: 0,
     enriched: 0,
     enrichSkippedUnchanged: 0,
+    cadastralLookupFailed: 0,
     dbErrors: 0,
     errors: [],
     durationMs: 0,
@@ -126,13 +130,42 @@ async function ingestSource(
     }
   }
 
+  // Cadastral lookup (id_lokalid/matrikelnr/ejerlav/zone) is per-property,
+  // not per-enrichment-source — it's needed both on the properties row and
+  // later (Fase 3/4) as input to enrichProperty, so it's resolved once here
+  // rather than inside enrich.ts. A failed lookup doesn't block the upsert;
+  // the four columns simply stay null for that property.
+  const cadastralByExternalId = new Map<string, AddressCadastral | null>();
+  for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
+    const results = await Promise.all(
+      listingChunk.map((l) => lookupAddressCadastral(l.address, l.postal_code, l.lat, l.lon)),
+    );
+    results.forEach((result, i) => {
+      const listing = listingChunk[i]!;
+      if (result.ok) {
+        cadastralByExternalId.set(listing.external_id, result.data);
+      } else {
+        cadastralByExternalId.set(listing.external_id, null);
+        report.cadastralLookupFailed += 1;
+        pushError(report, `cadastral lookup (${listing.external_id}): ${result.error}`);
+      }
+    });
+  }
+
   const propertyIdByExternalId = new Map<string, string>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
-    const rows = listingChunk.map((l) => ({
-      ...l,
-      content_hash: hashByExternalId.get(l.external_id),
-      last_seen_at: now,
-    }));
+    const rows = listingChunk.map((l) => {
+      const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
+      return {
+        ...l,
+        content_hash: hashByExternalId.get(l.external_id),
+        last_seen_at: now,
+        id_lokalid: cadastral?.idLokalid ?? null,
+        matrikelnr: cadastral?.matrikelnr ?? null,
+        ejerlav: cadastral?.ejerlav ?? null,
+        zone: cadastral?.zone ?? null,
+      };
+    });
     const { data, error } = await client
       .from("properties")
       .upsert(rows, { onConflict: "listing_source,external_id" })
@@ -196,7 +229,7 @@ async function ingestSource(
       rows = await Promise.all(
         enrichChunk.map(async (listing) => ({
           property_id: propertyIdByExternalId.get(listing.external_id)!,
-          ...(await enrichProperty(listing)),
+          ...(await enrichProperty(listing, cadastralByExternalId.get(listing.external_id) ?? null)),
         })),
       );
     } catch (err) {

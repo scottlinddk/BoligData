@@ -5,6 +5,8 @@ interface ChecklistItem {
   label: string;
   status: "ok" | "warning" | "unknown";
   detail: string;
+  /** When set, `detail` is rendered as a link (e.g. the tinglysning.dk deep-link for the encumbrance item). */
+  href?: string | null;
 }
 
 function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistItem[] {
@@ -18,6 +20,22 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     }));
   }
 
+  const soil = riskFlags.soilContamination;
+  const soilStatus: ChecklistItem["status"] =
+    soil.classification === "v1" || soil.classification === "v2"
+      ? "warning"
+      : soil.classification === "unknown"
+        ? "unknown"
+        : "ok";
+  const soilDetailKey =
+    soil.classification === "v2"
+      ? "dueDiligence.soil.v2"
+      : soil.classification === "v1"
+        ? "dueDiligence.soil.v1"
+        : soil.classification === "unknown"
+          ? "dueDiligence.soil.unknown"
+          : "dueDiligence.soil.none";
+
   return [
     {
       label: t("dueDiligence.noise.label"),
@@ -29,10 +47,11 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     },
     {
       label: t("dueDiligence.encumbrance.label"),
-      status: riskFlags.encumbranceCheckRequired ? "warning" : "ok",
-      detail: riskFlags.encumbranceCheckRequired
-        ? t("dueDiligence.encumbrance.warning")
-        : t("dueDiligence.encumbrance.ok"),
+      status: "warning",
+      detail: riskFlags.encumbranceLookupUrl
+        ? t("dueDiligence.encumbrance.linkLabel")
+        : t("dueDiligence.encumbrance.warning"),
+      href: riskFlags.encumbranceLookupUrl,
     },
     {
       label: t("dueDiligence.sewer.label"),
@@ -48,8 +67,8 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     },
     {
       label: t("dueDiligence.soil.label"),
-      status: riskFlags.soilContaminationRisk ? "warning" : "ok",
-      detail: riskFlags.soilContaminationRisk ? t("dueDiligence.soil.warning") : t("dueDiligence.soil.ok"),
+      status: soilStatus,
+      detail: t(soilDetailKey),
     },
   ];
 }
@@ -71,7 +90,15 @@ export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | nu
         {items.map((item) => (
           <li key={item.label} className={`rounded-lg border px-3 py-2 text-sm ${STATUS_STYLES[item.status]}`}>
             <div className="font-bold">{item.label}</div>
-            <div className="mt-0.5 text-xs opacity-85">{item.detail}</div>
+            <div className="mt-0.5 text-xs opacity-85">
+              {item.href ? (
+                <a href={item.href} target="_blank" rel="noreferrer" className="underline">
+                  {item.detail}
+                </a>
+              ) : (
+                item.detail
+              )}
+            </div>
           </li>
         ))}
       </ul>

@@ -29,6 +29,8 @@ export interface ListingImage {
   sources: ListingImageSource[];
 }
 
+export type ZoneStatus = "byzone" | "landzone" | "sommerhusomraade";
+
 export interface Property {
   id: string;
   address: string;
@@ -52,6 +54,13 @@ export interface Property {
   isPromoted: boolean;
   promotedAt: string | null;
   promotedBy: string | null;
+  /** Stable address UUID from DAWA/Adressevælger — the cross-registry join key BBR and Plandata key off of. */
+  idLokalid: string | null;
+  /** Cadastral parcel number (matrikelnummer), from DAWA/DAR. */
+  matrikelnr: string | null;
+  /** Cadastral district (ejerlav), from DAWA/DAR. */
+  ejerlav: string | null;
+  zone: ZoneStatus | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,12 +79,27 @@ export interface CalculatedMetrics {
   daysOnMarket: number;
 }
 
+export type SoilContaminationClassification = "v1" | "v2" | "none" | "unknown";
+
+/** Danmarks Miljøportal V1/V2 status (authoritative) plus GEUS jordart context (never overrides the classification). */
+export interface SoilContamination {
+  classification: SoilContaminationClassification;
+  jordart: string | null;
+}
+
+export type OilTankRiskSource = "bbr" | "heuristic";
+
 export interface RiskFlags {
   noiseExposureLden: number | null;
+  /** Always true in real (non-mock) mode: tinglysning.dk has no open API, so this stays advisory — see encumbranceLookupUrl. */
   encumbranceCheckRequired: boolean;
+  /** Deep link to tinglysning.dk built from the property's matrikelnr/ejerlav, null when cadastral data is unavailable. */
+  encumbranceLookupUrl: string | null;
   sewerSeparationRequired: boolean;
   oilTankRisk: boolean;
-  soilContaminationRisk: boolean;
+  /** Whether oilTankRisk came from BBR's real heating-installation data or the building-year heuristic fallback. */
+  oilTankRiskSource: OilTankRiskSource;
+  soilContamination: SoilContamination;
 }
 
 export interface SchoolTransportInfo {
@@ -91,6 +115,8 @@ export interface BbrData {
   energyLabel: string | null;
   areaSqm: number | null;
   buildingType: string | null;
+  /** Raw BBR varmeinstallation code/label (e.g. "oliefyr"), null until real Datafordeler BBR access lands. */
+  heatingInstallation: string | null;
 }
 
 export type EnrichmentSource = "mock" | "datafordeler" | "ois" | "vejdirektoratet";

@@ -39,6 +39,10 @@ export function rowToProperty(row: Record<string, any>): Property {
     isPromoted: row.is_promoted ?? false,
     promotedAt: row.promoted_at ?? null,
     promotedBy: row.promoted_by ?? null,
+    idLokalid: row.id_lokalid ?? null,
+    matrikelnr: row.matrikelnr ?? null,
+    ejerlav: row.ejerlav ?? null,
+    zone: row.zone ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
