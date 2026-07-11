@@ -90,6 +90,7 @@ export function rowToAdminUser(row: Record<string, any>): AdminUser {
     role: row.role,
     organizationName: row.organization_name,
     createdAt: row.created_at,
+    inviteAccepted: row.email_confirmed_at != null,
   };
 }
 

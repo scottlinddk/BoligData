@@ -33,6 +33,7 @@ function str(v: unknown): string | undefined {
  *
  *   GET    /api/admin?resource=invitations
  *   POST   /api/admin?resource=invitations
+ *   POST   /api/admin?resource=invitations&id=:id (resend)
  *   DELETE /api/admin?resource=invitations&id=:id
  *   GET    /api/admin?resource=users
  *   PATCH  /api/admin?resource=users&id=:id
@@ -133,6 +134,45 @@ async function handleInvitations(
     return;
   }
 
+  if (req.method === "POST" && id !== undefined) {
+    if (!isUuid(id)) {
+      sendError(res, 400, "Invalid invitation id");
+      return;
+    }
+    const { data: invitation, error: fetchError } = await client
+      .from("invitations")
+      .select("*")
+      .eq("id", id)
+      .eq("status", "pending")
+      .single();
+    if (fetchError || !invitation) {
+      sendError(res, 404, "Pending invitation not found", fetchError ?? undefined);
+      return;
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL;
+    const { error: inviteError } = await getAuthAdmin(client).inviteUserByEmail(invitation.email, {
+      redirectTo: frontendUrl ? `${frontendUrl}/auth/update-password` : undefined,
+    });
+    if (inviteError) {
+      sendError(res, 500, "Failed to resend invitation email", inviteError);
+      return;
+    }
+
+    const { data: updated, error: updateError } = await client
+      .from("invitations")
+      .update({ invited_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (updateError || !updated) {
+      sendError(res, 500, "Failed to update invitation", updateError ?? undefined);
+      return;
+    }
+    res.status(200).json(rowToInvitation(updated));
+    return;
+  }
+
   if (req.method === "DELETE" && id !== undefined) {
     if (!isUuid(id)) {
       sendError(res, 400, "Invalid invitation id");
@@ -173,8 +213,13 @@ async function handleUsers(
       return;
     }
     const emailById = new Map(userList.users.map((u) => [u.id, u.email ?? ""]));
+    const confirmedById = new Map(userList.users.map((u) => [u.id, u.email_confirmed_at ?? null]));
     const users = (profiles ?? []).map((row) =>
-      rowToAdminUser({ ...row, email: emailById.get(row.id) ?? "" }),
+      rowToAdminUser({
+        ...row,
+        email: emailById.get(row.id) ?? "",
+        email_confirmed_at: confirmedById.get(row.id) ?? null,
+      }),
     );
     res.status(200).json({ users });
     return;
@@ -208,7 +253,13 @@ async function handleUsers(
       return;
     }
     const { data: authUser } = await getAuthAdmin(client).getUserById(id);
-    res.status(200).json(rowToAdminUser({ ...data, email: authUser?.user?.email ?? "" }));
+    res.status(200).json(
+      rowToAdminUser({
+        ...data,
+        email: authUser?.user?.email ?? "",
+        email_confirmed_at: authUser?.user?.email_confirmed_at ?? null,
+      }),
+    );
     return;
   }
 
