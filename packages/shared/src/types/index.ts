@@ -35,6 +35,10 @@ export interface Property {
   imageUrls: string[];
   description: string | null;
   agentName: string | null;
+  agentUserId: string | null;
+  isPromoted: boolean;
+  promotedAt: string | null;
+  promotedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -90,12 +94,67 @@ export interface Enrichment {
   enrichedAt: string;
 }
 
-export type UserRole = "investor" | "advisor";
+export type UserRole = "admin" | "user" | "advisor" | "agent";
 
 export interface UserProfile {
   id: string;
   role: UserRole;
   organizationName: string | null;
+  createdAt: string;
+}
+
+export type InvitationStatus = "pending" | "accepted" | "revoked";
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: UserRole;
+  invitedBy: string | null;
+  status: InvitationStatus;
+  invitedAt: string;
+  acceptedAt: string | null;
+}
+
+/** A user_profiles row joined with its auth.users email, for admin listings. */
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  organizationName: string | null;
+  createdAt: string;
+}
+
+export interface FavoriteProperty {
+  id: string;
+  userId: string;
+  propertyId: string;
+  createdAt: string;
+}
+
+export interface AdvisorConnection {
+  id: string;
+  advisorId: string;
+  userId: string;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface ListingApproval {
+  id: string;
+  propertyId: string;
+  advisorId: string;
+  userId: string;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  searchId: string;
+  propertyId: string;
+  alertId: string | null;
+  readAt: string | null;
   createdAt: string;
 }
 

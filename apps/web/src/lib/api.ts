@@ -1,12 +1,24 @@
 import type {
+  AdminDashboardResponse,
+  AdminUsersResponse,
+  AdvisorConnectionsResponse,
+  AgentListingsResponse,
+  ApproveListingBody,
   ComparablesResponse,
+  CreateAdvisorConnectionBody,
+  CreateFavoriteBody,
+  CreateInvitationBody,
   CreateSearchBody,
+  FavoritesResponse,
+  InvitationsResponse,
+  NotificationsResponse,
   PropertyDetailResponse,
   SearchPropertiesQuery,
   SearchPropertiesResponse,
+  UpdateAdminUserBody,
   UpdateAlertBody,
 } from "@shared/types/api";
-import type { SavedSearch } from "@shared/types/index";
+import type { AdminUser, Invitation, Property, SavedSearch } from "@shared/types/index";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -25,6 +37,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `Request failed: ${res.status}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -54,4 +67,98 @@ export function createSearch(body: CreateSearchBody): Promise<SavedSearch> {
 
 export function updateAlert(searchId: string, body: UpdateAlertBody): Promise<SavedSearch> {
   return request(`/searches/${searchId}/alerts`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function listFavorites(): Promise<FavoritesResponse> {
+  return request(`/favorites`);
+}
+
+export function addFavorite(body: CreateFavoriteBody): Promise<void> {
+  return request(`/favorites`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function removeFavorite(propertyId: string): Promise<void> {
+  return request(`/favorites/${propertyId}`, { method: "DELETE" });
+}
+
+export function listNotifications(unreadOnly = false): Promise<NotificationsResponse> {
+  return request(`/notifications${unreadOnly ? "?unreadOnly=true" : ""}`);
+}
+
+export function markNotificationRead(id: string): Promise<void> {
+  return request(`/notifications/${id}/read`, { method: "PATCH" });
+}
+
+// --- Admin ---
+
+export function listInvitations(): Promise<InvitationsResponse> {
+  return request(`/admin/invitations`);
+}
+
+export function createInvitation(body: CreateInvitationBody): Promise<Invitation> {
+  return request(`/admin/invitations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function revokeInvitation(id: string): Promise<Invitation> {
+  return request(`/admin/invitations/${id}`, { method: "DELETE" });
+}
+
+export function listAdminUsers(): Promise<AdminUsersResponse> {
+  return request(`/admin/users`);
+}
+
+export function updateAdminUser(id: string, body: UpdateAdminUserBody): Promise<AdminUser> {
+  return request(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function listAdminAdvisorConnections(): Promise<AdvisorConnectionsResponse> {
+  return request(`/admin/advisor-connections`);
+}
+
+export function createAdvisorConnection(body: CreateAdvisorConnectionBody) {
+  return request(`/admin/advisor-connections`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function deleteAdvisorConnection(id: string): Promise<void> {
+  return request(`/admin/advisor-connections/${id}`, { method: "DELETE" });
+}
+
+export function getAdminDashboard(): Promise<AdminDashboardResponse> {
+  return request(`/admin/dashboard`);
+}
+
+// --- Advisor ---
+
+export function listAdvisorConnections(): Promise<AdvisorConnectionsResponse> {
+  return request(`/advisor/connections`);
+}
+
+export function listAdvisorFavorites(): Promise<FavoritesResponse> {
+  return request(`/advisor/favorites`);
+}
+
+export function approveListing(propertyId: string, body: ApproveListingBody) {
+  return request(`/listings/${propertyId}/approve`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function unapproveListing(propertyId: string, userId: string): Promise<void> {
+  return request(`/listings/${propertyId}/approve?userId=${userId}`, { method: "DELETE" });
+}
+
+// --- Agent ---
+
+export function claimListing(propertyId: string): Promise<Property> {
+  return request(`/listings/${propertyId}/claim`, { method: "POST" });
+}
+
+export function promoteListing(propertyId: string): Promise<Property> {
+  return request(`/listings/${propertyId}/promote`, { method: "POST" });
+}
+
+export function unpromoteListing(propertyId: string): Promise<Property> {
+  return request(`/listings/${propertyId}/promote`, { method: "DELETE" });
+}
+
+export function listAgentListings(): Promise<AgentListingsResponse> {
+  return request(`/agent/listings`);
 }

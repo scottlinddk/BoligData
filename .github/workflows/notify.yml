@@ -1,0 +1,51 @@
+name: Daily listing-match notifications
+
+on:
+  schedule:
+    # 06:00 UTC daily — after the 03:00 crawl, so new listings are in.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/notify and report results
+        run: |
+          set -uo pipefail
+
+          headers=(-H "Authorization: Bearer ${CRON_SECRET}")
+          if [ -n "${BYPASS_SECRET}" ]; then
+            headers+=(-H "x-vercel-protection-bypass: ${BYPASS_SECRET}" -H "x-vercel-set-bypass-cookie: true")
+          fi
+
+          http_code=$(curl -sS -X POST "${VERCEL_URL}/api/notify" "${headers[@]}" \
+            -o response.json -w '%{http_code}')
+          curl_status=$?
+
+          if [ "$curl_status" -ne 0 ]; then
+            echo "::error::curl failed to reach ${VERCEL_URL}/api/notify (exit $curl_status)."
+            exit 1
+          fi
+
+          echo "HTTP status: $http_code"
+
+          if ! jq empty response.json 2>/dev/null; then
+            echo "::error::Response body was not JSON — the request likely never reached the notify handler."
+            cat response.json
+            exit 1
+          fi
+
+          echo ""
+          echo "== Notify summary =="
+          jq -r '"due=\(.due) emailed=\([.reports[] | select(.emailed)] | length) errors=\([.reports[] | select(.error)] | length)"' response.json
+
+          ok=$(jq -r '.ok' response.json)
+          if [ "$http_code" != "200" ] || [ "$ok" != "true" ]; then
+            echo "::error::Notify run reported failure (HTTP $http_code, ok=$ok) — see reports above."
+            exit 1
+          fi
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

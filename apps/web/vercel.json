@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/crawl.ts": { "maxDuration": 60 }
+    "api/crawl.ts": { "maxDuration": 60 },
+    "api/notify.ts": { "maxDuration": 60 }
   },
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

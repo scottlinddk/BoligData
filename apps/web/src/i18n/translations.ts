@@ -148,6 +148,64 @@ const da = {
   "auth.updatePassword.backToSignIn": "Gå til log ind",
   "auth.updatePassword.invalidLink": "Dette nulstillingslink er ugyldigt eller udløbet.",
   "auth.updatePassword.requestNewLink": "Anmod om et nyt link",
+
+  "auth.signUp.inviteOnlyTitle": "Kun ved invitation",
+  "auth.signUp.inviteOnlyBody": "BoligData er i øjeblikket kun tilgængeligt via invitation. Kontakt din administrator for at få adgang.",
+
+  "nav.admin": "Admin",
+  "nav.advisor": "Rådgiver",
+  "nav.agent": "Mægler",
+
+  "admin.dashboard.title": "Admin-overblik",
+  "admin.dashboard.pendingInvitations": "Afventende invitationer",
+  "admin.dashboard.promotedListings": "Fremhævede boliger",
+  "admin.dashboard.recentApprovals": "Godkendelser (7 dage)",
+  "admin.dashboard.usersByRole": "Brugere pr. rolle",
+
+  "admin.invitations.title": "Invitationer",
+  "admin.invitations.email": "E-mail",
+  "admin.invitations.role": "Rolle",
+  "admin.invitations.status": "Status",
+  "admin.invitations.invite": "Send invitation",
+  "admin.invitations.sending": "Sender...",
+  "admin.invitations.revoke": "Tilbagekald",
+  "admin.invitations.empty": "Ingen invitationer endnu.",
+  "admin.invitations.emailPlaceholder": "navn@eksempel.dk",
+
+  "admin.users.title": "Brugere",
+  "admin.users.email": "E-mail",
+  "admin.users.role": "Rolle",
+  "admin.users.save": "Gem",
+  "admin.users.empty": "Ingen brugere endnu.",
+
+  "admin.advisorConnections.title": "Rådgiverforbindelser",
+  "admin.advisorConnections.advisor": "Rådgiver",
+  "admin.advisorConnections.user": "Bruger",
+  "admin.advisorConnections.connect": "Forbind",
+  "admin.advisorConnections.remove": "Fjern",
+  "admin.advisorConnections.empty": "Ingen forbindelser endnu.",
+
+  "role.admin": "Admin",
+  "role.user": "Bruger",
+  "role.advisor": "Rådgiver",
+  "role.agent": "Mægler",
+
+  "advisor.title": "Mine kunder",
+  "advisor.favorites": "Favoritboliger",
+  "advisor.approve": "Godkend",
+  "advisor.unapprove": "Fjern godkendelse",
+  "advisor.empty": "Ingen forbundne kunder endnu.",
+
+  "agent.title": "Mine boliger",
+  "agent.claim": "Gør krav på bolig",
+  "agent.promote": "Fremhæv (skuffesalg)",
+  "agent.unpromote": "Fjern fremhævning",
+  "agent.promoted": "Fremhævet",
+  "agent.empty": "Ingen boliger tilknyttet endnu.",
+
+  "notifications.title": "Beskeder",
+  "notifications.empty": "Ingen nye beskeder.",
+  "notifications.markRead": "Markér som læst",
 } as const;
 
 export type TranslationKey = keyof typeof da;
@@ -293,6 +351,64 @@ const en: Translations = {
   "auth.updatePassword.backToSignIn": "Go to sign in",
   "auth.updatePassword.invalidLink": "This reset link is invalid or has expired.",
   "auth.updatePassword.requestNewLink": "Request a new link",
+
+  "auth.signUp.inviteOnlyTitle": "Invite-only",
+  "auth.signUp.inviteOnlyBody": "BoligData is currently invite-only. Contact your administrator to request access.",
+
+  "nav.admin": "Admin",
+  "nav.advisor": "Advisor",
+  "nav.agent": "Agent",
+
+  "admin.dashboard.title": "Admin overview",
+  "admin.dashboard.pendingInvitations": "Pending invitations",
+  "admin.dashboard.promotedListings": "Promoted listings",
+  "admin.dashboard.recentApprovals": "Approvals (7 days)",
+  "admin.dashboard.usersByRole": "Users by role",
+
+  "admin.invitations.title": "Invitations",
+  "admin.invitations.email": "Email",
+  "admin.invitations.role": "Role",
+  "admin.invitations.status": "Status",
+  "admin.invitations.invite": "Send invitation",
+  "admin.invitations.sending": "Sending...",
+  "admin.invitations.revoke": "Revoke",
+  "admin.invitations.empty": "No invitations yet.",
+  "admin.invitations.emailPlaceholder": "name@example.com",
+
+  "admin.users.title": "Users",
+  "admin.users.email": "Email",
+  "admin.users.role": "Role",
+  "admin.users.save": "Save",
+  "admin.users.empty": "No users yet.",
+
+  "admin.advisorConnections.title": "Advisor connections",
+  "admin.advisorConnections.advisor": "Advisor",
+  "admin.advisorConnections.user": "User",
+  "admin.advisorConnections.connect": "Connect",
+  "admin.advisorConnections.remove": "Remove",
+  "admin.advisorConnections.empty": "No connections yet.",
+
+  "role.admin": "Admin",
+  "role.user": "User",
+  "role.advisor": "Advisor",
+  "role.agent": "Agent",
+
+  "advisor.title": "My clients",
+  "advisor.favorites": "Favorited listings",
+  "advisor.approve": "Approve",
+  "advisor.unapprove": "Remove approval",
+  "advisor.empty": "No connected clients yet.",
+
+  "agent.title": "My listings",
+  "agent.claim": "Claim listing",
+  "agent.promote": "Promote (skuffesalg)",
+  "agent.unpromote": "Remove promotion",
+  "agent.promoted": "Promoted",
+  "agent.empty": "No listings associated yet.",
+
+  "notifications.title": "Notifications",
+  "notifications.empty": "No new notifications.",
+  "notifications.markRead": "Mark as read",
 };
 
 export const translations: Record<Language, Translations> = { da, en };
