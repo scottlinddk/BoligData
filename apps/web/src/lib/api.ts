@@ -27,6 +27,15 @@ async function authHeaders(): Promise<HeadersInit> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = await authHeaders();
   const res = await fetch(`/api${path}`, {
@@ -35,7 +44,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(body.error ?? `Request failed: ${res.status}`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -50,11 +59,11 @@ export function searchProperties(query: SearchPropertiesQuery): Promise<SearchPr
 }
 
 export function getProperty(id: string): Promise<PropertyDetailResponse> {
-  return request(`/properties/${id}`);
+  return request(`/properties?id=${id}`);
 }
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
-  return request(`/properties/${id}/comparables`);
+  return request(`/properties?id=${id}&comparables=true`);
 }
 
 export function listSearches(): Promise<SavedSearch[]> {
