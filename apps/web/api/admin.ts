@@ -1,38 +1,45 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { UserRole } from "../../../../packages/shared/src/types/index.js";
+import type { UserRole } from "../../../packages/shared/src/types/index.js";
 import type {
   AdminDashboardResponse,
   CreateAdvisorConnectionBody,
   CreateInvitationBody,
   UpdateAdminUserBody,
-} from "../../../../packages/shared/src/types/api.js";
-import { applyCors } from "../../server/middleware/cors.js";
-import { requireRole } from "../../server/middleware/auth.js";
-import { getAuthAdmin, getServiceRoleClient } from "../../server/lib/supabase.js";
-import { isUuid, sendError } from "../../server/lib/http-helpers.js";
+} from "../../../packages/shared/src/types/api.js";
+import { applyCors } from "../server/middleware/cors.js";
+import { requireRole } from "../server/middleware/auth.js";
+import { getAuthAdmin, getServiceRoleClient } from "../server/lib/supabase.js";
+import { isUuid, sendError } from "../server/lib/http-helpers.js";
 import {
   rowToAdminUser,
   rowToAdvisorConnection,
   rowToInvitation,
-} from "../../server/lib/row-mappers.js";
+} from "../server/lib/row-mappers.js";
 
 const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
 
+function str(v: unknown): string | undefined {
+  return Array.isArray(v) ? v[0] : (v as string | undefined);
+}
+
 /**
- * Consolidated router for every /api/admin/* route. One catch-all file
- * instead of one file per route keeps the Vercel serverless function count
- * under the plan limit. Routes:
+ * Consolidated router for every /api/admin/* action. A flat file with
+ * query-param sub-routing (?resource=users&id=...) instead of a
+ * [...path].ts catch-all folder — Vercel's file-based routing doesn't
+ * reliably populate req.query.path for a folder catch-all in production
+ * (see the api/properties/[...path].ts fix), so this mirrors the query-param
+ * pattern already used by searches.ts/favorites.ts/properties.ts. Routes:
  *
- *   GET    /api/admin/invitations
- *   POST   /api/admin/invitations
- *   DELETE /api/admin/invitations/:id
- *   GET    /api/admin/users
- *   PATCH  /api/admin/users/:id
- *   GET    /api/admin/advisor-connections
- *   POST   /api/admin/advisor-connections
- *   DELETE /api/admin/advisor-connections/:id
- *   GET    /api/admin/dashboard
+ *   GET    /api/admin?resource=invitations
+ *   POST   /api/admin?resource=invitations
+ *   DELETE /api/admin?resource=invitations&id=:id
+ *   GET    /api/admin?resource=users
+ *   PATCH  /api/admin?resource=users&id=:id
+ *   GET    /api/admin?resource=advisor-connections
+ *   POST   /api/admin?resource=advisor-connections
+ *   DELETE /api/admin?resource=advisor-connections&id=:id
+ *   GET    /api/admin?resource=dashboard
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -48,12 +55,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   res.setHeader("Cache-Control", "no-store");
 
-  const raw = req.query.path;
-  const [resource, id, ...rest] = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  if (rest.length > 0) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
+  const resource = str(req.query.resource);
+  const id = str(req.query.id);
 
   switch (resource) {
     case "invitations":

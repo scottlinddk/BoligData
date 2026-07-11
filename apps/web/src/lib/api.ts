@@ -101,39 +101,39 @@ export function markNotificationRead(id: string): Promise<void> {
 // --- Admin ---
 
 export function listInvitations(): Promise<InvitationsResponse> {
-  return request(`/admin/invitations`);
+  return request(`/admin?resource=invitations`);
 }
 
 export function createInvitation(body: CreateInvitationBody): Promise<Invitation> {
-  return request(`/admin/invitations`, { method: "POST", body: JSON.stringify(body) });
+  return request(`/admin?resource=invitations`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export function revokeInvitation(id: string): Promise<Invitation> {
-  return request(`/admin/invitations/${id}`, { method: "DELETE" });
+  return request(`/admin?resource=invitations&id=${id}`, { method: "DELETE" });
 }
 
 export function listAdminUsers(): Promise<AdminUsersResponse> {
-  return request(`/admin/users`);
+  return request(`/admin?resource=users`);
 }
 
 export function updateAdminUser(id: string, body: UpdateAdminUserBody): Promise<AdminUser> {
-  return request(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  return request(`/admin?resource=users&id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
 export function listAdminAdvisorConnections(): Promise<AdvisorConnectionsResponse> {
-  return request(`/admin/advisor-connections`);
+  return request(`/admin?resource=advisor-connections`);
 }
 
 export function createAdvisorConnection(body: CreateAdvisorConnectionBody) {
-  return request(`/admin/advisor-connections`, { method: "POST", body: JSON.stringify(body) });
+  return request(`/admin?resource=advisor-connections`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export function deleteAdvisorConnection(id: string): Promise<void> {
-  return request(`/admin/advisor-connections/${id}`, { method: "DELETE" });
+  return request(`/admin?resource=advisor-connections&id=${id}`, { method: "DELETE" });
 }
 
 export function getAdminDashboard(): Promise<AdminDashboardResponse> {
-  return request(`/admin/dashboard`);
+  return request(`/admin?resource=dashboard`);
 }
 
 // --- Advisor ---
