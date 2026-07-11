@@ -17,7 +17,7 @@ const listing: RawListing = {
   building_year: 1960,
   property_type: "villa",
   rooms: 4,
-  image_urls: [],
+  images: [],
   description: null,
   agent_name: null,
 };

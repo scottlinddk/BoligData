@@ -1,3 +1,5 @@
+import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
+
 export type ListingSource = "boligsiden" | "boliga";
 
 export interface RawListing {
@@ -15,7 +17,7 @@ export interface RawListing {
   building_year: number | null;
   property_type: string;
   rooms: number | null;
-  image_urls: string[];
+  images: ListingImage[];
   description: string | null;
   agent_name: string | null;
 }

@@ -1,3 +1,4 @@
+import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
 import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
@@ -87,7 +88,7 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
     building_year: asPositiveInt(r.buildYear),
     property_type: (typeCode !== null && PROPERTY_TYPE_BY_CODE[typeCode]) || "other",
     rooms: asPositiveInt(r.rooms),
-    image_urls: asStringArray(r.images),
+    images: asStringArray(r.images).map((url): ListingImage => ({ url, category: "photo", sources: [] })),
     description: null,
     agent_name: null,
   };

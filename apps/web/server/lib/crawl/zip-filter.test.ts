@@ -24,7 +24,7 @@ function listing(postal_code: string | null): RawListing {
     building_year: null,
     property_type: "other",
     rooms: null,
-    image_urls: [],
+    images: [],
     description: null,
     agent_name: null,
   };

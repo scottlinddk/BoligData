@@ -55,7 +55,7 @@ describe("mapBoligaRecord", () => {
       building_year: 1955,
       property_type: "apartment",
       rooms: 3,
-      image_urls: [],
+      images: [],
       description: null,
       agent_name: null,
     });
@@ -98,7 +98,7 @@ describe("mapBoligsidenCase", () => {
       building_year: 1972,
       property_type: "villa",
       rooms: 5,
-      image_urls: [],
+      images: [],
       description: null,
       agent_name: "EDC Aarhus",
     });
@@ -113,6 +113,48 @@ describe("mapBoligsidenCase", () => {
 
   it("normalizes unknown address types to 'other'", () => {
     expect(mapBoligsidenCase({ ...boligsidenCase, addressType: "castle" })?.property_type).toBe("other");
+  });
+
+  it("parses images with categories and sized variants", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      images: [
+        {
+          url: "https://cdn.example/photo-1440x960.jpg",
+          category: "image",
+          imageSources: [
+            { url: "https://cdn.example/photo-300x200.jpg", width: 300, height: 200 },
+            { url: "https://cdn.example/photo-1440x960.jpg", width: 1440, height: 960 },
+          ],
+        },
+        {
+          url: "https://cdn.example/floorplan.jpg",
+          category: "floorplan",
+          imageSources: [{ url: "https://cdn.example/floorplan.jpg", width: 1440, height: 960 }],
+        },
+      ],
+    });
+
+    expect(listing?.images).toEqual([
+      {
+        url: "https://cdn.example/photo-1440x960.jpg",
+        category: "photo",
+        sources: [
+          { url: "https://cdn.example/photo-300x200.jpg", width: 300, height: 200 },
+          { url: "https://cdn.example/photo-1440x960.jpg", width: 1440, height: 960 },
+        ],
+      },
+      {
+        url: "https://cdn.example/floorplan.jpg",
+        category: "floorplan",
+        sources: [{ url: "https://cdn.example/floorplan.jpg", width: 1440, height: 960 }],
+      },
+    ]);
+  });
+
+  it("drops images missing a usable url", () => {
+    const listing = mapBoligsidenCase({ ...boligsidenCase, images: [{ category: "image", imageSources: [] }] });
+    expect(listing?.images).toEqual([]);
   });
 });
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Property } from "@shared/types/index";
-import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, MAP_STYLE_URL } from "@/lib/constants";
+import { DENMARK_BOUNDS, MAP_STYLE_URL } from "@/lib/constants";
 
 interface PropertyMapProps {
   properties: Property[];
@@ -19,8 +19,7 @@ export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
     mapRef.current = new maplibregl.Map({
       container: containerRef.current,
       style: MAP_STYLE_URL,
-      center: DEFAULT_MAP_CENTER,
-      zoom: DEFAULT_MAP_ZOOM,
+      bounds: DENMARK_BOUNDS,
     });
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
@@ -45,6 +44,16 @@ export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
       marker.getElement().addEventListener("click", () => onSelect?.(property));
       return marker;
     });
+
+    if (properties.length === 1) {
+      map.flyTo({ center: [properties[0]!.lon, properties[0]!.lat], zoom: 15 });
+    } else if (properties.length > 1) {
+      const bounds = properties.reduce(
+        (b, p) => b.extend([p.lon, p.lat]),
+        new maplibregl.LngLatBounds([properties[0]!.lon, properties[0]!.lat], [properties[0]!.lon, properties[0]!.lat]),
+      );
+      map.fitBounds(bounds, { padding: 48, maxZoom: 14 });
+    }
   }, [properties, onSelect]);
 
   return <div ref={containerRef} className="h-full w-full rounded-2xl" />;
