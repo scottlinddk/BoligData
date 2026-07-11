@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n";
 import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
+import { ToastProvider } from "@/components/toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
@@ -69,7 +70,9 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <I18nProvider>
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
         </QueryClientProvider>
       </I18nProvider>
     </ThemeProvider>
