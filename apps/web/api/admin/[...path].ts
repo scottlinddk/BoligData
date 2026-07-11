@@ -39,7 +39,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const auth = await requireRole(req, res, ["admin"]);
   if (!auth) return;
-  const client = getServiceRoleClient();
+  let client: SupabaseClient;
+  try {
+    client = getServiceRoleClient();
+  } catch (err) {
+    sendError(res, 500, "Admin API is not configured (missing service role credentials)", err);
+    return;
+  }
   res.setHeader("Cache-Control", "no-store");
 
   const raw = req.query.path;

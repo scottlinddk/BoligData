@@ -12,10 +12,15 @@ export function AdminUsersPage() {
   const queryClient = useQueryClient();
   const usersQuery = useQuery({ queryKey: ["admin", "users"], queryFn: listAdminUsers });
   const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, role }: { id: string; role: UserRole }) => updateAdminUser(id, { role }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+    onError: (err: Error) => setError(err.message),
   });
 
   const users = usersQuery.data?.users ?? [];
@@ -39,6 +44,7 @@ export function AdminUsersPage() {
           className="mb-4 w-full rounded-lg border border-border bg-paper px-3 py-2 text-sm text-ink"
         />
       )}
+      {error && <p className="mb-4 text-sm font-semibold text-danger">{error}</p>}
       {users.length === 0 && <p className="font-semibold text-ink-soft">{t("admin.users.empty")}</p>}
       {users.length > 0 && filteredUsers.length === 0 && (
         <p className="font-semibold text-ink-soft">{t("admin.users.searchEmpty")}</p>
