@@ -110,7 +110,11 @@ async function handleInvitations(
       .select("*")
       .single();
     if (insertError || !invitation) {
-      sendError(res, 409, "An invitation for this email is already pending", insertError ?? undefined);
+      if (insertError?.code === "23505") {
+        sendError(res, 409, "An invitation for this email is already pending", insertError);
+      } else {
+        sendError(res, 500, "Failed to create invitation", insertError ?? undefined);
+      }
       return;
     }
 
