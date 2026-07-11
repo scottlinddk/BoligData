@@ -161,6 +161,7 @@ const da = {
   "admin.dashboard.promotedListings": "Fremhævede boliger",
   "admin.dashboard.recentApprovals": "Godkendelser (7 dage)",
   "admin.dashboard.usersByRole": "Brugere pr. rolle",
+  "admin.dashboard.manageUsers": "Administrer brugere",
 
   "admin.invitations.title": "Invitationer",
   "admin.invitations.email": "E-mail",
@@ -177,6 +178,8 @@ const da = {
   "admin.users.role": "Rolle",
   "admin.users.save": "Gem",
   "admin.users.empty": "Ingen brugere endnu.",
+  "admin.users.searchPlaceholder": "Søg på e-mail eller rolle...",
+  "admin.users.searchEmpty": "Ingen brugere matcher din søgning.",
 
   "admin.advisorConnections.title": "Rådgiverforbindelser",
   "admin.advisorConnections.advisor": "Rådgiver",
@@ -364,6 +367,7 @@ const en: Translations = {
   "admin.dashboard.promotedListings": "Promoted listings",
   "admin.dashboard.recentApprovals": "Approvals (7 days)",
   "admin.dashboard.usersByRole": "Users by role",
+  "admin.dashboard.manageUsers": "Manage users",
 
   "admin.invitations.title": "Invitations",
   "admin.invitations.email": "Email",
@@ -380,6 +384,8 @@ const en: Translations = {
   "admin.users.role": "Role",
   "admin.users.save": "Save",
   "admin.users.empty": "No users yet.",
+  "admin.users.searchPlaceholder": "Search by email or role...",
+  "admin.users.searchEmpty": "No users match your search.",
 
   "admin.advisorConnections.title": "Advisor connections",
   "admin.advisorConnections.advisor": "Advisor",
