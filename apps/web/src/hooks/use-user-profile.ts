@@ -8,10 +8,12 @@ export function useUserProfile() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
       setProfile(null);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -22,18 +24,21 @@ export function useUserProfile() {
       .select("*")
       .eq("id", user.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error: queryError }) => {
         if (cancelled) return;
-        setProfile(
-          data
-            ? {
-                id: data.id,
-                role: data.role,
-                organizationName: data.organization_name,
-                createdAt: data.created_at,
-              }
-            : null,
-        );
+        if (queryError) {
+          console.error("Failed to load user profile", queryError);
+          setError(queryError.message);
+          setProfile(null);
+        } else {
+          setError(null);
+          setProfile({
+            id: data.id,
+            role: data.role,
+            organizationName: data.organization_name,
+            createdAt: data.created_at,
+          });
+        }
         setLoading(false);
       });
     return () => {
@@ -41,5 +46,5 @@ export function useUserProfile() {
     };
   }, [user?.id]);
 
-  return { profile, loading };
+  return { profile, loading, error };
 }
