@@ -55,7 +55,14 @@ export function AdminUsersPage() {
             key={u.id}
             className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
           >
-            <div className="font-bold text-ink">{u.email}</div>
+            <div>
+              <div className="font-bold text-ink">{u.email}</div>
+              {!u.inviteAccepted && (
+                <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                  {t("admin.users.inviteNotAccepted")}
+                </span>
+              )}
+            </div>
             <select
               value={u.role}
               onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value as UserRole })}

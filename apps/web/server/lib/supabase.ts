@@ -44,6 +44,7 @@ export function getServiceRoleClient(): SupabaseClient {
 interface AuthAdminUser {
   id: string;
   email?: string;
+  email_confirmed_at?: string | null;
 }
 
 interface AuthAdmin {

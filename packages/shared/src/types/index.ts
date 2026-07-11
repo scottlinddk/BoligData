@@ -135,6 +135,8 @@ export interface AdminUser {
   role: UserRole;
   organizationName: string | null;
   createdAt: string;
+  /** True once the invitee has confirmed their email (accepted their invite). */
+  inviteAccepted: boolean;
 }
 
 export interface FavoriteProperty {

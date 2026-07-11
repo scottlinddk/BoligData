@@ -108,6 +108,10 @@ export function createInvitation(body: CreateInvitationBody): Promise<Invitation
   return request(`/admin?resource=invitations`, { method: "POST", body: JSON.stringify(body) });
 }
 
+export function resendInvitation(id: string): Promise<Invitation> {
+  return request(`/admin?resource=invitations&id=${id}`, { method: "POST" });
+}
+
 export function revokeInvitation(id: string): Promise<Invitation> {
   return request(`/admin?resource=invitations&id=${id}`, { method: "DELETE" });
 }
