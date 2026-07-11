@@ -18,10 +18,12 @@ export function getAnonClient(jwt?: string): SupabaseClient {
 }
 
 /**
- * Elevated-privilege client that bypasses RLS. Only used by api/crawl.ts,
- * a system job with no end-user context. Requires SUPABASE_SERVICE_ROLE_KEY
- * to be set in the Vercel project's environment variables (no MCP tool can
- * set this — it must be added manually in the dashboard).
+ * Elevated-privilege client that bypasses RLS. Used by api/crawl.ts (a
+ * system job with no end-user context) and by every /api/admin/* route
+ * (api/admin/[...path].ts), which authorizes callers itself via requireRole
+ * before using this client. Requires SUPABASE_SERVICE_ROLE_KEY to be set in
+ * the Vercel project's environment variables (no MCP tool can set this — it
+ * must be added manually in the dashboard).
  */
 export function getServiceRoleClient(): SupabaseClient {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
