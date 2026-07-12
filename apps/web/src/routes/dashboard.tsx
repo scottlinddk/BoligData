@@ -1,7 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
+import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { listNotifications, markNotificationRead } from "@/lib/api";
+import { serializeFilters } from "@/lib/url-filters";
+import { PropertyCard } from "@/components/property-card";
 import { useI18n } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import type { AlertFrequency } from "@shared/types/index";
@@ -16,6 +20,7 @@ const ALERT_OPTIONS: { value: AlertFrequency; labelKey: TranslationKey }[] = [
 export function DashboardPage() {
   const { t, language } = useI18n();
   const { searches, isLoading, updateAlert } = useSavedSearches();
+  const { properties: favoriteProperties, isLoading: favoritesLoading } = useSavedProperties();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -66,44 +71,66 @@ export function DashboardPage() {
         </div>
       )}
 
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("dashboard.title")}</h1>
+      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("dashboard.heading")}</h1>
 
-      {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
-      {!isLoading && searches.length === 0 && (
-        <p className="font-semibold text-ink-soft">{t("dashboard.empty")}</p>
-      )}
+      <div className="mb-8">
+        <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.favoritesTitle")}</h2>
+        {favoritesLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
+        {!favoritesLoading && favoriteProperties.length === 0 && (
+          <p className="font-semibold text-ink-soft">{t("dashboard.favoritesEmpty")}</p>
+        )}
+        {favoriteProperties.length > 0 && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {favoriteProperties.map((property) => (
+              <PropertyCard key={property.id} property={property} />
+            ))}
+          </div>
+        )}
+      </div>
 
-      <ul className="flex flex-col gap-3">
-        {searches.map((search) => (
-          <li
-            key={search.id}
-            className="flex items-center justify-between rounded-2xl border border-border bg-surface p-4"
-          >
-            <div>
-              <div className="font-bold text-ink">{search.name}</div>
-              <div className="mt-0.5 text-xs font-semibold text-ink-soft">
-                {t("dashboard.lastAlert", {
-                  date: search.lastAlertAt
-                    ? new Date(search.lastAlertAt).toLocaleDateString(dateLocale)
-                    : t("dashboard.never"),
-                })}
-              </div>
-            </div>
-            <select
-              value={search.alertFrequency}
-              disabled={pendingId === search.id}
-              onChange={(e) => handleAlertChange(search.id, e.target.value as AlertFrequency)}
-              className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
+      <div>
+        <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.title")}</h2>
+
+        {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
+        {!isLoading && searches.length === 0 && (
+          <p className="font-semibold text-ink-soft">{t("dashboard.empty")}</p>
+        )}
+
+        <ul className="flex flex-col gap-3">
+          {searches.map((search) => (
+            <li
+              key={search.id}
+              className="flex items-center justify-between rounded-2xl border border-border bg-surface p-4"
             >
-              {ALERT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t(opt.labelKey)}
-                </option>
-              ))}
-            </select>
-          </li>
-        ))}
-      </ul>
+              <Link
+                to={`/search?${serializeFilters(search.filters)}`}
+                className="min-w-0 flex-1 hover:opacity-80"
+              >
+                <div className="font-bold text-ink">{search.name}</div>
+                <div className="mt-0.5 text-xs font-semibold text-ink-soft">
+                  {t("dashboard.lastAlert", {
+                    date: search.lastAlertAt
+                      ? new Date(search.lastAlertAt).toLocaleDateString(dateLocale)
+                      : t("dashboard.never"),
+                  })}
+                </div>
+              </Link>
+              <select
+                value={search.alertFrequency}
+                disabled={pendingId === search.id}
+                onChange={(e) => handleAlertChange(search.id, e.target.value as AlertFrequency)}
+                className="ml-3 shrink-0 rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
+              >
+                {ALERT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {t(opt.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

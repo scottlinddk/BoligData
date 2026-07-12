@@ -39,6 +39,7 @@ export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) 
             onClick={() =>
               onChange({
                 location: null,
+                postnummer: null,
                 minPrice: null,
                 maxPrice: null,
                 minSqm: null,

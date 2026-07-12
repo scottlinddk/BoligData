@@ -1,14 +1,14 @@
 /**
  * Tinglysning.dk (the Danish land register / tingbog) has no open API, so
  * the encumbrance checklist item can't be automated into a real true/false.
- * Instead, build a deep link into tinglysning.dk's search form pre-filled
- * with the property's matrikelnr/ejerlav, so an advisor can pull the actual
- * tingbogsattest themselves. The exact query parameter names below are a
- * best guess at a pre-filled search link — verify against tinglysning.dk's
- * live search form before relying on it to land on the right result.
+ * The site's own search ("Forespørg uden log ind") is an interactive SPA
+ * keyed on street/house number/postal code entered by the user — it does
+ * not accept matrikelnr/ejerlav (or anything else) as prefilling query
+ * parameters, so we can't deep-link straight to a result. Point at the
+ * site's real, working entry point instead of a guessed URL that 404s, and
+ * let the due-diligence UI tell the advisor to search by address there.
  */
 export function buildTinglysningUrl(matrikelnr: string | null, ejerlav: string | null): string | null {
   if (!matrikelnr || !ejerlav) return null;
-  const params = new URLSearchParams({ matrikelnummer: matrikelnr, ejerlavsnavn: ejerlav });
-  return `https://www.tinglysning.dk/soeg/tingbog?${params}`;
+  return "https://www.tinglysning.dk/";
 }

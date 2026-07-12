@@ -53,8 +53,7 @@ describe("enrichProperty (mock mode)", () => {
 
   it("builds a tinglysning.dk lookup URL when cadastral data is available", async () => {
     const result = await enrichProperty(listing, cadastral);
-    expect(result.risk_flags.encumbranceLookupUrl).toContain("matrikelnummer=12a");
-    expect(result.risk_flags.encumbranceLookupUrl).toContain("ejerlavsnavn=");
+    expect(result.risk_flags.encumbranceLookupUrl).toBe("https://www.tinglysning.dk/");
   });
 
   it("leaves encumbranceLookupUrl null without cadastral data", async () => {
