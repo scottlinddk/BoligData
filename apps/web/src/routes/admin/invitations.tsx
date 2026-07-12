@@ -61,7 +61,7 @@ export function AdminInvitationsPage() {
           placeholder={t("admin.invitations.emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="min-w-[220px] flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-ink"
+          className="w-full flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-ink sm:w-auto sm:min-w-[220px]"
         />
         <select
           value={role}
@@ -84,48 +84,64 @@ export function AdminInvitationsPage() {
       </form>
       {error && <p className="mb-4 text-sm font-semibold text-danger">{error}</p>}
 
-      {invitations.length === 0 && (
+      {invitationsQuery.isPending && (
+        <ul className="flex flex-col gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <li key={i} className="flex items-center justify-between rounded-xl border border-border bg-surface p-3">
+              <div className="flex flex-col gap-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-surface-alt" />
+                <div className="h-3 w-24 animate-pulse rounded bg-surface-alt" />
+              </div>
+              <div className="h-7 w-28 animate-pulse rounded-lg bg-surface-alt" />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!invitationsQuery.isPending && invitations.length === 0 && (
         <p className="font-semibold text-ink-soft">{t("admin.invitations.empty")}</p>
       )}
-      <ul className="flex flex-col gap-2">
-        {invitations.map((inv) => (
-          <li
-            key={inv.id}
-            className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
-          >
-            <div>
-              <div className="font-bold text-ink">{inv.email}</div>
-              <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-ink-soft">
-                <span>{t(`role.${inv.role}` as TranslationKey)}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 font-bold ${STATUS_STYLES[inv.status] ?? ""}`}
-                >
-                  {t(`admin.invitations.status.${inv.status}` as TranslationKey)}
-                </span>
+      {!invitationsQuery.isPending && invitations.length > 0 && (
+        <ul className="flex flex-col gap-2 animate-fade-up">
+          {invitations.map((inv) => (
+            <li
+              key={inv.id}
+              className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
+            >
+              <div>
+                <div className="font-bold text-ink">{inv.email}</div>
+                <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-ink-soft">
+                  <span>{t(`role.${inv.role}` as TranslationKey)}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-bold ${STATUS_STYLES[inv.status] ?? ""}`}
+                  >
+                    {t(`admin.invitations.status.${inv.status}` as TranslationKey)}
+                  </span>
+                </div>
               </div>
-            </div>
-            {inv.status === "pending" && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => resendMutation.mutate(inv.id)}
-                  disabled={resendMutation.isPending}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink disabled:opacity-50"
-                >
-                  {resendMutation.isPending && resendMutation.variables === inv.id
-                    ? t("admin.invitations.resending")
-                    : t("admin.invitations.resend")}
-                </button>
-                <button
-                  onClick={() => revokeMutation.mutate(inv.id)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink"
-                >
-                  {t("admin.invitations.revoke")}
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+              {inv.status === "pending" && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => resendMutation.mutate(inv.id)}
+                    disabled={resendMutation.isPending}
+                    className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink disabled:opacity-50"
+                  >
+                    {resendMutation.isPending && resendMutation.variables === inv.id
+                      ? t("admin.invitations.resending")
+                      : t("admin.invitations.resend")}
+                  </button>
+                  <button
+                    onClick={() => revokeMutation.mutate(inv.id)}
+                    className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink"
+                  >
+                    {t("admin.invitations.revoke")}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
