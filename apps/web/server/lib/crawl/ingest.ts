@@ -8,7 +8,11 @@ import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
 
 const CHUNK_SIZE = 500;
-const MAX_ERRORS_REPORTED = 10;
+// Fetch-stage errors (e.g. "skipped unmappable record") are capped separately
+// from DB errors so a flood of the former can never crowd out the latter —
+// the DB error is usually the one that actually explains a 502.
+const MAX_FETCH_ERRORS_REPORTED = 5;
+const MAX_DB_ERRORS_REPORTED = 5;
 const ALL_SOURCES: readonly ListingSource[] = ["boligsiden", "boliga"];
 
 /**
@@ -57,10 +61,6 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
-function pushError(report: IngestSourceReport, message: string): void {
-  if (report.errors.length < MAX_ERRORS_REPORTED) report.errors.push(message);
-}
-
 async function ingestSource(
   client: SupabaseClient,
   source: ListingSource,
@@ -82,10 +82,28 @@ async function ingestSource(
     durationMs: 0,
   };
 
+  // Fetch-stage errors (e.g. "skipped unmappable record") are capped
+  // separately from DB errors so a flood of the former can never crowd out
+  // the latter — the DB error is usually the one that actually explains a 502.
+  let fetchErrorsReported = 0;
+  let dbErrorsReported = 0;
+  const pushFetchError = (message: string): void => {
+    if (fetchErrorsReported < MAX_FETCH_ERRORS_REPORTED) {
+      report.errors.push(message);
+      fetchErrorsReported += 1;
+    }
+  };
+  const pushDbError = (message: string): void => {
+    if (dbErrorsReported < MAX_DB_ERRORS_REPORTED) {
+      report.errors.push(message);
+      dbErrorsReported += 1;
+    }
+  };
+
   if (settled.status === "rejected") {
     report.ok = false;
     const reason = settled.reason;
-    pushError(report, reason instanceof Error ? reason.message : String(reason));
+    pushFetchError(reason instanceof Error ? reason.message : String(reason));
     logError("crawl.source.fetch_failed", reason, { source });
     report.durationMs = Date.now() - startedAt;
     return report;
@@ -94,7 +112,7 @@ async function ingestSource(
   const { listings, stats } = settled.value;
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
-  for (const err of stats.errors) pushError(report, err);
+  for (const err of stats.errors) pushFetchError(err);
 
   // A page-fetch error (blocked, drifted API, network failure) makes the
   // fetcher return a resolved promise with zero listings rather than reject
@@ -118,7 +136,7 @@ async function ingestSource(
       .in("external_id", ids);
     if (error) {
       report.dbErrors += 1;
-      pushError(report, `prefetch: ${error.message}`);
+      pushDbError(`prefetch: ${error.message}`);
       logError("crawl.db.prefetch_failed", error, { source });
       continue;
     }
@@ -145,7 +163,7 @@ async function ingestSource(
       if (!result.ok) {
         cadastralByExternalId.set(listing.external_id, null);
         report.cadastralLookupFailed += 1;
-        pushError(report, `cadastral lookup (${listing.external_id}): ${result.error}`);
+        pushFetchError(`cadastral lookup (${listing.external_id}): ${result.error}`);
         return;
       }
       cadastralByExternalId.set(listing.external_id, result.data);
@@ -172,7 +190,7 @@ async function ingestSource(
       .select("id, external_id");
     if (error) {
       report.dbErrors += 1;
-      pushError(report, `properties upsert: ${error.message}`);
+      pushDbError(`properties upsert: ${error.message}`);
       logError("crawl.db.upsert_failed", error, { source, chunkSize: listingChunk.length });
       continue;
     }
@@ -204,7 +222,7 @@ async function ingestSource(
     const { data, error } = await client.from("enrichments").select("property_id").in("property_id", ids);
     if (error) {
       report.dbErrors += 1;
-      pushError(report, `enrichments check: ${error.message}`);
+      pushDbError(`enrichments check: ${error.message}`);
       logError("crawl.db.enrichment_check_failed", error, { source });
       continue;
     }
@@ -234,14 +252,14 @@ async function ingestSource(
       );
     } catch (err) {
       report.dbErrors += 1;
-      pushError(report, `enrich: ${err instanceof Error ? err.message : String(err)}`);
+      pushDbError(`enrich: ${err instanceof Error ? err.message : String(err)}`);
       logError("crawl.enrich_failed", err, { source, chunkSize: enrichChunk.length });
       continue;
     }
     const { error } = await client.from("enrichments").upsert(rows, { onConflict: "property_id" });
     if (error) {
       report.dbErrors += 1;
-      pushError(report, `enrichments upsert: ${error.message}`);
+      pushDbError(`enrichments upsert: ${error.message}`);
       logError("crawl.db.enrichment_upsert_failed", error, { source, chunkSize: rows.length });
       continue;
     }
