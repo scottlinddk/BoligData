@@ -7,12 +7,20 @@ export function logEvent(event: string, fields: Record<string, unknown> = {}): v
   console.log(JSON.stringify({ ts: new Date().toISOString(), event, ...fields }));
 }
 
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return String(err);
+}
+
 export function logError(event: string, err: unknown, fields: Record<string, unknown> = {}): void {
   console.error(
     JSON.stringify({
       ts: new Date().toISOString(),
       event,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMessage(err),
       ...fields,
     }),
   );
