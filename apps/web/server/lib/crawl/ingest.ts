@@ -142,13 +142,13 @@ async function ingestSource(
     );
     results.forEach((result, i) => {
       const listing = listingChunk[i]!;
-      if (result.ok) {
-        cadastralByExternalId.set(listing.external_id, result.data);
-      } else {
+      if (!result.ok) {
         cadastralByExternalId.set(listing.external_id, null);
         report.cadastralLookupFailed += 1;
         pushError(report, `cadastral lookup (${listing.external_id}): ${result.error}`);
+        return;
       }
+      cadastralByExternalId.set(listing.external_id, result.data);
     });
   }
 

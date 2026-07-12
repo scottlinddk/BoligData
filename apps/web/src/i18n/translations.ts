@@ -23,6 +23,7 @@ const da = {
   "controls.theme.toDark": "Skift til mørkt tema",
 
   "common.retry": "Prøv igen",
+  "common.cancel": "Annuller",
 
   "search.loading": "Indlæser boliger...",
   "search.error": "Kunne ikke indlæse boliger.",
@@ -35,6 +36,11 @@ const da = {
   "search.signInLock": "Log ind for detaljer",
   "search.tabList": "Liste",
   "search.tabMap": "Kort",
+  "search.saveSearch": "Gem søgning",
+  "search.saveSearchNamePlaceholder": "Navn på søgning",
+  "search.saveSearchConfirm": "Gem",
+  "search.saveSearchSuccess": "Søgning gemt",
+  "search.saveSearchError": "Kunne ikke gemme søgning",
 
   "filters.title": "Filtre",
   "filters.reset": "Nulstil",
@@ -252,6 +258,7 @@ const en: Translations = {
   "controls.theme.toDark": "Switch to dark theme",
 
   "common.retry": "Try again",
+  "common.cancel": "Cancel",
 
   "search.loading": "Loading properties...",
   "search.error": "Failed to load properties.",
@@ -264,6 +271,11 @@ const en: Translations = {
   "search.signInLock": "Sign in for details",
   "search.tabList": "List",
   "search.tabMap": "Map",
+  "search.saveSearch": "Save search",
+  "search.saveSearchNamePlaceholder": "Search name",
+  "search.saveSearchConfirm": "Save",
+  "search.saveSearchSuccess": "Search saved",
+  "search.saveSearchError": "Failed to save search",
 
   "filters.title": "Filters",
   "filters.reset": "Reset",
