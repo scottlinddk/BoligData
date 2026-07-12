@@ -31,6 +31,10 @@ export interface FetchJsonOptions {
   /** Base for exponential backoff between attempts. */
   baseDelayMs?: number;
   headers?: Record<string, string>;
+  /** Defaults to GET. */
+  method?: string;
+  /** Request body, e.g. a JSON-encoded GraphQL {query, variables} payload. */
+  body?: string;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -76,6 +80,8 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOptions
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, {
+        method: opts.method,
+        body: opts.body,
         signal: controller.signal,
         headers: {
           "User-Agent": CRAWLER_USER_AGENT,
