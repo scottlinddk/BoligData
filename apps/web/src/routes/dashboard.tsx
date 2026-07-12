@@ -103,7 +103,7 @@ export function DashboardPage() {
               className="flex items-center justify-between rounded-2xl border border-border bg-surface p-4"
             >
               <Link
-                to={`/search?${serializeFilters(search.filters)}`}
+                to={`/?${serializeFilters(search.filters)}`}
                 className="min-w-0 flex-1 hover:opacity-80"
               >
                 <div className="font-bold text-ink">{search.name}</div>
