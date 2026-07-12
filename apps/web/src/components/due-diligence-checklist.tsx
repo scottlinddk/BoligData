@@ -20,19 +20,22 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     }));
   }
 
-  const soil = riskFlags.soilContamination;
+  // Older enrichment rows were written before soilContamination existed on
+  // RiskFlags, so the stored JSON can still lack it — guard against that
+  // instead of trusting the type to match what's actually in the DB.
+  const soilClassification = riskFlags.soilContamination?.classification ?? "unknown";
   const soilStatus: ChecklistItem["status"] =
-    soil.classification === "v1" || soil.classification === "v2"
+    soilClassification === "v1" || soilClassification === "v2"
       ? "warning"
-      : soil.classification === "unknown"
+      : soilClassification === "unknown"
         ? "unknown"
         : "ok";
   const soilDetailKey =
-    soil.classification === "v2"
+    soilClassification === "v2"
       ? "dueDiligence.soil.v2"
-      : soil.classification === "v1"
+      : soilClassification === "v1"
         ? "dueDiligence.soil.v1"
-        : soil.classification === "unknown"
+        : soilClassification === "unknown"
           ? "dueDiligence.soil.unknown"
           : "dueDiligence.soil.none";
 
