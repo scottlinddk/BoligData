@@ -35,7 +35,7 @@ export function AdminUsersPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("admin.users.title")}</h1>
-      {users.length > 0 && (
+      {!usersQuery.isPending && users.length > 0 && (
         <input
           type="search"
           value={search}
@@ -45,38 +45,57 @@ export function AdminUsersPage() {
         />
       )}
       {error && <p className="mb-4 text-sm font-semibold text-danger">{error}</p>}
-      {users.length === 0 && <p className="font-semibold text-ink-soft">{t("admin.users.empty")}</p>}
-      {users.length > 0 && filteredUsers.length === 0 && (
+
+      {usersQuery.isPending && (
+        <ul className="flex flex-col gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <li key={i} className="flex items-center justify-between rounded-xl border border-border bg-surface p-3">
+              <div className="flex flex-col gap-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-surface-alt" />
+                <div className="h-3 w-24 animate-pulse rounded bg-surface-alt" />
+              </div>
+              <div className="h-7 w-20 animate-pulse rounded-lg bg-surface-alt" />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!usersQuery.isPending && users.length === 0 && (
+        <p className="font-semibold text-ink-soft">{t("admin.users.empty")}</p>
+      )}
+      {!usersQuery.isPending && users.length > 0 && filteredUsers.length === 0 && (
         <p className="font-semibold text-ink-soft">{t("admin.users.searchEmpty")}</p>
       )}
-      <ul className="flex flex-col gap-2">
-        {filteredUsers.map((u) => (
-          <li
-            key={u.id}
-            className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
-          >
-            <div>
-              <div className="font-bold text-ink">{u.email}</div>
-              {!u.inviteAccepted && (
-                <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-                  {t("admin.users.inviteNotAccepted")}
-                </span>
-              )}
-            </div>
-            <select
-              value={u.role}
-              onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value as UserRole })}
-              className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
+      {!usersQuery.isPending && filteredUsers.length > 0 && (
+        <ul className="flex flex-col gap-2 animate-fade-up">
+          {filteredUsers.map((u) => (
+            <li
+              key={u.id}
+              className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
             >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(`role.${r}` as TranslationKey)}
-                </option>
-              ))}
-            </select>
-          </li>
-        ))}
-      </ul>
+              <div>
+                <div className="font-bold text-ink">{u.email}</div>
+                {!u.inviteAccepted && (
+                  <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                    {t("admin.users.inviteNotAccepted")}
+                  </span>
+                )}
+              </div>
+              <select
+                value={u.role}
+                onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value as UserRole })}
+                className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
+              >
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {t(`role.${r}` as TranslationKey)}
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

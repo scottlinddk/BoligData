@@ -10,9 +10,9 @@ export function AdminDashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-serif text-3xl italic text-ink">{t("admin.dashboard.title")}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to="/admin/invitations"
             className="rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-hover"
@@ -33,9 +33,18 @@ export function AdminDashboardPage() {
           </Link>
         </div>
       </div>
-      {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
-      {data && (
+      {isLoading && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-surface p-4">
+              <div className="h-2.5 w-16 animate-pulse rounded bg-surface-alt" />
+              <div className="mt-2 h-7 w-10 animate-pulse rounded bg-surface-alt" />
+            </div>
+          ))}
+        </div>
+      )}
+      {data && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 animate-fade-up">
           <Link to="/admin/invitations">
             <StatCard label={t("admin.dashboard.pendingInvitations")} value={data.pendingInvitations} />
           </Link>
