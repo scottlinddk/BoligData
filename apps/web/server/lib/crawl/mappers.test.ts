@@ -156,6 +156,16 @@ describe("mapBoligsidenCase", () => {
     const listing = mapBoligsidenCase({ ...boligsidenCase, images: [{ category: "image", imageSources: [] }] });
     expect(listing?.images).toEqual([]);
   });
+
+  it("keeps an image whose imageSources lack width/height metadata", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      images: [{ category: "image", imageSources: [{ url: "https://cdn.example/photo-unsized.jpg" }] }],
+    });
+    expect(listing?.images).toEqual([
+      { url: "https://cdn.example/photo-unsized.jpg", category: "photo", sources: [] },
+    ]);
+  });
 });
 
 describe("listingContentHash", () => {
