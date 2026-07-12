@@ -64,8 +64,10 @@ function get(obj: unknown, ...path: string[]): unknown {
  * ever seeing one fixed URL.
  */
 function mapImage(img: unknown): ListingImage | null {
-  const rawSources = get(img, "imageSources");
-  const sources = (Array.isArray(rawSources) ? rawSources : [])
+  const rawSourceItems = get(img, "imageSources");
+  const sourceItems = Array.isArray(rawSourceItems) ? rawSourceItems : [];
+
+  const sources = sourceItems
     .map((s) => {
       const url = asNonEmptyString(get(s, "url"));
       const width = asPositiveInt(get(s, "width"));
@@ -74,7 +76,11 @@ function mapImage(img: unknown): ListingImage | null {
     })
     .filter((s): s is { url: string; width: number; height: number } => s !== null);
 
-  const url = asNonEmptyString(get(img, "url")) ?? sources[0]?.url ?? null;
+  // A usable image only needs *a* url — sized variants are a bonus for
+  // responsive picking, not a requirement. Missing/malformed width or
+  // height on every imageSources entry shouldn't drop the image entirely.
+  const looseSourceUrl = sourceItems.map((s) => asNonEmptyString(get(s, "url"))).find((u) => u !== null) ?? null;
+  const url = asNonEmptyString(get(img, "url")) ?? sources[0]?.url ?? looseSourceUrl ?? null;
   if (url === null) return null;
 
   const categoryRaw = asNonEmptyString(get(img, "category"))?.toLowerCase() ?? "";
