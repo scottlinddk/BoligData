@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePropertySearch } from "@/hooks/use-property-search";
+import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useAuth } from "@/hooks/use-auth";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { parseFilters, serializeFilters, type FiltersWithSort } from "@/lib/url-filters";
@@ -11,6 +12,7 @@ import { FiltersSheet } from "@/components/filters-sheet";
 import { PropertyCard } from "@/components/property-card";
 import { LockedPropertyCard } from "@/components/locked-property-card";
 import { PropertyMap } from "@/components/property-map";
+import { useToast } from "@/components/toast";
 import { useI18n } from "@/i18n/i18n";
 
 type MobileTab = "list" | "map";
@@ -18,6 +20,8 @@ type MobileTab = "list" | "map";
 export function SearchPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const { createSearch } = useSavedSearches();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = parseFilters(searchParams);
@@ -25,6 +29,9 @@ export function SearchPage() {
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("list");
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState("");
+  const [savingSearch, setSavingSearch] = useState(false);
 
   const { data, isLoading, isError, refetch } = usePropertySearch(filters, offset, pageSize);
 
@@ -36,6 +43,23 @@ export function SearchPage() {
   function handlePageSizeChange(size: number) {
     setOffset(0);
     setPageSize(size);
+  }
+
+  async function handleSaveSearch() {
+    const name = saveSearchName.trim();
+    if (!name) return;
+    const { sortField: _sortField, sortDirection: _sortDirection, ...propertyFilters } = filters;
+    setSavingSearch(true);
+    try {
+      await createSearch({ name, filters: propertyFilters, alertFrequency: "none" });
+      showToast(t("search.saveSearchSuccess"));
+      setSaveSearchOpen(false);
+      setSaveSearchName("");
+    } catch {
+      showToast(t("search.saveSearchError"));
+    } finally {
+      setSavingSearch(false);
+    }
   }
 
   const authenticated = data?.authenticated ?? Boolean(user);
@@ -119,6 +143,46 @@ export function SearchPage() {
                   ? t("search.range", { from: offset + 1, to: Math.min(offset + limit, total), total })
                   : t("search.noResults")}
               </span>
+              {authenticated &&
+                (saveSearchOpen ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={saveSearchName}
+                      onChange={(e) => setSaveSearchName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveSearch()}
+                      placeholder={t("search.saveSearchNamePlaceholder")}
+                      className="min-w-0 rounded-lg border border-border bg-paper px-2.5 py-1.5 text-sm font-medium text-ink placeholder:text-ink-faint"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingSearch || !saveSearchName.trim()}
+                      onClick={handleSaveSearch}
+                      className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                    >
+                      {t("search.saveSearchConfirm")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSaveSearchOpen(false);
+                        setSaveSearchName("");
+                      }}
+                      className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSaveSearchOpen(true)}
+                    className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
+                  >
+                    {t("search.saveSearch")}
+                  </button>
+                ))}
             </div>
 
             {isLoading && (
