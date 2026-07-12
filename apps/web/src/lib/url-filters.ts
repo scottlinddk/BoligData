@@ -7,6 +7,7 @@ export interface FiltersWithSort extends PropertyFilters {
 
 const DEFAULTS: FiltersWithSort = {
   location: null,
+  postnummer: null,
   minPrice: null,
   maxPrice: null,
   minSqm: null,
@@ -33,6 +34,7 @@ function readString(params: URLSearchParams, key: string): string | null {
 export function parseFilters(params: URLSearchParams): FiltersWithSort {
   return {
     location: readString(params, "location"),
+    postnummer: readString(params, "postnummer"),
     minPrice: readNumber(params, "minPrice"),
     maxPrice: readNumber(params, "maxPrice"),
     minSqm: readNumber(params, "minSqm"),

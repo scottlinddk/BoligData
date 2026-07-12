@@ -69,6 +69,9 @@ function fakeClient(rows: FakeRow[]): SupabaseClient {
         or() {
           return builder;
         },
+        ilike() {
+          return builder;
+        },
         gte() {
           return builder;
         },
@@ -127,5 +130,10 @@ describe("searchProperties", () => {
     process.env.SEARCH_MAX_PAGE_SIZE = "2";
     const result = await searchProperties(fakeClient(ROWS), { limit: 50 }, true);
     expect(result.limit).toBe(2);
+  });
+
+  it("accepts a postnummer filter without erroring", async () => {
+    const result = await searchProperties(fakeClient(ROWS), { postnummer: "9000" }, true);
+    expect(result.total).toBe(3);
   });
 });

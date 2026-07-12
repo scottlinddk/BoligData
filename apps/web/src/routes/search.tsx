@@ -52,11 +52,11 @@ export function SearchPage() {
     setSavingSearch(true);
     try {
       await createSearch({ name, filters: propertyFilters, alertFrequency: "none" });
-      showToast(t("search.saveSearchSuccess"));
+      showToast(t("search.saveSearchSuccess"), "success");
       setSaveSearchOpen(false);
       setSaveSearchName("");
     } catch {
-      showToast(t("search.saveSearchError"));
+      showToast(t("search.saveSearchError"), "error");
     } finally {
       setSavingSearch(false);
     }

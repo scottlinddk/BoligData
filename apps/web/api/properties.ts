@@ -27,6 +27,7 @@ function parseQuery(req: VercelRequest): SearchPropertiesQuery {
   const q = req.query;
   return {
     location: str(q.location),
+    postnummer: str(q.postnummer),
     minPrice: num(q.minPrice),
     maxPrice: num(q.maxPrice),
     minSqm: num(q.minSqm),

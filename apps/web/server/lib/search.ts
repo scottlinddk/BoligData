@@ -60,6 +60,10 @@ export async function searchProperties(
     const term = sanitizeForOrFilter(query.location);
     if (term) builder = builder.or(`address.ilike.%${term}%,municipality.ilike.%${term}%`);
   }
+  if (query.postnummer) {
+    const term = sanitizeForOrFilter(query.postnummer);
+    if (term) builder = builder.ilike("postal_code", `${term}%`);
+  }
   if (query.minPrice != null) builder = builder.gte("price", query.minPrice);
   if (query.maxPrice != null) builder = builder.lte("price", query.maxPrice);
   if (query.minSqm != null) builder = builder.gte("sqm", query.minSqm);

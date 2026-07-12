@@ -53,11 +53,11 @@ export function PropertyDetailPage() {
 
   async function handleSave() {
     const nowSaved = await toggle(property.id);
-    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"));
+    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"), nowSaved ? "success" : "info");
   }
 
   function handleContactAgent() {
-    showToast(t("detail.contactAgentComingSoon"));
+    showToast(t("detail.contactAgentComingSoon"), "info");
   }
 
   return (

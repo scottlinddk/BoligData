@@ -201,6 +201,7 @@ export interface Notification {
 
 export interface PropertyFilters {
   location: string | null;
+  postnummer: string | null;
   minPrice: number | null;
   maxPrice: number | null;
   minSqm: number | null;

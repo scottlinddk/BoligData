@@ -1,12 +1,19 @@
 import type { RiskFlags } from "@shared/types/index";
 import { useI18n, type TranslateFn } from "@/i18n/i18n";
 
+const MILJOEGIS_NOISE_MAP_URL = "https://miljoegis.mim.dk/spatialmap?profile=stoej";
+const MILJOEPORTAL_SOIL_MAP_URL = "https://arealinformation.miljoeportal.dk/";
+const BBR_URL = "https://bbr.dk/";
+
 interface ChecklistItem {
   label: string;
   status: "ok" | "warning" | "unknown";
   detail: string;
   /** When set, `detail` is rendered as a link (e.g. the tinglysning.dk deep-link for the encumbrance item). */
   href?: string | null;
+  /** Where this flag's value comes from — shown under the status line, linked out when a public lookup exists. */
+  source: string;
+  sourceHref?: string | null;
 }
 
 function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistItem[] {
@@ -17,6 +24,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       label: t(`dueDiligence.${key}.label`),
       status: "unknown" as const,
       detail: t("dueDiligence.noData"),
+      source: t("dueDiligence.noData"),
     }));
   }
 
@@ -47,6 +55,8 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
         riskFlags.noiseExposureLden !== null
           ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden })
           : t("dueDiligence.noise.none"),
+      source: t("dueDiligence.noise.source"),
+      sourceHref: MILJOEGIS_NOISE_MAP_URL,
     },
     {
       label: t("dueDiligence.encumbrance.label"),
@@ -55,6 +65,8 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
         ? t("dueDiligence.encumbrance.linkLabel")
         : t("dueDiligence.encumbrance.warning"),
       href: riskFlags.encumbranceLookupUrl,
+      source: t("dueDiligence.encumbrance.source"),
+      sourceHref: riskFlags.encumbranceLookupUrl,
     },
     {
       label: t("dueDiligence.sewer.label"),
@@ -62,16 +74,24 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       detail: riskFlags.sewerSeparationRequired
         ? t("dueDiligence.sewer.warning")
         : t("dueDiligence.sewer.ok"),
+      source: t("dueDiligence.sewer.source"),
     },
     {
       label: t("dueDiligence.oilTank.label"),
       status: riskFlags.oilTankRisk ? "warning" : "ok",
       detail: riskFlags.oilTankRisk ? t("dueDiligence.oilTank.warning") : t("dueDiligence.oilTank.ok"),
+      source:
+        riskFlags.oilTankRiskSource === "bbr"
+          ? t("dueDiligence.oilTank.source.bbr")
+          : t("dueDiligence.oilTank.source.heuristic"),
+      sourceHref: riskFlags.oilTankRiskSource === "bbr" ? BBR_URL : null,
     },
     {
       label: t("dueDiligence.soil.label"),
       status: soilStatus,
       detail: t(soilDetailKey),
+      source: t("dueDiligence.soil.source"),
+      sourceHref: MILJOEPORTAL_SOIL_MAP_URL,
     },
   ];
 }
@@ -100,6 +120,15 @@ export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | nu
                 </a>
               ) : (
                 item.detail
+              )}
+            </div>
+            <div className="mt-1 text-[11px] opacity-70">
+              {item.sourceHref ? (
+                <a href={item.sourceHref} target="_blank" rel="noreferrer" className="underline">
+                  {t("dueDiligence.source", { source: item.source })}
+                </a>
+              ) : (
+                t("dueDiligence.source", { source: item.source })
               )}
             </div>
           </li>

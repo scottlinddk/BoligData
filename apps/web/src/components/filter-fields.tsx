@@ -48,16 +48,29 @@ export function FilterFields({
 
   return (
     <>
-      <label className={label}>
-        {t("filters.location")}
-        <input
-          type="text"
-          placeholder={t("filters.locationPlaceholder")}
-          value={filters.location ?? ""}
-          onChange={(e) => onChange({ location: e.target.value || null })}
-          className={input}
-        />
-      </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className={label}>
+          {t("filters.location")}
+          <input
+            type="text"
+            placeholder={t("filters.locationPlaceholder")}
+            value={filters.location ?? ""}
+            onChange={(e) => onChange({ location: e.target.value || null })}
+            className={input}
+          />
+        </label>
+        <label className={label}>
+          {t("filters.postnummer")}
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder={t("filters.postnummerPlaceholder")}
+            value={filters.postnummer ?? ""}
+            onChange={(e) => onChange({ postnummer: e.target.value || null })}
+            className={input}
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <NumberField

@@ -20,7 +20,7 @@ export function PropertyCard({ property }: { property: Property }) {
     e.preventDefault();
     e.stopPropagation();
     const nowSaved = await toggle(property.id);
-    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"));
+    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"), nowSaved ? "success" : "info");
   }
 
   return (

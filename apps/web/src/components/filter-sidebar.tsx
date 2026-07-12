@@ -18,7 +18,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
         {activeCount > 0 && (
           <button
             type="button"
-            onClick={() => onChange({ location: null, minPrice: null, maxPrice: null, minSqm: null, maxSqm: null, maxDaysOnMarket: null, minBuildingYear: null, maxBuildingYear: null })}
+            onClick={() => onChange({ location: null, postnummer: null, minPrice: null, maxPrice: null, minSqm: null, maxSqm: null, maxDaysOnMarket: null, minBuildingYear: null, maxBuildingYear: null })}
             className="font-mono text-[10.5px] uppercase tracking-widest text-brand-text"
           >
             {t("filters.reset")}
