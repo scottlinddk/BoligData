@@ -61,6 +61,7 @@ export function rowToEnrichment(row: Record<string, any>): Enrichment {
     calculatedMetrics: row.calculated_metrics,
     riskFlags: row.risk_flags,
     schoolTransport: row.school_transport,
+    publicValuation: row.public_valuation ?? null,
     source: row.source,
     enrichedAt: row.enriched_at,
   };

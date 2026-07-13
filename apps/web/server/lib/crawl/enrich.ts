@@ -3,6 +3,7 @@ import type {
   CalculatedMetrics,
   EnrichmentSource,
   OilTankRiskSource,
+  PublicValuation,
   RiskFlags,
   SchoolTransportInfo,
   SoilContaminationClassification,
@@ -10,6 +11,7 @@ import type {
 } from "../../../../../packages/shared/src/types/index.js";
 import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupBbr, type BbrBuildingData } from "../enrichment-sources/bbr.js";
+import { lookupEjendomsvurdering, type EjendomsvurderingData } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
@@ -31,6 +33,7 @@ export interface EnrichmentPayload {
   calculated_metrics: CalculatedMetrics;
   risk_flags: RiskFlags;
   school_transport: SchoolTransportInfo | null;
+  public_valuation: PublicValuation | null;
   source: EnrichmentSource;
   enriched_at: string;
 }
@@ -62,6 +65,14 @@ export async function enrichProperty(
   let oilTankRiskSource: OilTankRiskSource;
   let noiseExposureLden: number | null;
   let source: EnrichmentSource;
+
+  // Independent of ENRICH_MOCK_MODE and the Promise.allSettled batch below:
+  // ejendomsvurdering.ts gates its own mock/real split internally (same as
+  // address-lookup.ts/matrikel.ts in ingest.ts), so this always resolves to
+  // either real or mock data on its own rather than being at the mercy of
+  // enrich.ts's overall mode.
+  const valuationResult = await lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
+  const publicValuation: EjendomsvurderingData | null = valuationResult.ok ? valuationResult.data : null;
 
   if (MOCK_MODE) {
     soilClassification = mockSoilClassification(seed);
@@ -135,6 +146,7 @@ export async function enrichProperty(
       soilContamination: { classification: soilClassification, jordart },
     },
     school_transport: null,
+    public_valuation: publicValuation,
     source,
     enriched_at: new Date().toISOString(),
   };
