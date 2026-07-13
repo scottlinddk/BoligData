@@ -73,6 +73,8 @@ const da = {
   "property.saved": "Gemt",
   "property.toastSaved": "Gemt til dine favoritter",
   "property.toastUnsaved": "Fjernet fra favoritter",
+  "property.bbr.energyLabelTitle": "Energimærke (BBR)",
+  "property.bbr.heatingTitle": "Varmeinstallation (BBR)",
 
   "detail.loading": "Indlæser...",
   "detail.notFound": "Bolig ikke fundet.",
@@ -334,6 +336,8 @@ const en: Translations = {
   "property.saved": "Saved",
   "property.toastSaved": "Saved to your favorites",
   "property.toastUnsaved": "Removed from favorites",
+  "property.bbr.energyLabelTitle": "Energy label (BBR)",
+  "property.bbr.heatingTitle": "Heating installation (BBR)",
 
   "detail.loading": "Loading...",
   "detail.notFound": "Property not found.",

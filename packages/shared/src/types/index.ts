@@ -63,6 +63,13 @@ export interface Property {
   zone: ZoneStatus | null;
   /** Registered land area (sqm) from Matriklen's Jordstykke entity, joined via matrikelnr/ejerlav. */
   registeredAreaSqm: number | null;
+  /**
+   * Not a `properties` table column — attached by search/detail endpoints
+   * from the property's `enrichments` row (batch-fetched alongside the
+   * property list) so listing cards can show energy label/heating without a
+   * second round-trip per card. Null when enrichment hasn't run yet.
+   */
+  bbrData: BbrData | null;
   createdAt: string;
   updatedAt: string;
 }

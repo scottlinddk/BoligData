@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BbrData } from "../../../../packages/shared/src/types/index.js";
 import type {
   SearchPropertiesQuery,
   SearchPropertiesResponse,
@@ -84,9 +85,28 @@ export async function searchProperties(
   if (error) throw error;
 
   const total = count ?? 0;
+
+  // BBR data lives on a separate enrichments row (Fase 2 enrichment, not a
+  // properties column) — batch-fetch it for the page's property ids, same
+  // pattern comparables.ts uses for sold_price_history, so listing cards get
+  // energy label/heating without a per-card round trip.
+  const bbrByPropertyId = new Map<string, BbrData>();
+  if (authenticated && (data ?? []).length > 0) {
+    const propertyIds = (data as any[]).map((row) => row.id);
+    const { data: enrichments } = await client
+      .from("enrichments")
+      .select("property_id, bbr_data")
+      .in("property_id", propertyIds);
+    for (const row of enrichments ?? []) {
+      if (row.bbr_data) bbrByPropertyId.set(row.property_id, row.bbr_data);
+    }
+  }
+
   return {
     authenticated,
-    properties: authenticated ? (data ?? []).map(rowToProperty) : [],
+    properties: authenticated
+      ? (data as any[]).map((row) => rowToProperty(row, bbrByPropertyId.get(row.id) ?? null))
+      : [],
     summaries: authenticated ? [] : (data ?? []).map(rowToPropertySummary),
     total,
     limit,

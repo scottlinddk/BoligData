@@ -27,5 +27,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sendError(res, 500, "Failed to load listings", error);
     return;
   }
-  res.status(200).json({ properties: (data ?? []).map(rowToProperty) });
+  res.status(200).json({ properties: (data ?? []).map((row) => rowToProperty(row)) });
 }

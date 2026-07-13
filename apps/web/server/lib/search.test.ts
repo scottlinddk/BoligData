@@ -51,9 +51,24 @@ function toResponseRow(row: FakeRow, columns: string): Record<string, unknown> {
 }
 
 /** Minimal chainable stand-in for PostgrestFilterBuilder, thenable like the real thing. */
-function fakeClient(rows: FakeRow[]): SupabaseClient {
+function fakeClient(rows: FakeRow[], enrichmentRows: Record<string, unknown>[] = []): SupabaseClient {
   const client = {
-    from(_table: string) {
+    from(table: string) {
+      if (table === "enrichments") {
+        const enrichmentBuilder = {
+          select() {
+            return enrichmentBuilder;
+          },
+          in() {
+            return enrichmentBuilder;
+          },
+          then(resolve: (value: { data: unknown[]; error: null }) => void) {
+            resolve({ data: enrichmentRows, error: null });
+          },
+        };
+        return enrichmentBuilder;
+      }
+
       let selectedColumns = "*";
       let rangeStart = 0;
       let rangeEnd = rows.length - 1;
@@ -135,5 +150,31 @@ describe("searchProperties", () => {
   it("accepts a postnummer filter without erroring", async () => {
     const result = await searchProperties(fakeClient(ROWS), { postnummer: "9000" }, true);
     expect(result.total).toBe(3);
+  });
+
+  it("attaches bbrData from the enrichments table onto authenticated properties", async () => {
+    const bbrData = {
+      yearBuilt: 1970,
+      renovationYear: null,
+      energyLabel: "C",
+      areaSqm: 80,
+      buildingType: "villa",
+      heatingInstallation: "fjernvarme",
+      floors: 1,
+      roofMaterial: "tegl",
+      wallMaterial: "mursten",
+    };
+    const result = await searchProperties(
+      fakeClient(ROWS, [{ property_id: "1", bbr_data: bbrData }]),
+      {},
+      true,
+    );
+    expect(result.properties.find((p) => p.id === "1")?.bbrData).toEqual(bbrData);
+    expect(result.properties.find((p) => p.id === "2")?.bbrData).toBeNull();
+  });
+
+  it("leaves bbrData null for anonymous summaries (no enrichments lookup needed)", async () => {
+    const result = await searchProperties(fakeClient(ROWS), {}, false);
+    expect(result.summaries.every((s) => !("bbrData" in s))).toBe(true);
   });
 });
