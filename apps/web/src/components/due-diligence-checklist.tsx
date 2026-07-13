@@ -70,11 +70,13 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     },
     {
       label: t("dueDiligence.sewer.label"),
-      status: riskFlags.sewerSeparationRequired ? "warning" : "ok",
-      detail: riskFlags.sewerSeparationRequired
-        ? t("dueDiligence.sewer.warning")
-        : t("dueDiligence.sewer.ok"),
+      status: "warning",
+      detail: riskFlags.sewerSeparationLookupUrl
+        ? t("dueDiligence.sewer.linkLabel")
+        : t("dueDiligence.sewer.warning"),
+      href: riskFlags.sewerSeparationLookupUrl,
       source: t("dueDiligence.sewer.source"),
+      sourceHref: riskFlags.sewerSeparationLookupUrl,
     },
     {
       label: t("dueDiligence.oilTank.label"),

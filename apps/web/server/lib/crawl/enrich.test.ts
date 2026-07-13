@@ -61,11 +61,21 @@ describe("enrichProperty (mock mode)", () => {
     expect(result.risk_flags.encumbranceLookupUrl).toBeNull();
   });
 
-  it("defers noise and sewer to the mock derivation regardless of cadastral input", async () => {
+  it("derives noise exposure from the listing's coordinates, independent of cadastral input", async () => {
     const withCadastral = await enrichProperty(listing, cadastral);
     const withoutCadastral = await enrichProperty(listing, null);
     expect(withCadastral.risk_flags.noiseExposureLden).toBe(withoutCadastral.risk_flags.noiseExposureLden);
-    expect(withCadastral.risk_flags.sewerSeparationRequired).toBe(withoutCadastral.risk_flags.sewerSeparationRequired);
+    expect(withCadastral.risk_flags.noiseExposureLden).not.toBeNull();
+  });
+
+  it("always marks sewerSeparationCheckRequired (advisory, no unified municipal spildevandsplan API)", async () => {
+    const result = await enrichProperty(listing);
+    expect(result.risk_flags.sewerSeparationCheckRequired).toBe(true);
+  });
+
+  it("builds a spildevandsplan lookup URL for a municipality in the lookup table", async () => {
+    const result = await enrichProperty(listing);
+    expect(result.risk_flags.sewerSeparationLookupUrl).toBe("https://www.aalborg.dk/");
   });
 
   it("soilContamination classification is 'none' or 'v2' in mock mode, never left as boolean", async () => {

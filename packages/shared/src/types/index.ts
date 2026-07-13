@@ -95,7 +95,10 @@ export interface RiskFlags {
   encumbranceCheckRequired: boolean;
   /** Deep link to tinglysning.dk built from the property's matrikelnr/ejerlav, null when cadastral data is unavailable. */
   encumbranceLookupUrl: string | null;
-  sewerSeparationRequired: boolean;
+  /** Always true: no unified municipal spildevandsplan API exists, so this stays advisory — see sewerSeparationLookupUrl. */
+  sewerSeparationCheckRequired: boolean;
+  /** Deep link to the property's municipality spildevandsplan info, null when the municipality isn't in the lookup table. */
+  sewerSeparationLookupUrl: string | null;
   oilTankRisk: boolean;
   /** Whether oilTankRisk came from BBR's real heating-installation data or the building-year heuristic fallback. */
   oilTankRiskSource: OilTankRiskSource;

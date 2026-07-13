@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiError, getComparables, getProperty } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
+import { calculateDueDiligenceScore } from "@shared/utils/due-diligence-score";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
+import { DueDiligenceScoreBadge } from "@/components/due-diligence-score-badge";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
@@ -47,6 +49,11 @@ export function PropertyDetailPage() {
 
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
+  const dueDiligenceScore = calculateDueDiligenceScore(
+    enrichment?.riskFlags ?? null,
+    pricePerSqm(property.price, property.sqm),
+    comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null,
+  );
   const saved = isSaved(property.id);
   const photos = getPhotos(property.images);
   const floorplan = getFloorplan(property.images);
@@ -88,6 +95,10 @@ export function PropertyDetailPage() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="mt-4">
+        <DueDiligenceScoreBadge breakdown={dueDiligenceScore} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
