@@ -65,6 +65,26 @@ export function PropertyCard({ property }: { property: Property }) {
           <span>{t("property.pricePerSqm", { price: formatDkk(pricePerSqm(property.price, property.sqm)) })}</span>
           <span>{t("property.daysOnMarket", { days: daysOnMarket })}</span>
         </div>
+        {property.bbrData && (property.bbrData.energyLabel || property.bbrData.heatingInstallation) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {property.bbrData.energyLabel && (
+              <span
+                title={t("property.bbr.energyLabelTitle")}
+                className="rounded-md border border-border bg-surface-alt px-1.5 py-0.5 font-mono text-[10px] font-bold text-ink-soft"
+              >
+                {property.bbrData.energyLabel}
+              </span>
+            )}
+            {property.bbrData.heatingInstallation && (
+              <span
+                title={t("property.bbr.heatingTitle")}
+                className="rounded-md border border-border bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-soft"
+              >
+                {property.bbrData.heatingInstallation}
+              </span>
+            )}
+          </div>
+        )}
         {property.agentName && <p className="mt-2 text-xs font-medium text-ink-faint">{property.agentName}</p>}
       </div>
     </Link>

@@ -1,6 +1,7 @@
 import type {
   AdminUser,
   AdvisorConnection,
+  BbrData,
   Enrichment,
   FavoriteProperty,
   Invitation,
@@ -15,7 +16,8 @@ export function rowToPropertySummary(row: Record<string, any>): PropertySummary 
   return { id: row.id, address: row.address };
 }
 
-export function rowToProperty(row: Record<string, any>): Property {
+/** `bbrData` is looked up separately (enrichments table, batch-fetched by the caller) and attached here — null when not supplied or not yet enriched. */
+export function rowToProperty(row: Record<string, any>, bbrData: BbrData | null = null): Property {
   return {
     id: row.id,
     address: row.address,
@@ -44,6 +46,7 @@ export function rowToProperty(row: Record<string, any>): Property {
     ejerlav: row.ejerlav ?? null,
     zone: row.zone ?? null,
     registeredAreaSqm: row.registered_area_sqm !== null && row.registered_area_sqm !== undefined ? Number(row.registered_area_sqm) : null,
+    bbrData,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
