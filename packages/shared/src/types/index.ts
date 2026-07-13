@@ -61,6 +61,8 @@ export interface Property {
   /** Cadastral district (ejerlav), from DAWA/DAR. */
   ejerlav: string | null;
   zone: ZoneStatus | null;
+  /** Registered land area (sqm) from Matriklen's Jordstykke entity, joined via matrikelnr/ejerlav. */
+  registeredAreaSqm: number | null;
   createdAt: string;
   updatedAt: string;
 }

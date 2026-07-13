@@ -6,6 +6,7 @@ import { enrichProperty } from "./enrich.js";
 import { listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
+import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
 
 const CHUNK_SIZE = 500;
 // Fetch-stage errors (e.g. "skipped unmappable record") are capped separately
@@ -45,6 +46,8 @@ export interface IngestSourceReport {
   enrichSkippedUnchanged: number;
   /** Address/cadastral lookups (id_lokalid/matrikelnr/ejerlav/zone) that failed — the property upsert still proceeds with those fields null. */
   cadastralLookupFailed: number;
+  /** Matriklen parcel-area lookups that failed or were skipped (no matrikelnr/ejerlav yet) — registered_area_sqm stays null. */
+  matrikelLookupFailed: number;
   dbErrors: number;
   errors: string[];
   durationMs: number;
@@ -77,6 +80,7 @@ async function ingestSource(
     enriched: 0,
     enrichSkippedUnchanged: 0,
     cadastralLookupFailed: 0,
+    matrikelLookupFailed: 0,
     dbErrors: 0,
     errors: [],
     durationMs: 0,
@@ -170,6 +174,28 @@ async function ingestSource(
     });
   }
 
+  // Matriklen parcel-area lookup is keyed off matrikelnr/ejerlav (not
+  // id_lokalid — parcels aren't addresses), so it can only run for listings
+  // whose cadastral lookup above already succeeded.
+  const registeredAreaByExternalId = new Map<string, number | null>();
+  for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
+    const results = await Promise.all(
+      listingChunk.map((l) => {
+        const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
+        return lookupMatrikelParcel(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
+      }),
+    );
+    results.forEach((result, i) => {
+      const listing = listingChunk[i]!;
+      if (!result.ok) {
+        registeredAreaByExternalId.set(listing.external_id, null);
+        report.matrikelLookupFailed += 1;
+        return;
+      }
+      registeredAreaByExternalId.set(listing.external_id, result.data.registeredAreaSqm);
+    });
+  }
+
   const propertyIdByExternalId = new Map<string, string>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const rows = listingChunk.map((l) => {
@@ -182,6 +208,7 @@ async function ingestSource(
         matrikelnr: cadastral?.matrikelnr ?? null,
         ejerlav: cadastral?.ejerlav ?? null,
         zone: cadastral?.zone ?? null,
+        registered_area_sqm: registeredAreaByExternalId.get(l.external_id) ?? null,
       };
     });
     const { data, error } = await client

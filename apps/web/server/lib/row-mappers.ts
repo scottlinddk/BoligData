@@ -43,6 +43,7 @@ export function rowToProperty(row: Record<string, any>): Property {
     matrikelnr: row.matrikelnr ?? null,
     ejerlav: row.ejerlav ?? null,
     zone: row.zone ?? null,
+    registeredAreaSqm: row.registered_area_sqm !== null && row.registered_area_sqm !== undefined ? Number(row.registered_area_sqm) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
