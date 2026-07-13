@@ -15,8 +15,16 @@ const MOCK_MODE = process.env.BBR_MOCK_MODE !== "false";
  * pending-credentials blocker the README documents for BBR/OIS/Vejdirektoratet
  * enrichment generally). Currently mock-only; this client's real branch is a
  * stub until a key exists.
+ *
+ * Confirmed against Datafordeler's "GraphQL (BBR)" doc (checked 2026-07-13):
+ * newest version is v3, and the top-level entity is `Bygning` (with related
+ * entities BBRSag/Ejendomsrelation/Enhed/Grund/GrundJordstykke/TekniskAnlæg
+ * etc.), not `BBR_Bygning` as queried below — that doc doesn't list
+ * field-level names (byg026Opførelsesår etc.), those live in the separate
+ * objekttypekatalog, so BUILDING_QUERY below is still unverified against the
+ * real v3 schema and may need both the entity name and field names updated.
  */
-const BBR_VERSION = process.env.DATAFORDELER_BBR_VERSION ?? "v1";
+const BBR_VERSION = process.env.DATAFORDELER_BBR_VERSION ?? "v3";
 const API_BASE = process.env.DATAFORDELER_BBR_API_BASE ?? `https://graphql.datafordeler.dk/BBR/${BBR_VERSION}`;
 
 const HEATING_TYPES = ["oliefyr", "fjernvarme", "elvarme", "naturgasfyr", "varmepumpe"];

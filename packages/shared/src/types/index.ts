@@ -139,6 +139,13 @@ export interface BbrData {
 
 export type EnrichmentSource = "mock" | "datafordeler" | "ois" | "vejdirektoratet";
 
+/** Official public property valuation (VUR/Ejendomsvurdering via Datafordeler), directly comparable to listing price. */
+export interface PublicValuation {
+  assessedPropertyValueDkk: number | null;
+  assessedLandValueDkk: number | null;
+  valuationYear: number | null;
+}
+
 export interface Enrichment {
   id: string;
   propertyId: string;
@@ -147,6 +154,7 @@ export interface Enrichment {
   calculatedMetrics: CalculatedMetrics;
   riskFlags: RiskFlags;
   schoolTransport: SchoolTransportInfo | null;
+  publicValuation: PublicValuation | null;
   source: EnrichmentSource;
   enrichedAt: string;
 }
