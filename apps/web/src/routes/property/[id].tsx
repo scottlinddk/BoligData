@@ -113,6 +113,9 @@ export function PropertyDetailPage() {
           label={t("detail.renovated")}
           value={enrichment?.bbrData.renovationYear ? String(enrichment.bbrData.renovationYear) : empty}
         />
+        <Stat label={t("detail.floors")} value={enrichment?.bbrData.floors ? String(enrichment.bbrData.floors) : empty} />
+        <Stat label={t("detail.roofMaterial")} value={enrichment?.bbrData.roofMaterial ?? empty} />
+        <Stat label={t("detail.wallMaterial")} value={enrichment?.bbrData.wallMaterial ?? empty} />
       </div>
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}

@@ -9,7 +9,7 @@ import type {
   SoldPriceEntry,
 } from "../../../../../packages/shared/src/types/index.js";
 import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
-import { lookupBbr } from "../enrichment-sources/bbr.js";
+import { lookupBbr, type BbrBuildingData } from "../enrichment-sources/bbr.js";
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
@@ -57,7 +57,7 @@ export async function enrichProperty(
 
   let soilClassification: SoilContaminationClassification;
   let jordart: string | null;
-  let heatingInstallation: string | null = null;
+  let bbrBuilding: BbrBuildingData | null = null;
   let oilTankRisk: boolean;
   let oilTankRiskSource: OilTankRiskSource;
   let noiseExposureLden: number | null;
@@ -90,11 +90,10 @@ export async function enrichProperty(
     noiseExposureLden =
       noiseResult.status === "fulfilled" && noiseResult.value.ok ? noiseResult.value.data.ldenDb : null;
 
-    const bbrData = bbrResult.status === "fulfilled" && bbrResult.value.ok ? bbrResult.value.data : null;
-    const bbrOk = bbrData !== null;
-    heatingInstallation = bbrData?.heatingInstallation ?? null;
+    bbrBuilding = bbrResult.status === "fulfilled" && bbrResult.value.ok ? bbrResult.value.data : null;
+    const heatingInstallation = bbrBuilding?.heatingInstallation ?? null;
 
-    if (bbrOk && heatingInstallation !== null) {
+    if (bbrBuilding !== null && heatingInstallation !== null) {
       oilTankRisk = heatingInstallation === "oliefyr";
       oilTankRiskSource = "bbr";
       source = "datafordeler";
@@ -107,12 +106,15 @@ export async function enrichProperty(
 
   return {
     bbr_data: {
-      yearBuilt: listing.building_year,
-      renovationYear: seed % 3 === 0 ? (listing.building_year ?? 1970) + 20 : null,
+      yearBuilt: bbrBuilding?.yearBuilt ?? listing.building_year,
+      renovationYear: bbrBuilding?.renovationYear ?? (seed % 3 === 0 ? (listing.building_year ?? 1970) + 20 : null),
       energyLabel: ["A", "B", "C", "D", "E"][seed % 5] ?? null,
-      areaSqm: listing.sqm,
-      buildingType: listing.property_type,
-      heatingInstallation,
+      areaSqm: bbrBuilding?.areaSqm ?? listing.sqm,
+      buildingType: bbrBuilding?.buildingType ?? listing.property_type,
+      floors: bbrBuilding?.floors ?? null,
+      roofMaterial: bbrBuilding?.roofMaterial ?? null,
+      wallMaterial: bbrBuilding?.wallMaterial ?? null,
+      heatingInstallation: bbrBuilding?.heatingInstallation ?? null,
     },
     sold_price_history: [],
     calculated_metrics: {
