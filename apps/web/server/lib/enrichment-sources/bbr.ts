@@ -20,46 +20,102 @@ const BBR_VERSION = process.env.DATAFORDELER_BBR_VERSION ?? "v1";
 const API_BASE = process.env.DATAFORDELER_BBR_API_BASE ?? `https://graphql.datafordeler.dk/BBR/${BBR_VERSION}`;
 
 const HEATING_TYPES = ["oliefyr", "fjernvarme", "elvarme", "naturgasfyr", "varmepumpe"];
+const ROOF_MATERIALS = ["tegl", "fibercement", "built-up-tag", "tagpap", "metalplader"];
+const WALL_MATERIALS = ["mursten", "letbeton", "træbeklædning", "betonelementer", "pudset mur"];
+
+export interface BbrBuildingData {
+  yearBuilt: number | null;
+  renovationYear: number | null;
+  areaSqm: number | null;
+  /** Raw BBR bygningsanvendelse code (e.g. "120"), null until real Datafordeler BBR access lands. */
+  buildingType: string | null;
+  floors: number | null;
+  /** Raw BBR tagdækningsmateriale code/label, null until real Datafordeler BBR access lands. */
+  roofMaterial: string | null;
+  /** Raw BBR ydervæggens materiale code/label, null until real Datafordeler BBR access lands. */
+  wallMaterial: string | null;
+  heatingInstallation: string | null;
+}
 
 /**
- * `byg056Varmeinstallation` is BBR's well-known REST/Grunddatamodel field
- * code for a building's heating installation; the transition guide's
- * examples cover paging/filtering syntax but not BBR's specific field
- * catalogue, so confirm this against the live schema
+ * Field codes are BBR's well-known REST/Grunddatamodel identifiers for a
+ * building's core attributes; the transition guide's examples cover
+ * paging/filtering syntax but not BBR's specific field catalogue, so
+ * confirm these against the live schema
  * (https://graphql.datafordeler.dk/BBR/v1/schema?apiKey=...) before flipping
  * BBR_MOCK_MODE=false — datafordeler.dk isn't reachable from this sandbox to
  * verify directly.
  */
-const HEATING_QUERY = `
-  query BbrBygningVarmeinstallation($idLokalId: String!) {
+const BUILDING_QUERY = `
+  query BbrBygning($idLokalId: String!) {
     BBR_Bygning(where: { id_lokalId: { eq: $idLokalId } }, first: 1) {
       nodes {
+        byg026Opførelsesår
+        byg027OmTilbygningsår
+        byg038SamletBygningsareal
+        byg021BygningensAnvendelse
+        byg054AntalEtager
+        byg033Tagdækningsmateriale
+        byg032YdervæggensMateriale
         byg056Varmeinstallation
       }
     }
   }
 `;
 
+interface GraphQlBygningNode {
+  byg026Opførelsesår?: unknown;
+  byg027OmTilbygningsår?: unknown;
+  byg038SamletBygningsareal?: unknown;
+  byg021BygningensAnvendelse?: unknown;
+  byg054AntalEtager?: unknown;
+  byg033Tagdækningsmateriale?: unknown;
+  byg032YdervæggensMateriale?: unknown;
+  byg056Varmeinstallation?: unknown;
+}
+
 interface GraphQlResponse {
   data?: {
     BBR_Bygning?: {
-      nodes?: Array<{ byg056Varmeinstallation?: unknown }>;
+      nodes?: GraphQlBygningNode[];
     };
   };
   errors?: Array<{ message: string }>;
 }
 
+function asNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mockBuildingData(idLokalid: string): BbrBuildingData {
+  const seed = hashSeed(idLokalid);
+  const yearBuilt = 1890 + (seed % 130);
+  return {
+    yearBuilt,
+    renovationYear: seed % 3 === 0 ? yearBuilt + 20 : null,
+    areaSqm: 60 + (seed % 200),
+    buildingType: "120",
+    floors: 1 + (seed % 3),
+    roofMaterial: ROOF_MATERIALS[seed % ROOF_MATERIALS.length]!,
+    wallMaterial: WALL_MATERIALS[seed % WALL_MATERIALS.length]!,
+    heatingInstallation: HEATING_TYPES[seed % HEATING_TYPES.length]!,
+  };
+}
+
 /**
- * Looks up the BBR heating installation (varmeinstallation) for a property
- * by its address UUID (id_lokalid). A real "oliefyr" (oil furnace) result is
- * a far stronger oilTankRisk signal than the building-year heuristic.
+ * Looks up BBR's building-level data (year built, renovation year, area,
+ * building use, floors, roof/wall material, heating installation) for a
+ * property by its address UUID (id_lokalid). A real "oliefyr" (oil furnace)
+ * heating result is a far stronger oilTankRisk signal than the
+ * building-year heuristic, and the remaining fields replace listing-derived
+ * guesses with the authoritative register values once real access lands.
  */
-export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<{ heatingInstallation: string | null }>> {
+export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<BbrBuildingData>> {
   if (!idLokalid) return sourceFailed("no id_lokalid to look up");
 
   if (MOCK_MODE) {
-    const seed = hashSeed(idLokalid);
-    return sourceOk({ heatingInstallation: HEATING_TYPES[seed % HEATING_TYPES.length]! });
+    return sourceOk(mockBuildingData(idLokalid));
   }
 
   const apiKey = process.env.DATAFORDELER_API_KEY;
@@ -72,7 +128,7 @@ export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<
     const body = await fetchJson<GraphQlResponse>(`${API_BASE}?${params}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: HEATING_QUERY, variables: { idLokalId: idLokalid } }),
+      body: JSON.stringify({ query: BUILDING_QUERY, variables: { idLokalId: idLokalid } }),
     });
 
     if (body.errors?.length) {
@@ -80,7 +136,16 @@ export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<
     }
 
     const node = body.data?.BBR_Bygning?.nodes?.[0];
-    return sourceOk({ heatingInstallation: asNonEmptyString(node?.byg056Varmeinstallation) });
+    return sourceOk({
+      yearBuilt: asNumber(node?.byg026Opførelsesår),
+      renovationYear: asNumber(node?.byg027OmTilbygningsår),
+      areaSqm: asNumber(node?.byg038SamletBygningsareal),
+      buildingType: asNonEmptyString(node?.byg021BygningensAnvendelse),
+      floors: asNumber(node?.byg054AntalEtager),
+      roofMaterial: asNonEmptyString(node?.byg033Tagdækningsmateriale),
+      wallMaterial: asNonEmptyString(node?.byg032YdervæggensMateriale),
+      heatingInstallation: asNonEmptyString(node?.byg056Varmeinstallation),
+    });
   } catch (err) {
     return sourceFailed(err);
   }

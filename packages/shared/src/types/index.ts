@@ -122,6 +122,12 @@ export interface BbrData {
   buildingType: string | null;
   /** Raw BBR varmeinstallation code/label (e.g. "oliefyr"), null until real Datafordeler BBR access lands. */
   heatingInstallation: string | null;
+  /** Number of storeys (byg054AntalEtager), null until real Datafordeler BBR access lands. */
+  floors: number | null;
+  /** Roof covering material (byg033Tagdækningsmateriale), null until real Datafordeler BBR access lands. */
+  roofMaterial: string | null;
+  /** Exterior wall material (byg032YdervæggensMateriale), null until real Datafordeler BBR access lands. */
+  wallMaterial: string | null;
 }
 
 export type EnrichmentSource = "mock" | "datafordeler" | "ois" | "vejdirektoratet";
