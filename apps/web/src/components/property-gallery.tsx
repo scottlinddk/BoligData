@@ -37,7 +37,15 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
             onClick={() => setOpenIndex(i)}
             className="aspect-[7/5] overflow-hidden rounded-xl border border-border bg-surface-alt"
           >
-            <img src={getImageUrl(image, 700, 500)} alt={alt} loading="lazy" className="h-full w-full object-cover" />
+            <img
+              src={getImageUrl(image, 700, 500)}
+              alt={alt}
+              loading="lazy"
+              onError={(e) => {
+                if (e.currentTarget.src !== image.url) e.currentTarget.src = image.url;
+              }}
+              className="h-full w-full object-cover"
+            />
           </button>
         ))}
       </div>
@@ -70,6 +78,10 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
             src={getImageUrl(images[openIndex]!, 1440, 960)}
             alt={alt}
             onClick={(e) => e.stopPropagation()}
+            onError={(e) => {
+              const original = images[openIndex!]!.url;
+              if (e.currentTarget.src !== original) e.currentTarget.src = original;
+            }}
             className="max-h-full max-w-full rounded-xl object-contain"
           />
           <button

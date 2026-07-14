@@ -82,6 +82,7 @@ export function AdminInvitationsPage() {
           {inviteMutation.isPending ? t("admin.invitations.sending") : t("admin.invitations.invite")}
         </button>
       </form>
+      <p className="-mt-4 mb-4 text-xs font-medium text-ink-faint">{t("admin.invitations.mockHint")}</p>
       {error && <p className="mb-4 text-sm font-semibold text-danger">{error}</p>}
 
       {invitationsQuery.isPending && (

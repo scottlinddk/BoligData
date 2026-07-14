@@ -13,7 +13,8 @@ export function PropertyCard({ property }: { property: Property }) {
   const { showToast } = useToast();
   const daysOnMarket = daysBetween(property.listingDate);
   const photos = getPhotos(property.images);
-  const photoUrl = photos[0] ? getImageUrl(photos[0], 300, 200) : null;
+  // 2x the rendered ~300x150 box so the card stays sharp on retina screens.
+  const photoUrl = photos[0] ? getImageUrl(photos[0], 600, 400) : null;
   const saved = isSaved(property.id);
 
   async function handleSave(e: MouseEvent) {
@@ -30,7 +31,15 @@ export function PropertyCard({ property }: { property: Property }) {
     >
       <div className="relative h-[150px] overflow-hidden bg-surface-alt">
         {photoUrl ? (
-          <img src={photoUrl} alt={property.address} loading="lazy" className="h-full w-full object-cover" />
+          <img
+            src={photoUrl}
+            alt={property.address}
+            loading="lazy"
+            onError={(e) => {
+              if (photos[0] && e.currentTarget.src !== photos[0].url) e.currentTarget.src = photos[0].url;
+            }}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-ink-faint">
             <span className="font-mono text-[9px]">{t("property.noPhoto")}</span>

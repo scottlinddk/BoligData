@@ -10,6 +10,7 @@ import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { useI18n } from "@/i18n/i18n";
+import type { TranslationKey } from "@/i18n/translations";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
@@ -116,6 +117,31 @@ export function PropertyDetailPage() {
         <Stat label={t("detail.floors")} value={enrichment?.bbrData.floors ? String(enrichment.bbrData.floors) : empty} />
         <Stat label={t("detail.roofMaterial")} value={enrichment?.bbrData.roofMaterial ?? empty} />
         <Stat label={t("detail.wallMaterial")} value={enrichment?.bbrData.wallMaterial ?? empty} />
+        <Stat
+          label={t("detail.zone")}
+          value={property.zone ? t(`zone.${property.zone}` as TranslationKey) : empty}
+        />
+        <Stat
+          label={t("detail.parcelArea")}
+          value={property.registeredAreaSqm ? t("property.sqm", { sqm: property.registeredAreaSqm }) : empty}
+        />
+        <Stat
+          label={t("detail.publicValuation")}
+          value={
+            enrichment?.publicValuation?.assessedPropertyValueDkk
+              ? formatDkk(enrichment.publicValuation.assessedPropertyValueDkk) +
+                (enrichment.publicValuation.valuationYear ? ` (${enrichment.publicValuation.valuationYear})` : "")
+              : empty
+          }
+        />
+        <Stat
+          label={t("detail.landValue")}
+          value={
+            enrichment?.publicValuation?.assessedLandValueDkk
+              ? formatDkk(enrichment.publicValuation.assessedLandValueDkk)
+              : empty
+          }
+        />
       </div>
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
@@ -125,6 +151,9 @@ export function PropertyDetailPage() {
           <img
             src={getImageUrl(photos[0], 1440, 960)}
             alt={property.address}
+            onError={(e) => {
+              if (photos[0] && e.currentTarget.src !== photos[0].url) e.currentTarget.src = photos[0].url;
+            }}
             className="h-full w-full object-cover"
           />
         ) : (
@@ -146,6 +175,9 @@ export function PropertyDetailPage() {
             <img
               src={getImageUrl(floorplan, 1440, 960)}
               alt={t("detail.floorplan")}
+              onError={(e) => {
+                if (e.currentTarget.src !== floorplan.url) e.currentTarget.src = floorplan.url;
+              }}
               className="max-h-[600px] w-full object-contain"
             />
           </div>
