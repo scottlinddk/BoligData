@@ -92,8 +92,14 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       label: t("dueDiligence.soil.label"),
       status: soilStatus,
       detail: t(soilDetailKey),
-      source: t("dueDiligence.soil.source"),
-      sourceHref: MILJOEPORTAL_SOIL_MAP_URL,
+      // Deep link to the parcel's jordforureningsattest (jord.miljoeportal.dk)
+      // when cadastral data allowed building one; the source line keeps the
+      // general map as fallback either way.
+      href: riskFlags.soilContaminationAttestUrl ?? null,
+      source: riskFlags.soilContaminationAttestUrl
+        ? t("dueDiligence.soil.source.attest")
+        : t("dueDiligence.soil.source"),
+      sourceHref: riskFlags.soilContaminationAttestUrl ?? MILJOEPORTAL_SOIL_MAP_URL,
     },
   ];
 }

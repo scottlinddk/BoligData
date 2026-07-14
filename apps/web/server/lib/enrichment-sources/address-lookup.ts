@@ -24,20 +24,28 @@ export interface AddressCadastral {
   idLokalid: string | null;
   matrikelnr: string | null;
   ejerlav: string | null;
+  /** Numeric ejerlav code (e.g. "620551") — jord.miljoeportal.dk's attest link keys off this, not the ejerlav name. */
+  ejerlavskode: string | null;
   zone: (typeof ZONES)[number] | null;
 }
 
 interface DarAddressResponse {
   id?: unknown;
   matrikelnr?: unknown;
-  ejerlav?: { navn?: unknown } | unknown;
+  ejerlav?: { navn?: unknown; kode?: unknown } | unknown;
 }
 
 interface ZoneStatusResponse {
   zone?: unknown;
 }
 
-type DarAddressFields = Pick<AddressCadastral, "idLokalid" | "matrikelnr" | "ejerlav">;
+type DarAddressFields = Pick<AddressCadastral, "idLokalid" | "matrikelnr" | "ejerlav" | "ejerlavskode">;
+
+/** Ejerlav codes come back numeric from some DAR shapes — normalize to string. */
+function asCodeString(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return asNonEmptyString(value);
+}
 
 function mockCadastral(address: string, postalCode: string | null): AddressCadastral {
   const seed = hashSeed(`${address}|${postalCode ?? ""}`);
@@ -45,6 +53,7 @@ function mockCadastral(address: string, postalCode: string | null): AddressCadas
     idLokalid: `mock-${seed.toString(16)}`,
     matrikelnr: `${(seed % 900) + 1}${String.fromCharCode(97 + (seed % 26))}`,
     ejerlav: `Mock Ejerlav ${(seed % 50) + 1}`,
+    ejerlavskode: String(100000 + (seed % 900000)),
     zone: ZONES[seed % ZONES.length]!,
   };
 }
@@ -55,7 +64,7 @@ function mockCadastral(address: string, postalCode: string | null): AddressCadas
  * can't wipe out a zone lookup that succeeded independently.
  */
 async function fetchDarAddress(address: string, postalCode: string | null): Promise<DarAddressFields> {
-  const empty: DarAddressFields = { idLokalid: null, matrikelnr: null, ejerlav: null };
+  const empty: DarAddressFields = { idLokalid: null, matrikelnr: null, ejerlav: null, ejerlavskode: null };
   try {
     const params = new URLSearchParams({
       q: address,
@@ -67,15 +76,13 @@ async function fetchDarAddress(address: string, postalCode: string | null): Prom
     if (!match) return empty;
 
     const ejerlavRaw = match.ejerlav;
-    const ejerlavNavn =
-      typeof ejerlavRaw === "object" && ejerlavRaw !== null
-        ? asNonEmptyString((ejerlavRaw as Record<string, unknown>).navn)
-        : null;
+    const ejerlavObj = typeof ejerlavRaw === "object" && ejerlavRaw !== null ? (ejerlavRaw as Record<string, unknown>) : null;
 
     return {
       idLokalid: asNonEmptyString(match.id),
       matrikelnr: asNonEmptyString(match.matrikelnr),
-      ejerlav: ejerlavNavn,
+      ejerlav: ejerlavObj ? asNonEmptyString(ejerlavObj.navn) : null,
+      ejerlavskode: ejerlavObj ? asCodeString(ejerlavObj.kode) : null,
     };
   } catch {
     return empty;

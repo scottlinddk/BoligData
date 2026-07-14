@@ -118,6 +118,8 @@ export interface RiskFlags {
   /** Whether oilTankRisk came from BBR's real heating-installation data or the building-year heuristic fallback. */
   oilTankRiskSource: OilTankRiskSource;
   soilContamination: SoilContamination;
+  /** Deep link to the jordforureningsattest report on jord.miljoeportal.dk, built from the property's ejerlavskode/matrikelnr — null when cadastral data is unavailable. */
+  soilContaminationAttestUrl: string | null;
 }
 
 export interface SchoolTransportInfo {
