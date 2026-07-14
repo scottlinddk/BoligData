@@ -96,8 +96,9 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
               onToggleSelect?.(property.id);
             }}
             aria-label={t("recommend.selectListing")}
+            title={t("recommend.selectListing")}
             aria-pressed={selected}
-            className={`absolute left-2.5 top-10 flex h-6 w-6 items-center justify-center rounded-md border text-xs font-bold shadow-card ${selected ? "border-brand bg-brand text-white" : "border-border bg-surface text-transparent"}`}
+            className={`absolute left-2.5 top-10 flex h-7 w-7 items-center justify-center rounded-md border-2 text-sm font-bold shadow-card transition ${selected ? "border-brand bg-brand text-white" : "border-white bg-white/90 text-transparent hover:border-brand"}`}
           >
             ✓
           </button>

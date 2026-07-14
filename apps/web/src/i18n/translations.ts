@@ -316,6 +316,7 @@ const da = {
 
   "recommend.cta": "Send anbefaling(er) til kunde(r)",
   "recommend.selectListing": "Vælg denne bolig",
+  "recommend.selectHint": "Klik på ✓-mærket i hjørnet af en bolig for at vælge den, og send den derefter som en anbefaling til en kunde.",
   "recommend.selectedCount": "{count} valgt",
   "recommend.title": "Anbefal {count} boliger",
   "recommend.titleOne": "Anbefal bolig",
@@ -653,6 +654,7 @@ const en: Translations = {
 
   "recommend.cta": "Send recommendation(s) to client(s)",
   "recommend.selectListing": "Select this listing",
+  "recommend.selectHint": "Click the ✓ mark in the corner of a listing to select it, then send it as a recommendation to a client.",
   "recommend.selectedCount": "{count} selected",
   "recommend.title": "Recommend {count} listings",
   "recommend.titleOne": "Recommend listing",
