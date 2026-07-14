@@ -28,6 +28,7 @@ const da = {
   "search.loading": "Indlæser boliger...",
   "search.error": "Kunne ikke indlæse boliger.",
   "search.noResults": "Ingen resultater",
+  "search.noResultsHint": "Prøv at justere dine filtre.",
   "search.range": "{from}-{to} af {total}",
   "search.previous": "Forrige",
   "search.next": "Næste",
@@ -76,6 +77,7 @@ const da = {
   "property.bbr.energyLabelTitle": "Energimærke (BBR)",
   "property.bbr.heatingTitle": "Varmeinstallation (BBR)",
 
+  "detail.back": "Tilbage",
   "detail.loading": "Indlæser...",
   "detail.notFound": "Bolig ikke fundet.",
   "detail.contactAgent": "Kontakt mægler",
@@ -105,6 +107,21 @@ const da = {
   "detail.galleryClose": "Luk",
   "detail.galleryPrev": "Forrige",
   "detail.galleryNext": "Næste",
+
+  "bbrFacts.title": "Bygningsoplysninger (BBR)",
+  "bbrFacts.noData": "Ingen berigelsesdata endnu.",
+  "bbrFacts.heating": "Varmeinstallation",
+  "bbrFacts.wallMaterial": "Ydervæg",
+  "bbrFacts.roofMaterial": "Tagmateriale",
+  "bbrFacts.floors": "Antal etager",
+  "bbrFacts.plotSqm": "Grundareal",
+  "bbrFacts.basementSqm": "Kælderareal",
+  "bbrFacts.toiletCount": "Toiletter",
+  "bbrFacts.bathroomCount": "Badeværelser",
+
+  "riskChip.ok": "OK",
+  "riskChip.flagged": "Bemærk",
+  "riskChip.unknown": "Ukendt",
 
   "dueDiligence.title": "Due diligence-tjekliste",
   "dueDiligence.noData": "Ingen berigelsesdata endnu.",
@@ -147,7 +164,7 @@ const da = {
 
   "comparables.loading": "Indlæser sammenlignelige boliger...",
   "comparables.error": "Kunne ikke indlæse sammenlignelige boliger.",
-  "comparables.soldHistory": "Historik for salgspriser",
+  "comparables.soldHistory": "Historik & sammenlignelige boliger",
   "comparables.noHistory": "Ingen prishistorik tilgængelig.",
   "comparables.onePoint": "Kun ét datapunkt registreret.",
   "comparables.title": "Sammenlignelige boliger (seneste 12 mdr.)",
@@ -303,6 +320,7 @@ const en: Translations = {
   "search.loading": "Loading properties...",
   "search.error": "Failed to load properties.",
   "search.noResults": "No results",
+  "search.noResultsHint": "Try adjusting your filters.",
   "search.range": "{from}-{to} of {total}",
   "search.previous": "Previous",
   "search.next": "Next",
@@ -351,6 +369,7 @@ const en: Translations = {
   "property.bbr.energyLabelTitle": "Energy label (BBR)",
   "property.bbr.heatingTitle": "Heating installation (BBR)",
 
+  "detail.back": "Back",
   "detail.loading": "Loading...",
   "detail.notFound": "Property not found.",
   "detail.contactAgent": "Contact agent",
@@ -380,6 +399,21 @@ const en: Translations = {
   "detail.galleryClose": "Close",
   "detail.galleryPrev": "Previous",
   "detail.galleryNext": "Next",
+
+  "bbrFacts.title": "Building facts (BBR)",
+  "bbrFacts.noData": "No enrichment data yet.",
+  "bbrFacts.heating": "Heating",
+  "bbrFacts.wallMaterial": "Exterior wall",
+  "bbrFacts.roofMaterial": "Roof material",
+  "bbrFacts.floors": "Floors",
+  "bbrFacts.plotSqm": "Plot size",
+  "bbrFacts.basementSqm": "Basement area",
+  "bbrFacts.toiletCount": "Toilets",
+  "bbrFacts.bathroomCount": "Bathrooms",
+
+  "riskChip.ok": "OK",
+  "riskChip.flagged": "Flagged",
+  "riskChip.unknown": "Unknown",
 
   "dueDiligence.title": "Due diligence checklist",
   "dueDiligence.noData": "No enrichment data yet.",
@@ -422,7 +456,7 @@ const en: Translations = {
 
   "comparables.loading": "Loading comparables...",
   "comparables.error": "Failed to load comparables.",
-  "comparables.soldHistory": "Sold price history",
+  "comparables.soldHistory": "History & comparables",
   "comparables.noHistory": "No price history available.",
   "comparables.onePoint": "Only one data point on record.",
   "comparables.title": "Comparable properties (last 12mo)",

@@ -5,8 +5,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Geist", "system-ui", "sans-serif"],
-        serif: ['"Instrument Serif"', "ui-serif", "serif"],
+        sans: ['"Space Grotesk"', "system-ui", "sans-serif"],
+        // Display type is Space Grotesk too — kept as `serif` so legacy
+        // `font-serif` call sites resolve to the new heading face.
+        serif: ['"Space Grotesk"', "system-ui", "sans-serif"],
         mono: ['"Geist Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
@@ -24,6 +26,11 @@ export default {
           DEFAULT: "var(--color-text-primary)",
           soft: "var(--color-text-secondary)",
           faint: "var(--color-text-tertiary)",
+        },
+        cta: {
+          DEFAULT: "var(--color-cta)",
+          hover: "var(--color-cta-hover)",
+          text: "var(--color-cta-text)",
         },
         brand: {
           DEFAULT: "var(--color-brand)",

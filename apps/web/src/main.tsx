@@ -27,7 +27,7 @@ import "./index.css";
 
 function RootLayout() {
   return (
-    <div className="min-h-full overflow-x-hidden bg-paper font-sans text-ink">
+    <div className="min-h-full overflow-x-hidden font-sans text-ink">
       <Header />
       <main>
         <Outlet />

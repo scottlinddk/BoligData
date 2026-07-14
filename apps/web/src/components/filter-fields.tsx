@@ -40,7 +40,7 @@ export function FilterFields({
   filters,
   onChange,
   fieldLabelClassName = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft",
-  fieldInputClassName = "rounded-lg border border-border bg-paper px-2.5 py-2 text-sm font-medium text-ink placeholder:text-ink-faint",
+  fieldInputClassName = "rounded-full border border-border bg-paper px-3 py-2 text-[13px] font-medium text-ink placeholder:text-ink-faint",
 }: FilterFieldsProps) {
   const { t } = useI18n();
   const label = fieldLabelClassName;

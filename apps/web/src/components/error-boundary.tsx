@@ -20,7 +20,7 @@ export function RouteErrorBoundary() {
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center gap-3 px-4 py-16 text-center">
-      <h1 className="font-serif text-2xl italic text-ink">{t("errorBoundary.title")}</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink">{t("errorBoundary.title")}</h1>
       <p className="font-semibold text-ink-soft">{t("errorBoundary.description")}</p>
       {message && (
         <p className="max-w-full break-words font-mono text-xs text-ink-faint">{message}</p>

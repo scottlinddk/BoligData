@@ -98,10 +98,10 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
   ];
 }
 
-const STATUS_STYLES: Record<ChecklistItem["status"], string> = {
-  ok: "bg-success-soft text-success-text border-success-soft",
-  warning: "bg-warning-soft text-warning-text border-warning-soft",
-  unknown: "bg-unknown-soft text-unknown-text border-unknown-soft",
+const STATUS_STYLES: Record<ChecklistItem["status"], { row: string; icon: string }> = {
+  ok: { row: "border-success-soft bg-success-soft text-success-text", icon: "✓" },
+  warning: { row: "border-warning-soft bg-warning-soft text-warning-text", icon: "!" },
+  unknown: { row: "border-unknown-soft bg-unknown-soft text-unknown-text", icon: "?" },
 };
 
 export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | null }) {
@@ -109,13 +109,16 @@ export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | nu
   const items = buildChecklist(riskFlags, t);
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
+    <div className="rounded-[20px] border border-border bg-surface p-4 shadow-card">
       <h3 className="mb-3 text-[15px] font-extrabold text-ink">{t("dueDiligence.title")}</h3>
       <ul className="flex flex-col gap-2">
         {items.map((item) => (
-          <li key={item.label} className={`rounded-lg border px-3 py-2 text-sm ${STATUS_STYLES[item.status]}`}>
-            <div className="font-bold">{item.label}</div>
-            <div className="mt-0.5 text-xs opacity-85">
+          <li key={item.label} className={`rounded-[9px] border px-3 py-2 text-sm ${STATUS_STYLES[item.status].row}`}>
+            <div className="flex items-center gap-1.5 text-[13px] font-bold">
+              <span aria-hidden="true">{STATUS_STYLES[item.status].icon}</span>
+              {item.label}
+            </div>
+            <div className="mt-0.5 text-[11.5px] opacity-85">
               {item.href ? (
                 <a href={item.href} target="_blank" rel="noreferrer" className="underline">
                   {item.detail}

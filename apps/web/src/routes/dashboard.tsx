@@ -71,7 +71,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("dashboard.heading")}</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("dashboard.heading")}</h1>
 
       <div className="mb-8">
         <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.favoritesTitle")}</h2>

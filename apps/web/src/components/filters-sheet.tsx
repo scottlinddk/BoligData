@@ -10,7 +10,7 @@ interface FiltersSheetProps {
 
 const SHEET_FIELD_LABEL = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft";
 const SHEET_FIELD_INPUT =
-  "w-full rounded-[9px] border border-border bg-paper px-3 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint";
+  "w-full rounded-full border border-border bg-paper px-3.5 py-2.5 text-[13px] font-medium text-ink placeholder:text-ink-faint";
 
 export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) {
   const { t } = useI18n();
@@ -18,14 +18,14 @@ export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) 
   return (
     <div className="fixed inset-0 z-50">
       <div onClick={onClose} className="absolute inset-0 animate-fade-up bg-black/50" />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col gap-3.5 overflow-y-auto rounded-t-[18px] bg-surface p-4.5 pb-[90px] shadow-lift animate-fade-up">
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col gap-3.5 overflow-y-auto rounded-t-[20px] bg-surface p-4.5 pb-[90px] shadow-lift animate-fade-up">
         <div className="flex items-center justify-between">
           <span className="text-base font-extrabold text-ink">{t("filters.title")}</span>
           <button
             type="button"
             onClick={onClose}
             aria-label={t("filters.close")}
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-surface-alt text-ink-soft"
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-surface-alt text-ink-soft"
           >
             ✕
           </button>
@@ -49,14 +49,14 @@ export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) 
                 maxBuildingYear: null,
               })
             }
-            className="flex-1 rounded-[10px] border border-border bg-surface px-3 py-3 text-sm font-bold text-ink"
+            className="flex-1 rounded-full border border-border-strong bg-surface px-3 py-3 text-sm font-bold text-ink"
           >
             {t("filters.reset")}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="flex-[2] rounded-[10px] bg-brand px-3 py-3 text-sm font-bold text-white"
+            className="flex-[2] rounded-full bg-cta px-3 py-3 text-sm font-bold text-cta-text"
           >
             {t("filters.title")}
           </button>
