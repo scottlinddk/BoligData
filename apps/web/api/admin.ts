@@ -329,6 +329,11 @@ async function handleUsers(
   res.status(405).json({ error: "Method not allowed" });
 }
 
+/**
+ * Despite the "advisor" naming (kept for backwards compatibility with the
+ * advisor_connections table/column names), this pairs any professional
+ * account — advisor or agent — with a customer account.
+ */
 async function handleAdvisorConnections(
   req: VercelRequest,
   res: VercelResponse,
@@ -359,8 +364,8 @@ async function handleAdvisorConnections(
       client.from("user_profiles").select("role").eq("id", body.advisorId).single(),
       client.from("user_profiles").select("role").eq("id", body.userId).single(),
     ]);
-    if (advisorProfile?.role !== "advisor") {
-      res.status(400).json({ error: "advisorId does not belong to an advisor account" });
+    if (advisorProfile?.role !== "advisor" && advisorProfile?.role !== "agent") {
+      res.status(400).json({ error: "advisorId does not belong to an advisor or agent account" });
       return;
     }
     if (!userProfile) {

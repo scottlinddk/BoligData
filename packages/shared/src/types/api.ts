@@ -98,6 +98,27 @@ export interface AdvisorConnectionsResponse {
   connections: AdvisorConnection[];
 }
 
+/**
+ * One connection from the caller's own point of view, with the other
+ * party's contact info resolved (email lives in auth.users, which callers
+ * can't read directly). "professional" means the caller is the customer and
+ * the other party is their advisor/agent; "client" means the caller is the
+ * advisor/agent and the other party is one of their connected customers.
+ */
+export interface MyConnection {
+  id: string;
+  direction: "professional" | "client";
+  otherUserId: string;
+  otherUserEmail: string;
+  otherUserRole: UserRole;
+  otherUserOrganizationName: string | null;
+  createdAt: string;
+}
+
+export interface MyConnectionsResponse {
+  connections: MyConnection[];
+}
+
 export interface AdminDashboardResponse {
   pendingInvitations: number;
   usersByRole: Record<UserRole, number>;

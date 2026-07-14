@@ -12,7 +12,11 @@ import {
 /**
  * Consolidated router for /api/advisor/connections and /api/advisor/favorites.
  * One catch-all file instead of one file per route keeps the Vercel
- * serverless function count under the plan limit.
+ * serverless function count under the plan limit. Despite the "advisor"
+ * path, agents use these same routes for their own connected customers —
+ * the underlying advisor_connections/favorites tables and RLS policies
+ * don't distinguish advisor vs. agent, only "the professional side of a
+ * connection" vs. "the customer side".
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -21,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const auth = await requireRole(req, res, ["advisor"]);
+  const auth = await requireRole(req, res, ["advisor", "agent"]);
   if (!auth) return;
 
   const client = getAnonClient(auth.jwt);

@@ -11,6 +11,7 @@ import type {
   CreateSearchBody,
   FavoritesResponse,
   InvitationsResponse,
+  MyConnectionsResponse,
   NotificationsResponse,
   PropertyDetailResponse,
   SearchPropertiesQuery,
@@ -88,6 +89,10 @@ export function addFavorite(body: CreateFavoriteBody): Promise<void> {
 
 export function removeFavorite(propertyId: string): Promise<void> {
   return request(`/favorites?propertyId=${propertyId}`, { method: "DELETE" });
+}
+
+export function listMyConnections(): Promise<MyConnectionsResponse> {
+  return request(`/connections`);
 }
 
 export function listNotifications(unreadOnly = false): Promise<NotificationsResponse> {

@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
-import { listNotifications, markNotificationRead } from "@/lib/api";
+import { listMyConnections, listNotifications, markNotificationRead } from "@/lib/api";
 import { serializeFilters } from "@/lib/url-filters";
 import { PropertyCard } from "@/components/property-card";
+import { ConnectionList } from "@/components/connection-list";
 import { useI18n } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import type { AlertFrequency } from "@shared/types/index";
@@ -28,6 +29,10 @@ export function DashboardPage() {
     queryKey: ["notifications", "unread"],
     queryFn: () => listNotifications(true),
   });
+  const connectionsQuery = useQuery({ queryKey: ["connections", "mine"], queryFn: listMyConnections });
+  const myProfessionals = (connectionsQuery.data?.connections ?? []).filter(
+    (c) => c.direction === "professional",
+  );
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
@@ -54,6 +59,12 @@ export function DashboardPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("dashboard.heading")}</h1>
+
+      <ConnectionList
+        connections={myProfessionals}
+        titleKey="connections.myProfessionals.title"
+        emptyKey="connections.myProfessionals.empty"
+      />
 
       <div className="mb-8">
         <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.favoritesTitle")}</h2>

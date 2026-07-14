@@ -268,12 +268,16 @@ const da = {
   "admin.users.removing": "Fjerner...",
   "admin.users.removeConfirm": "Fjern brugeren {email} permanent? Dette kan ikke fortrydes.",
 
-  "admin.advisorConnections.title": "Rådgiverforbindelser",
-  "admin.advisorConnections.advisor": "Rådgiver",
-  "admin.advisorConnections.user": "Bruger",
+  "admin.advisorConnections.title": "Rådgiver- og mæglerforbindelser",
+  "admin.advisorConnections.hint":
+    "Forbind en rådgiver eller mægler med en kunde. Den forbundne rådgiver/mægler får adgang til kundens favoritboliger og kan godkende dem.",
+  "admin.advisorConnections.advisor": "Rådgiver / mægler",
+  "admin.advisorConnections.user": "Kunde",
   "admin.advisorConnections.connect": "Forbind",
   "admin.advisorConnections.remove": "Fjern",
-  "admin.advisorConnections.empty": "Ingen forbindelser endnu.",
+  "admin.advisorConnections.empty": "Ingen forbindelser endnu. Opret den første ovenfor.",
+  "admin.advisorConnections.noProfessionals":
+    "Ingen rådgiver- eller mæglerkonti endnu. Inviter en under Invitationer for at komme i gang.",
 
   "role.admin": "Admin",
   "role.user": "Bruger",
@@ -292,6 +296,15 @@ const da = {
   "agent.unpromote": "Fjern fremhævning",
   "agent.promoted": "Fremhævet",
   "agent.empty": "Ingen boliger tilknyttet endnu.",
+
+  "connections.myClients.title": "Mine forbundne kunder",
+  "connections.myClients.empty":
+    "Ingen forbundne kunder endnu. Bed en admin om at forbinde dig med en kunde.",
+  "connections.contact": "Kontakt",
+  "connections.since": "Forbundet siden {date}",
+
+  "connections.myProfessionals.title": "Din rådgiver & mægler",
+  "connections.myProfessionals.empty": "Du er endnu ikke forbundet med en rådgiver eller mægler.",
 
   "notifications.title": "Beskeder",
   "notifications.empty": "Ingen nye beskeder.",
@@ -564,12 +577,16 @@ const en: Translations = {
   "admin.users.removeConfirm": "Permanently remove user {email}? This cannot be undone.",
   "admin.users.searchEmpty": "No users match your search.",
 
-  "admin.advisorConnections.title": "Advisor connections",
-  "admin.advisorConnections.advisor": "Advisor",
-  "admin.advisorConnections.user": "User",
+  "admin.advisorConnections.title": "Advisor & agent connections",
+  "admin.advisorConnections.hint":
+    "Connect an advisor or agent with a customer. The connected advisor/agent gets access to the customer's favorited listings and can approve them.",
+  "admin.advisorConnections.advisor": "Advisor / agent",
+  "admin.advisorConnections.user": "Customer",
   "admin.advisorConnections.connect": "Connect",
   "admin.advisorConnections.remove": "Remove",
-  "admin.advisorConnections.empty": "No connections yet.",
+  "admin.advisorConnections.empty": "No connections yet. Create the first one above.",
+  "admin.advisorConnections.noProfessionals":
+    "No advisor or agent accounts yet. Invite one under Invitations to get started.",
 
   "role.admin": "Admin",
   "role.user": "User",
@@ -581,6 +598,14 @@ const en: Translations = {
   "advisor.approve": "Approve",
   "advisor.unapprove": "Remove approval",
   "advisor.empty": "No connected clients yet.",
+
+  "connections.myClients.title": "My connected clients",
+  "connections.myClients.empty": "No connected clients yet. Ask an admin to connect you with a customer.",
+  "connections.contact": "Contact",
+  "connections.since": "Connected since {date}",
+
+  "connections.myProfessionals.title": "Your advisor & agent",
+  "connections.myProfessionals.empty": "You're not connected with an advisor or agent yet.",
 
   "agent.title": "My listings",
   "agent.claim": "Claim listing",
