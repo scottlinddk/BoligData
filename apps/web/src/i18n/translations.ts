@@ -236,7 +236,7 @@ const da = {
   "admin.invitations.status.accepted": "Accepteret",
   "admin.invitations.status.revoked": "Tilbagekaldt",
   "admin.invitations.mockHint":
-    "E-mails der ender på @scottlind.dk oprettes som testbrugere med det samme (adgangskode: test1234) — der sendes ingen invitations-e-mail.",
+    "E-mails der ender på @test.com oprettes som testbrugere med det samme (adgangskode: test1234) — der sendes ingen invitations-e-mail.",
 
   "admin.users.title": "Brugere",
   "admin.users.email": "E-mail",
@@ -511,7 +511,7 @@ const en: Translations = {
   "admin.invitations.status.accepted": "Accepted",
   "admin.invitations.status.revoked": "Revoked",
   "admin.invitations.mockHint":
-    "Emails ending in @scottlind.dk are created as test users immediately (password: test1234) — no invitation email is sent.",
+    "Emails ending in @test.com are created as test users immediately (password: test1234) — no invitation email is sent.",
 
   "admin.users.title": "Users",
   "admin.users.email": "Email",

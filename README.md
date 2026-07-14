@@ -72,7 +72,7 @@ Verified directly against the live Supabase database (this sandbox's network pol
 
 ## Admin user management
 
-`/api/admin?resource=users` supports `DELETE` (admin-only, cannot delete your own account; cascades through profiles/favorites/searches/notifications/connections), surfaced as a Remove button with confirmation on the admin Users page. Invitations to emails ending in **`@scottlind.dk`** are treated as mock test accounts: the auth user is created immediately with password `test1234` and a pre-confirmed email, and the invitation is marked accepted — no invitation email is sent.
+`/api/admin?resource=users` supports `DELETE` (admin-only, cannot delete your own account; cascades through profiles/favorites/searches/notifications/connections), surfaced as a Remove button with confirmation on the admin Users page. Invitations to emails ending in **`@test.com`** are treated as mock test accounts: the auth user is created immediately with password `test1234` and a pre-confirmed email, and the invitation is marked accepted — no invitation email is sent.
 
 ## Infrastructure status
 

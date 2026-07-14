@@ -26,7 +26,7 @@ const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
  * accepted right away. Lets an admin stamp out test users for every role
  * without a real inbox.
  */
-const MOCK_EMAIL_DOMAIN = "@scottlind.dk";
+const MOCK_EMAIL_DOMAIN = "@test.com";
 const MOCK_USER_PASSWORD = "test1234";
 
 function str(v: unknown): string | undefined {
