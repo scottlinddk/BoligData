@@ -135,6 +135,12 @@ export function SearchPage() {
           </div>
         )}
 
+        {canRecommend && (
+          <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
+            <span>{t("recommend.selectHint")}</span>
+          </div>
+        )}
+
         {!authenticated && (
           <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
             <span>{t("search.signInForDetails")}</span>

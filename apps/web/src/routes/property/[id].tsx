@@ -266,6 +266,15 @@ export function PropertyDetailPage() {
           >
             {t("detail.contactAgent")}
           </button>
+          {canRecommend && (
+            <button
+              type="button"
+              onClick={() => setRecommendOpen(true)}
+              className="flex-1 rounded-full border border-border-strong bg-surface px-3 py-3 text-sm font-bold text-ink"
+            >
+              {t("recommend.cta")}
+            </button>
+          )}
         </div>
       )}
     </div>
