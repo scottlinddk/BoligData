@@ -78,6 +78,23 @@ describe("enrichProperty (mock mode)", () => {
     expect(result.risk_flags.sewerSeparationLookupUrl).toBe("https://www.aalborg.dk/");
   });
 
+  it("populates BBR building facts (materials, heating, counts) when cadastral id_lokalid is available", async () => {
+    const result = await enrichProperty(listing, cadastral);
+    expect(result.bbr_data.wallMaterial).not.toBeNull();
+    expect(result.bbr_data.roofMaterial).not.toBeNull();
+    expect(result.bbr_data.heatingInstallation).not.toBeNull();
+    expect(result.bbr_data.floors).not.toBeNull();
+    expect(result.bbr_data.toiletCount).not.toBeNull();
+    expect(result.bbr_data.bathroomCount).not.toBeNull();
+  });
+
+  it("falls back to listing-derived bbr_data without cadastral data", async () => {
+    const result = await enrichProperty(listing, null);
+    expect(result.bbr_data.yearBuilt).toBe(listing.building_year);
+    expect(result.bbr_data.areaSqm).toBe(listing.sqm);
+    expect(result.bbr_data.wallMaterial).toBeNull();
+  });
+
   it("soilContamination classification is 'none' or 'v2' in mock mode, never left as boolean", async () => {
     const result = await enrichProperty(listing);
     expect(["none", "v2"]).toContain(result.risk_flags.soilContamination.classification);
