@@ -11,7 +11,7 @@ export function AdminDashboardPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-serif text-3xl italic text-ink">{t("admin.dashboard.title")}</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">{t("admin.dashboard.title")}</h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to="/admin/invitations"
@@ -63,7 +63,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">{label}</div>
-      <div className="mt-1 font-serif text-3xl italic text-ink">{value}</div>
+      <div className="mt-1 text-3xl font-bold tracking-tight text-ink">{value}</div>
     </div>
   );
 }

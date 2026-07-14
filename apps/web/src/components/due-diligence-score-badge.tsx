@@ -21,11 +21,11 @@ export function DueDiligenceScoreBadge({ breakdown }: { breakdown: DueDiligenceS
   const tier = score === null ? "unknown" : scoreTier(score);
 
   return (
-    <div className={`rounded-2xl border p-4 ${SCORE_STYLES[tier]}`}>
+    <div className={`rounded-[20px] border p-4 ${SCORE_STYLES[tier]}`}>
       <div className="font-mono text-[10.5px] uppercase tracking-widest opacity-80">
         {t("dueDiligenceScore.title")}
       </div>
-      <div className="mt-1 font-serif text-3xl">
+      <div className="mt-1 text-3xl font-bold tracking-tight">
         {score === null ? t("dueDiligenceScore.unknown") : t("dueDiligenceScore.outOf", { score: String(score) })}
       </div>
       {score !== null && (

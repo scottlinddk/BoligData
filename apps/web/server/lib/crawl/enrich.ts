@@ -126,6 +126,9 @@ export async function enrichProperty(
       roofMaterial: bbrBuilding?.roofMaterial ?? null,
       wallMaterial: bbrBuilding?.wallMaterial ?? null,
       heatingInstallation: bbrBuilding?.heatingInstallation ?? null,
+      basementSqm: bbrBuilding?.basementSqm ?? null,
+      toiletCount: bbrBuilding?.toiletCount ?? null,
+      bathroomCount: bbrBuilding?.bathroomCount ?? null,
     },
     sold_price_history: [],
     calculated_metrics: {

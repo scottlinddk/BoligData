@@ -21,7 +21,7 @@ export function AgentPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("agent.title")}</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("agent.title")}</h1>
       {properties.length === 0 && <p className="font-semibold text-ink-soft">{t("agent.empty")}</p>}
       <ul className="flex flex-col gap-2">
         {properties.map((property) => (

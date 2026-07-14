@@ -98,24 +98,39 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
   ];
 }
 
-const STATUS_STYLES: Record<ChecklistItem["status"], string> = {
-  ok: "bg-success-soft text-success-text border-success-soft",
-  warning: "bg-warning-soft text-warning-text border-warning-soft",
-  unknown: "bg-unknown-soft text-unknown-text border-unknown-soft",
+const STATUS_PILL_STYLES: Record<ChecklistItem["status"], string> = {
+  ok: "bg-success-soft text-success-text",
+  warning: "bg-warning-soft text-warning-text",
+  unknown: "bg-unknown-soft text-unknown-text",
 };
+
+const STATUS_PILL_KEY = {
+  ok: "dueDiligence.status.ok",
+  warning: "dueDiligence.status.flagged",
+  unknown: "dueDiligence.status.unknown",
+} as const;
 
 export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | null }) {
   const { t } = useI18n();
   const items = buildChecklist(riskFlags, t);
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <h3 className="mb-3 text-[15px] font-extrabold text-ink">{t("dueDiligence.title")}</h3>
+    <div className="rounded-[20px] border border-border bg-surface p-4 shadow-card">
+      <h3 className="mb-3 font-mono text-[10.5px] uppercase tracking-widest text-ink-faint">
+        {t("dueDiligence.title")}
+      </h3>
       <ul className="flex flex-col gap-2">
         {items.map((item) => (
-          <li key={item.label} className={`rounded-lg border px-3 py-2 text-sm ${STATUS_STYLES[item.status]}`}>
-            <div className="font-bold">{item.label}</div>
-            <div className="mt-0.5 text-xs opacity-85">
+          <li key={item.label} className="rounded-2xl border border-border bg-surface-alt px-3.5 py-2.5 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-ink">{item.label}</span>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-0.5 font-mono text-[9.5px] uppercase tracking-widest ${STATUS_PILL_STYLES[item.status]}`}
+              >
+                {t(STATUS_PILL_KEY[item.status])}
+              </span>
+            </div>
+            <div className="mt-0.5 text-xs text-ink-soft">
               {item.href ? (
                 <a href={item.href} target="_blank" rel="noreferrer" className="underline">
                   {item.detail}
@@ -124,7 +139,7 @@ export function DueDiligenceChecklist({ riskFlags }: { riskFlags: RiskFlags | nu
                 item.detail
               )}
             </div>
-            <div className="mt-1 text-[11px] opacity-70">
+            <div className="mt-1 text-[11px] text-ink-faint">
               {item.sourceHref ? (
                 <a href={item.sourceHref} target="_blank" rel="noreferrer" className="underline">
                   {t("dueDiligence.source", { source: item.source })}

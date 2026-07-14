@@ -49,7 +49,7 @@ export function AdminUsersPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("admin.users.title")}</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("admin.users.title")}</h1>
       {!usersQuery.isPending && users.length > 0 && (
         <input
           type="search"

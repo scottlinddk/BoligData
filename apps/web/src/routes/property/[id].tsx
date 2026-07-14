@@ -4,6 +4,7 @@ import { ApiError, getComparables, getProperty } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { calculateDueDiligenceScore } from "@shared/utils/due-diligence-score";
+import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { DueDiligenceScoreBadge } from "@/components/due-diligence-score-badge";
 import { ComparablesPanel } from "@/components/comparables-panel";
@@ -72,7 +73,7 @@ export function PropertyDetailPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 pb-24 md:pb-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl italic text-ink">{property.address}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink md:text-4xl">{property.address}</h1>
           <p className="mt-1 text-sm font-semibold text-ink-soft">
             {property.municipality}
             {property.postalCode ? ` · ${property.postalCode}` : ""}
@@ -83,14 +84,14 @@ export function PropertyDetailPage() {
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-[9px] border border-border bg-surface px-4 py-2.5 text-sm font-bold text-ink"
+              className="rounded-full border border-border-strong bg-surface px-5 py-2.5 text-sm font-bold text-ink hover:bg-surface-hover"
             >
               {saved ? t("property.saved") : t("property.save")}
             </button>
             <button
               type="button"
               onClick={handleContactAgent}
-              className="rounded-[9px] bg-brand px-4.5 py-2.5 text-sm font-bold text-white"
+              className="rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-cta-text hover:bg-cta-hover"
             >
               {t("detail.contactAgent")}
             </button>
@@ -102,7 +103,7 @@ export function PropertyDetailPage() {
         <DueDiligenceScoreBadge breakdown={dueDiligenceScore} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="mt-4 flex flex-wrap gap-2">
         <Stat label={t("detail.price")} value={formatDkk(property.price)} />
         <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
         <Stat label={t("detail.pricePerSqm")} value={formatDkk(pricePerSqm(property.price, property.sqm))} />
@@ -146,7 +147,7 @@ export function PropertyDetailPage() {
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
 
-      <div className="relative mt-6 h-64 overflow-hidden rounded-2xl border border-border bg-surface-alt">
+      <div className="relative mt-6 h-64 overflow-hidden rounded-[20px] border border-border bg-surface-alt">
         {photos[0] ? (
           <img
             src={getImageUrl(photos[0], 1440, 960)}
@@ -170,8 +171,8 @@ export function PropertyDetailPage() {
 
       {floorplan && (
         <div className="mt-6">
-          <h2 className="font-serif text-xl italic text-ink">{t("detail.floorplan")}</h2>
-          <div className="mt-2.5 overflow-hidden rounded-2xl border border-border bg-surface-alt">
+          <h2 className="text-xl font-bold tracking-tight text-ink">{t("detail.floorplan")}</h2>
+          <div className="mt-2.5 overflow-hidden rounded-[20px] border border-border bg-surface-alt">
             <img
               src={getImageUrl(floorplan, 1440, 960)}
               alt={t("detail.floorplan")}
@@ -186,19 +187,20 @@ export function PropertyDetailPage() {
 
       <PropertyGallery images={photos.slice(1)} alt={property.address} />
 
-      <div className="mt-6 h-64 overflow-hidden rounded-2xl border border-border">
+      <div className="mt-6 h-64 overflow-hidden rounded-[20px] border border-border">
         <PropertyMap properties={[property]} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} />
+        <BbrFactsPanel bbrData={enrichment?.bbrData ?? null} plotSqm={property.registeredAreaSqm} />
         {comparablesQuery.isLoading && <p className="p-3 font-semibold text-ink-soft">{t("comparables.loading")}</p>}
         {comparablesQuery.isError && (
-          <div className="flex items-center gap-3 rounded-2xl border border-danger-soft bg-danger-soft p-4">
+          <div className="flex items-center gap-3 rounded-[20px] border border-danger-soft bg-danger-soft p-4">
             <p className="font-semibold text-danger">{t("comparables.error")}</p>
             <button
               onClick={() => comparablesQuery.refetch()}
-              className="rounded-lg bg-danger px-3 py-1.5 text-sm font-bold text-white"
+              className="rounded-full bg-danger px-4 py-1.5 text-sm font-bold text-white"
             >
               {t("common.retry")}
             </button>
@@ -223,14 +225,14 @@ export function PropertyDetailPage() {
             type="button"
             onClick={handleSave}
             aria-label={saved ? t("property.saved") : t("property.save")}
-            className="w-[46px] shrink-0 rounded-[10px] border border-border bg-surface text-base text-ink"
+            className="w-[46px] shrink-0 rounded-full border border-border bg-surface text-base text-ink"
           >
             {saved ? "♥" : "♡"}
           </button>
           <button
             type="button"
             onClick={handleContactAgent}
-            className="flex-1 rounded-[10px] bg-brand px-3 py-3 text-sm font-bold text-white"
+            className="flex-1 rounded-full bg-cta px-3 py-3 text-sm font-bold text-cta-text"
           >
             {t("detail.contactAgent")}
           </button>
@@ -242,9 +244,9 @@ export function PropertyDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-3">
-      <div className="font-mono text-[9.5px] uppercase tracking-widest text-ink-faint">{label}</div>
-      <div className="mt-0.5 font-serif text-xl text-ink">{value}</div>
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 shadow-card">
+      <span className="font-mono text-[9.5px] uppercase tracking-widest text-ink-faint">{label}</span>
+      <span className="text-sm font-bold tracking-tight text-ink">{value}</span>
     </div>
   );
 }

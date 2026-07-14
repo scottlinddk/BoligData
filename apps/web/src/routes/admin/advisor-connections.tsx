@@ -46,7 +46,7 @@ export function AdminAdvisorConnectionsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("admin.advisorConnections.title")}</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("admin.advisorConnections.title")}</h1>
 
       <form onSubmit={handleSubmit} className="mb-6 flex flex-wrap gap-2">
         <select

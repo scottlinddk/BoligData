@@ -135,6 +135,12 @@ export interface BbrData {
   roofMaterial: string | null;
   /** Exterior wall material (byg032YdervæggensMateriale), null until real Datafordeler BBR access lands. */
   wallMaterial: string | null;
+  /** Basement area in sqm, null until real Datafordeler BBR access lands. */
+  basementSqm: number | null;
+  /** Number of water-flushing toilets (enh065), null until real Datafordeler BBR access lands. */
+  toiletCount: number | null;
+  /** Number of bathrooms (enh066), null until real Datafordeler BBR access lands. */
+  bathroomCount: number | null;
 }
 
 export type EnrichmentSource = "mock" | "datafordeler" | "ois" | "vejdirektoratet";

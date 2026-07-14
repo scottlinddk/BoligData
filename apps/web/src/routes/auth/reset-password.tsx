@@ -19,7 +19,7 @@ export function ResetPasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="mb-6 font-serif text-3xl italic text-ink">{t("auth.reset.title")}</h1>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.reset.title")}</h1>
       {sent ? (
         <p className="font-medium text-ink-soft">{t("auth.reset.sent", { email })}</p>
       ) : (

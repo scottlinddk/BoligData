@@ -28,7 +28,7 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
 
   return (
     <>
-      <h2 className="mt-6 font-serif text-xl italic text-ink">{t("detail.gallery")}</h2>
+      <h2 className="mt-6 text-xl font-bold tracking-tight text-ink">{t("detail.gallery")}</h2>
       <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
         {images.map((image, i) => (
           <button

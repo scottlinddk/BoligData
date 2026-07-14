@@ -43,6 +43,12 @@ export interface BbrBuildingData {
   /** Raw BBR ydervæggens materiale code/label, null until real Datafordeler BBR access lands. */
   wallMaterial: string | null;
   heatingInstallation: string | null;
+  /** Basement area in sqm. Real branch returns null until the v3 field name is confirmed against the live schema. */
+  basementSqm: number | null;
+  /** Water-flushing toilet count — lives on BBR's Enhed entity (enh065), not Bygning; real branch returns null until that lookup exists. */
+  toiletCount: number | null;
+  /** Bathroom count — lives on BBR's Enhed entity (enh066), not Bygning; real branch returns null until that lookup exists. */
+  bathroomCount: number | null;
 }
 
 /**
@@ -108,6 +114,9 @@ function mockBuildingData(idLokalid: string): BbrBuildingData {
     roofMaterial: ROOF_MATERIALS[seed % ROOF_MATERIALS.length]!,
     wallMaterial: WALL_MATERIALS[seed % WALL_MATERIALS.length]!,
     heatingInstallation: HEATING_TYPES[seed % HEATING_TYPES.length]!,
+    basementSqm: seed % 2 === 0 ? 20 + (seed % 60) : null,
+    toiletCount: 1 + (seed % 3),
+    bathroomCount: 1 + (seed % 2),
   };
 }
 
@@ -153,6 +162,9 @@ export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<
       roofMaterial: asNonEmptyString(node?.byg033Tagdækningsmateriale),
       wallMaterial: asNonEmptyString(node?.byg032YdervæggensMateriale),
       heatingInstallation: asNonEmptyString(node?.byg056Varmeinstallation),
+      basementSqm: null,
+      toiletCount: null,
+      bathroomCount: null,
     });
   } catch (err) {
     return sourceFailed(err);

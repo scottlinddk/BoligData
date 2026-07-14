@@ -27,7 +27,7 @@ export function SignInPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="mb-6 font-serif text-3xl italic text-ink">{t("auth.signIn.title")}</h1>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.signIn.title")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="email"

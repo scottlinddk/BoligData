@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           key={toast.id}
           role="status"
-          className={`fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-xl border border-border border-l-4 ${styles.border} bg-surface px-4 py-3 shadow-lift animate-fade-up`}
+          className={`fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-full border border-border border-l-4 ${styles.border} bg-surface px-4 py-3 shadow-lift animate-fade-up`}
         >
           <span
             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${styles.iconLabel}`}

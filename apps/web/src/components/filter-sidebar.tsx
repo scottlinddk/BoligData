@@ -12,7 +12,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   const activeCount = countActiveFilters(filters);
 
   return (
-    <aside className="sticky top-[78px] flex w-64 shrink-0 flex-col gap-3.5 rounded-2xl border border-border bg-surface p-4.5 shadow-card">
+    <aside className="sticky top-[78px] flex w-64 shrink-0 flex-col gap-3.5 rounded-[20px] border border-border bg-surface p-4.5 shadow-card">
       <div className="flex items-center justify-between">
         <span className="font-mono text-xs uppercase tracking-widest text-ink">{t("filters.title")}</span>
         {activeCount > 0 && (

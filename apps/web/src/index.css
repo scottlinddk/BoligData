@@ -8,73 +8,86 @@ body,
   height: 100%;
 }
 
-/* Let native form controls, scrollbars and the map follow the active theme. */
+/*
+ * BoligData Refined design tokens. The page sits on a soft dawn/dusk
+ * gradient; surfaces are near-white (light) / deep slate (dark) panels with
+ * 20px radii, and every input/button/chip is a full pill capsule. Brand red
+ * is accent-only — primary CTAs are the solid `cta` ink pill.
+ */
 :root {
   color-scheme: light;
 
-  --color-bg: #f2ebdb;
-  --color-surface: #fbf6e8;
-  --color-surface-alt: #e8dfc8;
-  --color-surface-hover: #f8ebc8;
-  --color-border: #d6cbb4;
-  --color-border-strong: #bfb39a;
-  --color-text-primary: #1a1612;
-  --color-text-secondary: #4a4239;
-  --color-text-tertiary: #8b7f6e;
-  --color-brand: #dc4a1e;
-  --color-brand-hover: #bc3a12;
-  --color-brand-soft: #f6ded0;
-  --color-brand-text: #bc3a12;
-  --color-success: #5a6b3a;
-  --color-success-soft: #e4e8d8;
-  --color-success-text: #455328;
-  --color-warning: #7b1f18;
-  --color-warning-soft: #f3dcd4;
-  --color-warning-text: #7b1f18;
-  --color-danger: #7b1f18;
-  --color-danger-soft: #f3dcd4;
-  --color-unknown: #8b7f6e;
-  --color-unknown-soft: #ebe3d0;
-  --color-unknown-text: #4a4239;
-  --shadow-card: none;
-  --shadow-lift: 0 10px 24px rgba(26, 22, 18, 0.16);
+  --color-bg: #f6e4d3;
+  --gradient-bg: linear-gradient(150deg, #fbebc9 0%, #f6e4d3 22%, #e4ecf9 62%, #cfe0f5 100%);
+  --color-surface: #fffefa;
+  --color-surface-alt: #f3efe4;
+  --color-surface-hover: #f8f4e9;
+  --color-border: #e3dccb;
+  --color-border-strong: #c8beaa;
+  --color-text-primary: #171717;
+  --color-text-secondary: #4c4a45;
+  --color-text-tertiary: #8a867c;
+  --color-cta: #171717;
+  --color-cta-hover: #2c2c2c;
+  --color-cta-text: #f2efe7;
+  --color-brand: #ff291b;
+  --color-brand-hover: #e01f12;
+  --color-brand-soft: #ffe6e3;
+  --color-brand-text: #d71e12;
+  --color-success: #2f7a46;
+  --color-success-soft: #e1f0e4;
+  --color-success-text: #22623a;
+  --color-warning: #9a4b00;
+  --color-warning-soft: #fdebd7;
+  --color-warning-text: #8a4300;
+  --color-danger: #c81e12;
+  --color-danger-soft: #fbe3e0;
+  --color-unknown: #8a867c;
+  --color-unknown-soft: #eee9dc;
+  --color-unknown-text: #4c4a45;
+  --shadow-card: 0 1px 2px rgba(23, 23, 23, 0.05);
+  --shadow-lift: 0 10px 24px rgba(23, 23, 23, 0.16);
 }
 
 :root.dark {
   color-scheme: dark;
 
-  --color-bg: #0f0d0b;
-  --color-surface: #15110d;
-  --color-surface-alt: #1a1714;
-  --color-surface-hover: #221d18;
-  --color-border: #2f2924;
-  --color-border-strong: #3c342c;
-  --color-text-primary: #f2ebdb;
-  --color-text-secondary: #c9bfa8;
-  --color-text-tertiary: #7a7060;
-  --color-brand: #f26a3d;
-  --color-brand-hover: #ff8a5f;
-  --color-brand-soft: #2a1b12;
-  --color-brand-text: #f26a3d;
-  --color-success: #8aa055;
-  --color-success-soft: #1e2318;
-  --color-success-text: #8aa055;
-  --color-warning: #b23a2a;
-  --color-warning-soft: #2a1712;
-  --color-warning-text: #e08268;
-  --color-danger: #b23a2a;
-  --color-danger-soft: #2a1712;
-  --color-unknown: #7a7060;
-  --color-unknown-soft: #1e1a15;
-  --color-unknown-text: #c9bfa8;
-  --shadow-card: none;
+  --color-bg: #12141c;
+  --gradient-bg: linear-gradient(160deg, #232a3d 0%, #12141c 45%, #0b0e14 70%, #1c130e 100%);
+  --color-surface: #1a1f2c;
+  --color-surface-alt: #232937;
+  --color-surface-hover: #2a3040;
+  --color-border: #303748;
+  --color-border-strong: #434c61;
+  --color-text-primary: #f2efe7;
+  --color-text-secondary: #b9bdc9;
+  --color-text-tertiary: #7d8294;
+  --color-cta: #f2efe7;
+  --color-cta-hover: #ffffff;
+  --color-cta-text: #171717;
+  --color-brand: #ff5240;
+  --color-brand-hover: #ff6b5c;
+  --color-brand-soft: #3a201c;
+  --color-brand-text: #ff6b5c;
+  --color-success: #7fbf8e;
+  --color-success-soft: #1c2e22;
+  --color-success-text: #9bd3a8;
+  --color-warning: #e8b36a;
+  --color-warning-soft: #33260f;
+  --color-warning-text: #e8b36a;
+  --color-danger: #ff5240;
+  --color-danger-soft: #3a201c;
+  --color-unknown: #7d8294;
+  --color-unknown-soft: #232937;
+  --color-unknown-text: #b9bdc9;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-lift: 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 
 body {
-  transition:
-    background-color 0.25s ease,
-    color 0.25s ease;
+  background: var(--gradient-bg);
+  background-attachment: fixed;
+  transition: color 0.25s ease;
 }
 
 .ds-mono {
@@ -84,7 +97,7 @@ body {
 }
 
 .ds-display {
-  font-family: "Instrument Serif", "Times New Roman", serif;
-  font-style: italic;
-  letter-spacing: -0.01em;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }

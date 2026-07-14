@@ -84,12 +84,12 @@ export function SearchPage() {
                 value={filters.location ?? ""}
                 onChange={(e) => handleFilterChange({ location: e.target.value || null })}
                 placeholder={t("filters.locationPlaceholder")}
-                className="min-w-0 flex-1 rounded-[10px] border border-border bg-paper px-3 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint"
+                className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint"
               />
               <button
                 type="button"
                 onClick={() => setFiltersOpen(true)}
-                className="relative shrink-0 rounded-[10px] border border-border bg-paper px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-ink"
+                className="relative shrink-0 rounded-full border border-border bg-surface px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-ink"
               >
                 {t("filters.title")}
                 {activeFilterCount > 0 && (
@@ -104,14 +104,14 @@ export function SearchPage() {
                 <button
                   type="button"
                   onClick={() => setMobileTab("list")}
-                  className={`flex-1 rounded-lg px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "list" ? "bg-brand text-white" : "border border-border bg-surface text-ink-soft"}`}
+                  className={`flex-1 rounded-full px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "list" ? "bg-cta text-cta-text" : "border border-border bg-surface text-ink-soft"}`}
                 >
                   {t("search.tabList")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setMobileTab("map")}
-                  className={`flex-1 rounded-lg px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "map" ? "bg-brand text-white" : "border border-border bg-surface text-ink-soft"}`}
+                  className={`flex-1 rounded-full px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "map" ? "bg-cta text-cta-text" : "border border-border bg-surface text-ink-soft"}`}
                 >
                   {t("search.tabMap")}
                 </button>
@@ -121,16 +121,16 @@ export function SearchPage() {
         )}
 
         {!authenticated && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
+          <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
             <span>{t("search.signInForDetails")}</span>
-            <Link to="/auth/signin" className="rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-white">
+            <Link to="/auth/signin" className="rounded-full bg-cta px-3.5 py-1.5 text-xs font-bold text-cta-text">
               {t("nav.signIn")}
             </Link>
           </div>
         )}
 
         {showMap && (
-          <div className="h-[230px] overflow-hidden rounded-2xl border border-border md:h-72">
+          <div className="h-[230px] overflow-hidden rounded-[20px] border border-border md:h-72">
             <PropertyMap properties={properties} />
           </div>
         )}
@@ -153,13 +153,13 @@ export function SearchPage() {
                       onChange={(e) => setSaveSearchName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSaveSearch()}
                       placeholder={t("search.saveSearchNamePlaceholder")}
-                      className="min-w-0 rounded-lg border border-border bg-paper px-2.5 py-1.5 text-sm font-medium text-ink placeholder:text-ink-faint"
+                      className="min-w-0 rounded-full border border-border bg-surface px-3.5 py-1.5 text-sm font-medium text-ink placeholder:text-ink-faint"
                     />
                     <button
                       type="button"
                       disabled={savingSearch || !saveSearchName.trim()}
                       onClick={handleSaveSearch}
-                      className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                      className="shrink-0 rounded-full bg-cta px-3.5 py-1.5 text-xs font-bold text-cta-text disabled:opacity-40"
                     >
                       {t("search.saveSearchConfirm")}
                     </button>
@@ -169,7 +169,7 @@ export function SearchPage() {
                         setSaveSearchOpen(false);
                         setSaveSearchName("");
                       }}
-                      className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
+                      className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs font-bold text-ink"
                     >
                       {t("common.cancel")}
                     </button>
@@ -178,7 +178,7 @@ export function SearchPage() {
                   <button
                     type="button"
                     onClick={() => setSaveSearchOpen(true)}
-                    className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
+                    className="shrink-0 rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs font-bold text-ink"
                   >
                     {t("search.saveSearch")}
                   </button>
@@ -188,7 +188,7 @@ export function SearchPage() {
             {isLoading && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="overflow-hidden rounded-2xl border border-border bg-surface">
+                  <div key={i} className="overflow-hidden rounded-[20px] border border-border bg-surface">
                     <div className="h-[140px] animate-pulse bg-surface-alt" />
                     <div className="flex flex-col gap-2 p-4">
                       <div className="h-3.5 w-2/3 animate-pulse rounded bg-surface-alt" />
@@ -201,9 +201,9 @@ export function SearchPage() {
             )}
 
             {isError && (
-              <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-danger-soft bg-danger-soft p-6 text-center animate-pop-in">
+              <div className="flex flex-col items-center gap-2.5 rounded-[20px] border border-danger-soft bg-danger-soft p-6 text-center animate-pop-in">
                 <p className="font-semibold text-danger">{t("search.error")}</p>
-                <button onClick={() => refetch()} className="rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white">
+                <button onClick={() => refetch()} className="rounded-full bg-danger px-4 py-2 text-sm font-bold text-white">
                   {t("common.retry")}
                 </button>
               </div>
@@ -219,7 +219,7 @@ export function SearchPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center">
+                  <div className="rounded-[20px] border border-dashed border-border-strong px-5 py-8 text-center">
                     <p className="font-semibold text-ink">{t("search.noResults")}</p>
                   </div>
                 )
@@ -230,7 +230,7 @@ export function SearchPage() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center">
+                <div className="rounded-[20px] border border-dashed border-border-strong px-5 py-8 text-center">
                   <p className="font-semibold text-ink">{t("search.noResults")}</p>
                 </div>
               ))}
@@ -247,7 +247,7 @@ export function SearchPage() {
                   <select
                     value={pageSize}
                     onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="rounded-lg border border-border bg-surface px-2 py-1 text-ink"
+                    className="rounded-full border border-border bg-surface px-2.5 py-1 text-ink"
                   >
                     {PAGE_SIZE_OPTIONS.map((size) => (
                       <option key={size} value={size}>
@@ -260,14 +260,14 @@ export function SearchPage() {
                   <button
                     disabled={offset === 0}
                     onClick={() => setOffset(Math.max(0, offset - limit))}
-                    className="rounded-lg border border-border bg-surface px-3 py-1.5 font-bold text-ink disabled:opacity-40"
+                    className="rounded-full border border-border bg-surface px-3.5 py-1.5 font-bold text-ink disabled:opacity-40"
                   >
                     {t("search.previous")}
                   </button>
                   <button
                     disabled={offset + limit >= total}
                     onClick={() => setOffset(offset + limit)}
-                    className="rounded-lg border border-border bg-surface px-3 py-1.5 font-bold text-ink disabled:opacity-40"
+                    className="rounded-full border border-border bg-surface px-3.5 py-1.5 font-bold text-ink disabled:opacity-40"
                   >
                     {t("search.next")}
                   </button>

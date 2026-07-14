@@ -15,10 +15,10 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-ink">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand text-sm text-white">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm text-white">
             B
           </span>
           {t("app.name")}
@@ -59,7 +59,7 @@ export function Header() {
             ) : (
               <Link
                 to="/auth/signin"
-                className="rounded-full bg-brand-soft px-4 py-2 text-sm font-semibold text-brand-text transition hover:-translate-y-px"
+                className="rounded-full bg-cta px-4 py-2 text-sm font-semibold text-cta-text transition hover:-translate-y-px hover:bg-cta-hover"
               >
                 {t("nav.signIn")}
               </Link>
@@ -77,7 +77,7 @@ export function Header() {
               onClick={() => setMenuOpen((v) => !v)}
               aria-label={t("nav.menu")}
               aria-expanded={menuOpen}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-base text-ink-soft"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-base text-ink-soft"
             >
               ☰
             </button>
@@ -115,7 +115,7 @@ export function Header() {
                   setMenuOpen(false);
                   signOut();
                 }}
-                className="rounded-lg bg-surface-alt px-3.5 py-2.5 text-left text-sm font-bold text-ink-soft"
+                className="rounded-full bg-surface-alt px-3.5 py-2.5 text-left text-sm font-bold text-ink-soft"
               >
                 {t("nav.signOut")}
               </button>
@@ -124,7 +124,7 @@ export function Header() {
             <Link
               to="/auth/signin"
               onClick={() => setMenuOpen(false)}
-              className="rounded-lg bg-brand-soft px-3.5 py-2.5 text-left text-sm font-bold text-brand-text"
+              className="rounded-full bg-cta px-3.5 py-2.5 text-left text-sm font-bold text-cta-text"
             >
               {t("nav.signIn")}
             </Link>
