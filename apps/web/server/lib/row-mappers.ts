@@ -6,6 +6,7 @@ import type {
   FavoriteProperty,
   Invitation,
   ListingApproval,
+  ListingRecommendation,
   Notification,
   Property,
   PropertySummary,
@@ -136,6 +137,21 @@ export function rowToListingApproval(row: Record<string, any>): ListingApproval 
     userId: row.user_id,
     note: row.note,
     createdAt: row.created_at,
+  };
+}
+
+export function rowToListingRecommendation(row: Record<string, any>): ListingRecommendation {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    propertyId: row.property_id,
+    advisorId: row.advisor_id,
+    userId: row.user_id,
+    message: row.message,
+    status: row.status,
+    responseMessage: row.response_message,
+    createdAt: row.created_at,
+    respondedAt: row.responded_at,
   };
 }
 

@@ -6,6 +6,7 @@ import { I18nProvider } from "@/i18n/i18n";
 import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
 import { ToastProvider } from "@/components/toast";
+import { RecommendationAlerts } from "@/components/recommendation-alerts";
 import { AuthProvider } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
@@ -13,6 +14,7 @@ import { RouteErrorBoundary } from "@/components/error-boundary";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
 import { DashboardPage } from "@/routes/dashboard";
+import { RecommendationsPage } from "@/routes/recommendations";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
 import { AdminInvitationsPage } from "@/routes/admin/invitations";
 import { AdminUsersPage } from "@/routes/admin/users";
@@ -29,9 +31,10 @@ function RootLayout() {
   return (
     <div className="min-h-full overflow-x-hidden font-sans text-ink">
       <Header />
-      <main>
+      <main className="mx-auto max-w-6xl">
         <Outlet />
       </main>
+      <RecommendationAlerts />
     </div>
   );
 }
@@ -55,6 +58,14 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <DashboardPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/recommendations",
+        element: (
+          <AuthGuard>
+            <RecommendationsPage />
           </AuthGuard>
         ),
       },

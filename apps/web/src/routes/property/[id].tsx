@@ -15,6 +15,9 @@ import type { TranslationKey } from "@/i18n/translations";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
+import { useState } from "react";
+import { useUserProfile } from "@/hooks/use-user-profile";
+import { RecommendModal } from "@/components/recommend-modal";
 
 export function PropertyDetailPage() {
   const { t } = useI18n();
@@ -23,6 +26,9 @@ export function PropertyDetailPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
+  const { profile } = useUserProfile();
+  const canRecommend = profile?.role === "advisor" || profile?.role === "agent";
+  const [recommendOpen, setRecommendOpen] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ["property", id],
@@ -103,9 +109,22 @@ export function PropertyDetailPage() {
             >
               {t("detail.contactAgent")}
             </button>
+            {canRecommend && (
+              <button
+                type="button"
+                onClick={() => setRecommendOpen(true)}
+                className="rounded-full border border-border-strong bg-surface px-5 py-2.5 text-sm font-bold text-ink hover:bg-surface-hover"
+              >
+                {t("recommend.cta")}
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {recommendOpen && (
+        <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />
+      )}
 
       <div className="mt-4">
         <DueDiligenceScoreBadge breakdown={dueDiligenceScore} />
@@ -158,7 +177,7 @@ export function PropertyDetailPage() {
       <div className="relative mt-6 h-[260px] overflow-hidden rounded-[20px] border border-border bg-surface-alt">
         {photos[0] ? (
           <img
-            src={getImageUrl(photos[0], 1440, 960)}
+            src={getImageUrl(photos[0], 2400, 1600)}
             alt={property.address}
             onError={(e) => {
               if (photos[0] && e.currentTarget.src !== photos[0].url) e.currentTarget.src = photos[0].url;

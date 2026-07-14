@@ -239,6 +239,22 @@ export interface Notification {
   createdAt: string;
 }
 
+export type RecommendationStatus = "pending" | "accepted" | "dismissed";
+
+/** An advisor/agent recommending a listing to a connected client, with the client's response. */
+export interface ListingRecommendation {
+  id: string;
+  batchId: string;
+  propertyId: string;
+  advisorId: string;
+  userId: string;
+  message: string | null;
+  status: RecommendationStatus;
+  responseMessage: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
 export interface PropertyFilters {
   location: string | null;
   postnummer: string | null;

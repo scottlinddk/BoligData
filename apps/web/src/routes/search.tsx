@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { usePropertySearch } from "@/hooks/use-property-search";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { parseFilters, serializeFilters, type FiltersWithSort } from "@/lib/url-filters";
 import { countActiveFilters } from "@/components/filter-fields";
@@ -12,6 +13,7 @@ import { FiltersSheet } from "@/components/filters-sheet";
 import { PropertyCard } from "@/components/property-card";
 import { LockedPropertyCard } from "@/components/locked-property-card";
 import { PropertyMap } from "@/components/property-map";
+import { RecommendModal } from "@/components/recommend-modal";
 import { useToast } from "@/components/toast";
 import { useI18n } from "@/i18n/i18n";
 
@@ -20,6 +22,7 @@ type MobileTab = "list" | "map";
 export function SearchPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const { showToast } = useToast();
   const { createSearch } = useSavedSearches();
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -32,6 +35,18 @@ export function SearchPage() {
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState("");
   const [savingSearch, setSavingSearch] = useState(false);
+  const canRecommend = profile?.role === "advisor" || profile?.role === "agent";
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [recommendOpen, setRecommendOpen] = useState(false);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const { data, isLoading, isError, refetch } = usePropertySearch(filters, offset, pageSize);
 
@@ -215,7 +230,13 @@ export function SearchPage() {
                 properties.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
                     {properties.map((property) => (
-                      <PropertyCard key={property.id} property={property} />
+                      <PropertyCard
+                        key={property.id}
+                        property={property}
+                        selectable={canRecommend}
+                        selected={selectedIds.has(property.id)}
+                        onToggleSelect={toggleSelected}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -281,6 +302,37 @@ export function SearchPage() {
 
       {filtersOpen && (
         <FiltersSheet filters={filters} onChange={handleFilterChange} onClose={() => setFiltersOpen(false)} />
+      )}
+
+      {canRecommend && selectedIds.size > 0 && (
+        <div className="fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2.5 shadow-lift">
+            <span className="text-sm font-bold text-ink">{t("recommend.selectedCount", { count: selectedIds.size })}</span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecommendOpen(true)}
+              className="rounded-full bg-cta px-3.5 py-1.5 text-xs font-bold text-cta-text"
+            >
+              {t("recommend.cta")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {recommendOpen && (
+        <RecommendModal
+          propertyIds={Array.from(selectedIds)}
+          propertyCount={selectedIds.size}
+          onClose={() => setRecommendOpen(false)}
+          onSent={() => setSelectedIds(new Set())}
+        />
       )}
     </div>
   );

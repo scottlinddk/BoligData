@@ -11,9 +11,12 @@ import type {
   CreateSearchBody,
   FavoritesResponse,
   InvitationsResponse,
+  CreateRecommendationsBody,
   MyConnectionsResponse,
   NotificationsResponse,
   PropertyDetailResponse,
+  RecommendationsResponse,
+  RespondRecommendationBody,
   SearchPropertiesQuery,
   SearchPropertiesResponse,
   UpdateAdminUserBody,
@@ -183,4 +186,18 @@ export function unpromoteListing(propertyId: string): Promise<Property> {
 
 export function listAgentListings(): Promise<AgentListingsResponse> {
   return request(`/agent/listings`);
+}
+
+// --- Recommendations ---
+
+export function listRecommendations(direction: "sent" | "received"): Promise<RecommendationsResponse> {
+  return request(`/recommendations?direction=${direction}`);
+}
+
+export function sendRecommendations(body: CreateRecommendationsBody) {
+  return request(`/recommendations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function respondToRecommendation(id: string, body: RespondRecommendationBody) {
+  return request(`/recommendations?id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }

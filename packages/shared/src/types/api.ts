@@ -5,10 +5,12 @@ import type {
   FavoriteProperty,
   Invitation,
   ListingApproval,
+  ListingRecommendation,
   Notification,
   Property,
   PropertyFilters,
   PropertySummary,
+  RecommendationStatus,
   SortDirection,
   SortField,
   UserRole,
@@ -149,5 +151,21 @@ export interface NotificationsResponse {
 }
 
 export interface AgentListingsResponse {
+  properties: Property[];
+}
+
+export interface CreateRecommendationsBody {
+  propertyIds: string[];
+  userIds: string[];
+  message?: string;
+}
+
+export interface RespondRecommendationBody {
+  status: Extract<RecommendationStatus, "accepted" | "dismissed">;
+  responseMessage?: string;
+}
+
+export interface RecommendationsResponse {
+  recommendations: ListingRecommendation[];
   properties: Property[];
 }

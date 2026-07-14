@@ -75,6 +75,10 @@ Verified directly against the live Supabase database (this sandbox's network pol
 
 `/api/admin?resource=users` supports `DELETE` (admin-only, cannot delete your own account; cascades through profiles/favorites/searches/notifications/connections), surfaced as a Remove button with confirmation on the admin Users page. Invitations to emails ending in **`@test.com`** are treated as mock test accounts: the auth user is created immediately with password `test1234` and a pre-confirmed email, and the invitation is marked accepted — no invitation email is sent.
 
+## Listing recommendations
+
+An advisor or agent can push one or more listings to one or more of their connected clients (search results and the property detail page both expose a "Send recommendation(s) to client(s)" action when signed in as `advisor`/`agent`), with an optional message. `public.listing_recommendations` (migration 014) holds one row per `(property, client)` pair, grouped by `batch_id` for a single send; RLS scopes reads to either party, inserts to the connected advisor/agent, and updates (accept/dismiss + a reply message) to the recipient only. `GET/POST/PATCH /api/recommendations` (`apps/web/api/recommendations.ts`) is the single consolidated endpoint (kept to one file to stay under Vercel's serverless function count limit, same as `notifications.ts`/`favorites.ts`). `RecommendationAlerts` (`apps/web/src/components/recommendation-alerts.tsx`) polls a client's pending recommendations every 30s and renders them as dismissible, actionable toast cards; the full history (sent for advisors/agents, received for clients) lives at `/recommendations`, linked from the main nav.
+
 ## Infrastructure status
 
 - Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`005` are applied and seed data is loaded.
@@ -101,3 +105,4 @@ Page size is caller-configurable (`limit`/`offset` query params, exposed in the 
 6. Verify the live DAR and zone-status endpoints (DAWA replacements), Miljøportalen "Forurenede grunde" WFS, and GEUS Jordartskort endpoint shapes before flipping `ADDRESS_LOOKUP_MOCK_MODE`/`MILJOEPORTALEN_MOCK_MODE`/`GEUS_MOCK_MODE` to `false` — none of these were reachable for schema verification during this session (DAWA is mid-deprecation; Miljøportalen 403'd automated fetches).
 7. ~~Apply migration `packages/supabase/migrations/012_matrikel_parcel_area.sql` (adds `properties.registered_area_sqm`) to the Supabase project.~~ Done — confirmed applied.
 8. `public.spatial_ref_sys` (a PostGIS system table, not application data) has Row Level Security disabled — flagged by a routine advisory check, not something introduced by this session's changes. Decide whether to `ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY;`; not applied automatically since it's a security-posture decision, not a bug fix.
+9. ~~Apply migration `packages/supabase/migrations/014_listing_recommendations.sql` (adds `public.listing_recommendations`, backing the advisor/agent -> client listing recommendations feature) to the Supabase project.~~ Done — confirmed applied.
