@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   res.setHeader("Cache-Control", "no-store");
 
-  const { data: rows, error } = await client
+  const { data, error } = await client
     .from("advisor_connections")
     .select("*")
     .or(`advisor_id.eq.${auth.userId},user_id.eq.${auth.userId}`)
@@ -46,16 +46,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sendError(res, 500, "Failed to load connections", error);
     return;
   }
+  const rows = (data ?? []) as Record<string, any>[];
 
-  const otherIds = Array.from(
-    new Set((rows ?? []).map((row) => (row.advisor_id === auth.userId ? row.user_id : row.advisor_id))),
+  const otherIds: string[] = Array.from(
+    new Set(rows.map((row) => (row.advisor_id === auth.userId ? row.user_id : row.advisor_id) as string)),
   );
   if (otherIds.length === 0) {
     res.status(200).json({ connections: [] });
     return;
   }
 
-  const [{ data: profiles, error: profilesError }, authUsers] = await Promise.all([
+  const [{ data: profilesData, error: profilesError }, authUsers] = await Promise.all([
     client.from("user_profiles").select("*").in("id", otherIds),
     Promise.all(otherIds.map((id) => getAuthAdmin(client).getUserById(id))),
   ]);
@@ -63,13 +64,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sendError(res, 500, "Failed to load connection details", profilesError);
     return;
   }
+  const profiles = (profilesData ?? []) as Record<string, any>[];
 
   const emailById = new Map(otherIds.map((id, i) => [id, authUsers[i]?.data.user?.email ?? ""]));
-  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const profileById = new Map(profiles.map((p) => [p.id as string, p]));
 
-  const connections: MyConnection[] = (rows ?? []).map((row) => {
+  const connections: MyConnection[] = rows.map((row) => {
     const isCallerAdvisor = row.advisor_id === auth.userId;
-    const otherUserId = isCallerAdvisor ? row.user_id : row.advisor_id;
+    const otherUserId: string = isCallerAdvisor ? row.user_id : row.advisor_id;
     const otherProfile = profileById.get(otherUserId);
     return {
       id: row.id,
