@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listAdminUsers, updateAdminUser } from "@/lib/api";
+import { deleteAdminUser, listAdminUsers, updateAdminUser } from "@/lib/api";
 import { useI18n } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import type { UserRole } from "@shared/types/index";
@@ -22,6 +22,21 @@ export function AdminUsersPage() {
     },
     onError: (err: Error) => setError(err.message),
   });
+
+  const removeMutation = useMutation({
+    mutationFn: deleteAdminUser,
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  function handleRemove(id: string, email: string) {
+    if (window.confirm(t("admin.users.removeConfirm", { email }))) {
+      removeMutation.mutate(id);
+    }
+  }
 
   const users = usersQuery.data?.users ?? [];
   const filteredUsers = useMemo(() => {
@@ -81,17 +96,29 @@ export function AdminUsersPage() {
                   </span>
                 )}
               </div>
-              <select
-                value={u.role}
-                onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value as UserRole })}
-                className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {t(`role.${r}` as TranslationKey)}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={u.role}
+                  onChange={(e) => updateMutation.mutate({ id: u.id, role: e.target.value as UserRole })}
+                  className="rounded-lg border border-border bg-paper px-2 py-1 text-sm text-ink"
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {t(`role.${r}` as TranslationKey)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(u.id, u.email)}
+                  disabled={removeMutation.isPending}
+                  className="rounded-lg border border-border px-2.5 py-1 text-sm font-bold text-danger disabled:opacity-50"
+                >
+                  {removeMutation.isPending && removeMutation.variables === u.id
+                    ? t("admin.users.removing")
+                    : t("admin.users.remove")}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

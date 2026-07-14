@@ -19,6 +19,16 @@ import {
 
 const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
 
+/**
+ * Emails on this domain are "mock" test accounts: inviting one creates the
+ * auth user immediately (email pre-confirmed, fixed password below) instead
+ * of sending a real invitation email, and the invitation row is marked
+ * accepted right away. Lets an admin stamp out test users for every role
+ * without a real inbox.
+ */
+const MOCK_EMAIL_DOMAIN = "@test.com";
+const MOCK_USER_PASSWORD = "test1234";
+
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
 }
@@ -64,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await handleInvitations(req, res, client, auth.userId, id);
       return;
     case "users":
-      await handleUsers(req, res, client, id);
+      await handleUsers(req, res, client, auth.userId, id);
       return;
     case "advisor-connections":
       await handleAdvisorConnections(req, res, client, auth.userId, id);
@@ -116,6 +126,36 @@ async function handleInvitations(
       } else {
         sendError(res, 500, "Failed to create invitation", insertError ?? undefined);
       }
+      return;
+    }
+
+    if (email.endsWith(MOCK_EMAIL_DOMAIN)) {
+      // Mock account: create the user directly (pre-confirmed, fixed test
+      // password) instead of emailing an invite. handle_new_user() picks up
+      // the pending invitation row above and assigns its role; the
+      // confirmed-email trigger never fires for pre-confirmed inserts, so
+      // the invitation is marked accepted explicitly here.
+      const { error: createError } = await getAuthAdmin(client).createUser({
+        email,
+        password: MOCK_USER_PASSWORD,
+        email_confirm: true,
+      });
+      if (createError) {
+        await client.from("invitations").delete().eq("id", invitation.id);
+        sendError(res, 500, "Failed to create mock user", createError);
+        return;
+      }
+      const { data: accepted, error: acceptError } = await client
+        .from("invitations")
+        .update({ status: "accepted", accepted_at: new Date().toISOString() })
+        .eq("id", invitation.id)
+        .select("*")
+        .single();
+      if (acceptError || !accepted) {
+        sendError(res, 500, "Mock user created but failed to mark invitation accepted", acceptError ?? undefined);
+        return;
+      }
+      res.status(201).json(rowToInvitation(accepted));
       return;
     }
 
@@ -200,6 +240,7 @@ async function handleUsers(
   req: VercelRequest,
   res: VercelResponse,
   client: SupabaseClient,
+  adminUserId: string,
   id: string | undefined,
 ) {
   if (req.method === "GET" && id === undefined) {
@@ -260,6 +301,28 @@ async function handleUsers(
         email_confirmed_at: authUser?.user?.email_confirmed_at ?? null,
       }),
     );
+    return;
+  }
+
+  if (req.method === "DELETE" && id !== undefined) {
+    if (!isUuid(id)) {
+      sendError(res, 400, "Invalid user id");
+      return;
+    }
+    if (id === adminUserId) {
+      res.status(400).json({ error: "You cannot remove your own account" });
+      return;
+    }
+    // Deleting the auth user cascades to user_profiles, favorites, saved
+    // searches, notifications, and advisor connections (all FK on delete
+    // cascade), so this is the whole removal.
+    const { error } = await getAuthAdmin(client).deleteUser(id);
+    if (error) {
+      const status = (error as { status?: number }).status === 404 ? 404 : 500;
+      sendError(res, status, status === 404 ? "User not found" : "Failed to remove user", error);
+      return;
+    }
+    res.status(204).end();
     return;
   }
 

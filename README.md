@@ -60,6 +60,20 @@ Enrichment (`enrich.ts`) is still **mock-only** by default, gated by its own `EN
 
 **Vercel Deployment Protection**: if the Vercel project has Deployment Protection (Vercel Authentication) enabled, unauthenticated requests to `/api/crawl` are redirected to a login page instead of reaching the handler — `crawl.yml` will report this as a JSON-parse failure rather than silently "succeeding". Either disable protection for the production deployment, or generate a Protection Bypass for Automation secret (Vercel dashboard: Project Settings → Deployment Protection) and set it as the `VERCEL_AUTOMATION_BYPASS_SECRET` GitHub Actions repo secret.
 
+## Data validation status (checked 2026-07-14)
+
+Verified directly against the live Supabase database (this sandbox's network policy blocks the external Danish data endpoints themselves, so upstream APIs were validated via the data they landed rather than live probes):
+
+- **Boligsiden (live)**: 127 active listings ingested, last crawl 2026-07-13. Every listing has price, sqm, coordinates and images; 127/127 have `matrikelnr`/`ejerlav`/`zone` (DAR + zone lookup working live), 120/127 have `registered_area_sqm` (Matriklen). No null-price/null-sqm rows — mapping is holding up.
+- **Live-crawled images were 100×80 thumbnails**: Boligsiden's real API returns only the default thumbnail URL with an empty `imageSources` set, unlike the fixtures. Fixed on the frontend: `getImageUrl` now rewrites the `/WxH/` size segment of Boligsiden CDN URLs to the requested size (with an `onError` fallback to the original URL in every consumer), so cards, hero, gallery and lightbox render sharp images from the existing data without a recrawl.
+- **Migration `013_public_valuation.sql` was missing from the live DB** (the `enrichments.public_valuation` column didn't exist, which would fail the next enrichment upsert from code that includes the key). Applied 2026-07-14.
+- **Enrichment is still mock** (`source = "mock"` on all 127 rows) pending the schema verifications listed under "Data ingest status" — energy label/BBR fields shown in the UI are mock values until `BBR_MOCK_MODE` etc. are flipped.
+- The property detail page now surfaces the real enrichment data that previously never reached the UI: zone status, registered parcel area, and public valuation (property + land value, once VUR goes live).
+
+## Admin user management
+
+`/api/admin?resource=users` supports `DELETE` (admin-only, cannot delete your own account; cascades through profiles/favorites/searches/notifications/connections), surfaced as a Remove button with confirmation on the admin Users page. Invitations to emails ending in **`@test.com`** are treated as mock test accounts: the auth user is created immediately with password `test1234` and a pre-confirmed email, and the invitation is marked accepted — no invitation email is sent.
+
 ## Infrastructure status
 
 - Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`005` are applied and seed data is loaded.

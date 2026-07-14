@@ -124,6 +124,10 @@ export function updateAdminUser(id: string, body: UpdateAdminUserBody): Promise<
   return request(`/admin?resource=users&id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
+export function deleteAdminUser(id: string): Promise<void> {
+  return request(`/admin?resource=users&id=${id}`, { method: "DELETE" });
+}
+
 export function listAdminAdvisorConnections(): Promise<AdvisorConnectionsResponse> {
   return request(`/admin?resource=advisor-connections`);
 }
