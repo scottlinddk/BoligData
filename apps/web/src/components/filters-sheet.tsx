@@ -8,9 +8,9 @@ interface FiltersSheetProps {
   onClose: () => void;
 }
 
-const SHEET_FIELD_LABEL = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft";
+const SHEET_FIELD_LABEL = "flex flex-col gap-2 text-xs font-bold text-ink-soft";
 const SHEET_FIELD_INPUT =
-  "w-full rounded-full border border-border bg-paper px-3.5 py-2.5 text-[13px] font-medium text-ink placeholder:text-ink-faint";
+  "w-full rounded-full border border-border bg-paper px-3.5 py-3 text-[13px] font-medium text-ink placeholder:text-ink-faint";
 
 export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) {
   const { t } = useI18n();
@@ -18,7 +18,7 @@ export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) 
   return (
     <div className="fixed inset-0 z-50">
       <div onClick={onClose} className="absolute inset-0 animate-fade-up bg-black/50" />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col gap-3.5 overflow-y-auto rounded-t-[20px] bg-surface p-4.5 pb-[90px] shadow-lift animate-fade-up">
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col gap-5 overflow-y-auto rounded-t-[20px] bg-surface p-6 pb-[90px] shadow-lift animate-fade-up">
         <div className="flex items-center justify-between">
           <span className="text-base font-extrabold text-ink">{t("filters.title")}</span>
           <button
@@ -33,7 +33,7 @@ export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) 
 
         <FilterFields filters={filters} onChange={onChange} fieldLabelClassName={SHEET_FIELD_LABEL} fieldInputClassName={SHEET_FIELD_INPUT} />
 
-        <div className="mt-1 flex gap-2.5">
+        <div className="mt-2 flex gap-2.5">
           <button
             type="button"
             onClick={() =>
