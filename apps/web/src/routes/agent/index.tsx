@@ -46,7 +46,7 @@ export function AgentPage() {
                   ? unpromoteMutation.mutate(property.id)
                   : promoteMutation.mutate(property.id)
               }
-              className="rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-hover"
+              className="rounded-full bg-cta px-3 py-1.5 text-sm font-bold text-cta-text transition hover:bg-cta-hover"
             >
               {property.isPromoted ? t("agent.unpromote") : t("agent.promote")}
             </button>

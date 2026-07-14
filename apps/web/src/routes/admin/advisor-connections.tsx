@@ -75,7 +75,7 @@ export function AdminAdvisorConnectionsPage() {
         </select>
         <button
           type="submit"
-          className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover"
+          className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover"
         >
           {t("admin.advisorConnections.connect")}
         </button>

@@ -8,9 +8,9 @@ import type { UserRole } from "@shared/types/index";
 const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  accepted: "bg-emerald-100 text-emerald-800",
-  revoked: "bg-neutral-200 text-neutral-600",
+  pending: "bg-warning-soft text-warning-text",
+  accepted: "bg-success-soft text-success-text",
+  revoked: "bg-unknown-soft text-unknown-text",
 };
 
 export function AdminInvitationsPage() {
@@ -77,7 +77,7 @@ export function AdminInvitationsPage() {
         <button
           type="submit"
           disabled={inviteMutation.isPending}
-          className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+          className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
         >
           {inviteMutation.isPending ? t("admin.invitations.sending") : t("admin.invitations.invite")}
         </button>

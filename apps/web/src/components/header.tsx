@@ -130,9 +130,6 @@ export function Header() {
         </div>
       )}
 
-      <svg width="100%" height="6" viewBox="0 0 1180 6" preserveAspectRatio="none" className="block text-brand opacity-55">
-        <line x1="0" y1="3" x2="1180" y2="3" stroke="currentColor" strokeWidth="1" strokeDasharray="2 8" strokeLinecap="round" />
-      </svg>
     </header>
   );
 }

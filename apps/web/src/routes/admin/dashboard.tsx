@@ -15,7 +15,7 @@ export function AdminDashboardPage() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/admin/invitations"
-            className="rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white hover:bg-brand-hover"
+            className="rounded-full bg-cta px-3 py-1.5 text-sm font-bold text-cta-text transition hover:bg-cta-hover"
           >
             {t("admin.dashboard.inviteUsers")}
           </Link>

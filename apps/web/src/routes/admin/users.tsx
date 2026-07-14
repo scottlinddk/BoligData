@@ -91,7 +91,7 @@ export function AdminUsersPage() {
               <div>
                 <div className="font-bold text-ink">{u.email}</div>
                 {!u.inviteAccepted && (
-                  <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                  <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold text-warning-text">
                     {t("admin.users.inviteNotAccepted")}
                   </span>
                 )}
