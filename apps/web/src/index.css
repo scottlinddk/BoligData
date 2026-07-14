@@ -54,36 +54,44 @@ body,
 :root.dark {
   color-scheme: dark;
 
-  --color-bg: #0b0e14;
-  --gradient-bg: linear-gradient(160deg, #232a3d 0%, #12141c 45%, #0b0e14 70%, #1c130e 100%);
-  --color-surface: #15181f;
-  --color-surface-alt: #1b1f27;
-  --color-surface-hover: #232833;
-  --color-border: #262b35;
-  --color-border-strong: #343b48;
-  --color-text-primary: #f2efe7;
-  --color-text-secondary: #b7b9c2;
-  --color-text-tertiary: #767b87;
-  --color-cta: #f2efe7;
+  --color-bg: #090b12;
+  --gradient-bg: radial-gradient(120% 90% at 15% -10%, #232c47 0%, #141826 35%, #0a0c14 65%, #07080d 100%);
+  --color-surface: #141824;
+  --color-surface-alt: #1a1f2e;
+  --color-surface-hover: #232a3c;
+  --color-border: #262e42;
+  --color-border-strong: #38415a;
+  --color-text-primary: #f5f6fa;
+  --color-text-secondary: #aeb3c4;
+  --color-text-tertiary: #6c7288;
+  --color-cta: #f5f6fa;
   --color-cta-hover: #ffffff;
-  --color-cta-text: #171717;
+  --color-cta-text: #12141c;
   --color-brand: #ff5240;
   --color-brand-hover: #ff7263;
   --color-brand-soft: #2b1712;
   --color-brand-text: #ff7263;
-  --color-success: #7fbb78;
-  --color-success-soft: #182a17;
-  --color-success-text: #8fcb88;
+  --color-success: #6fd68a;
+  --color-success-soft: #142a1e;
+  --color-success-text: #8fe3a4;
   --color-warning: #e2685a;
   --color-warning-soft: #2c1712;
   --color-warning-text: #f0897d;
   --color-danger: #e2685a;
   --color-danger-soft: #2c1712;
-  --color-unknown: #767b87;
-  --color-unknown-soft: #1b1f27;
-  --color-unknown-text: #b7b9c2;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.35);
-  --shadow-lift: 0 16px 36px rgba(0, 0, 0, 0.55);
+  --color-unknown: #6c7288;
+  --color-unknown-soft: #1a1f2e;
+  --color-unknown-text: #aeb3c4;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(3, 5, 12, 0.55);
+  --shadow-lift: 0 20px 48px rgba(3, 5, 12, 0.7);
+}
+
+:root.dark body {
+  background-color: var(--color-bg);
+}
+
+:root.dark header {
+  background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
 }
 
 body {

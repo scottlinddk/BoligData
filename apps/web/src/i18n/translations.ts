@@ -295,6 +295,9 @@ const da = {
   "notifications.title": "Beskeder",
   "notifications.empty": "Ingen nye beskeder.",
   "notifications.markRead": "Markér som læst",
+  "notifications.summary": "{count} ulæste beskeder · seneste {date}",
+  "notifications.summaryOne": "1 ulæst besked · {date}",
+  "notifications.markAllRead": "Markér alle som læst",
 } as const;
 
 export type TranslationKey = keyof typeof da;
@@ -587,6 +590,9 @@ const en: Translations = {
   "notifications.title": "Notifications",
   "notifications.empty": "No new notifications.",
   "notifications.markRead": "Mark as read",
+  "notifications.summary": "{count} unread notifications · latest {date}",
+  "notifications.summaryOne": "1 unread notification · {date}",
+  "notifications.markAllRead": "Mark all as read",
 };
 
 export const translations: Record<Language, Translations> = { da, en };

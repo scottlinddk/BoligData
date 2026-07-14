@@ -45,32 +45,14 @@ export function DashboardPage() {
     }
   }
 
+  async function handleMarkAllRead() {
+    await Promise.all(notifications.map((n) => markReadMutation.mutateAsync(n.id)));
+  }
+
+  const latestNotification = notifications[0] ?? null;
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      {notifications.length > 0 && (
-        <div className="mb-6">
-          <h2 className="mb-2 font-semibold text-ink-soft">{t("notifications.title")}</h2>
-          <ul className="flex flex-col gap-2">
-            {notifications.map((n) => (
-              <li
-                key={n.id}
-                className="flex items-center justify-between rounded-xl border border-border bg-surface p-3"
-              >
-                <span className="text-sm font-semibold text-ink">
-                  {new Date(n.createdAt).toLocaleDateString(dateLocale)}
-                </span>
-                <button
-                  onClick={() => markReadMutation.mutate(n.id)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink"
-                >
-                  {t("notifications.markRead")}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("dashboard.heading")}</h1>
 
       <div className="mb-8">
@@ -131,6 +113,27 @@ export function DashboardPage() {
           ))}
         </ul>
       </div>
+
+      {notifications.length > 0 && latestNotification && (
+        <div className="mt-8 flex items-center justify-between rounded-2xl border border-border bg-surface p-4">
+          <div>
+            <h2 className="font-semibold text-ink-soft">{t("notifications.title")}</h2>
+            <p className="mt-0.5 text-sm font-semibold text-ink">
+              {t(notifications.length === 1 ? "notifications.summaryOne" : "notifications.summary", {
+                count: notifications.length,
+                date: new Date(latestNotification.createdAt).toLocaleDateString(dateLocale),
+              })}
+            </p>
+          </div>
+          <button
+            onClick={handleMarkAllRead}
+            disabled={markReadMutation.isPending}
+            className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink"
+          >
+            {t("notifications.markAllRead")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
