@@ -38,7 +38,7 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
             className="aspect-[7/5] overflow-hidden rounded-xl border border-border bg-surface-alt"
           >
             <img
-              src={getImageUrl(image, 700, 500)}
+              src={getImageUrl(image, 900, 640)}
               alt={alt}
               loading="lazy"
               onError={(e) => {
@@ -75,7 +75,7 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
             ‹
           </button>
           <img
-            src={getImageUrl(images[openIndex]!, 1440, 960)}
+            src={getImageUrl(images[openIndex]!, 2400, 1600)}
             alt={alt}
             onClick={(e) => e.stopPropagation()}
             onError={(e) => {

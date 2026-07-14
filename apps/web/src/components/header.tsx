@@ -31,6 +31,9 @@ export function Header() {
                 <Link to="/dashboard" className="font-semibold text-ink-soft hover:text-ink">
                   {t("nav.dashboard")}
                 </Link>
+                <Link to="/recommendations" className="font-semibold text-ink-soft hover:text-ink">
+                  {t("nav.recommendations")}
+                </Link>
                 {profile?.role === "admin" && (
                   <Link to="/admin" className="font-semibold text-ink-soft hover:text-ink">
                     {t("nav.admin")}
@@ -91,6 +94,9 @@ export function Header() {
             <>
               <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">
                 {t("nav.dashboard")}
+              </Link>
+              <Link to="/recommendations" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">
+                {t("nav.recommendations")}
               </Link>
               {profile?.role === "admin" && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">

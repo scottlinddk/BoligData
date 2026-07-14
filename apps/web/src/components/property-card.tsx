@@ -38,7 +38,14 @@ function overallRisk(riskFlags: RiskFlags | null): OverallRisk {
   return warn ? "warning" : "ok";
 }
 
-export function PropertyCard({ property }: { property: Property }) {
+interface PropertyCardProps {
+  property: Property;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
+}
+
+export function PropertyCard({ property, selectable, selected, onToggleSelect }: PropertyCardProps) {
   const { t } = useI18n();
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
@@ -80,6 +87,21 @@ export function PropertyCard({ property }: { property: Property }) {
         <span className="absolute left-2.5 top-2.5 rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-widest text-ink-soft">
           {property.listingSource}
         </span>
+        {selectable && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSelect?.(property.id);
+            }}
+            aria-label={t("recommend.selectListing")}
+            aria-pressed={selected}
+            className={`absolute left-2.5 top-10 flex h-6 w-6 items-center justify-center rounded-md border text-xs font-bold shadow-card ${selected ? "border-brand bg-brand text-white" : "border-border bg-surface text-transparent"}`}
+          >
+            ✓
+          </button>
+        )}
         <button
           type="button"
           onClick={handleSave}
