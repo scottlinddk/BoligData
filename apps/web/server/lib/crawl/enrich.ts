@@ -81,6 +81,12 @@ export async function enrichProperty(
     oilTankRiskSource = "heuristic";
     noiseExposureLden = mockNoiseExposure(listing.lat, listing.lon);
     source = "mock";
+    // lookupBbr gates its own mock/real split (BBR_MOCK_MODE), so calling it
+    // here still yields deterministic mock building facts — without it the
+    // bbr_data materials/heating/counts stay null and the UI's BBR facts
+    // panel renders its empty state for every listing.
+    const bbrResult = await lookupBbr(cadastral?.idLokalid ?? null);
+    bbrBuilding = bbrResult.ok ? bbrResult.data : null;
   } else {
     // Each source is independently gated and failure-isolated: one lookup
     // erroring must not blank out the others, mirroring ingest.ts's
