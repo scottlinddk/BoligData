@@ -14,6 +14,7 @@ import { lookupBbr, type BbrBuildingData } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering, type EjendomsvurderingData } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
+import { buildJordforureningsattestUrl } from "../enrichment-sources/jordforureningsattest-link.js";
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
 import { lookupNoiseExposure, mockNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { buildTinglysningUrl } from "../enrichment-sources/tinglysning-link.js";
@@ -56,6 +57,10 @@ export async function enrichProperty(
   const pricePerSqm = Math.round(listing.price / listing.sqm);
   const encumbranceLookupUrl = buildTinglysningUrl(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
   const sewerSeparationLookupUrl = buildSpildevandsplanUrl(listing.municipality);
+  const soilContaminationAttestUrl = buildJordforureningsattestUrl(
+    cadastral?.ejerlavskode ?? null,
+    cadastral?.matrikelnr ?? null,
+  );
   const oilTankHeuristic = (listing.building_year ?? 2000) < 1970;
 
   let soilClassification: SoilContaminationClassification;
@@ -153,6 +158,7 @@ export async function enrichProperty(
       oilTankRisk,
       oilTankRiskSource,
       soilContamination: { classification: soilClassification, jordart },
+      soilContaminationAttestUrl,
     },
     school_transport: null,
     public_valuation: publicValuation,

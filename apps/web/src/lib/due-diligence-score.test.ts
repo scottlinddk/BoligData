@@ -11,6 +11,7 @@ const baseFlags: RiskFlags = {
   oilTankRisk: false,
   oilTankRiskSource: "heuristic",
   soilContamination: { classification: "none", jordart: null },
+  soilContaminationAttestUrl: null,
 };
 
 describe("calculateDueDiligenceScore", () => {

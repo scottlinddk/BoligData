@@ -27,6 +27,7 @@ const cadastral: AddressCadastral = {
   idLokalid: "test-uuid-1",
   matrikelnr: "12a",
   ejerlav: "Testby Ejerlav",
+  ejerlavskode: "620551",
   zone: "byzone",
 };
 
@@ -54,6 +55,18 @@ describe("enrichProperty (mock mode)", () => {
   it("builds a tinglysning.dk lookup URL when cadastral data is available", async () => {
     const result = await enrichProperty(listing, cadastral);
     expect(result.risk_flags.encumbranceLookupUrl).toBe("https://www.tinglysning.dk/");
+  });
+
+  it("builds a jordforureningsattest URL when cadastral data is available", async () => {
+    const result = await enrichProperty(listing, cadastral);
+    expect(result.risk_flags.soilContaminationAttestUrl).toBe(
+      "https://jord.miljoeportal.dk/report/?elav=620551&matrnr=12a",
+    );
+  });
+
+  it("leaves soilContaminationAttestUrl null without cadastral data", async () => {
+    const result = await enrichProperty(listing, null);
+    expect(result.risk_flags.soilContaminationAttestUrl).toBeNull();
   });
 
   it("leaves encumbranceLookupUrl null without cadastral data", async () => {
