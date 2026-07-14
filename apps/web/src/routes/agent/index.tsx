@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listAgentListings, promoteListing, unpromoteListing } from "@/lib/api";
+import { listAgentListings, listMyConnections, promoteListing, unpromoteListing } from "@/lib/api";
+import { ConnectionList } from "@/components/connection-list";
 import { useI18n } from "@/i18n/i18n";
 import { formatDkk } from "@shared/utils/price";
 
@@ -7,6 +8,8 @@ export function AgentPage() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const listingsQuery = useQuery({ queryKey: ["agent", "listings"], queryFn: listAgentListings });
+  const connectionsQuery = useQuery({ queryKey: ["connections", "mine"], queryFn: listMyConnections });
+  const myClients = (connectionsQuery.data?.connections ?? []).filter((c) => c.direction === "client");
 
   const promoteMutation = useMutation({
     mutationFn: promoteListing,
@@ -22,6 +25,13 @@ export function AgentPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("agent.title")}</h1>
+
+      <ConnectionList
+        connections={myClients}
+        titleKey="connections.myClients.title"
+        emptyKey="connections.myClients.empty"
+      />
+
       {properties.length === 0 && <p className="font-semibold text-ink-soft">{t("agent.empty")}</p>}
       <ul className="flex flex-col gap-2">
         {properties.map((property) => (

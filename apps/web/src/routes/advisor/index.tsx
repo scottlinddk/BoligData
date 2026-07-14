@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { approveListing, listAdvisorFavorites } from "@/lib/api";
+import { approveListing, listAdvisorFavorites, listMyConnections } from "@/lib/api";
+import { ConnectionList } from "@/components/connection-list";
 import { useI18n } from "@/i18n/i18n";
 import { formatDkk } from "@shared/utils/price";
 
@@ -7,6 +8,8 @@ export function AdvisorPage() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const favoritesQuery = useQuery({ queryKey: ["advisor", "favorites"], queryFn: listAdvisorFavorites });
+  const connectionsQuery = useQuery({ queryKey: ["connections", "mine"], queryFn: listMyConnections });
+  const myClients = (connectionsQuery.data?.connections ?? []).filter((c) => c.direction === "client");
 
   const approveMutation = useMutation({
     mutationFn: ({ propertyId, userId }: { propertyId: string; userId: string }) =>
@@ -20,6 +23,13 @@ export function AdvisorPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("advisor.title")}</h1>
+
+      <ConnectionList
+        connections={myClients}
+        titleKey="connections.myClients.title"
+        emptyKey="connections.myClients.empty"
+      />
+
       <h2 className="mb-2 font-semibold text-ink-soft">{t("advisor.favorites")}</h2>
       {favorites.length === 0 && <p className="font-semibold text-ink-soft">{t("advisor.empty")}</p>}
       <ul className="flex flex-col gap-2">
