@@ -28,7 +28,7 @@ export function RouteErrorBoundary() {
       <div className="mt-2 flex gap-2">
         <button
           onClick={() => window.location.reload()}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-hover"
+          className="rounded-full bg-cta px-4 py-2 text-sm font-bold text-cta-text transition hover:bg-cta-hover"
         >
           {t("errorBoundary.reload")}
         </button>
