@@ -39,8 +39,8 @@ function NumberField({
 export function FilterFields({
   filters,
   onChange,
-  fieldLabelClassName = "flex flex-col gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-soft",
-  fieldInputClassName = "rounded-full border border-border bg-surface-alt px-3 py-2 font-sans text-sm font-medium normal-case tracking-normal text-ink placeholder:text-ink-faint",
+  fieldLabelClassName = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft",
+  fieldInputClassName = "rounded-full border border-border bg-paper px-3 py-2 text-[13px] font-medium text-ink placeholder:text-ink-faint",
 }: FilterFieldsProps) {
   const { t } = useI18n();
   const label = fieldLabelClassName;

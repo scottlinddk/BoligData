@@ -8,9 +8,9 @@ interface FiltersSheetProps {
   onClose: () => void;
 }
 
-const SHEET_FIELD_LABEL = "flex flex-col gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-soft";
+const SHEET_FIELD_LABEL = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft";
 const SHEET_FIELD_INPUT =
-  "w-full rounded-full border border-border bg-surface-alt px-3.5 py-2.5 font-sans text-sm font-medium normal-case tracking-normal text-ink placeholder:text-ink-faint";
+  "w-full rounded-full border border-border bg-paper px-3.5 py-2.5 text-[13px] font-medium text-ink placeholder:text-ink-faint";
 
 export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) {
   const { t } = useI18n();

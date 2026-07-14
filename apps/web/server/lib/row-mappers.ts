@@ -9,6 +9,7 @@ import type {
   Notification,
   Property,
   PropertySummary,
+  RiskFlags,
   SavedSearch,
 } from "../../../../packages/shared/src/types/index.js";
 
@@ -16,8 +17,12 @@ export function rowToPropertySummary(row: Record<string, any>): PropertySummary 
   return { id: row.id, address: row.address };
 }
 
-/** `bbrData` is looked up separately (enrichments table, batch-fetched by the caller) and attached here — null when not supplied or not yet enriched. */
-export function rowToProperty(row: Record<string, any>, bbrData: BbrData | null = null): Property {
+/** `bbrData`/`riskFlags` are looked up separately (enrichments table, batch-fetched by the caller) and attached here — null when not supplied or not yet enriched. */
+export function rowToProperty(
+  row: Record<string, any>,
+  bbrData: BbrData | null = null,
+  riskFlags: RiskFlags | null = null,
+): Property {
   return {
     id: row.id,
     address: row.address,
@@ -47,6 +52,7 @@ export function rowToProperty(row: Record<string, any>, bbrData: BbrData | null 
     zone: row.zone ?? null,
     registeredAreaSqm: row.registered_area_sqm !== null && row.registered_area_sqm !== undefined ? Number(row.registered_area_sqm) : null,
     bbrData,
+    riskFlags,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

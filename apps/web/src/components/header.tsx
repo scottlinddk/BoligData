@@ -17,10 +17,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-ink">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm text-white">
-            B
-          </span>
+        <Link to="/" className="text-[19px] font-bold tracking-[-0.02em] text-ink">
           {t("app.name")}
         </Link>
 

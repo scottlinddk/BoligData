@@ -9,79 +9,81 @@ body,
 }
 
 /*
- * BoligData Refined design tokens. The page sits on a soft dawn/dusk
- * gradient; surfaces are near-white (light) / deep slate (dark) panels with
- * 20px radii, and every input/button/chip is a full pill capsule. Brand red
- * is accent-only — primary CTAs are the solid `cta` ink pill.
+ * BoligData Refined design tokens — values mirror the design prototype's
+ * TOKENS object (BoligData Refined.dc.html) verbatim. The page sits on a
+ * dawn/dusk gradient; surfaces are white (light) / deep slate (dark) panels
+ * with 20px radii, and every input/button/chip is a full pill capsule.
+ * Brand red is accent-only — primary CTAs are the solid `cta` pill
+ * (prototype: pillBg/pillText).
  */
 :root {
   color-scheme: light;
 
-  --color-bg: #f6e4d3;
+  --color-bg: #eef2fa;
   --gradient-bg: linear-gradient(150deg, #fbebc9 0%, #f6e4d3 22%, #e4ecf9 62%, #cfe0f5 100%);
-  --color-surface: #fffefa;
-  --color-surface-alt: #f3efe4;
-  --color-surface-hover: #f8f4e9;
-  --color-border: #e3dccb;
-  --color-border-strong: #c8beaa;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f3f4f6;
+  --color-surface-hover: #eaecef;
+  --color-border: #e7e4dc;
+  --color-border-strong: #d6d2c6;
   --color-text-primary: #171717;
-  --color-text-secondary: #4c4a45;
-  --color-text-tertiary: #8a867c;
+  --color-text-secondary: #59564d;
+  --color-text-tertiary: #8c8880;
   --color-cta: #171717;
   --color-cta-hover: #2c2c2c;
-  --color-cta-text: #f2efe7;
+  --color-cta-text: #ffffff;
   --color-brand: #ff291b;
   --color-brand-hover: #e01f12;
-  --color-brand-soft: #ffe6e3;
-  --color-brand-text: #d71e12;
-  --color-success: #2f7a46;
-  --color-success-soft: #e1f0e4;
-  --color-success-text: #22623a;
-  --color-warning: #9a4b00;
-  --color-warning-soft: #fdebd7;
-  --color-warning-text: #8a4300;
-  --color-danger: #c81e12;
-  --color-danger-soft: #fbe3e0;
-  --color-unknown: #8a867c;
-  --color-unknown-soft: #eee9dc;
-  --color-unknown-text: #4c4a45;
-  --shadow-card: 0 1px 2px rgba(23, 23, 23, 0.05);
-  --shadow-lift: 0 10px 24px rgba(23, 23, 23, 0.16);
+  --color-brand-soft: #ffe9e6;
+  --color-brand-text: #e01f12;
+  --color-success: #3f7a3b;
+  --color-success-soft: #e4f1e1;
+  --color-success-text: #2e5c2b;
+  --color-warning: #b4321f;
+  --color-warning-soft: #fbe3de;
+  --color-warning-text: #b4321f;
+  --color-danger: #b4321f;
+  --color-danger-soft: #fbe3de;
+  --color-unknown: #8c8880;
+  --color-unknown-soft: #f0eee7;
+  --color-unknown-text: #59564d;
+  --shadow-card: 0 1px 2px rgba(23, 23, 23, 0.05), 0 10px 26px rgba(23, 23, 23, 0.06);
+  --shadow-lift: 0 16px 34px rgba(23, 23, 23, 0.18);
 }
 
 :root.dark {
   color-scheme: dark;
 
-  --color-bg: #12141c;
+  --color-bg: #0b0e14;
   --gradient-bg: linear-gradient(160deg, #232a3d 0%, #12141c 45%, #0b0e14 70%, #1c130e 100%);
-  --color-surface: #1a1f2c;
-  --color-surface-alt: #232937;
-  --color-surface-hover: #2a3040;
-  --color-border: #303748;
-  --color-border-strong: #434c61;
+  --color-surface: #15181f;
+  --color-surface-alt: #1b1f27;
+  --color-surface-hover: #232833;
+  --color-border: #262b35;
+  --color-border-strong: #343b48;
   --color-text-primary: #f2efe7;
-  --color-text-secondary: #b9bdc9;
-  --color-text-tertiary: #7d8294;
+  --color-text-secondary: #b7b9c2;
+  --color-text-tertiary: #767b87;
   --color-cta: #f2efe7;
   --color-cta-hover: #ffffff;
   --color-cta-text: #171717;
   --color-brand: #ff5240;
-  --color-brand-hover: #ff6b5c;
-  --color-brand-soft: #3a201c;
-  --color-brand-text: #ff6b5c;
-  --color-success: #7fbf8e;
-  --color-success-soft: #1c2e22;
-  --color-success-text: #9bd3a8;
-  --color-warning: #e8b36a;
-  --color-warning-soft: #33260f;
-  --color-warning-text: #e8b36a;
-  --color-danger: #ff5240;
-  --color-danger-soft: #3a201c;
-  --color-unknown: #7d8294;
-  --color-unknown-soft: #232937;
-  --color-unknown-text: #b9bdc9;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-lift: 0 10px 26px rgba(0, 0, 0, 0.5);
+  --color-brand-hover: #ff7263;
+  --color-brand-soft: #2b1712;
+  --color-brand-text: #ff7263;
+  --color-success: #7fbb78;
+  --color-success-soft: #182a17;
+  --color-success-text: #8fcb88;
+  --color-warning: #e2685a;
+  --color-warning-soft: #2c1712;
+  --color-warning-text: #f0897d;
+  --color-danger: #e2685a;
+  --color-danger-soft: #2c1712;
+  --color-unknown: #767b87;
+  --color-unknown-soft: #1b1f27;
+  --color-unknown-text: #b7b9c2;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 16px 36px rgba(0, 0, 0, 0.55);
 }
 
 body {

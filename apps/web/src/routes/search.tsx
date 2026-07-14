@@ -72,7 +72,7 @@ export function SearchPage() {
   const showList = !isMobile || mobileTab === "list";
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-5 px-4 py-4 md:items-start md:py-6">
+    <div className="mx-auto flex max-w-[1180px] gap-5 px-4 py-4 md:items-start md:px-5 md:py-7">
       {!isMobile && <FilterSidebar filters={filters} onChange={handleFilterChange} />}
 
       <div className="flex flex-1 flex-col gap-3.5">
@@ -186,7 +186,7 @@ export function SearchPage() {
             </div>
 
             {isLoading && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="overflow-hidden rounded-[20px] border border-border bg-surface">
                     <div className="h-[140px] animate-pulse bg-surface-alt" />
@@ -213,7 +213,7 @@ export function SearchPage() {
               !isError &&
               (authenticated ? (
                 properties.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
                     {properties.map((property) => (
                       <PropertyCard key={property.id} property={property} />
                     ))}
@@ -221,10 +221,11 @@ export function SearchPage() {
                 ) : (
                   <div className="rounded-[20px] border border-dashed border-border-strong px-5 py-8 text-center">
                     <p className="font-semibold text-ink">{t("search.noResults")}</p>
+                    <p className="mt-1 text-xs font-medium text-ink-faint">{t("search.noResultsHint")}</p>
                   </div>
                 )
               ) : summaries.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))]">
                   {summaries.map((summary) => (
                     <LockedPropertyCard key={summary.id} summary={summary} />
                   ))}

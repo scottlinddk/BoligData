@@ -70,6 +70,12 @@ export interface Property {
    * second round-trip per card. Null when enrichment hasn't run yet.
    */
   bbrData: BbrData | null;
+  /**
+   * Like `bbrData`, attached by search/detail endpoints from the property's
+   * `enrichments` row so listing cards can show the overall OK/Bemærk/Ukendt
+   * risk chip. Null when enrichment hasn't run yet.
+   */
+  riskFlags: RiskFlags | null;
   createdAt: string;
   updatedAt: string;
 }

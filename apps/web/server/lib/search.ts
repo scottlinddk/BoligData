@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BbrData } from "../../../../packages/shared/src/types/index.js";
+import type { BbrData, RiskFlags } from "../../../../packages/shared/src/types/index.js";
 import type {
   SearchPropertiesQuery,
   SearchPropertiesResponse,
@@ -91,21 +91,25 @@ export async function searchProperties(
   // pattern comparables.ts uses for sold_price_history, so listing cards get
   // energy label/heating without a per-card round trip.
   const bbrByPropertyId = new Map<string, BbrData>();
+  const riskByPropertyId = new Map<string, RiskFlags>();
   if (authenticated && (data ?? []).length > 0) {
     const propertyIds = (data as any[]).map((row) => row.id);
     const { data: enrichments } = await client
       .from("enrichments")
-      .select("property_id, bbr_data")
+      .select("property_id, bbr_data, risk_flags")
       .in("property_id", propertyIds);
     for (const row of enrichments ?? []) {
       if (row.bbr_data) bbrByPropertyId.set(row.property_id, row.bbr_data);
+      if (row.risk_flags) riskByPropertyId.set(row.property_id, row.risk_flags);
     }
   }
 
   return {
     authenticated,
     properties: authenticated
-      ? (data as any[]).map((row) => rowToProperty(row, bbrByPropertyId.get(row.id) ?? null))
+      ? (data as any[]).map((row) =>
+          rowToProperty(row, bbrByPropertyId.get(row.id) ?? null, riskByPropertyId.get(row.id) ?? null),
+        )
       : [],
     summaries: authenticated ? [] : (data ?? []).map(rowToPropertySummary),
     total,
