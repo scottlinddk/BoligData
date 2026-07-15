@@ -5,7 +5,9 @@ import type {
   AdminDashboardResponse,
   CreateAdvisorConnectionBody,
   CreateInvitationBody,
+  RegisteredAgent,
   UpdateAdminUserBody,
+  UpdateAppSettingsBody,
 } from "../../../packages/shared/src/types/api.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { requireRole } from "../server/middleware/auth.js";
@@ -51,6 +53,9 @@ function str(v: unknown): string | undefined {
  *   POST   /api/admin?resource=advisor-connections
  *   DELETE /api/admin?resource=advisor-connections&id=:id
  *   GET    /api/admin?resource=dashboard
+ *   GET    /api/admin?resource=app-settings
+ *   PATCH  /api/admin?resource=app-settings
+ *   GET    /api/admin?resource=agents
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -82,6 +87,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "dashboard":
       if (id !== undefined || req.method !== "GET") break;
       await handleDashboard(res, client);
+      return;
+    case "app-settings":
+      if (id !== undefined) break;
+      await handleAppSettings(req, res, client);
+      return;
+    case "agents":
+      if (id !== undefined || req.method !== "GET") break;
+      await handleAgents(res, client);
       return;
   }
   res.status(404).json({ error: "Not found" });
@@ -441,4 +454,63 @@ async function handleDashboard(res: VercelResponse, client: SupabaseClient) {
     recentApprovals: recentApprovals.count ?? 0,
   };
   res.status(200).json(body);
+}
+
+/** The singleton app_settings row — id is a boolean PK pinned to `true`. */
+async function handleAppSettings(req: VercelRequest, res: VercelResponse, client: SupabaseClient) {
+  if (req.method === "GET") {
+    const { data, error } = await client.from("app_settings").select("*").eq("id", true).single();
+    if (error || !data) {
+      sendError(res, 500, "Failed to load app settings", error ?? undefined);
+      return;
+    }
+    res.status(200).json({
+      settings: { broadcastEnabled: data.broadcast_enabled, updatedAt: data.updated_at },
+    });
+    return;
+  }
+
+  if (req.method === "PATCH") {
+    const body = req.body as UpdateAppSettingsBody;
+    if (typeof body?.broadcastEnabled !== "boolean") {
+      res.status(400).json({ error: "broadcastEnabled (boolean) is required" });
+      return;
+    }
+    const { data, error } = await client
+      .from("app_settings")
+      .update({ broadcast_enabled: body.broadcastEnabled, updated_at: new Date().toISOString() })
+      .eq("id", true)
+      .select("*")
+      .single();
+    if (error || !data) {
+      sendError(res, 500, "Failed to update app settings", error ?? undefined);
+      return;
+    }
+    res.status(200).json({
+      settings: { broadcastEnabled: data.broadcast_enabled, updatedAt: data.updated_at },
+    });
+    return;
+  }
+
+  res.status(405).json({ error: "Method not allowed" });
+}
+
+/** Read-only agency directory for the admin Settings view — no CRUD, just the existing agent accounts. */
+async function handleAgents(res: VercelResponse, client: SupabaseClient) {
+  const [{ data: profiles, error: profilesError }, { data: userList, error: usersError }] =
+    await Promise.all([
+      client.from("user_profiles").select("id, organization_name").eq("role", "agent"),
+      getAuthAdmin(client).listUsers({ perPage: 1000 }),
+    ]);
+  if (profilesError || usersError) {
+    sendError(res, 500, "Failed to load agents", profilesError ?? usersError);
+    return;
+  }
+  const emailById = new Map(userList.users.map((u) => [u.id, u.email ?? ""]));
+  const agents: RegisteredAgent[] = (profiles ?? []).map((row) => ({
+    id: row.id,
+    organizationName: row.organization_name,
+    email: emailById.get(row.id) ?? "",
+  }));
+  res.status(200).json({ agents });
 }

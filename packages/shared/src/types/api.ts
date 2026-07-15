@@ -2,17 +2,26 @@ import type {
   AdminUser,
   AdvisorConnection,
   AlertFrequency,
+  AppSettings,
+  BestTimeToContact,
+  ContactPreference,
+  ConversationWithContext,
   FavoriteProperty,
   Invitation,
+  LeadRouting,
   ListingApproval,
   ListingRecommendation,
+  Message,
   Notification,
+  NotificationChannels,
+  NotificationType,
   Property,
   PropertyFilters,
   PropertySummary,
   RecommendationStatus,
   SortDirection,
   SortField,
+  UserProfile,
   UserRole,
 } from "./index.js";
 
@@ -146,8 +155,71 @@ export interface ListingApprovalsResponse {
   approvals: ListingApproval[];
 }
 
+export interface NotificationsQuery {
+  unreadOnly?: boolean;
+  type?: NotificationType;
+}
+
 export interface NotificationsResponse {
   notifications: Notification[];
+}
+
+// --- Messages ---
+
+export interface ConversationsResponse {
+  conversations: ConversationWithContext[];
+}
+
+export interface MessagesResponse {
+  messages: Message[];
+}
+
+export interface SendMessageBody {
+  body: string;
+}
+
+export interface CreateConversationBody {
+  /** The connected professional (agent/advisor) to start a thread with. */
+  otherUserId: string;
+  propertyId?: string | null;
+}
+
+// --- Profile ---
+
+export interface ProfileResponse {
+  profile: UserProfile;
+  email: string;
+}
+
+export interface UpdateProfileBody {
+  fullName?: string | null;
+  phone?: string | null;
+  contactPref?: ContactPreference;
+  bestTime?: BestTimeToContact;
+  notificationChannels?: NotificationChannels;
+  licenseNumber?: string | null;
+  leadRouting?: LeadRouting;
+  notifyNewLead?: boolean;
+}
+
+// --- Admin: app settings & agents ---
+
+export interface AppSettingsResponse {
+  settings: AppSettings;
+}
+
+export interface UpdateAppSettingsBody {
+  broadcastEnabled: boolean;
+}
+
+export interface RegisteredAgent {
+  id: string;
+  organizationName: string | null;
+  email: string;
+}
+
+export interface RegisteredAgentsResponse {
+  agents: RegisteredAgent[];
 }
 
 export interface AgentListingsResponse {

@@ -2,16 +2,19 @@ import type {
   AdminUser,
   AdvisorConnection,
   BbrData,
+  Conversation,
   Enrichment,
   FavoriteProperty,
   Invitation,
   ListingApproval,
   ListingRecommendation,
+  Message,
   Notification,
   Property,
   PropertySummary,
   RiskFlags,
   SavedSearch,
+  UserProfile,
 } from "../../../../packages/shared/src/types/index.js";
 
 export function rowToPropertySummary(row: Record<string, any>): PropertySummary {
@@ -159,11 +162,56 @@ export function rowToNotification(row: Record<string, any>): Notification {
   return {
     id: row.id,
     userId: row.user_id,
+    type: row.type,
     searchId: row.search_id,
     propertyId: row.property_id,
     alertId: row.alert_id,
+    conversationId: row.conversation_id,
+    title: row.title,
+    body: row.body,
+    linkPath: row.link_path,
     readAt: row.read_at,
     createdAt: row.created_at,
+  };
+}
+
+export function rowToConversation(row: Record<string, any>): Conversation {
+  return {
+    id: row.id,
+    propertyId: row.property_id,
+    advisorId: row.advisor_id,
+    userId: row.user_id,
+    createdAt: row.created_at,
+    advisorLastReadAt: row.advisor_last_read_at,
+    userLastReadAt: row.user_last_read_at,
+  };
+}
+
+export function rowToMessage(row: Record<string, any>): Message {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    senderId: row.sender_id,
+    body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+/** Expects a user_profiles row (snake_case columns) — email is resolved separately from auth.users. */
+export function rowToProfile(row: Record<string, any>): UserProfile {
+  return {
+    id: row.id,
+    role: row.role,
+    organizationName: row.organization_name,
+    createdAt: row.created_at,
+    fullName: row.full_name,
+    phone: row.phone,
+    contactPref: row.contact_pref,
+    bestTime: row.best_time,
+    notificationChannels: row.notification_channels,
+    licenseNumber: row.license_number,
+    leadRouting: row.lead_routing,
+    notifyNewLead: row.notify_new_lead,
   };
 }
 

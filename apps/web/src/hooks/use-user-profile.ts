@@ -37,6 +37,14 @@ export function useUserProfile() {
             role: data.role,
             organizationName: data.organization_name,
             createdAt: data.created_at,
+            fullName: data.full_name,
+            phone: data.phone,
+            contactPref: data.contact_pref,
+            bestTime: data.best_time,
+            notificationChannels: data.notification_channels,
+            licenseNumber: data.license_number,
+            leadRouting: data.lead_routing,
+            notifyNewLead: data.notify_new_lead,
           });
         }
         setLoading(false);

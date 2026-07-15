@@ -21,6 +21,10 @@ import { AdminUsersPage } from "@/routes/admin/users";
 import { AdminAdvisorConnectionsPage } from "@/routes/admin/advisor-connections";
 import { AdvisorPage } from "@/routes/advisor/index";
 import { AgentPage } from "@/routes/agent/index";
+import { AccountNotificationsPage } from "@/routes/account/notifications";
+import { AccountMessagesPage } from "@/routes/account/messages";
+import { AccountProfilePage } from "@/routes/account/profile";
+import { AccountSettingsPage } from "@/routes/account/settings";
 import { SignInPage } from "@/routes/auth/signin";
 import { SignUpPage } from "@/routes/auth/signup";
 import { ResetPasswordPage } from "@/routes/auth/reset-password";
@@ -115,6 +119,38 @@ const router = createBrowserRouter([
           <RoleGuard allowed={["agent"]}>
             <AgentPage />
           </RoleGuard>
+        ),
+      },
+      {
+        path: "/account/notifications",
+        element: (
+          <AuthGuard>
+            <AccountNotificationsPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/account/messages",
+        element: (
+          <AuthGuard>
+            <AccountMessagesPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/account/profile",
+        element: (
+          <AuthGuard>
+            <AccountProfilePage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/account/settings",
+        element: (
+          <AuthGuard>
+            <AccountSettingsPage />
+          </AuthGuard>
         ),
       },
       { path: "/auth/signin", element: <SignInPage /> },

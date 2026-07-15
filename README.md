@@ -79,9 +79,20 @@ Verified directly against the live Supabase database (this sandbox's network pol
 
 An advisor or agent can push one or more listings to one or more of their connected clients (search results and the property detail page both expose a "Send recommendation(s) to client(s)" action when signed in as `advisor`/`agent`), with an optional message. `public.listing_recommendations` (migration 014) holds one row per `(property, client)` pair, grouped by `batch_id` for a single send; RLS scopes reads to either party, inserts to the connected advisor/agent, and updates (accept/dismiss + a reply message) to the recipient only. `GET/POST/PATCH /api/recommendations` (`apps/web/api/recommendations.ts`) is the single consolidated endpoint (kept to one file to stay under Vercel's serverless function count limit, same as `notifications.ts`/`favorites.ts`). `RecommendationAlerts` (`apps/web/src/components/recommendation-alerts.tsx`) polls a client's pending recommendations every 30s and renders them as dismissible, actionable toast cards; the full history (sent for advisors/agents, received for clients) lives at `/recommendations`, linked from the main nav.
 
+## Account area: notifications, messages, personal info, settings
+
+Signed-in users get an account area (avatar menu in the header, or the ☰ menu on mobile) with four views under `/account/*`:
+
+- **Notifications** (`/account/notifications`) — the existing search-match feed (migration `008`) widened by migration `015` to a general-purpose, typed feed (`new_listing` / `price_drop` / `message` / `data_update` / `system`), filterable by type, with mark-read/mark-all-read.
+- **Messages** (`/account/messages`) — 1:1 buyer↔professional (agent or advisor) chat threads, optionally scoped to a listing. `public.conversations`/`public.messages` (migration `016`) hang off the existing `advisor_connections` pairing — a thread can only be started between two already-connected parties, enforced by RLS. Sending a message writes a `message`-type notification for the recipient via the service-role client (notifications otherwise has no authenticated-insert policy). No websockets: the inbox and open thread poll every 15s, the same pattern `RecommendationAlerts` already used for 30s polling.
+- **Personal info** (`/account/profile`) — name/phone/contact-preference/best-time-to-contact, self-service editable. Email is read-only (sourced from the auth session) to avoid wiring Supabase's email-change/re-confirmation flow.
+- **Settings** (`/account/settings`) — per-notification-type Email/"Push" (in-app only, no real browser push infra) toggles for everyone; an agent-only Agency profile card (license number, lead routing, notify-on-new-lead); admin-only System notices (site-wide banner toggle, `public.app_settings`, migration `019`) and a read-only Registered agents directory.
+
+All four resources (profile fields, notification channels, agent config) live on `user_profiles`, added by migration `017`, alongside a `before update` trigger that blocks any non-service-role update to `role`/`organization_name` — closing a latent gap where `user_profiles_update_own`'s RLS policy (migration `001`) had no `with check` and would otherwise have let a signed-in user self-promote via a direct Supabase client call. `GET/POST /api/account?resource=conversations|thread|profile` (`apps/web/api/account.ts`) is one consolidated endpoint, same "stay under Vercel's serverless function count limit" reasoning as `admin.ts`/`notifications.ts` — the project was already at exactly 12 API functions before this feature.
+
 ## Infrastructure status
 
-- Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`005` are applied and seed data is loaded.
+- Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`019` are applied and seed data is loaded.
 - Vercel project `bolig-data-web` is linked to this GitHub repo.
 
 ## Search access levels
