@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AccountMenu, useAccountMenuItems } from "@/components/account-menu";
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -13,6 +14,7 @@ export function Header() {
   const { t } = useI18n();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [menuOpen, setMenuOpen] = useState(false);
+  const accountMenuItems = useAccountMenuItems();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
@@ -49,6 +51,7 @@ export function Header() {
                     {t("nav.agent")}
                   </Link>
                 )}
+                <AccountMenu />
                 <button
                   onClick={() => signOut()}
                   className="rounded-full bg-surface-alt px-4 py-2 text-sm font-semibold text-ink-soft transition hover:bg-surface-hover"
@@ -113,6 +116,21 @@ export function Header() {
                   {t("nav.agent")}
                 </Link>
               )}
+              {accountMenuItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-between rounded-full border border-border bg-surface px-3.5 py-2.5 font-semibold text-ink"
+                >
+                  <span>{t(item.labelKey)}</span>
+                  {item.badge !== undefined && (
+                    <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              ))}
               <button
                 onClick={() => {
                   setMenuOpen(false);

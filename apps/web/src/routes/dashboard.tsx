@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
-import { listMyConnections, listNotifications, markNotificationRead } from "@/lib/api";
+import { useNotifications } from "@/hooks/use-notifications";
+import { listMyConnections } from "@/lib/api";
 import { serializeFilters } from "@/lib/url-filters";
 import { PropertyCard } from "@/components/property-card";
 import { ConnectionList } from "@/components/connection-list";
@@ -23,21 +24,12 @@ export function DashboardPage() {
   const { searches, isLoading, updateAlert } = useSavedSearches();
   const { properties: favoriteProperties, isLoading: favoritesLoading } = useSavedProperties();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
-  const notificationsQuery = useQuery({
-    queryKey: ["notifications", "unread"],
-    queryFn: () => listNotifications(true),
-  });
+  const { notifications, markAllRead, isMarkingRead } = useNotifications({ unreadOnly: true });
   const connectionsQuery = useQuery({ queryKey: ["connections", "mine"], queryFn: listMyConnections });
   const myProfessionals = (connectionsQuery.data?.connections ?? []).filter(
     (c) => c.direction === "professional",
   );
-  const markReadMutation = useMutation({
-    mutationFn: markNotificationRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
-  });
-  const notifications = notificationsQuery.data?.notifications ?? [];
 
   const dateLocale = language === "da" ? "da-DK" : "en-GB";
 
@@ -48,10 +40,6 @@ export function DashboardPage() {
     } finally {
       setPendingId(null);
     }
-  }
-
-  async function handleMarkAllRead() {
-    await Promise.all(notifications.map((n) => markReadMutation.mutateAsync(n.id)));
   }
 
   const latestNotification = notifications[0] ?? null;
@@ -137,8 +125,8 @@ export function DashboardPage() {
             </p>
           </div>
           <button
-            onClick={handleMarkAllRead}
-            disabled={markReadMutation.isPending}
+            onClick={() => markAllRead()}
+            disabled={isMarkingRead}
             className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-bold text-ink"
           >
             {t("notifications.markAllRead")}

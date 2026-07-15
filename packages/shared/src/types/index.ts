@@ -175,11 +175,29 @@ export interface Enrichment {
 
 export type UserRole = "admin" | "user" | "advisor" | "agent";
 
+export type ContactPreference = "email" | "phone" | "app";
+export type BestTimeToContact = "morning" | "afternoon" | "evening" | "anytime";
+export type LeadRouting = "roundRobin" | "manual";
+
+export type NotificationType = "new_listing" | "price_drop" | "message" | "data_update" | "system";
+
+/** Per notification-type email/in-app("push") delivery toggles, keyed by NotificationType. */
+export type NotificationChannels = Record<NotificationType, { email: boolean; push: boolean }>;
+
 export interface UserProfile {
   id: string;
   role: UserRole;
   organizationName: string | null;
   createdAt: string;
+  fullName: string | null;
+  phone: string | null;
+  contactPref: ContactPreference;
+  bestTime: BestTimeToContact;
+  notificationChannels: NotificationChannels;
+  /** Agent-only config — meaningful when role === 'agent'. */
+  licenseNumber: string | null;
+  leadRouting: LeadRouting;
+  notifyNewLead: boolean;
 }
 
 export type InvitationStatus = "pending" | "accepted" | "revoked";
@@ -232,11 +250,50 @@ export interface ListingApproval {
 export interface Notification {
   id: string;
   userId: string;
-  searchId: string;
-  propertyId: string;
+  type: NotificationType;
+  searchId: string | null;
+  propertyId: string | null;
   alertId: string | null;
+  conversationId: string | null;
+  title: string | null;
+  body: string | null;
+  linkPath: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+/** A buyer<->professional (agent/advisor) 1:1 chat thread, optionally scoped to a listing. */
+export interface Conversation {
+  id: string;
+  propertyId: string | null;
+  advisorId: string;
+  userId: string;
+  createdAt: string;
+  advisorLastReadAt: string | null;
+  userLastReadAt: string | null;
+}
+
+/** A Conversation joined with the caller's counterpart + property + last-message context, for the inbox list. */
+export interface ConversationWithContext extends Conversation {
+  counterpartId: string;
+  counterpartName: string;
+  counterpartRole: UserRole;
+  propertyAddress: string | null;
+  lastMessage: Message | null;
+  unread: boolean;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface AppSettings {
+  broadcastEnabled: boolean;
+  updatedAt: string;
 }
 
 export type RecommendationStatus = "pending" | "accepted" | "dismissed";

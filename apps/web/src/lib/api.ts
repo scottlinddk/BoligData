@@ -3,26 +3,35 @@ import type {
   AdminUsersResponse,
   AdvisorConnectionsResponse,
   AgentListingsResponse,
+  AppSettingsResponse,
   ApproveListingBody,
   ComparablesResponse,
+  ConversationsResponse,
   CreateAdvisorConnectionBody,
+  CreateConversationBody,
   CreateFavoriteBody,
   CreateInvitationBody,
   CreateSearchBody,
   FavoritesResponse,
   InvitationsResponse,
   CreateRecommendationsBody,
+  MessagesResponse,
   MyConnectionsResponse,
   NotificationsResponse,
+  ProfileResponse,
   PropertyDetailResponse,
   RecommendationsResponse,
+  RegisteredAgentsResponse,
   RespondRecommendationBody,
   SearchPropertiesQuery,
   SearchPropertiesResponse,
+  SendMessageBody,
   UpdateAdminUserBody,
   UpdateAlertBody,
+  UpdateAppSettingsBody,
+  UpdateProfileBody,
 } from "@shared/types/api";
-import type { AdminUser, Invitation, Property, SavedSearch } from "@shared/types/index";
+import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -98,8 +107,12 @@ export function listMyConnections(): Promise<MyConnectionsResponse> {
   return request(`/connections`);
 }
 
-export function listNotifications(unreadOnly = false): Promise<NotificationsResponse> {
-  return request(`/notifications${unreadOnly ? "?unreadOnly=true" : ""}`);
+export function listNotifications(unreadOnly = false, type?: NotificationType): Promise<NotificationsResponse> {
+  const params = new URLSearchParams();
+  if (unreadOnly) params.set("unreadOnly", "true");
+  if (type) params.set("type", type);
+  const qs = params.toString();
+  return request(`/notifications${qs ? `?${qs}` : ""}`);
 }
 
 export function markNotificationRead(id: string): Promise<void> {
@@ -200,4 +213,49 @@ export function sendRecommendations(body: CreateRecommendationsBody) {
 
 export function respondToRecommendation(id: string, body: RespondRecommendationBody) {
   return request(`/recommendations?id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// --- Messages ---
+
+export function listConversations(): Promise<ConversationsResponse> {
+  return request(`/account?resource=conversations`);
+}
+
+export function startConversation(body: CreateConversationBody): Promise<Conversation> {
+  return request(`/account?resource=conversations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function listMessages(conversationId: string): Promise<MessagesResponse> {
+  return request(`/account?resource=thread&conversationId=${conversationId}`);
+}
+
+export function sendMessage(conversationId: string, body: SendMessageBody): Promise<Message> {
+  return request(`/account?resource=thread&conversationId=${conversationId}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// --- Profile ---
+
+export function getProfile(): Promise<ProfileResponse> {
+  return request(`/account?resource=profile`);
+}
+
+export function updateProfile(body: UpdateProfileBody): Promise<ProfileResponse> {
+  return request(`/account?resource=profile`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// --- Admin: app settings & agents ---
+
+export function getAppSettings(): Promise<AppSettingsResponse> {
+  return request(`/admin?resource=app-settings`);
+}
+
+export function updateAppSettings(body: UpdateAppSettingsBody): Promise<AppSettingsResponse> {
+  return request(`/admin?resource=app-settings`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function listRegisteredAgents(): Promise<RegisteredAgentsResponse> {
+  return request(`/admin?resource=agents`);
 }
