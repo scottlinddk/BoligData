@@ -104,7 +104,7 @@ export function removeFavorite(propertyId: string): Promise<void> {
 }
 
 export function listMyConnections(): Promise<MyConnectionsResponse> {
-  return request(`/connections`);
+  return request(`/account?resource=connections`);
 }
 
 export function listNotifications(unreadOnly = false, type?: NotificationType): Promise<NotificationsResponse> {
@@ -198,7 +198,7 @@ export function unpromoteListing(propertyId: string): Promise<Property> {
 }
 
 export function listAgentListings(): Promise<AgentListingsResponse> {
-  return request(`/agent/listings`);
+  return request(`/advisor/listings`);
 }
 
 // --- Recommendations ---

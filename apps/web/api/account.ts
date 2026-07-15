@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ConversationWithContext, UserRole } from "../../../packages/shared/src/types/index.js";
 import type {
   CreateConversationBody,
+  MyConnection,
   SendMessageBody,
   UpdateProfileBody,
 } from "../../../packages/shared/src/types/api.js";
@@ -17,12 +18,14 @@ function str(v: unknown): string | undefined {
 }
 
 /**
- * Consolidated router for the signed-in-user account area (messaging +
- * personal info/preferences), following the same ?resource= sub-routing as
+ * Consolidated router for the signed-in-user account area (messaging,
+ * personal info/preferences, and the caller's own advisor/agent<->customer
+ * connections), following the same ?resource= sub-routing as
  * admin.ts/notifications.ts to stay under Vercel's serverless function
- * count limit — the project is already at exactly 12 API functions, so this
- * folds two related-but-distinct resources into one file rather than adding
- * two new ones.
+ * count limit — the project was already at exactly 12 API functions before
+ * `connections` was folded in here too, so this deliberately consolidates
+ * several related-but-distinct resources into one file rather than adding
+ * more.
  *
  *   GET  /api/account?resource=conversations
  *   POST /api/account?resource=conversations
@@ -30,6 +33,7 @@ function str(v: unknown): string | undefined {
  *   POST /api/account?resource=thread&conversationId=:id
  *   GET  /api/account?resource=profile
  *   PATCH /api/account?resource=profile
+ *   GET  /api/account?resource=connections
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -50,8 +54,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "profile":
       await handleProfile(req, res, client, auth.userId);
       return;
+    case "connections":
+      await handleConnections(req, res, auth.userId);
+      return;
   }
   res.status(404).json({ error: "Not found" });
+}
+
+/**
+ * GET /api/account?resource=connections — the caller's own advisor/agent<->
+ * customer connections, from whichever side they're on, with the other
+ * party's email and role resolved so the frontend can show a real contact
+ * card instead of a bare UUID.
+ *
+ * advisor_connections rows are already readable by either party via RLS
+ * (advisor_connections_select_party), but emails live in auth.users, which
+ * PostgREST doesn't expose to the anon client — hence the service-role
+ * lookup here. To avoid turning that into a privilege escalation, the query
+ * is manually scoped to rows where the caller is advisor_id or user_id;
+ * nothing here lets a caller see connections they aren't a party to.
+ */
+async function handleConnections(req: VercelRequest, res: VercelResponse, userId: string) {
+  if (req.method !== "GET") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  let serviceClient: SupabaseClient;
+  try {
+    serviceClient = getServiceRoleClient();
+  } catch (err) {
+    sendError(res, 500, "Account API is not configured (missing service role credentials)", err);
+    return;
+  }
+
+  const { data, error } = await serviceClient
+    .from("advisor_connections")
+    .select("*")
+    .or(`advisor_id.eq.${userId},user_id.eq.${userId}`)
+    .order("created_at", { ascending: false });
+  if (error) {
+    sendError(res, 500, "Failed to load connections", error);
+    return;
+  }
+  const rows = (data ?? []) as Record<string, any>[];
+
+  const otherIds: string[] = Array.from(
+    new Set(rows.map((row) => (row.advisor_id === userId ? row.user_id : row.advisor_id) as string)),
+  );
+  if (otherIds.length === 0) {
+    res.status(200).json({ connections: [] });
+    return;
+  }
+
+  const [{ data: profilesData, error: profilesError }, authUsers] = await Promise.all([
+    serviceClient.from("user_profiles").select("*").in("id", otherIds),
+    Promise.all(otherIds.map((id) => getAuthAdmin(serviceClient).getUserById(id))),
+  ]);
+  if (profilesError) {
+    sendError(res, 500, "Failed to load connection details", profilesError);
+    return;
+  }
+  const profiles = (profilesData ?? []) as Record<string, any>[];
+
+  const emailById = new Map(otherIds.map((id, i) => [id, authUsers[i]?.data.user?.email ?? ""]));
+  const profileById = new Map(profiles.map((p) => [p.id as string, p]));
+
+  const connections: MyConnection[] = rows.map((row) => {
+    const isCallerAdvisor = row.advisor_id === userId;
+    const otherUserId: string = isCallerAdvisor ? row.user_id : row.advisor_id;
+    const otherProfile = profileById.get(otherUserId);
+    return {
+      id: row.id,
+      direction: isCallerAdvisor ? "client" : "professional",
+      otherUserId,
+      otherUserEmail: emailById.get(otherUserId) ?? "",
+      otherUserRole: otherProfile?.role ?? "user",
+      otherUserOrganizationName: otherProfile?.organization_name ?? null,
+      createdAt: row.created_at,
+    };
+  });
+
+  res.status(200).json({ connections });
 }
 
 async function handleProfile(req: VercelRequest, res: VercelResponse, client: SupabaseClient, userId: string) {

@@ -10,13 +10,15 @@ import {
 } from "../../server/lib/row-mappers.js";
 
 /**
- * Consolidated router for /api/advisor/connections and /api/advisor/favorites.
- * One catch-all file instead of one file per route keeps the Vercel
- * serverless function count under the plan limit. Despite the "advisor"
- * path, agents use these same routes for their own connected customers —
- * the underlying advisor_connections/favorites tables and RLS policies
- * don't distinguish advisor vs. agent, only "the professional side of a
- * connection" vs. "the customer side".
+ * Consolidated router for /api/advisor/connections, /api/advisor/favorites,
+ * and /api/advisor/listings. One catch-all file instead of one file per
+ * route keeps the Vercel serverless function count under the plan limit.
+ * Despite the "advisor" path, agents use connections/favorites for their
+ * own connected customers — the underlying advisor_connections/favorites
+ * tables and RLS policies don't distinguish advisor vs. agent, only "the
+ * professional side of a connection" vs. "the customer side". `listings`
+ * (an agent's own claimed properties) is agent-only, gated separately below
+ * since it doesn't apply to advisors.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -49,6 +51,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     res.status(200).json({ connections: (data ?? []).map(rowToAdvisorConnection) });
+    return;
+  }
+
+  if (resource === "listings") {
+    if (auth.role !== "agent") {
+      res.status(403).json({ error: "Insufficient role" });
+      return;
+    }
+    // properties has public-read RLS, so the anon (JWT-scoped) client is fine here.
+    const { data, error } = await client
+      .from("properties")
+      .select("*")
+      .eq("agent_user_id", auth.userId)
+      .order("listing_date", { ascending: false });
+    if (error) {
+      sendError(res, 500, "Failed to load listings", error);
+      return;
+    }
+    res.status(200).json({ properties: (data ?? []).map((row) => rowToProperty(row)) });
     return;
   }
 
