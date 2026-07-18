@@ -17,7 +17,7 @@ export function Header() {
   const accountMenuItems = useAccountMenuItems();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur md:bg-surface/85">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <Link to="/" className="text-[19px] font-bold tracking-[-0.02em] text-ink">
           {t("app.name")}
@@ -89,7 +89,7 @@ export function Header() {
       </div>
 
       {isMobile && menuOpen && (
-        <div className="flex flex-col gap-2.5 border-t border-border px-5 pb-4 pt-3 animate-fade-up">
+        <div className="flex flex-col gap-2.5 border-t border-border bg-surface px-5 pb-4 pt-3 animate-fade-up">
           <Link to="/" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">
             {t("nav.search")}
           </Link>
