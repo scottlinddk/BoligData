@@ -9,8 +9,8 @@ import {
   asPositiveInt,
   asPositiveNumber,
   dedupeByExternalId,
-  filterByZipRange,
-  getZipRange,
+  filterByZipRanges,
+  getZipRanges,
   isDanishCoordinate,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
@@ -173,11 +173,11 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     errors: [],
   };
 
-  const zipRange = getZipRange();
+  const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
     const all = fixtures as RawListing[];
-    const { kept, excluded } = filterByZipRange(all, zipRange);
+    const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsSkipped = excluded;
     return { listings: kept, stats };
@@ -234,7 +234,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     if (total === null && cases.length < pageSize) break;
   }
 
-  const { kept, excluded } = filterByZipRange(listings, zipRange);
+  const { kept, excluded } = filterByZipRanges(listings, zipRanges);
   stats.recordsSkipped += excluded;
 
   logEvent("crawl.boligsiden.fetched", { ...stats, listings: kept.length });

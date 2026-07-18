@@ -5,8 +5,8 @@
  * own site), so a single automated true/false isn't realistic across the
  * country. This stays a pure derivation, like tinglysning-link.ts: a deep
  * link the advisor can follow themselves, scoped to the municipalities
- * within the crawl's current postal-code range (CRAWL_ZIP_MIN/MAX 9000-9900,
- * Region Nordjylland) rather than an empty/unhelpful "not supported"
+ * within the crawl's current postal-code ranges (CRAWL_ZIP_RANGES, default
+ * 9000-9900, Region Nordjylland) rather than an empty/unhelpful "not supported"
  * everywhere else.
  *
  * URLs point at each municipality's own domain root — not a page-level deep
