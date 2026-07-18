@@ -94,6 +94,32 @@ body,
   background-color: color-mix(in srgb, var(--color-surface) 78%, transparent);
 }
 
+.maplibregl-popup-content {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--color-surface);
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--color-surface);
+}
+
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--color-surface);
+}
+
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--color-surface);
+}
+
+.maplibregl-popup-close-button {
+  color: var(--color-text-secondary);
+}
+
 body {
   background: var(--gradient-bg);
   background-attachment: fixed;
