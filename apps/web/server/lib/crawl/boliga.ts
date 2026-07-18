@@ -10,9 +10,10 @@ import {
   asPositiveNumber,
   asStringArray,
   dedupeByExternalId,
-  filterByZipRange,
-  getZipRange,
+  filterByZipRanges,
+  getZipRanges,
   isDanishCoordinate,
+  overallZipBounds,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boliga.sample.json" with { type: "json" };
 
@@ -108,11 +109,11 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     errors: [],
   };
 
-  const zipRange = getZipRange();
+  const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
     const all = fixtures as RawListing[];
-    const { kept, excluded } = filterByZipRange(all, zipRange);
+    const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsSkipped = excluded;
     return { listings: kept, stats };
@@ -139,9 +140,12 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     });
     if (municipalityCodes.length > 0) params.set("municipality", municipalityCodes.join(","));
     // Best-effort server-side narrowing (undocumented param name, may be a
-    // no-op) — filterByZipRange() below is the source of truth either way.
-    params.set("zipcodeFrom", String(zipRange.min));
-    params.set("zipcodeTo", String(zipRange.max));
+    // no-op, and only supports one contiguous span even with multiple
+    // configured ranges) — filterByZipRanges() below is the source of truth
+    // either way.
+    const bounds = overallZipBounds(zipRanges);
+    params.set("zipcodeFrom", String(bounds.min));
+    params.set("zipcodeTo", String(bounds.max));
     const url = `${API_BASE}?${params}`;
 
     let body: BoligaPage;
@@ -177,7 +181,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     if (pageCount === null && results.length < pageSize) break;
   }
 
-  const { kept, excluded } = filterByZipRange(listings, zipRange);
+  const { kept, excluded } = filterByZipRanges(listings, zipRanges);
   stats.recordsSkipped += excluded;
 
   logEvent("crawl.boliga.fetched", { ...stats, listings: kept.length });
