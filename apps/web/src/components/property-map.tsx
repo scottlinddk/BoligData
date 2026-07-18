@@ -9,13 +9,6 @@ interface PropertyMapProps {
   onSelect?: (property: Property) => void;
 }
 
-function createPinElement() {
-  const el = document.createElement("div");
-  el.className = "boligdata-pin";
-  el.innerHTML = '<span class="boligdata-pin__body"></span><span class="boligdata-pin__dot"></span>';
-  return el;
-}
-
 export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -40,11 +33,13 @@ export function PropertyMap({ properties, onSelect }: PropertyMapProps) {
     const map = mapRef.current;
     if (!map) return;
 
+    const brandColor = getComputedStyle(document.documentElement).getPropertyValue("--color-brand").trim();
+
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = properties.map((property) => {
-      const marker = new maplibregl.Marker({ element: createPinElement() })
+      const marker = new maplibregl.Marker({ color: brandColor || "#dc4a1e" })
         .setLngLat([property.lon, property.lat])
-        .setPopup(new maplibregl.Popup({ offset: 20, className: "boligdata-popup" }).setText(property.address))
+        .setPopup(new maplibregl.Popup({ offset: 16 }).setText(property.address))
         .addTo(map);
       marker.getElement().addEventListener("click", () => onSelect?.(property));
       return marker;
