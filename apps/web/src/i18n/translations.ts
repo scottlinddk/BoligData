@@ -77,6 +77,14 @@ const da = {
   "property.toastUnsaved": "Fjernet fra favoritter",
   "property.bbr.energyLabelTitle": "Energimærke (BBR)",
   "property.bbr.heatingTitle": "Varmeinstallation (BBR)",
+  "property.viewListing": "Se bolig",
+
+  "propertyType.villa": "Villa",
+  "propertyType.apartment": "Lejlighed",
+  "propertyType.terraced_house": "Rækkehus",
+  "propertyType.summer_house": "Sommerhus",
+  "propertyType.farm": "Landejendom",
+  "propertyType.other": "Andet",
 
   "detail.back": "Tilbage",
   "detail.loading": "Indlæser...",
@@ -472,6 +480,14 @@ const en: Translations = {
   "property.toastUnsaved": "Removed from favorites",
   "property.bbr.energyLabelTitle": "Energy label (BBR)",
   "property.bbr.heatingTitle": "Heating installation (BBR)",
+  "property.viewListing": "View listing",
+
+  "propertyType.villa": "Villa",
+  "propertyType.apartment": "Apartment",
+  "propertyType.terraced_house": "Terraced house",
+  "propertyType.summer_house": "Summer house",
+  "propertyType.farm": "Farm",
+  "propertyType.other": "Other",
 
   "detail.back": "Back",
   "detail.loading": "Loading...",
