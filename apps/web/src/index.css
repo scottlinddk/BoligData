@@ -111,3 +111,80 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+/* Map pins — teardrop built from a rotated rounded square, matching the
+ * brand-red accent + white chrome + shadow-card/lift language used for
+ * cards and badges elsewhere in the design system. */
+.boligdata-pin {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.boligdata-pin__body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 50% 0;
+  background: var(--color-brand);
+  border: 2.5px solid #ffffff;
+  box-shadow: var(--shadow-card);
+  transform: rotate(-45deg);
+  transform-origin: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.boligdata-pin__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.boligdata-pin:hover .boligdata-pin__body {
+  background: var(--color-brand-hover);
+  box-shadow: var(--shadow-lift);
+  transform: rotate(-45deg) scale(1.12);
+}
+
+.boligdata-popup .maplibregl-popup-content {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lift);
+  padding: 8px 14px;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.boligdata-popup .maplibregl-popup-close-button {
+  color: var(--color-text-tertiary);
+  font-size: 16px;
+  padding: 2px 8px 0 0;
+}
+
+.boligdata-popup .maplibregl-popup-close-button:hover {
+  color: var(--color-text-primary);
+  background: transparent;
+}
+
+.boligdata-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--color-surface);
+}
+
+.boligdata-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--color-surface);
+}
+
+.boligdata-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--color-surface);
+}
+
+.boligdata-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--color-surface);
+}
