@@ -85,35 +85,40 @@ export function SearchPage() {
   const activeFilterCount = countActiveFilters(filters);
   const showMap = authenticated && (!isMobile || mobileTab === "map");
   const showList = !isMobile || mobileTab === "list";
+  const mapFullScreen = isMobile && showMap;
+
+  const locationFilterFields = (
+    <>
+      <input
+        type="text"
+        value={filters.location ?? ""}
+        onChange={(e) => handleFilterChange({ location: e.target.value || null })}
+        placeholder={t("filters.locationPlaceholder")}
+        className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint"
+      />
+      <button
+        type="button"
+        onClick={() => setFiltersOpen(true)}
+        className="relative shrink-0 rounded-full border border-border bg-surface px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-ink"
+      >
+        {t("filters.title")}
+        {activeFilterCount > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-[17px] w-[17px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-surface">
+            {activeFilterCount}
+          </span>
+        )}
+      </button>
+    </>
+  );
 
   return (
     <div className="mx-auto flex max-w-[1180px] gap-5 px-4 py-4 md:items-start md:px-5 md:py-7">
       {!isMobile && <FilterSidebar filters={filters} onChange={handleFilterChange} />}
 
       <div className="flex flex-1 flex-col gap-3.5">
-        {isMobile && (
+        {isMobile && !mapFullScreen && (
           <div className="flex flex-col gap-2.5">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={filters.location ?? ""}
-                onChange={(e) => handleFilterChange({ location: e.target.value || null })}
-                placeholder={t("filters.locationPlaceholder")}
-                className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint"
-              />
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(true)}
-                className="relative shrink-0 rounded-full border border-border bg-surface px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-ink"
-              >
-                {t("filters.title")}
-                {activeFilterCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-[17px] w-[17px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-surface">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </div>
+            <div className="flex gap-2">{locationFilterFields}</div>
             {authenticated && (
               <div className="flex gap-1.5">
                 <button
@@ -135,7 +140,7 @@ export function SearchPage() {
           </div>
         )}
 
-        {canRecommend && (
+        {!mapFullScreen && canRecommend && (
           <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
             <span>{t("recommend.selectHint")}</span>
           </div>
@@ -150,9 +155,32 @@ export function SearchPage() {
           </div>
         )}
 
-        {showMap && (
-          <div className="h-[230px] overflow-hidden rounded-[20px] border border-border md:h-72">
+        {showMap && !mapFullScreen && (
+          <div className="overflow-hidden rounded-[20px] border border-border md:h-72">
             <PropertyMap properties={properties} />
+          </div>
+        )}
+
+        {mapFullScreen && (
+          <div className="fixed inset-x-0 bottom-0 top-[61px] z-30">
+            <PropertyMap properties={properties} />
+
+            <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex gap-2">
+              <div className="pointer-events-auto flex flex-1 gap-2">{locationFilterFields}</div>
+            </div>
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-4">
+              <button
+                type="button"
+                onClick={() => setMobileTab("list")}
+                className="pointer-events-auto flex items-center gap-2 rounded-full bg-surface px-5 py-3 text-sm font-bold text-ink shadow-lift"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                {t("search.tabList")}
+              </button>
+            </div>
           </div>
         )}
 
