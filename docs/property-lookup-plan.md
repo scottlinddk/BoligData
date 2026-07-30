@@ -32,6 +32,12 @@
   adapter-interface pattern already used (`enrichment-sources/*.ts`, one
   file per source, common `MOCK_MODE` gating) makes this a low-cost
   decision to defer or reverse later, exactly as originally planned.
+- Every enrichment source defaults to mock (`X_MOCK_MODE !== "false"`),
+  so **the endpoint currently returns entirely mock building/valuation/
+  noise data unless those flags are explicitly set to `"false"`.** Two of
+  the six criteria are also inert by default (see §4), and three
+  code-level correctness findings are listed in §8 — read those before
+  treating any current output as meaningful.
 
 ---
 
@@ -127,9 +133,17 @@ renaming.
 
 ## 4. Screening rule engine (`screening/hard-criteria.ts`)
 
-Implemented as six pure, independently-testable functions (confirmed via
-`symbol-engine.ts` — there is no seventh check anywhere in the codebase;
-an earlier version of this doc said "seven," that was wrong):
+Implemented as six pure, independently-testable functions, composed in
+that order by `symbol-engine.ts`:
+
+> **Where "seven" came from:** there are seven **scoring inputs**
+> (§5 Phase 3) but only six **hard criteria** — the two counts got
+> conflated. `symbol-engine.ts` runs exactly six checks and its own
+> comment says "all six"; but the header comment in `hard-criteria.ts:10`
+> still reads "The seven hard criteria," which is stale and should be
+> corrected to six. If a seventh criterion was genuinely intended and
+> never built, that's a gap to raise with Scott — nothing in the code
+> suggests one was started.
 
 - `checkPriceCeiling(askingPrice, renovationCategory, isEstimate, assumptions)`
 - `checkMonthlyCost(askingPrice, energyLabel, assumptions)` — mortgage via
@@ -148,10 +162,31 @@ exactly, tested in `hard-criteria.test.ts`.
 
 Financing constants live in `screening/config/financing-assumptions.ts`
 as `DEFAULT_FINANCING_ASSUMPTIONS`, every value overridable via
-`SCREENING_*` env vars — matches the spec's design intent. **All current
-default values are placeholders**, marked `TODO(scott)` inline, pending
-confirmation of the real house-buying decision rule thresholds (see
-README "Manual follow-up steps" item 10).
+`SCREENING_*` env vars — matches the spec's design intent. The file
+header states **all** thresholds are placeholders pending confirmation
+against the v3 decision rule; inline `TODO(scott)` markers sit on two of
+them specifically (per-category price ceilings, room-count definitions).
+Current defaults, for eyeballing against the real rule:
+
+| Assumption | Default | Env var |
+|---|---|---|
+| Down payment | 965.000 kr. | `SCREENING_DOWN_PAYMENT_DKK` |
+| Effective interest rate | 2.9% | `SCREENING_EFFECTIVE_INTEREST_RATE` |
+| Grundskyld | 16‰ | `SCREENING_GRUNDSKYLD_PROMILLE` |
+| Price ceiling A/B/C/D | 3.5M / 3.2M / 2.9M / 2.6M | `SCREENING_PRICE_CEILING_{A..D}` |
+| Max monthly cost | 15.000 kr. | `SCREENING_MAX_MONTHLY_COST_DKK` |
+| Min area | 120 m² | `SCREENING_MIN_AREA_SQM` |
+| Min rooms A/B/C | 4 / 5 / 6 | `SCREENING_MIN_ROOMS_{A,B,C}` |
+| Latest takeover date | **null** | `SCREENING_LATEST_TAKEOVER_DATE` |
+| Max encumbrance ratio | 5% | `SCREENING_MAX_ENCUMBRANCE_RATIO` |
+
+Note the takeover-date default of `null` means `checkTakeoverDate` always
+returns `~` ("no takeover deadline configured yet") regardless of input —
+that criterion is inert until the env var is set. Combined with
+`checkEncumbranceRatio` also returning `~` unless the caller hand-passes
+`totalEncumbrancesDkk`, **two of the six criteria are effectively
+non-scoring in the default configuration.** Worth knowing before reading
+any screening output as a real six-of-six pass.
 
 ---
 
@@ -172,11 +207,15 @@ README "Manual follow-up steps" item 10).
   tagged `source: "ai"`.
 
 **Phase 3 — scoring inputs: done.**
-- `relative-score-inputs.ts` extracts location match, condition proxy,
-  price headroom, area margin, school-district score, noise-zone
-  estimate, legal-risk proxy. `locationMatch` and `schoolDistrictScore`
-  are permanently `null` — no source wired in yet, not a bug. Does not
-  compute a weighted score, as intended.
+- `relative-score-inputs.ts` extracts all seven: location match,
+  condition proxy, price headroom, area margin, school-district score,
+  noise-zone estimate, legal-risk proxy. Does not compute a weighted
+  score, as intended.
+- `locationMatch` and `schoolDistrictScore` are **optional pass-through
+  params** on `RelativeScoreInputsParams`, not hardcoded nulls — the
+  plumbing exists, but `property-lookup.handler.ts` doesn't pass either,
+  so both come back `null` in the endpoint's response today. Wiring
+  a source in is a handler change, not a signature change.
 
 **Phase 4 — wire into daily screening: OPEN.**
 - No cron job or UI calls `/api/property-lookup` today. `crawl.yml` only
@@ -225,6 +264,56 @@ Unchanged — still accurate:
    code, not blocking — worth a small cleanup pass whenever someone's
    touching that enum next.
 5. **Confirm real financing thresholds with Scott** — every default in
-   `financing-assumptions.ts` is a placeholder (`TODO(scott)`), per
-   README "Manual follow-up steps" item 10. Not a code gap, a
+   `financing-assumptions.ts` is a placeholder, per README "Manual
+   follow-up steps" item 10 and the table in §4 above. Not a code gap, a
    data-confirmation task.
+
+---
+
+## 8. Code-level findings from the 30 July audit
+
+Small, concrete items found while checking the implementation against
+this spec. None block Phase 4; the first two affect output correctness
+and are worth fixing before anyone reads the endpoint's output as
+trustworthy.
+
+1. **Real assessed land value is fetched but never used.** The handler
+   resolves `publicValuation.assessedLandValueDkk` from VUR and returns
+   it in the payload, but `checkMonthlyCost` still estimates grundskyld
+   from `askingPrice * 0.3` — its own comment
+   (`hard-criteria.ts:59-66`) anticipates wiring the real value through
+   "once wired through." The value is already in scope in
+   `property-lookup.handler.ts`; passing it into `evaluateScreening`
+   would make the grundskyld component real instead of a guess. (Worth
+   noting this only helps once `EJENDOMSVURDERING_MOCK_MODE=false`.)
+
+2. **Omitted `lat`/`lon` silently produce a fabricated noise estimate.**
+   Both are optional query params, and the handler defaults them to `0`
+   (`lookupNoiseExposure(input.lat ?? 0, input.lon ?? 0)`), i.e. null
+   island off West Africa. In mock mode that returns a deterministic
+   fake Lden for those coordinates; in live mode it queries a bbox at
+   (0,0) and comes back `ldenDb: null`, which per `stoejkort.ts`'s own
+   documented contract means "outside any mapped noise-exposed area" — a
+   *positive* not-exposed result, not "unknown". Either way
+   `scoringInputs.noiseZoneEstimate` is misleading rather than absent
+   when the caller omits coordinates. The same `?? 0` default feeds the
+   zone lookup in `address-lookup.ts`. Suggested fix: propagate `null`
+   and skip the lookup, so a missing coordinate yields a genuinely
+   unknown value.
+
+3. **`bbrData.energyLabel` is caller input, not BBR data.** It's echoed
+   straight from `input.energyLabel` into the `bbrData` object, where its
+   placement implies it came from BBR. BBR's actual response has no
+   energy label (see the §2 table). Consequence: when the caller omits
+   `energyLabel`, `checkMonthlyCost` silently falls back to the "D" row
+   of its utility table — a mid-range guess presented with the same
+   confidence as a real value. Consider moving it out of `bbrData` or
+   naming it as caller-supplied.
+
+4. **Stale comment:** `hard-criteria.ts:10` says "The seven hard
+   criteria"; six are implemented. See §4.
+
+5. **Dangling doc reference:** `financing-assumptions.ts:58` points at
+   "property-lookup-endpoint plan §4" — no such file existed in-repo
+   until this document. Either update that reference to
+   `docs/property-lookup-plan.md` or rename this file to match.
