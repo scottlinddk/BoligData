@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import handler from "./property-lookup.js";
+// Lives here rather than next to the handler in api/, because Vercel turns
+// every file it uploads under api/ into a Serverless Function — including
+// *.test.ts — and the Hobby plan caps a deployment at 12. See .vercelignore.
+import handler from "../../../api/property-lookup.js";
 
 interface Captured {
   statusCode: number | null;
