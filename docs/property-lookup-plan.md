@@ -66,8 +66,16 @@ GET /api/property-lookup?address=<free-text address>&askingPrice=<dkk>
 
 **Live today.** Implemented in `apps/web/api/property-lookup.ts` →
 `apps/web/server/lib/property-lookup/property-lookup.handler.ts`, with
-test coverage in `property-lookup.handler.test.ts`. Requires the same
-`Authorization: Bearer <jwt>` session as `/api/properties/:id`. Optional
+test coverage in `property-lookup.handler.test.ts` and
+`api/property-lookup.test.ts`. **Open — no `Authorization` header
+required** (changed 30 July 2026; it previously required a session like
+`/api/properties/:id`). Nothing in the response is per-caller, so
+anonymous access exposes no user data — but it does expose the
+deployment's `SCREENING_*` thresholds via the screening reasons, and
+becomes an unmetered public path to the `DATAFORDELER_API_KEY` upstream
+once mock mode is off. Public CDN caching (`s-maxage=300,
+stale-while-revalidate=3600`) is the only throttle in front of it today;
+a shared secret or rate limit is the open follow-up. Optional
 query params: `postalCode`, `lat`, `lon`, `sellerTakeoverDate`,
 `totalEncumbrancesDkk`, `roomCount`, `roomCountDefinition` (`A`/`B`/`C`,
 defaults to `B`), `energyLabel`.
@@ -219,7 +227,10 @@ any screening output as a real six-of-six pass.
 
 **Phase 4 — wire into daily screening: OPEN.**
 - No cron job or UI calls `/api/property-lookup` today. `crawl.yml` only
-  calls `/api/crawl`. This is the concrete next step once Scott decides
+  calls `/api/crawl`. The auth barrier is gone as of 30 July 2026 — a
+  caller no longer needs a browser session, so a scheduled task can curl
+  the endpoint directly, no `CRON_SECRET` plumbing needed. This is the
+  concrete next step once Scott decides
   whether the daily Cowork screening task should call this endpoint for
   hard-criteria pass/fail (never as a substitute for the full 9-point
   analysis or anything requiring professional verification).
