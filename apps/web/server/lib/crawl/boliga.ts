@@ -109,6 +109,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
+    recordsFiltered: 0,
     errors: [],
   };
 
@@ -118,7 +119,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     const all = fixtures as unknown as RawListing[];
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
-    stats.recordsSkipped = excluded;
+    stats.recordsFiltered = excluded;
     return { listings: kept, stats };
   }
 
@@ -185,7 +186,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
   }
 
   const { kept, excluded } = filterByZipRanges(listings, zipRanges);
-  stats.recordsSkipped += excluded;
+  stats.recordsFiltered = excluded;
 
   logEvent("crawl.boliga.fetched", { ...stats, listings: kept.length });
   return { listings: dedupeByExternalId(kept), stats };

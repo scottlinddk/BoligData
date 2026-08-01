@@ -55,7 +55,7 @@ jobs:
           echo "== Crawl summary =="
           jq -r '
             .reports[] |
-            "[\(.source)] found=\(.fetched) new=\(.created) updated=\(.upserted - .created) enriched=\(.enriched) skippedInvalid=\(.skippedInvalid) dbErrors=\(.dbErrors) ok=\(.ok)" +
+            "[\(.source)] found=\(.fetched) new=\(.created) updated=\(.upserted - .created) enriched=\(.enriched) skippedInvalid=\(.skippedInvalid) filteredOut=\(.filteredOut) dbErrors=\(.dbErrors) ok=\(.ok)" +
             (if (.errors | length) > 0 then "\n  errors: " + (.errors | join("; ")) else "" end)
           ' response.json
           echo ""

@@ -182,6 +182,20 @@ describe("runIngest (mock mode, stubbed DB)", () => {
     expect(enrichments.has(firstEnriched!)).toBe(true);
   });
 
+  // The fixtures are 3 listings per source with only one inside the default
+  // 9000-9900 zip range. Those 2 are the filter doing its job, and reporting
+  // them as "skippedInvalid" is what made a healthy nationwide fetch read as
+  // 899 broken records in the 2026-08-01 run.
+  it("counts zip-filtered listings as filteredOut, not skippedInvalid", async () => {
+    const { client } = fakeDb();
+    const result = await runIngest(client);
+
+    for (const report of result.reports) {
+      expect(report.filteredOut).toBe(2);
+      expect(report.skippedInvalid).toBe(0);
+    }
+  });
+
   // Regression: sold_price_history is enrichment data, not a properties
   // column. Spreading the RawListing into the properties upsert sent it
   // anyway, and PostgREST failed every chunk with "Could not find the

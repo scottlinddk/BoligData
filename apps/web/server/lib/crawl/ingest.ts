@@ -33,7 +33,13 @@ function enabledSources(): ListingSource[] {
 
 export interface IngestSourceReport {
   source: ListingSource;
-  /** False when the fetcher itself rejected — nothing was ingested for this source. */
+  /**
+   * Whether this source's run was clean end to end: the fetcher resolved
+   * *and* every DB write landed. It used to mean only the former, so a run
+   * that fetched fine and then failed every upsert reported `ok=true` on the
+   * source line directly above an `ok=false` total — the one line a reader
+   * checks first said the opposite of what happened.
+   */
   ok: boolean;
   fetched: number;
   upserted: number;
@@ -41,6 +47,8 @@ export interface IngestSourceReport {
   created: number;
   /** Records the fetcher saw but could not map to a valid RawListing. */
   skippedInvalid: number;
+  /** Records discarded by CRAWL_ZIP_RANGES — expected, not a failure (see SourceCrawlStats). */
+  filteredOut: number;
   enriched: number;
   /** Listings whose content_hash was unchanged and enrichment already exists. */
   enrichSkippedUnchanged: number;
@@ -111,6 +119,7 @@ async function ingestSource(
     upserted: 0,
     created: 0,
     skippedInvalid: 0,
+    filteredOut: 0,
     enriched: 0,
     enrichSkippedUnchanged: 0,
     cadastralLookupFailed: 0,
@@ -150,6 +159,7 @@ async function ingestSource(
   const { listings, stats } = settled.value;
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
+  report.filteredOut = stats.recordsFiltered;
   for (const err of stats.errors) pushFetchError(err);
 
   // A page-fetch error (blocked, drifted API, network failure) makes the
@@ -327,6 +337,10 @@ async function ingestSource(
     report.enriched += rows.length;
   }
 
+  // A source that couldn't write what it fetched did not have a clean run,
+  // whatever the fetcher managed.
+  if (report.dbErrors > 0) report.ok = false;
+
   report.durationMs = Date.now() - startedAt;
   return report;
 }
@@ -354,7 +368,9 @@ export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
 
   for (const report of reports) logEvent("crawl.source.done", { ...report });
 
-  const ok = reports.every((r) => r.ok && r.dbErrors === 0);
+  // report.ok already folds in dbErrors, so the total is a plain conjunction
+  // of the per-source lines the workflow prints — the two can't disagree.
+  const ok = reports.every((r) => r.ok);
   logEvent("crawl.done", {
     ok,
     fetched: reports.reduce((sum, r) => sum + r.fetched, 0),
