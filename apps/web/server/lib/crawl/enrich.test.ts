@@ -21,6 +21,7 @@ const listing: RawListing = {
   images: [],
   description: null,
   agent_name: null,
+  listing_url: null,
   sold_price_history: [],
 };
 

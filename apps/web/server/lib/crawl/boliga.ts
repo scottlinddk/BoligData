@@ -3,7 +3,9 @@ import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import {
+  absoluteUrl,
   asFiniteNumber,
+  asHttpUrl,
   asIsoDate,
   asNonEmptyString,
   asPositiveInt,
@@ -27,6 +29,9 @@ const MAX_ERRORS_REPORTED = 10;
  * (skip + count, never throw) and the endpoint is env-overridable.
  */
 const API_BASE = process.env.BOLIGA_API_BASE ?? "https://api.boliga.dk/api/v2/search/results";
+
+/** Origin the listing link is built against, and the guard `absoluteUrl` keeps a relative path on. */
+const SITE_ORIGIN = "https://www.boliga.dk";
 
 /**
  * Boliga propertyType codes → our CHECK-constrained enum
@@ -92,6 +97,12 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
     images: asStringArray(r.images).map((url): ListingImage => ({ url, category: "photo", sources: [] })),
     description: null,
     agent_name: null,
+    // Prefer a link the payload states outright; `/bolig/<estate id>` is
+    // boliga.dk's own listing route (their frontend appends an address slug,
+    // which the bare id redirects to) and `id` is that estate id — the same
+    // value external_id is keyed on.
+    listing_url:
+      asHttpUrl(r.url) ?? absoluteUrl(SITE_ORIGIN, asNonEmptyString(r.detailUrl)) ?? `${SITE_ORIGIN}/bolig/${id}`,
     // Boliga's listing payload carries no registered-sale history; only
     // Boligsiden embeds one (see boligsiden.ts#mapRegistrations).
     sold_price_history: [],

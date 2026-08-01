@@ -50,6 +50,15 @@ export interface Property {
   images: ListingImage[];
   description: string | null;
   agentName: string | null;
+  /**
+   * Canonical URL of this listing on the source site (boliga.dk /
+   * boligsiden.dk) — what the "go to broker listing" link points at. Always
+   * an absolute http(s) URL: the crawl validates the scheme before storing,
+   * since this value goes straight into an `href`. Null when the source
+   * record carried no usable link, or for rows written before migration 020;
+   * consumers must hide the link rather than fabricate one.
+   */
+  listingUrl: string | null;
   agentUserId: string | null;
   isPromoted: boolean;
   promotedAt: string | null;

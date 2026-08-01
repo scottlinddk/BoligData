@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import type { ListingSource } from "@shared/types/index";
 import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
@@ -27,6 +28,44 @@ import { RecommendModal } from "@/components/recommend-modal";
  */
 const HERO_IMAGE_WIDTHS = [600, 900, 1200, 1800, 2400];
 const HERO_IMAGE_ASPECT = 3 / 2;
+
+/** Proper nouns, not translatable strings — the same in both languages. */
+const SOURCE_NAMES: Record<ListingSource, string> = {
+  boligsiden: "Boligsiden",
+  boliga: "Boliga",
+};
+
+/**
+ * Link out to the broker's own listing, which is where the full description,
+ * viewing times and sales material live — BoligData only mirrors the parts it
+ * can analyse. Rendered only when the crawl captured a URL (`listingUrl`),
+ * never from a guessed pattern, so the link can't 404.
+ */
+function BrokerListingLink({
+  url,
+  source,
+  className,
+}: {
+  url: string;
+  source: ListingSource;
+  className: string;
+}) {
+  const { t } = useI18n();
+  const sourceName = SOURCE_NAMES[source];
+  return (
+    <a
+      href={url}
+      target="_blank"
+      // noreferrer as well as noopener: the target is a third-party site we
+      // don't control, and it has no business seeing the user's BoligData path.
+      rel="noopener noreferrer"
+      title={t("detail.brokerListingOn", { source: sourceName })}
+      className={className}
+    >
+      {t("detail.brokerListing")} <span aria-hidden="true">↗</span>
+    </a>
+  );
+}
 
 export function PropertyDetailPage() {
   const { t } = useI18n();
@@ -130,6 +169,13 @@ export function PropertyDetailPage() {
         </div>
         {!isMobile && (
           <div className="flex gap-2">
+            {property.listingUrl && (
+              <BrokerListingLink
+                url={property.listingUrl}
+                source={property.listingSource}
+                className="rounded-full border border-border-strong bg-surface px-5 py-2.5 text-sm font-bold text-ink hover:bg-surface-hover"
+              />
+            )}
             <button
               type="button"
               onClick={handleSave}
@@ -236,6 +282,17 @@ export function PropertyDetailPage() {
           </span>
         )}
       </div>
+
+      {/* On mobile the action row above is replaced by the fixed bottom bar,
+          which is already full of primary CTAs — so the broker link sits here
+          instead, next to the photos it leads to more of. */}
+      {isMobile && property.listingUrl && (
+        <BrokerListingLink
+          url={property.listingUrl}
+          source={property.listingSource}
+          className="mt-2.5 block rounded-full border border-border-strong bg-surface px-5 py-3 text-center text-sm font-bold text-ink"
+        />
+      )}
 
       {floorplan && (
         <div className="mt-6">

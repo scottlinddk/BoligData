@@ -42,7 +42,8 @@
       }
     ],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "Nybolig Aalborg"
+    "agent_name": "Nybolig Aalborg",
+    "listing_url": "https://www.boligsiden.dk/adresse/vesterbrogade-20-3-tv-9000-aalborg"
   },
   {
     "address": "Skovbakken 14",
@@ -61,7 +62,8 @@
     "rooms": 5,
     "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "Home Aarhus"
+    "agent_name": "Home Aarhus",
+    "listing_url": "https://www.boligsiden.dk/adresse/skovbakken-14-8000-aarhus"
   },
   {
     "address": "Amagerbrogade 55, 2. th",
@@ -80,6 +82,7 @@
     "rooms": 3,
     "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "EDC Amager"
+    "agent_name": "EDC Amager",
+    "listing_url": "https://www.boligsiden.dk/adresse/amagerbrogade-55-2-th-2300-koebenhavn"
   }
 ]

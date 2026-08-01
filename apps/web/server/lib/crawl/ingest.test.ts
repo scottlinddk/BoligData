@@ -27,6 +27,7 @@ const PROPERTY_COLUMNS = new Set([
   "images",
   "description",
   "agent_name",
+  "listing_url",
   "content_hash",
   "last_seen_at",
   "id_lokalid",

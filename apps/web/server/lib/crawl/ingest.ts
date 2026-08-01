@@ -95,6 +95,7 @@ function toPropertyColumns(l: RawListing) {
     images: l.images,
     description: l.description,
     agent_name: l.agent_name,
+    listing_url: l.listing_url,
   };
 }
 

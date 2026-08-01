@@ -99,7 +99,7 @@ All four resources (profile fields, notification channels, agent config) live on
 
 ## Infrastructure status
 
-- Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`019` are applied and seed data is loaded.
+- Supabase project `bolig-data` (`hfqswyafdnfjzegasqpq`, `eu-west-1`) is provisioned; migrations `001`-`019` are applied and seed data is loaded (`020_listing_url.sql` is pending — see follow-up step 11).
 - Vercel project `bolig-data-web` is linked to this GitHub repo.
 
 ## Property lookup (screening + scoring inputs)
@@ -137,3 +137,5 @@ Page size is caller-configurable (`limit`/`offset` query params, exposed in the 
 8. `public.spatial_ref_sys` (a PostGIS system table, not application data) has Row Level Security disabled — flagged by a routine advisory check, not something introduced by this session's changes. Decide whether to `ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY;`; not applied automatically since it's a security-posture decision, not a bug fix.
 9. ~~Apply migration `packages/supabase/migrations/014_listing_recommendations.sql` (adds `public.listing_recommendations`, backing the advisor/agent -> client listing recommendations feature) to the Supabase project.~~ Done — confirmed applied.
 10. Confirm the real house-buying decision rule's thresholds (per-renovation-category price ceilings, max monthly cost, min area/rooms, room-count definition, encumbrance ratio ceiling, takeover deadline) with Scott and set them via the `SCREENING_*` env vars documented in "Property lookup" above — every default in `apps/web/server/lib/screening/config/financing-assumptions.ts` is a placeholder today.
+11. **Apply migration `packages/supabase/migrations/020_listing_url.sql` (adds `properties.listing_url`) before deploying the "go to broker listing" change.** This one is ordering-sensitive rather than optional: the crawl's property upsert now writes `listing_url`, and PostgREST rejects the *whole chunk* for an unknown column (the failure documented on `toPropertyColumns` in `ingest.ts`), so a deploy that runs a crawl before the migration lands writes zero properties. The read path is safe either way — `rowToProperty` maps a missing column to `null` and the UI hides the link.
+12. Verify Boligsiden's listing-URL field against the live API. `mapListingUrl` in `boligsiden.ts` tries `url`, `case.url`, `slug` and `address.slug` in order because this sandbox has never been able to reach `api.boligsiden.dk` to confirm which one exists; a miss leaves `listing_url` null and hides the button rather than linking to a guessed 404. Boliga needs no such check — its records are keyed by the estate id that `boliga.dk/bolig/<id>` routes on. Existing rows backfill on the next crawl without a forced re-enrich, since `listing_url` is deliberately not part of `content_hash`.
