@@ -15,7 +15,7 @@ export function LockedPropertyCard({ summary }: { summary: PropertySummary }) {
       to={`/property/${summary.id}`}
       className="block overflow-hidden rounded-[20px] border border-border bg-surface shadow-card transition hover:-translate-y-0.5 hover:border-border-strong"
     >
-      <div className="flex h-[150px] flex-col items-center justify-center gap-1 bg-surface-alt text-ink-faint">
+      <div className="flex h-[220px] flex-col items-center justify-center gap-1 bg-surface-alt text-ink-faint sm:h-[190px]">
         <span className="font-mono text-[9px]">{t("property.noPhoto")}</span>
       </div>
       <div className="p-3.5">

@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
-import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
+import { getFloorplan, getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
 import { calculateDueDiligenceScore } from "@shared/utils/due-diligence-score";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
@@ -20,6 +20,13 @@ import { useToast } from "@/components/toast";
 import { useState } from "react";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { RecommendModal } from "@/components/recommend-modal";
+
+/**
+ * The detail column is 900px at most, so 1800px covers a 2x phone and desktop
+ * retina alike; the smaller steps keep narrow phones off the biggest file.
+ */
+const HERO_IMAGE_WIDTHS = [600, 900, 1200, 1800, 2400];
+const HERO_IMAGE_ASPECT = 3 / 2;
 
 export function PropertyDetailPage() {
   const { t } = useI18n();
@@ -203,13 +210,18 @@ export function PropertyDetailPage() {
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
 
-      <div className="relative mt-6 h-[260px] overflow-hidden rounded-[20px] border border-border bg-surface-alt">
+      <div className="relative mt-6 h-[300px] overflow-hidden rounded-[20px] border border-border bg-surface-alt sm:h-[420px] lg:h-[520px]">
         {photos[0] ? (
           <img
-            src={getImageUrl(photos[0], 2400, 1600)}
+            src={getImageUrl(photos[0], 1800, 1200)}
+            srcSet={getImageSrcSet(photos[0], HERO_IMAGE_WIDTHS, HERO_IMAGE_ASPECT)}
+            sizes="(min-width: 900px) 900px, 100vw"
             alt={property.address}
             onError={(e) => {
-              if (photos[0] && e.currentTarget.src !== photos[0].url) e.currentTarget.src = photos[0].url;
+              if (photos[0] && e.currentTarget.src !== photos[0].url) {
+                e.currentTarget.srcset = "";
+                e.currentTarget.src = photos[0].url;
+              }
             }}
             className="h-full w-full object-cover"
           />
@@ -230,12 +242,17 @@ export function PropertyDetailPage() {
           <h2 className="text-xl font-bold tracking-tight text-ink">{t("detail.floorplan")}</h2>
           <div className="mt-2.5 overflow-hidden rounded-[20px] border border-border bg-surface-alt">
             <img
-              src={getImageUrl(floorplan, 1440, 960)}
+              src={getImageUrl(floorplan, 1800, 1200)}
+              srcSet={getImageSrcSet(floorplan, HERO_IMAGE_WIDTHS, HERO_IMAGE_ASPECT)}
+              sizes="(min-width: 900px) 900px, 100vw"
               alt={t("detail.floorplan")}
               onError={(e) => {
-                if (e.currentTarget.src !== floorplan.url) e.currentTarget.src = floorplan.url;
+                if (e.currentTarget.src !== floorplan.url) {
+                  e.currentTarget.srcset = "";
+                  e.currentTarget.src = floorplan.url;
+                }
               }}
-              className="max-h-[600px] w-full object-contain"
+              className="max-h-[760px] w-full object-contain"
             />
           </div>
         </div>

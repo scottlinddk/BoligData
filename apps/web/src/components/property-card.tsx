@@ -2,12 +2,16 @@ import { Link } from "react-router-dom";
 import type { MouseEvent } from "react";
 import type { Property, RiskFlags } from "@shared/types/index";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
-import { getImageUrl, getPhotos } from "@shared/utils/image";
+import { getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
 
 type OverallRisk = "ok" | "warning" | "unknown";
+
+/** Candidate widths for the card photo, from a narrow phone up to a 3x wide card. */
+const CARD_IMAGE_WIDTHS = [400, 600, 800, 1200, 1600];
+const CARD_IMAGE_ASPECT = 8 / 5;
 
 const RISK_CHIP_STYLES: Record<OverallRisk, string> = {
   ok: "bg-success-soft text-success-text",
@@ -51,8 +55,13 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
   const { showToast } = useToast();
   const daysOnMarket = daysBetween(property.listingDate);
   const photos = getPhotos(property.images);
-  // 2x the rendered ~300x150 box so the card stays sharp on retina screens.
-  const photoUrl = photos[0] ? getImageUrl(photos[0], 600, 400) : null;
+  // The card image is full-bleed on phones and ~240-400px wide in the desktop
+  // grid, so a single fixed size can't cover both. `sizes` + `srcSet` let the
+  // browser pick per layout width and device pixel ratio; `src` is the
+  // fallback for browsers that ignore the srcset.
+  const photo = photos[0] ?? null;
+  const photoUrl = photo ? getImageUrl(photo, 800, 500) : null;
+  const photoSrcSet = photo ? getImageSrcSet(photo, CARD_IMAGE_WIDTHS, CARD_IMAGE_ASPECT) : undefined;
   const saved = isSaved(property.id);
   const risk = overallRisk(property.riskFlags);
 
@@ -68,14 +77,19 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
       to={`/property/${property.id}`}
       className="block overflow-hidden rounded-[20px] border border-border bg-surface shadow-card transition hover:-translate-y-0.5 hover:border-border-strong"
     >
-      <div className="relative h-[150px] overflow-hidden bg-surface-alt">
+      <div className="relative h-[220px] overflow-hidden bg-surface-alt sm:h-[190px]">
         {photoUrl ? (
           <img
             src={photoUrl}
+            srcSet={photoSrcSet}
+            sizes="(min-width: 640px) 400px, 100vw"
             alt={property.address}
             loading="lazy"
             onError={(e) => {
-              if (photos[0] && e.currentTarget.src !== photos[0].url) e.currentTarget.src = photos[0].url;
+              if (photo && e.currentTarget.src !== photo.url) {
+                e.currentTarget.srcset = "";
+                e.currentTarget.src = photo.url;
+              }
             }}
             className="h-full w-full object-cover"
           />

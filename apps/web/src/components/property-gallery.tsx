@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import type { ListingImage } from "@shared/types/index";
-import { getImageUrl } from "@shared/utils/image";
+import { getImageSrcSet, getImageUrl } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 
 interface PropertyGalleryProps {
   images: ListingImage[];
   alt: string;
 }
+
+/** Thumbnails span roughly half a phone screen up to a quarter of the 900px column. */
+const THUMB_WIDTHS = [400, 600, 900, 1200];
+const THUMB_ASPECT = 4 / 3;
+/** The lightbox fills the viewport, so it needs full-screen-retina sizes. */
+const LIGHTBOX_WIDTHS = [900, 1400, 2000, 2800];
+const LIGHTBOX_ASPECT = 3 / 2;
 
 /** Thumbnail grid of the remaining photos plus a full-screen lightbox. */
 export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
@@ -29,20 +36,25 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
   return (
     <>
       <h2 className="mt-6 text-xl font-bold tracking-tight text-ink">{t("detail.gallery")}</h2>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5 md:grid-cols-3">
         {images.map((image, i) => (
           <button
             key={image.url}
             type="button"
             onClick={() => setOpenIndex(i)}
-            className="aspect-[7/5] overflow-hidden rounded-xl border border-border bg-surface-alt"
+            className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface-alt"
           >
             <img
-              src={getImageUrl(image, 900, 640)}
+              src={getImageUrl(image, 900, 675)}
+              srcSet={getImageSrcSet(image, THUMB_WIDTHS, THUMB_ASPECT)}
+              sizes="(min-width: 768px) 300px, 50vw"
               alt={alt}
               loading="lazy"
               onError={(e) => {
-                if (e.currentTarget.src !== image.url) e.currentTarget.src = image.url;
+                if (e.currentTarget.src !== image.url) {
+                  e.currentTarget.srcset = "";
+                  e.currentTarget.src = image.url;
+                }
               }}
               className="h-full w-full object-cover"
             />
@@ -75,12 +87,17 @@ export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
             ‹
           </button>
           <img
-            src={getImageUrl(images[openIndex]!, 2400, 1600)}
+            src={getImageUrl(images[openIndex]!, 2000, 1333)}
+            srcSet={getImageSrcSet(images[openIndex]!, LIGHTBOX_WIDTHS, LIGHTBOX_ASPECT)}
+            sizes="100vw"
             alt={alt}
             onClick={(e) => e.stopPropagation()}
             onError={(e) => {
               const original = images[openIndex!]!.url;
-              if (e.currentTarget.src !== original) e.currentTarget.src = original;
+              if (e.currentTarget.src !== original) {
+                e.currentTarget.srcset = "";
+                e.currentTarget.src = original;
+              }
             }}
             className="max-h-full max-w-full rounded-xl object-contain"
           />
