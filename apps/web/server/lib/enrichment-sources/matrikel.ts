@@ -1,5 +1,5 @@
-import { fetchJson } from "../crawl/http.js";
 import { asPositiveNumber } from "../crawl/map-utils.js";
+import { postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 const MOCK_MODE = process.env.MATRIKEL_MOCK_MODE !== "false";
@@ -14,8 +14,12 @@ const MOCK_MODE = process.env.MATRIKEL_MOCK_MODE !== "false";
  * address UUID, so this looks up by the matrikelnr/ejerlav pair
  * address-lookup.ts already resolves per property.
  */
-const MATRIKEL_VERSION = process.env.DATAFORDELER_MATRIKEL_VERSION ?? "v2";
-const API_BASE = process.env.DATAFORDELER_MATRIKEL_API_BASE ?? `https://graphql.datafordeler.dk/Matrikel/${MATRIKEL_VERSION}`;
+const MATRIKEL_SERVICE: DatafordelerService = {
+  register: "Matrikel",
+  versionEnv: "DATAFORDELER_MATRIKEL_VERSION",
+  baseEnv: "DATAFORDELER_MATRIKEL_API_BASE",
+  versions: ["v2", "v3", "v1"],
+};
 
 /**
  * `registreretAreal` is Jordstykke's registered-area field per the object
@@ -35,13 +39,10 @@ const PARCEL_AREA_QUERY = `
   }
 `;
 
-interface GraphQlResponse {
-  data?: {
-    Matrikel_Jordstykke?: {
-      nodes?: Array<{ registreretAreal?: unknown }>;
-    };
+interface JordstykkeData {
+  Matrikel_Jordstykke?: {
+    nodes?: Array<{ registreretAreal?: unknown }>;
   };
-  errors?: Array<{ message: string }>;
 }
 
 /**
@@ -66,18 +67,12 @@ export async function lookupMatrikelParcel(
   }
 
   try {
-    const params = new URLSearchParams({ apiKey });
-    const body = await fetchJson<GraphQlResponse>(`${API_BASE}?${params}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: PARCEL_AREA_QUERY, variables: { matrikelnummer: matrikelnr, ejerlav } }),
+    const data = await postGraphQl<JordstykkeData>(MATRIKEL_SERVICE, apiKey, PARCEL_AREA_QUERY, {
+      matrikelnummer: matrikelnr,
+      ejerlav,
     });
 
-    if (body.errors?.length) {
-      throw new Error(body.errors.map((e) => e.message).join("; "));
-    }
-
-    const node = body.data?.Matrikel_Jordstykke?.nodes?.[0];
+    const node = data?.Matrikel_Jordstykke?.nodes?.[0];
     return sourceOk({ registeredAreaSqm: asPositiveNumber(node?.registreretAreal) });
   } catch (err) {
     return sourceFailed(err);

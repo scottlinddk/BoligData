@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lookupProperty } from "./property-lookup.handler.js";
+import { resetDatafordelerCache } from "../enrichment-sources/datafordeler.js";
 import type { PropertyLookupInput } from "../../../../../packages/shared/src/types/property-lookup.js";
 
 const input: PropertyLookupInput = {
@@ -50,26 +51,60 @@ const valuationBody = {
 
 const noiseBody = { features: [{ properties: { lden: 57 } }] };
 
+/** What the Datafordeler registers answer when asked which fields a type has. */
+function introspectionBody(fields: string[]) {
+  return { data: { __type: { fields: fields.map((name) => ({ name })) } } };
+}
+
+const BYGNING_FIELDS = [
+  "byg007Bygningsnummer",
+  "byg021BygningensAnvendelse",
+  "byg026Opfoerelsesaar",
+  "byg027OmTilbygningsaar",
+  "byg032YdervaeggensMateriale",
+  "byg033Tagdaekningsmateriale",
+  "byg038SamletBygningsareal",
+  "byg039BygningensSamledeBoligAreal",
+  "byg054AntalEtager",
+  "byg056Varmeinstallation",
+  "byg057Opvarmningsmiddel",
+];
+
+const VALUATION_FIELDS = ["bfeNummer", "ejendomsvaerdi", "grundvaerdi", "vurderingsaar"];
+
 /**
  * The address lookup resolves first and on its own; BBR, VUR and noise then
  * run concurrently, so their responses are matched by URL rather than by
- * position in the queue.
+ * position in the queue. Each Datafordeler register is asked for its schema
+ * before its first query, which is matched on the request body.
  */
 function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown } = {}) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown) => {
+  return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
+    const introspecting = typeof init?.body === "string" && init.body.includes("__type");
     const body = href.includes("adgangsadresser")
       ? [dawaRecord]
       : href.includes("/jordstykker/")
         ? parcelRecord
         : href.includes("/DAR/")
-          ? (overrides.bbr ?? bbrBody)
+          ? introspecting
+            ? introspectionBody(BYGNING_FIELDS)
+            : (overrides.bbr ?? bbrBody)
           : href.includes("/VUR/")
-            ? (overrides.valuation ?? valuationBody)
+            ? introspecting
+              ? introspectionBody(VALUATION_FIELDS)
+              : (overrides.valuation ?? valuationBody)
             : (overrides.noise ?? noiseBody);
     return { ok: true, status: 200, headers: new Headers(), json: async () => body };
   }) as unknown as typeof fetch);
 }
+
+beforeEach(() => {
+  resetDatafordelerCache();
+  // The noise layer is deployment configuration — without it the source is
+  // reported unconfigured rather than queried.
+  vi.stubEnv("STOEJKORT_TYPENAME", "stoej:lden_vej_bane");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();

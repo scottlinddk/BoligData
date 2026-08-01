@@ -1,5 +1,5 @@
-import { fetchJson } from "../crawl/http.js";
 import { asNonEmptyString, asPositiveInt, asPositiveNumber } from "../crawl/map-utils.js";
+import { entityFields, GraphQlError, postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 const MOCK_FLAG = "BBR_MOCK_MODE";
@@ -24,9 +24,22 @@ const MOCK_FLAG = "BBR_MOCK_MODE";
  * "tjenestebruger" login only works for fetching the schema, not for querying
  * entity data). Without `DATAFORDELER_API_KEY` this reports a failed source
  * rather than inventing numbers.
+ *
+ * The version segment is not pinned: DAR was published as v1, and once the
+ * register moved on that URL began answering `HTTP 404`, which surfaced in the
+ * UI as "BBR unavailable" for every listing. `postGraphQl` walks the candidate
+ * versions newest-first, so a register release costs one wasted request rather
+ * than an outage. `DATAFORDELER_DAR_VERSION` pins one when that is wanted.
  */
-const DAR_VERSION = process.env.DATAFORDELER_DAR_VERSION ?? "v1";
-const API_BASE = process.env.DATAFORDELER_DAR_API_BASE ?? `https://graphql.datafordeler.dk/DAR/${DAR_VERSION}`;
+const DAR_SERVICE: DatafordelerService = {
+  register: "DAR",
+  versionEnv: "DATAFORDELER_DAR_VERSION",
+  baseEnv: "DATAFORDELER_DAR_API_BASE",
+  versions: ["v3", "v2", "v1"],
+};
+
+/** BBR's building entity as DAR's schema names it, for the field-name check below. */
+const BYGNING_TYPE = "BBR_Bygning";
 
 const HEATING_TYPES = ["oliefyr", "fjernvarme", "elvarme", "naturgasfyr", "varmepumpe"];
 const ROOF_MATERIALS = ["tegl", "fibercement", "built-up-tag", "tagpap", "metalplader"];
@@ -87,11 +100,8 @@ const EXTENDED_FIELDS = [
   "byg057Opvarmningsmiddel",
 ] as const;
 
-interface GraphQlResponse {
-  data?: {
-    DAR_Husnummer?: { nodes?: unknown } | null;
-  };
-  errors?: Array<{ message?: unknown }>;
+interface HusnummerData {
+  DAR_Husnummer?: { nodes?: unknown } | null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -183,13 +193,23 @@ function mockBuildingData(idLokalid: string): BbrBuildingData {
  * their types (`String!` vs `DateTime!`), which differ per Datafordeler
  * register and would fail the whole document if guessed wrong; inlining
  * sidesteps that, and `JSON.stringify` does the escaping.
+ *
+ * `tid` is null for the retry that drops the bitemporal arguments: they are
+ * required on the registers that have them and rejected outright ("the
+ * argument `registreringstid` does not exist") on the ones that don't, and
+ * which is which is only observable from the error.
  */
-export function buildBygningQuery(idLokalId: string, tid: string, fields: readonly string[]): string {
+export function buildBygningQuery(idLokalId: string, tid: string | null, fields: readonly string[]): string {
+  const bitemporal =
+    tid === null
+      ? ""
+      : `registreringstid: ${JSON.stringify(tid)}
+    virkningstid: ${JSON.stringify(tid)}
+    `;
+
   return `query HusnummerBygning {
   DAR_Husnummer(
-    registreringstid: ${JSON.stringify(tid)}
-    virkningstid: ${JSON.stringify(tid)}
-    where: { id_lokalId: { eq: ${JSON.stringify(idLokalId)} } }
+    ${bitemporal}where: { id_lokalId: { eq: ${JSON.stringify(idLokalId)} } }
   ) {
     nodes {
       husnummerGiverAdgangTilBygning {
@@ -244,19 +264,42 @@ function mapBuilding(building: Record<string, unknown>): BbrBuildingData {
   };
 }
 
-async function runQuery(apiKey: string, query: string): Promise<Record<string, unknown> | null> {
-  const params = new URLSearchParams({ apiKey });
-  const body = await fetchJson<GraphQlResponse>(`${API_BASE}?${params}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-  });
-
-  if (body.errors?.length) {
-    throw new Error(body.errors.map((e) => asNonEmptyString(e.message) ?? "unknown GraphQL error").join("; "));
+async function runQuery(
+  apiKey: string,
+  idLokalid: string,
+  tid: string,
+  fields: readonly string[],
+): Promise<Record<string, unknown> | null> {
+  try {
+    const data = await postGraphQl<HusnummerData>(DAR_SERVICE, apiKey, buildBygningQuery(idLokalid, tid, fields));
+    return pickPrimaryBuilding(data?.DAR_Husnummer?.nodes);
+  } catch (err) {
+    if (!(err instanceof GraphQlError) || !err.hasUnknownArgument) throw err;
+    const data = await postGraphQl<HusnummerData>(DAR_SERVICE, apiKey, buildBygningQuery(idLokalid, null, fields));
+    return pickPrimaryBuilding(data?.DAR_Husnummer?.nodes);
   }
+}
 
-  return pickPrimaryBuilding(body.data?.DAR_Husnummer?.nodes);
+/**
+ * Narrows a field list to the names the live schema actually defines, so an
+ * unverified guess is dropped before it can reject the whole document. Falls
+ * back to the list as written when the schema can't be read (introspection is
+ * disabled on some deployments) or when the filter would empty the selection
+ * set, which is not a legal GraphQL query.
+ */
+export function fieldsInSchema(fields: readonly string[], schema: Set<string> | null): readonly string[] {
+  if (schema === null) return fields;
+  const known = fields.filter((field) => schema.has(field));
+  return known.length > 0 ? known : fields;
+}
+
+async function bygningSchema(apiKey: string): Promise<Set<string> | null> {
+  try {
+    return await entityFields(DAR_SERVICE, apiKey, BYGNING_TYPE);
+  } catch {
+    // Best-effort: the two-tier field retry below is the real safety net.
+    return null;
+  }
 }
 
 /**
@@ -278,10 +321,11 @@ export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<
   if (!apiKey) return sourceFailed("DATAFORDELER_API_KEY not configured");
 
   const tid = new Date().toISOString();
+  const schema = await bygningSchema(apiKey);
 
   let extendedError: unknown;
   try {
-    const building = await runQuery(apiKey, buildBygningQuery(idLokalid, tid, EXTENDED_FIELDS));
+    const building = await runQuery(apiKey, idLokalid, tid, fieldsInSchema(EXTENDED_FIELDS, schema));
     if (building !== null) return sourceOk(mapBuilding(building));
     return sourceFailed(`no BBR building linked to husnummer ${idLokalid}`);
   } catch (err) {
@@ -289,7 +333,7 @@ export async function lookupBbr(idLokalid: string | null): Promise<SourceResult<
   }
 
   try {
-    const building = await runQuery(apiKey, buildBygningQuery(idLokalid, tid, CORE_FIELDS));
+    const building = await runQuery(apiKey, idLokalid, tid, fieldsInSchema(CORE_FIELDS, schema));
     if (building === null) return sourceFailed(`no BBR building linked to husnummer ${idLokalid}`);
     return sourceOk(mapBuilding(building));
   } catch (coreError) {
