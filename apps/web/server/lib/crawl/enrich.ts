@@ -76,7 +76,11 @@ export async function enrichProperty(
   // address-lookup.ts/matrikel.ts in ingest.ts), so this always resolves to
   // either real or mock data on its own rather than being at the mercy of
   // enrich.ts's overall mode.
-  const valuationResult = await lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
+  const valuationResult = await lookupEjendomsvurdering(
+    cadastral?.matrikelnr ?? null,
+    cadastral?.ejerlav ?? null,
+    cadastral?.bfeNummer ?? null,
+  );
   const publicValuation: EjendomsvurderingData | null = valuationResult.ok ? valuationResult.data : null;
 
   if (MOCK_MODE) {
@@ -86,10 +90,11 @@ export async function enrichProperty(
     oilTankRiskSource = "heuristic";
     noiseExposureLden = mockNoiseExposure(listing.lat, listing.lon);
     source = "mock";
-    // lookupBbr gates its own mock/real split (BBR_MOCK_MODE), so calling it
-    // here still yields deterministic mock building facts — without it the
-    // bbr_data materials/heating/counts stay null and the UI's BBR facts
-    // panel renders its empty state for every listing.
+    // lookupBbr gates its own mock/real split (BBR_MOCK_MODE), which now
+    // defaults to *live*: with a Datafordeler key configured this returns
+    // real building facts even on a mock enrichment run, and without one it
+    // returns nothing rather than fabricating materials/heating/counts. Set
+    // BBR_MOCK_MODE=true for a fully offline run.
     const bbrResult = await lookupBbr(cadastral?.idLokalid ?? null);
     bbrBuilding = bbrResult.ok ? bbrResult.data : null;
   } else {
