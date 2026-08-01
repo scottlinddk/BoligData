@@ -291,27 +291,29 @@ export function PropertyDetailPage() {
       )}
 
       {isMobile && (
-        <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2.5 border-t border-border bg-surface px-4 py-2.5 shadow-lift">
-          <button
-            type="button"
-            onClick={handleSave}
-            aria-label={saved ? t("property.saved") : t("property.save")}
-            className="w-[46px] shrink-0 rounded-full border border-border bg-surface text-base text-ink"
-          >
-            {saved ? "♥" : "♡"}
-          </button>
-          <button
-            type="button"
-            onClick={handleContactAgent}
-            className="flex-1 rounded-full bg-cta px-3 py-3 text-sm font-bold text-cta-text"
-          >
-            {t("detail.contactAgent")}
-          </button>
+        <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-surface px-4 py-2.5 shadow-lift">
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={handleSave}
+              aria-label={saved ? t("property.saved") : t("property.save")}
+              className="w-[46px] shrink-0 rounded-full border border-border bg-surface text-base text-ink"
+            >
+              {saved ? "♥" : "♡"}
+            </button>
+            <button
+              type="button"
+              onClick={handleContactAgent}
+              className="flex-1 rounded-full bg-cta px-3 py-3 text-sm font-bold text-cta-text"
+            >
+              {t("detail.contactAgent")}
+            </button>
+          </div>
           {canRecommend && (
             <button
               type="button"
               onClick={() => setRecommendOpen(true)}
-              className="flex-1 rounded-full border border-border-strong bg-surface px-3 py-3 text-sm font-bold text-ink"
+              className="w-full rounded-full border border-border-strong bg-surface px-3 py-3 text-sm font-bold text-ink"
             >
               {t("recommend.cta")}
             </button>
