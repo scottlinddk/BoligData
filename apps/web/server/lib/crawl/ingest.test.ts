@@ -3,6 +3,68 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { runIngest } from "./ingest";
 
 /**
+ * Writable columns of the two tables, mirroring packages/supabase/migrations.
+ * The fake DB below rejects anything else the way PostgREST does, because the
+ * failure mode is invisible otherwise: a listing field that isn't a column
+ * (sold_price_history, which belongs to `enrichments`) made the real upsert
+ * reject every chunk while a permissive fake happily accepted the row.
+ */
+const PROPERTY_COLUMNS = new Set([
+  "address",
+  "municipality",
+  "postal_code",
+  "price",
+  "sqm",
+  "listing_date",
+  "listing_source",
+  "external_id",
+  "lat",
+  "lon",
+  "status",
+  "building_year",
+  "property_type",
+  "rooms",
+  "images",
+  "description",
+  "agent_name",
+  "content_hash",
+  "last_seen_at",
+  "id_lokalid",
+  "matrikelnr",
+  "ejerlav",
+  "zone",
+  "registered_area_sqm",
+]);
+
+const ENRICHMENT_COLUMNS = new Set([
+  "property_id",
+  "bbr_data",
+  "sold_price_history",
+  "calculated_metrics",
+  "risk_flags",
+  "school_transport",
+  "public_valuation",
+  "source",
+  "enriched_at",
+]);
+
+/** The PostgREST error a write to a non-existent column actually returns. */
+function unknownColumnError(
+  rows: Array<Record<string, unknown>>,
+  columns: Set<string>,
+  table: string,
+): { message: string } | null {
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!columns.has(key)) {
+        return { message: `Could not find the '${key}' column of '${table}' in the schema cache` };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * In-memory stand-in for the two tables the ingest touches, faking the exact
  * PostgREST call chains ingest.ts uses. CRAWL_MOCK_MODE defaults to true in
  * tests, so the fetchers return the committed fixtures (3 listings each).
@@ -28,8 +90,10 @@ function fakeDb() {
             }),
           }),
           upsert: (rows: Array<Record<string, unknown>>) => ({
-            select: () =>
-              Promise.resolve({
+            select: () => {
+              const error = unknownColumnError(rows, PROPERTY_COLUMNS, "properties");
+              if (error) return Promise.resolve({ data: null, error });
+              return Promise.resolve({
                 data: rows.map((row) => {
                   const key = `${row.listing_source}|${row.external_id}`;
                   const id = properties.get(key)?.id ?? `id-${nextId++}`;
@@ -37,7 +101,8 @@ function fakeDb() {
                   return { id, external_id: row.external_id };
                 }),
                 error: null,
-              }),
+              });
+            },
           }),
         };
       }
@@ -50,6 +115,8 @@ function fakeDb() {
             }),
         }),
         upsert: (rows: Array<Record<string, unknown>>) => {
+          const error = unknownColumnError(rows, ENRICHMENT_COLUMNS, "enrichments");
+          if (error) return Promise.resolve({ data: null, error });
           for (const row of rows) enrichments.set(row.property_id as string, row);
           return Promise.resolve({ data: null, error: null });
         },
@@ -113,6 +180,25 @@ describe("runIngest (mock mode, stubbed DB)", () => {
     expect(totals.enriched).toBe(1);
     expect(totals.skipped).toBe(totals.fetched - 1);
     expect(enrichments.has(firstEnriched!)).toBe(true);
+  });
+
+  // Regression: sold_price_history is enrichment data, not a properties
+  // column. Spreading the RawListing into the properties upsert sent it
+  // anyway, and PostgREST failed every chunk with "Could not find the
+  // 'sold_price_history' column of 'properties' in the schema cache" — the
+  // nightly crawl wrote nothing and returned 502.
+  it("writes sold_price_history to enrichments and never to properties", async () => {
+    const { client, properties, enrichments } = fakeDb();
+    const result = await runIngest(client);
+
+    expect(result.ok).toBe(true);
+    expect(properties.size).toBeGreaterThan(0);
+    for (const row of properties.values()) {
+      expect(row).not.toHaveProperty("sold_price_history");
+    }
+    for (const row of enrichments.values()) {
+      expect(row).toHaveProperty("sold_price_history");
+    }
   });
 });
 
