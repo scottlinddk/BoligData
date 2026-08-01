@@ -33,11 +33,13 @@ const storedBbr: BbrData = {
   bathroomCount: 1,
 };
 
+const storedHistory = [{ soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: 7438, saleType: "normal" as const }];
+
 const enrichment = {
   bbrData: storedBbr,
   publicValuation: { assessedPropertyValueDkk: 2_000_000, assessedLandValueDkk: 500_000, valuationYear: 2023 },
   riskFlags: null,
-  soldPriceHistory: [],
+  soldPriceHistory: storedHistory,
 } as unknown as Enrichment;
 
 function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupResult {
@@ -176,6 +178,50 @@ describe("mergePropertyFacts", () => {
     const facts = mergePropertyFacts(property, enrichment, lookup({ bbrData: allNull }));
     expect(facts.bbrSource).toBe("stored");
     expect(facts.bbrData?.yearBuilt).toBe(1970);
+  });
+});
+
+describe("mergePropertyFacts — sales", () => {
+  const liveHistory = [
+    { soldDate: "2021-08-30", price: 2_050_000, pricePerSqm: 10199, saleType: "normal" as const },
+    { soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: 7438, saleType: "normal" as const },
+  ];
+  const nearby = [
+    {
+      address: "Alfavej 13, 9000 Aalborg",
+      soldDate: "2026-04-24",
+      price: 4_250_000,
+      pricePerSqm: 22874,
+      saleType: "normal" as const,
+      areaSqm: 186,
+      propertyType: "villa",
+      distanceMeters: 78,
+      lat: 57.046623,
+      lon: 9.876311,
+    },
+  ];
+
+  it("falls back to the crawled history when the live read has none", () => {
+    const facts = mergePropertyFacts(property, enrichment, lookup());
+    expect(facts.priceHistory).toEqual(storedHistory);
+    expect(facts.priceHistorySource).toBe("stored");
+  });
+
+  it("prefers the live history — the stored one is only as fresh as the last crawl", () => {
+    const facts = mergePropertyFacts(property, enrichment, lookup({ priceHistory: liveHistory }));
+    expect(facts.priceHistory).toEqual(liveHistory);
+    expect(facts.priceHistorySource).toBe("register");
+  });
+
+  it("reports no source at all when neither side has a history", () => {
+    const facts = mergePropertyFacts(property, null, lookup());
+    expect(facts.priceHistory).toEqual([]);
+    expect(facts.priceHistorySource).toBeNull();
+  });
+
+  it("passes nearby sales straight through, and is empty without a lookup", () => {
+    expect(mergePropertyFacts(property, enrichment, lookup({ nearbySales: nearby })).nearbySales).toEqual(nearby);
+    expect(mergePropertyFacts(property, enrichment, null).nearbySales).toEqual([]);
   });
 });
 

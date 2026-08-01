@@ -249,7 +249,6 @@ export function PropertyDetailPage() {
 
       <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} />
-        {comparablesQuery.isLoading && <p className="p-3 font-semibold text-ink-soft">{t("comparables.loading")}</p>}
         {comparablesQuery.isError && (
           <div className="flex items-center gap-3 rounded-[20px] border border-danger-soft bg-danger-soft p-4">
             <p className="font-semibold text-danger">{t("comparables.error")}</p>
@@ -261,13 +260,13 @@ export function PropertyDetailPage() {
             </button>
           </div>
         )}
-        {comparablesQuery.data && (
-          <ComparablesPanel
-            soldPriceHistory={enrichment?.soldPriceHistory ?? []}
-            comparables={comparablesQuery.data.comparables}
-            neighborhoodAvgPricePerSqm={comparablesQuery.data.neighborhoodAvgPricePerSqm}
-          />
-        )}
+        <ComparablesPanel
+          soldPriceHistory={facts.priceHistory}
+          priceHistorySource={facts.priceHistorySource}
+          nearbySales={facts.nearbySales}
+          comparables={comparablesQuery.data?.comparables ?? []}
+          neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null}
+        />
       </div>
 
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">

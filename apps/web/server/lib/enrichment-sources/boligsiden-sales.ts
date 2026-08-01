@@ -32,6 +32,12 @@ const DEFAULT_API_BASE = "https://api.boligsiden.dk/search/addresses";
 /** Half-width of the search box. ~500 m is a street-and-neighbours radius, not a district. */
 const DEFAULT_RADIUS_M = 500;
 const DEFAULT_LIMIT = 8;
+/**
+ * Box for finding the subject address itself. Small enough that only the
+ * property and its immediate neighbours fall inside, so the match doesn't
+ * depend on where the address ranks in a sorted list.
+ */
+const SUBJECT_RADIUS_M = 40;
 /** Same-address tolerance when picking the subject property out of the results. */
 const SUBJECT_MATCH_METERS = 20;
 
@@ -153,17 +159,28 @@ export interface NearbySalesOptions {
   limit?: number;
 }
 
+async function search(params: URLSearchParams): Promise<ParsedAddress[]> {
+  return parseAddresses(await fetchJson<AddressSearchResponse>(`${apiBase()}?${params}`));
+}
+
 /**
- * One request, two answers: the subject address's own sale history and the
+ * Two answers, two queries: the subject address's own sale history and the
  * recent sales around it.
  *
- * Both come out of the same polygon search because the subject property is
- * simply the result standing on the same spot — matching it by coordinate
- * (within `SUBJECT_MATCH_METERS`) is cheaper and more robust than a second
- * lookup keyed on an address string that the register and the listing spell
- * differently. Everything else in the box becomes `nearbySales`, carrying
- * `saleType` through so a family transfer or a forced auction can be shown as
- * what it is rather than averaged into a "neighbourhood price".
+ * They can't share one query. The neighbourhood query is sorted by `soldDate`
+ * so it returns *recent* sales, which means the subject address appears in it
+ * only if its own last sale happens to rank among the most recent nearby —
+ * for a house that last changed hands in 2004 it simply isn't on the page, and
+ * the history comes back empty for no visible reason. So the subject is found
+ * with its own tight box instead, where ranking can't hide it.
+ *
+ * Both queries are matched to the subject by coordinate rather than by address
+ * string: the register and the listing spell the same address differently
+ * often enough that string matching would be the fragile part.
+ *
+ * `saleType` is carried through rather than filtered, so a family transfer or
+ * a forced auction can be shown as what it is instead of being averaged into
+ * a "neighbourhood price".
  */
 export async function lookupBoligsidenSales(
   lat: number,
@@ -177,24 +194,35 @@ export async function lookupBoligsidenSales(
   const limit = options.limit ?? DEFAULT_LIMIT;
 
   try {
-    const params = new URLSearchParams({
-      polygon: boxPolygon(lat, lon, radiusMeters),
-      sortBy: "soldDate",
-      sortAscending: "false",
-      // Oversample: the subject address and any address whose registrations
-      // didn't map both come out of this list, so asking for exactly `limit`
-      // would routinely return fewer.
-      per_page: String(limit + 5),
-      page: "1",
-    });
+    const [subjectMatches, neighbourhood] = await Promise.all([
+      search(
+        new URLSearchParams({
+          polygon: boxPolygon(lat, lon, SUBJECT_RADIUS_M),
+          per_page: "10",
+          page: "1",
+        }),
+      ),
+      search(
+        new URLSearchParams({
+          polygon: boxPolygon(lat, lon, radiusMeters),
+          sortBy: "soldDate",
+          sortAscending: "false",
+          // Oversample: addresses that have never been sold, and the subject
+          // itself, both come out of this list, so asking for exactly `limit`
+          // would routinely return fewer.
+          per_page: String(limit + 5),
+          page: "1",
+        }),
+      ),
+    ]);
 
-    const body = await fetchJson<AddressSearchResponse>(`${apiBase()}?${params}`);
-    const parsed = parseAddresses(body);
+    const subject = subjectMatches
+      .map((entry) => ({ entry, distance: haversineMeters(lat, lon, entry.lat, entry.lon) }))
+      .filter(({ distance }) => distance <= SUBJECT_MATCH_METERS)
+      .sort((a, b) => a.distance - b.distance)[0]?.entry;
 
-    const subject = parsed.find((entry) => haversineMeters(lat, lon, entry.lat, entry.lon) <= SUBJECT_MATCH_METERS);
-
-    const nearbySales: NearbySale[] = parsed
-      .filter((entry) => entry !== subject)
+    const nearbySales: NearbySale[] = neighbourhood
+      .filter((entry) => haversineMeters(lat, lon, entry.lat, entry.lon) > SUBJECT_MATCH_METERS)
       .map((entry): NearbySale | null => {
         const latest = entry.history[0];
         const address = formatAddress(entry.record);

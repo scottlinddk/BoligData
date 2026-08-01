@@ -57,15 +57,37 @@ describe("boxPolygon", () => {
 });
 
 describe("lookupBoligsidenSales (live)", () => {
-  it("queries a polygon around the point, newest sales first", async () => {
+  it("asks for the subject address and the neighbourhood separately", async () => {
     const stub = stubFetch([{ body: body([addressRecord()]) }]);
     await lookupBoligsidenSales(LAT, LON);
 
-    const url = stub.urls[0]!;
-    expect(url).toContain("api.boligsiden.dk/search/addresses");
-    expect(url).toContain("sortBy=soldDate");
-    expect(url).toContain("sortAscending=false");
-    expect(decodeURIComponent(url)).toContain("polygon=9.8");
+    expect(stub.urls).toHaveLength(2);
+    for (const url of stub.urls) {
+      expect(url).toContain("api.boligsiden.dk/search/addresses");
+      expect(decodeURIComponent(url)).toContain("polygon=9.8");
+    }
+    // Only the neighbourhood query is sorted by sale date — sorting the
+    // subject query would let ranking hide the address being looked up.
+    const [subjectUrl, neighbourhoodUrl] = stub.urls;
+    expect(subjectUrl).not.toContain("sortBy");
+    expect(neighbourhoodUrl).toContain("sortBy=soldDate");
+    expect(neighbourhoodUrl).toContain("sortAscending=false");
+  });
+
+  it("finds the subject history even when its own sale is too old to rank nearby", async () => {
+    const subject = addressRecord({
+      coordinates: { lat: LAT, lon: LON },
+      houseNumber: "6",
+      registrations: [{ amount: 1_495_000, date: "2004-08-23", area: 201, type: "normal" }],
+    });
+    // First response answers the subject query; second answers the
+    // neighbourhood query, which the old sale would never have ranked into.
+    stubFetch([{ body: body([subject]) }, { body: body([addressRecord()]) }]);
+
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.priceHistory[0]?.soldDate).toBe("2004-08-23");
+    expect(result.data.nearbySales.map((s) => s.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
   });
 
   it("separates the subject address from its neighbours by coordinate", async () => {
@@ -75,6 +97,7 @@ describe("lookupBoligsidenSales (live)", () => {
       registrations: [{ amount: 3_000_000, date: "2019-02-01", livingArea: 150, type: "normal" }],
     });
     stubFetch([{ body: body([subject, addressRecord()]) }]);
+    // Both queries see the subject; it must be the history, never a neighbour.
 
     const result = await lookupBoligsidenSales(LAT, LON);
     expect(result.ok).toBe(true);
@@ -154,6 +177,8 @@ describe("lookupBoligsidenSales (live)", () => {
     const result = await lookupBoligsidenSales(0, 0);
     expect(result.ok).toBe(false);
     expect(stub.urls).toHaveLength(0);
+    if (result.ok) return;
+    expect(result.error).toContain("no usable coordinates");
   });
 
   it("reports an upstream failure instead of an empty 'no sales nearby'", async () => {

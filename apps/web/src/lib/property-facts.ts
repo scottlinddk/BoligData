@@ -1,6 +1,6 @@
-import type { BbrData, Property, PublicValuation, ZoneStatus } from "@shared/types/index";
+import type { BbrData, Property, PublicValuation, SoldPriceEntry, ZoneStatus } from "@shared/types/index";
 import type { PropertyDetailResponse } from "@shared/types/api";
-import type { PropertyLookupDataMode, PropertyLookupResult } from "@shared/types/property-lookup";
+import type { NearbySaleEntry, PropertyLookupDataMode, PropertyLookupResult } from "@shared/types/property-lookup";
 
 type Enrichment = PropertyDetailResponse["enrichment"];
 
@@ -31,6 +31,11 @@ export interface MergedPropertyFacts {
    * quietly replacing the other. Null when they agree or BBR has no area.
    */
   registerAreaSqm: number | null;
+  /** Registered sales of this address, newest first. */
+  priceHistory: SoldPriceEntry[];
+  priceHistorySource: FactSource | null;
+  /** Recent registered sales around this address ("salg i nærheden"), nearest first. */
+  nearbySales: NearbySaleEntry[];
 }
 
 /** True when the lookup produced a value for at least one BBR field. */
@@ -83,6 +88,16 @@ export function mergePropertyFacts(
 
   const registerArea = live?.areaSqm ?? null;
 
+  // Boligsiden embeds an address's registered sales in the same case record
+  // the crawl already reads, so the stored row carries a history too. The live
+  // read still wins: the stored one is only as fresh as the last crawl of this
+  // listing, and `listingContentHash` doesn't change when a *neighbour*
+  // transacts — or when this address does, if nothing else about the listing
+  // moved.
+  const livePriceHistory = lookup?.priceHistory ?? [];
+  const storedPriceHistory = enrichment?.soldPriceHistory ?? [];
+  const priceHistory = livePriceHistory.length > 0 ? livePriceHistory : storedPriceHistory;
+
   return {
     bbrData,
     bbrSource: bbrData === null ? null : liveIsUsable ? "register" : "stored",
@@ -98,6 +113,10 @@ export function mergePropertyFacts(
     buildingYear: live?.yearBuilt ?? property.buildingYear ?? stored?.yearBuilt ?? null,
     renovationYear: live?.renovationYear ?? stored?.renovationYear ?? null,
     registerAreaSqm: registerArea !== null && registerArea !== property.sqm ? registerArea : null,
+    priceHistory,
+    priceHistorySource:
+      priceHistory.length === 0 ? null : livePriceHistory.length > 0 ? "register" : "stored",
+    nearbySales: lookup?.nearbySales ?? [],
   };
 }
 

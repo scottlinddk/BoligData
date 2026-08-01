@@ -51,6 +51,7 @@ describe("GET /api/property-lookup", () => {
     vi.stubEnv("BBR_MOCK_MODE", "true");
     vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "true");
     vi.stubEnv("STOEJKORT_MOCK_MODE", "true");
+    vi.stubEnv("BOLIGSIDEN_SALES_MOCK_MODE", "true");
   });
 
   afterEach(() => {
