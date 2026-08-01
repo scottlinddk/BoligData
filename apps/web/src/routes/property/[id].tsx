@@ -1,10 +1,12 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ApiError, getComparables, getProperty } from "@/lib/api";
+import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { calculateDueDiligenceScore } from "@shared/utils/due-diligence-score";
+import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
+import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { DueDiligenceScoreBadge } from "@/components/due-diligence-score-badge";
 import { ComparablesPanel } from "@/components/comparables-panel";
@@ -42,6 +44,30 @@ export function PropertyDetailPage() {
     enabled: !!id,
   });
 
+  // Live register read for this address. Deliberately a second request rather
+  // than something the detail endpoint inlines: /api/property-lookup is open
+  // and CDN-cached per query string, while /api/properties is per-caller, so
+  // folding it in would make every detail request pay for register latency and
+  // lose the shared cache. It also means the page renders immediately from the
+  // stored row and upgrades in place when the registers answer.
+  const listing = detailQuery.data?.property;
+  const lookupQuery = useQuery({
+    queryKey: ["property-lookup", listing?.id],
+    queryFn: () =>
+      getPropertyLookup({
+        address: listing!.address,
+        askingPrice: listing!.price,
+        postalCode: listing!.postalCode,
+        lat: listing!.lat,
+        lon: listing!.lon,
+        roomCount: listing!.rooms,
+        energyLabel: detailQuery.data?.enrichment?.bbrData.energyLabel ?? null,
+      }),
+    enabled: !!listing,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   if (detailQuery.isLoading) return <p className="p-6 font-semibold text-ink-soft">{t("detail.loading")}</p>;
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) {
     return (
@@ -58,6 +84,8 @@ export function PropertyDetailPage() {
 
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
+  const facts = mergePropertyFacts(property, enrichment, lookupQuery.data ?? null);
+  const registerSources = summarizeLookupSources(lookupQuery.data ?? null);
   const dueDiligenceScore = calculateDueDiligenceScore(
     enrichment?.riskFlags ?? null,
     pricePerSqm(property.price, property.sqm),
@@ -136,19 +164,16 @@ export function PropertyDetailPage() {
         <Stat label={t("detail.pricePerSqm")} value={formatDkk(pricePerSqm(property.price, property.sqm))} />
         <Stat label={t("detail.daysOnMarket")} value={String(daysBetween(property.listingDate))} />
         <Stat label={t("detail.rooms")} value={property.rooms ? String(property.rooms) : empty} />
-        <Stat label={t("detail.built")} value={property.buildingYear ? String(property.buildingYear) : empty} />
-        <Stat label={t("detail.energyLabel")} value={enrichment?.bbrData.energyLabel ?? empty} />
+        <Stat label={t("detail.built")} value={facts.buildingYear ? String(facts.buildingYear) : empty} />
+        <Stat label={t("detail.energyLabel")} value={facts.bbrData?.energyLabel ?? empty} />
         <Stat
           label={t("detail.renovated")}
-          value={enrichment?.bbrData.renovationYear ? String(enrichment.bbrData.renovationYear) : empty}
+          value={facts.renovationYear ? String(facts.renovationYear) : empty}
         />
-        <Stat label={t("detail.floors")} value={enrichment?.bbrData.floors ? String(enrichment.bbrData.floors) : empty} />
-        <Stat label={t("detail.roofMaterial")} value={enrichment?.bbrData.roofMaterial ?? empty} />
-        <Stat label={t("detail.wallMaterial")} value={enrichment?.bbrData.wallMaterial ?? empty} />
-        <Stat
-          label={t("detail.zone")}
-          value={property.zone ? t(`zone.${property.zone}` as TranslationKey) : empty}
-        />
+        <Stat label={t("detail.floors")} value={facts.bbrData?.floors ? String(facts.bbrData.floors) : empty} />
+        <Stat label={t("detail.roofMaterial")} value={facts.bbrData?.roofMaterial ?? empty} />
+        <Stat label={t("detail.wallMaterial")} value={facts.bbrData?.wallMaterial ?? empty} />
+        <Stat label={t("detail.zone")} value={facts.zone ? t(`zone.${facts.zone}` as TranslationKey) : empty} />
         <Stat
           label={t("detail.parcelArea")}
           value={property.registeredAreaSqm ? t("property.sqm", { sqm: property.registeredAreaSqm }) : empty}
@@ -156,20 +181,24 @@ export function PropertyDetailPage() {
         <Stat
           label={t("detail.publicValuation")}
           value={
-            enrichment?.publicValuation?.assessedPropertyValueDkk
-              ? formatDkk(enrichment.publicValuation.assessedPropertyValueDkk) +
-                (enrichment.publicValuation.valuationYear ? ` (${enrichment.publicValuation.valuationYear})` : "")
+            facts.publicValuation?.assessedPropertyValueDkk
+              ? formatDkk(facts.publicValuation.assessedPropertyValueDkk) +
+                (facts.publicValuation.valuationYear ? ` (${facts.publicValuation.valuationYear})` : "")
               : empty
           }
         />
         <Stat
           label={t("detail.landValue")}
-          value={
-            enrichment?.publicValuation?.assessedLandValueDkk
-              ? formatDkk(enrichment.publicValuation.assessedLandValueDkk)
-              : empty
-          }
+          value={facts.publicValuation?.assessedLandValueDkk ? formatDkk(facts.publicValuation.assessedLandValueDkk) : empty}
         />
+        {facts.registerAreaSqm !== null && (
+          <Stat
+            label={t("detail.registerArea")}
+            value={t("property.sqm", { sqm: facts.registerAreaSqm })}
+            tone="warning"
+            title={t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}
+          />
+        )}
       </div>
 
       {property.description && <p className="mt-4 text-sm leading-relaxed text-ink-soft">{property.description}</p>}
@@ -241,8 +270,21 @@ export function PropertyDetailPage() {
         )}
       </div>
 
-      <div className="mt-3.5">
-        <BbrFactsPanel bbrData={enrichment?.bbrData ?? null} plotSqm={property.registeredAreaSqm} />
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <BbrFactsPanel
+          bbrData={facts.bbrData}
+          plotSqm={property.registeredAreaSqm}
+          source={facts.bbrSource}
+          matrikelnr={facts.matrikelnr}
+          ejerlav={facts.ejerlav}
+          bfeNummer={facts.bfeNummer}
+        />
+        <RegisterSourcesPanel
+          sources={registerSources}
+          isLoading={lookupQuery.isLoading}
+          isError={lookupQuery.isError}
+          onRetry={() => lookupQuery.refetch()}
+        />
       </div>
 
       {property.agentName && (
@@ -281,9 +323,22 @@ export function PropertyDetailPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tone = "neutral",
+  title,
+}: {
+  label: string;
+  value: string;
+  /** "warning" marks a figure that disagrees with the listing — see `title` for the comparison. */
+  tone?: "neutral" | "warning";
+  title?: string;
+}) {
+  const toneClass =
+    tone === "warning" ? "border-warning-soft bg-warning-soft" : "border-border bg-surface";
   return (
-    <div className="flex items-baseline gap-1.5 rounded-full border border-border bg-surface px-4 py-2">
+    <div className={`flex items-baseline gap-1.5 rounded-full border px-4 py-2 ${toneClass}`} title={title}>
       <span className="text-[14.5px] font-bold text-ink">{value}</span>
       <span className="ds-mono text-[9px] text-ink-faint">{label}</span>
     </div>
