@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 // Lives here rather than next to the handler in api/, because Vercel turns
 // every file it uploads under api/ into a Serverless Function — including
@@ -41,7 +41,22 @@ function mockReq(query: Record<string, string>, headers: Record<string, string> 
 
 const query = { address: "Skomagergyden 4, 9000 Aalborg", askingPrice: "2000000" };
 
-describe("GET /api/property-lookup (mock mode)", () => {
+describe("GET /api/property-lookup", () => {
+  // These assert the endpoint's HTTP contract, not its data. Pinning every
+  // source to mock keeps them hermetic — otherwise each case would reach for
+  // the live registers and the "same payload with or without a bearer token"
+  // comparison would turn on upstream availability.
+  beforeEach(() => {
+    vi.stubEnv("ADDRESS_LOOKUP_MOCK_MODE", "true");
+    vi.stubEnv("BBR_MOCK_MODE", "true");
+    vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "true");
+    vi.stubEnv("STOEJKORT_MOCK_MODE", "true");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("answers without an Authorization header", async () => {
     const captured = mockRes();
     await handler(mockReq(query), captured.res);

@@ -50,11 +50,39 @@ export interface ScoringInputs {
 }
 
 export interface PropertyLookupResolved {
+  /** DAR husnummer UUID. */
   idLokalid: string | null;
   matrikelnr: string | null;
   ejerlav: string | null;
   ejerlavskode: string | null;
+  /** BFE (Bestemt Fast Ejendom) number of the parcel. */
+  bfeNummer: string | null;
   zone: ZoneStatus | null;
+  /** The address as the register spells it — differs from the caller's free text. */
+  formattedAddress: string | null;
+  postalCode: string | null;
+  /** Access-point coordinates (WGS84) from the address register, or the caller's own if it supplied them. */
+  lat: number | null;
+  lon: number | null;
+}
+
+/**
+ * Where one upstream register's contribution came from.
+ * - `live` — the register answered.
+ * - `mock` — that source's `*_MOCK_MODE` flag is on and the values are
+ *   fabricated. Never true in a default deployment; opt-in for local dev.
+ * - `unavailable` — the register was not reached (missing credential, no key
+ *   to query by, upstream error); the corresponding fields are null.
+ */
+export type PropertyLookupDataMode = "live" | "mock" | "unavailable";
+
+export interface PropertyLookupSourceStatus {
+  key: "address" | "bbr" | "publicValuation" | "noise";
+  /** The register behind this field group, e.g. "DAR/DAWA", "BBR", "VUR". */
+  register: string;
+  mode: PropertyLookupDataMode;
+  /** Why the source is unavailable, verbatim from the upstream error. Null when it isn't. */
+  error: string | null;
 }
 
 export interface PropertyLookupResult {
@@ -65,6 +93,17 @@ export interface PropertyLookupResult {
   renovationCategory: RenovationCategoryResult;
   screening: ScreeningCriterionResult[];
   scoringInputs: ScoringInputs;
+  /**
+   * Per-register provenance. Read this before trusting any figure above: it
+   * is what distinguishes a real BBR area from a fabricated one and names the
+   * reason behind every null.
+   */
+  sources: PropertyLookupSourceStatus[];
+  /**
+   * Worst mode across `sources` — `live` only when every source that
+   * contributed did so from its real register.
+   */
+  dataMode: PropertyLookupDataMode;
   source: ScreeningSource;
 }
 

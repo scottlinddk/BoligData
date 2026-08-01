@@ -1,5 +1,16 @@
 # Plan: Property Lookup Endpoint (BBR / OIS / DAR / Datafordeler)
 
+> **Status update, 1 August 2026:** The enrichment sources no longer
+> default to mock. Every `*_MOCK_MODE` flag on the property-lookup path is
+> now opt-in (`"true"` to mock) and read at call time, the address lookup
+> runs against Dataforsyningen's open address API (no credential) and
+> doubles as the geocoder, BBR is reached by traversing DAR's `Husnummer`
+> entity, and each response carries a `sources` array reporting per
+> register whether its values are `live`, `mock` or `unavailable`. §8
+> findings 1 and 2 below are addressed; the VUR field names remain the
+> main unverified assumption. Sections marked "still default to mock"
+> below refer only to `MATRIKEL_MOCK_MODE`.
+>
 > **Status update, 30 July 2026 (audited against the repo):** The
 > property-lookup endpoint, its screening engine, and its scoring-inputs
 > extraction are **fully implemented and tested**, not just the adapters
@@ -21,9 +32,15 @@
   already set in Vercel production. The real remaining blocker is that
   the BBR/Matriklen/VUR **GraphQL schema field names are unverified**
   against the live Datafordeler docs (sandboxed dev environments can't
-  reach `datafordeler.dk`), so `BBR_MOCK_MODE` / `MATRIKEL_MOCK_MODE` /
-  `EJENDOMSVURDERING_MOCK_MODE` all still default to mock in production.
-  All 127 currently-ingested rows have `enrichments.source = "mock"`.
+  reach `datafordeler.dk`). As of 1 Aug 2026 that is no longer a reason to
+  serve mock data: BBR and VUR default to live and report an unavailable
+  source (with the upstream error verbatim) when a query is rejected, so a
+  wrong field name costs facts rather than fabricating them. BBR's query
+  was also corrected — bitemporal `registreringstid`/`virkningstid`
+  arguments and ASCII-transliterated field names (`byg026Opfoerelsesaar`),
+  either of which alone produced an all-null result. `MATRIKEL_MOCK_MODE`
+  still defaults to mock. The 127 already-ingested rows keep
+  `enrichments.source = "mock"` until they are re-enriched.
 - **Confirmed NOT done:** the daily ingest cron (`crawl.yml`) only calls
   `/api/crawl`; nothing calls `/api/property-lookup` on a schedule, and
   no frontend page consumes it yet either. Phase 4 (below) is open, not
@@ -32,12 +49,12 @@
   adapter-interface pattern already used (`enrichment-sources/*.ts`, one
   file per source, common `MOCK_MODE` gating) makes this a low-cost
   decision to defer or reverse later, exactly as originally planned.
-- Every enrichment source defaults to mock (`X_MOCK_MODE !== "false"`),
-  so **the endpoint currently returns entirely mock building/valuation/
-  noise data unless those flags are explicitly set to `"false"`.** Two of
-  the six criteria are also inert by default (see §4), and three
-  code-level correctness findings are listed in §8 — read those before
-  treating any current output as meaningful.
+- ~~Every enrichment source defaults to mock (`X_MOCK_MODE !== "false"`)~~
+  — **inverted 1 Aug 2026.** A source mocks only when its flag is
+  explicitly `"true"`; unset means live. Read the response's `sources`
+  array and `dataMode` to see which registers actually answered. Two of
+  the six criteria remain inert by default (see §4), and the §8 findings
+  are worth reading before treating any output as meaningful.
 
 ---
 
@@ -86,8 +103,8 @@ defaults to `B`), `energyLabel`.
 
 | Source | Provides | Access | Status |
 |---|---|---|---|
-| **DAR** (via Datafordeler) | Resolves free-text address → id_lokalid, matrikelnr, ejerlav, zone | Datafordeler REST, no auth needed | Live-capable; `address-lookup.ts`, default mock via `ADDRESS_LOOKUP_MOCK_MODE` |
-| **BBR** (via Datafordeler) | Build year, renovation year, floor area, floors, roof/wall material, heating installation | Datafordeler **GraphQL** (`graphql.datafordeler.dk/BBR/<version>`), `DATAFORDELER_API_KEY` | Implemented (`bbr.ts`); entity/field names unverified against live v3 schema — blocks flipping `BBR_MOCK_MODE=false` |
+| **DAR** (via Dataforsyningen/DAWA) | Resolves free-text address → husnummer UUID, matrikelnr, ejerlav, coordinates, plus BFE-nummer from the linked `jordstykker` record | `api.dataforsyningen.dk/adgangsadresser`, **no credential** | **Live and verified** (`address-lookup.ts`); also the geocoder. Zone status is gone — DAWA answers `"Udfaset"`. DAWA closes 2026-08-17 — see `ADDRESS_LOOKUP_API_BASE` |
+| **BBR** (via Datafordeler) | Build year, renovation year, floor area, floors, roof/wall material, heating installation | Datafordeler **GraphQL**, entered via DAR `Husnummer` → `husnummerGiverAdgangTilBygning` (`graphql.datafordeler.dk/DAR/<version>`), `DATAFORDELER_API_KEY` | **Live by default** (`bbr.ts`). Two-tier query: an extended field set falling back to the set verified against Datafordeler's published DAR→BBR example |
 | **OIS / public valuation** | Assessed property value, assessed land value, valuation year | Datafordeler VUR GraphQL, same API key | Implemented as `ejendomsvurdering.ts` — there is no separate "OIS" client; VUR fills this role. `EnrichmentSource` still has an unused `"ois"` literal (dead enum value, cosmetic) |
 | **Matriklen (cadastral)** | Registered parcel area | Datafordeler GraphQL, same API key | Implemented (`matrikel.ts`); field name unverified against live schema |
 | **Boliga/Boligsiden** | Comparable sales, days on market, price history | Unofficial JSON APIs (not official) | Implemented (`crawl/{boliga,boligsiden}.ts`); **Boliga blocked by Vercel-IP-range 403s** as of 2026-07-10, disabled via `CRAWL_SOURCES=boligsiden`; Boligsiden ingests live data cleanly. Feeds `comparables.ts` (Supabase-based, haversine distance) — a separate code path from property-lookup, not a stub |
@@ -298,7 +315,12 @@ trustworthy.
    would make the grundskyld component real instead of a guess. (Worth
    noting this only helps once `EJENDOMSVURDERING_MOCK_MODE=false`.)
 
-2. **Omitted `lat`/`lon` silently produce a fabricated noise estimate.**
+2. ~~**Omitted `lat`/`lon` silently produce a fabricated noise estimate.**~~
+   **Fixed 1 Aug 2026:** the address lookup returns the register's own
+   access-point coordinates, so a caller supplying only an address gets a
+   real point; when no coordinate can be resolved at all the noise lookup
+   is skipped rather than queried at (0,0), and `sources` says why. The
+   original finding, for reference:
    Both are optional query params, and the handler defaults them to `0`
    (`lookupNoiseExposure(input.lat ?? 0, input.lon ?? 0)`), i.e. null
    island off West Africa. In mock mode that returns a deterministic

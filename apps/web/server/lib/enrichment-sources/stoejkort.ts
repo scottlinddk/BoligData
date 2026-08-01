@@ -1,16 +1,19 @@
 import { fetchJson } from "../crawl/http.js";
-import { hashSeed, sourceFailed, sourceOk, type SourceResult } from "./types.js";
+import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
-const MOCK_MODE = process.env.STOEJKORT_MOCK_MODE !== "false";
+const MOCK_FLAG = "STOEJKORT_MOCK_MODE";
 
 /**
  * Miljøstyrelsen's "Støj-Danmarkskortet" (Lden road/rail noise mapping) WFS,
  * part of the "Noise Map" theme group on geoserver.plandata.dk. Miljøstyrelsen
  * states access to that theme group requires contacting them directly — this
  * is not a fully open self-serve endpoint like DAWA or GEUS Jordartskort, so
- * the exact layer name and auth requirements are unverified. Confirm both
- * against a live GetCapabilities response before flipping
- * STOEJKORT_MOCK_MODE=false, same caveat as miljoeportalen-v1v2.ts and bbr.ts.
+ * the exact layer name and auth requirements are unverified — confirm both
+ * against a live GetCapabilities response, same caveat as
+ * miljoeportalen-v1v2.ts. Until then the live path reports a failed source
+ * and `noiseZoneEstimate` comes back null, which is the honest answer:
+ * `STOEJKORT_MOCK_MODE=true` brings back a synthetic dB value that reads like
+ * a measurement, so it belongs in local development only.
  */
 const API_BASE = process.env.STOEJKORT_API_BASE ?? "https://geoserver.plandata.dk/geoserver/wfs";
 
@@ -37,7 +40,7 @@ export function mockNoiseExposure(lat: number, lon: number): number {
  * distinct from a failed lookup which returns `ok: false`).
  */
 export async function lookupNoiseExposure(lat: number, lon: number): Promise<SourceResult<{ ldenDb: number | null }>> {
-  if (MOCK_MODE) return sourceOk({ ldenDb: mockNoiseExposure(lat, lon) });
+  if (mockModeEnabled(MOCK_FLAG)) return sourceOk({ ldenDb: mockNoiseExposure(lat, lon) });
 
   try {
     const params = new URLSearchParams({

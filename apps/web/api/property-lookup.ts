@@ -43,10 +43,12 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
 
 /**
  * GET /api/property-lookup?address=...&askingPrice=... — resolves a
- * free-text Danish address against DAR/BBR/OIS, screens it against the
- * hard house-buying criteria, and returns the raw inputs for the relative
- * scoring model. Every value in the response is tagged `source: "ai"`;
- * this endpoint never asserts `source: "verified"` — that's a human call.
+ * free-text Danish address against the address register, BBR and VUR,
+ * screens it against the hard house-buying criteria, and returns the raw
+ * inputs for the relative scoring model. Every value in the response is
+ * tagged `source: "ai"`; this endpoint never asserts `source: "verified"` —
+ * that's a human call. `sources` reports, per register, whether each group of
+ * values came back live, mock or unavailable, and why.
  *
  * Open — no Authorization header required, so scripts and the scheduled
  * screening task can call it without minting a browser session. It reads
@@ -55,8 +57,8 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
  * (`DEFAULT_FINANCING_ASSUMPTIONS`), touches no Supabase row, and is
  * identical for every caller — which is also why it is safe to hand to the
  * CDN. Two consequences worth knowing: the configured thresholds are
- * inferable from the screening reasons, and once the enrichment sources
- * leave mock mode this is an unmetered public path to the
+ * inferable from the screening reasons, and now that the enrichment sources
+ * default to live this *is* an unmetered public path to the
  * `DATAFORDELER_API_KEY` upstream, throttled only by the cache below.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {

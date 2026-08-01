@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { enrichProperty } from "./enrich.js";
 import type { RawListing } from "./types.js";
 import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
@@ -28,8 +28,19 @@ const cadastral: AddressCadastral = {
   matrikelnr: "12a",
   ejerlav: "Testby Ejerlav",
   ejerlavskode: "620551",
+  bfeNummer: "1234567",
   zone: "byzone",
+  lat: 57.05,
+  lon: 9.92,
+  postalCode: "9000",
+  postalName: "Aalborg",
+  municipalityCode: "851",
+  formattedAddress: "Testvej 1, 9000 Aalborg",
 };
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("enrichProperty (mock mode)", () => {
   it("derives a deterministic price-per-sqm and flags a pre-1970 oil tank risk via the building-year heuristic", async () => {
@@ -92,6 +103,9 @@ describe("enrichProperty (mock mode)", () => {
   });
 
   it("populates BBR building facts (materials, heating, counts) when cadastral id_lokalid is available", async () => {
+    // BBR follows its own flag: ENRICH_MOCK_MODE alone no longer fabricates
+    // building facts, so the mock path has to be asked for explicitly.
+    vi.stubEnv("BBR_MOCK_MODE", "true");
     const result = await enrichProperty(listing, cadastral);
     expect(result.bbr_data.wallMaterial).not.toBeNull();
     expect(result.bbr_data.roofMaterial).not.toBeNull();
