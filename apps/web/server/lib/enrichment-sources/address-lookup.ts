@@ -22,6 +22,7 @@ const MOCK_FLAG = "ADDRESS_LOOKUP_MOCK_MODE";
  * swapped in silently.
  */
 const DEFAULT_API_BASE = "https://api.dataforsyningen.dk/adgangsadresser";
+const DEFAULT_PARCEL_API_BASE = "https://api.dataforsyningen.dk/jordstykker";
 
 const ZONES = ["byzone", "landzone", "sommerhusomraade"] as const;
 
@@ -32,8 +33,9 @@ export interface AddressCadastral {
   ejerlav: string | null;
   /** Numeric ejerlav code (e.g. "620551") — jord.miljoeportal.dk's attest link keys off this, not the ejerlav name. */
   ejerlavskode: string | null;
-  /** BFE (Bestemt Fast Ejendom) number of the parcel — the key VUR indexes valuations by. Null when DAWA doesn't carry it. */
+  /** BFE (Bestemt Fast Ejendom) number of the parcel — the key VUR indexes valuations by. Resolved from the linked `jordstykker` record. */
   bfeNummer: string | null;
+  /** Retired upstream: DAWA answers "Udfaset" for every address, so this is null in practice. See `normalizeZone`. */
   zone: (typeof ZONES)[number] | null;
   /** Register coordinates of the access point (WGS84). Lets callers geocode from an address alone. */
   lat: number | null;
@@ -47,6 +49,17 @@ export interface AddressCadastral {
 
 function apiBase(): string {
   return process.env.ADDRESS_LOOKUP_API_BASE?.trim() || DEFAULT_API_BASE;
+}
+
+function parcelApiBase(): string {
+  return process.env.ADDRESS_LOOKUP_PARCEL_API_BASE?.trim() || DEFAULT_PARCEL_API_BASE;
+}
+
+/** Appends the optional Dataforsyningen token to a URL that may already carry a query string. */
+function withToken(url: string): string {
+  const token = process.env.DATAFORSYNINGEN_TOKEN?.trim();
+  if (!token) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -67,6 +80,12 @@ function asCodeString(value: unknown): string | null {
  * (1/2/3). Both normalize onto the repo's ASCII `ZoneStatus` union — a plain
  * `includes()` against the raw value silently yields null for every real
  * response.
+ *
+ * As of 2026 DAWA answers `"Udfaset"` ("phased out") for every address: the
+ * zone field is retired, not merely absent for some addresses. It maps to
+ * null like any other unrecognized value, but it is called out here because
+ * it means byzone/landzone/sommerhusområde now needs a different source
+ * (Plandata's zonekort WFS) rather than a fix to this mapping.
  */
 function normalizeZone(value: unknown): AddressCadastral["zone"] {
   const numeric = typeof value === "number" ? value : null;
@@ -153,22 +172,54 @@ export function parseAdgangsadresse(raw: unknown): AddressCadastral | null {
   };
 }
 
+/**
+ * The adgangsadresse's `jordstykke` object carries only href/ejerlav/
+ * matrikelnr/esrejendomsnr — no BFE number. DAWA's separate `jordstykker`
+ * resource does carry one, and the address record links straight to it, so
+ * the BFE number costs one extra request rather than a second search.
+ */
+export function parcelUrl(raw: unknown): string | null {
+  const record = asRecord(raw);
+  const jordstykke = asRecord(record?.jordstykke);
+  const href = asNonEmptyString(jordstykke?.href);
+  if (href !== null) return href;
+
+  const ejerlavskode = asCodeString(asRecord(jordstykke?.ejerlav)?.kode) ?? asCodeString(record?.ejerlavkode);
+  const matrikelnr = asNonEmptyString(jordstykke?.matrikelnr) ?? asNonEmptyString(record?.matrikelnr);
+  if (ejerlavskode === null || matrikelnr === null) return null;
+  return `${parcelApiBase()}/${encodeURIComponent(ejerlavskode)}/${encodeURIComponent(matrikelnr)}`;
+}
+
+/**
+ * Fetches the parcel's BFE number — the key VUR indexes valuations by.
+ * Failure-isolated on purpose: this is supplementary, and a parcel lookup
+ * erroring must not cost the caller an otherwise good address resolution.
+ */
+async function fetchBfeNummer(url: string | null): Promise<string | null> {
+  if (url === null) return null;
+  try {
+    const parcel = asRecord(await fetchJson<unknown>(withToken(url)));
+    return parcel === null ? null : asCodeString(parcel.bfenummer);
+  } catch {
+    return null;
+  }
+}
+
 async function search(address: string, postalCode: string | null, fuzzy: boolean): Promise<unknown[]> {
   const params = new URLSearchParams({ q: address, per_side: "1", side: "1" });
   if (postalCode) params.set("postnr", postalCode);
   // DAWA reads `fuzzy` as a presence flag, so it must only be appended on the
   // retry — sending `fuzzy=false` still enables fuzzy matching.
   if (fuzzy) params.set("fuzzy", "");
-  const token = process.env.DATAFORSYNINGEN_TOKEN?.trim();
-  if (token) params.set("token", token);
 
-  const results = await fetchJson<unknown>(`${apiBase()}?${params}`);
+  const results = await fetchJson<unknown>(withToken(`${apiBase()}?${params}`));
   return Array.isArray(results) ? results : [];
 }
 
 /**
  * Looks up the DAR husnummer UUID plus cadastral parcel (matrikelnr/ejerlav/
- * BFE), zone status and coordinates for one free-text address.
+ * BFE) and coordinates for one free-text address. Zone status comes back null:
+ * DAWA has retired that field (see `normalizeZone`).
  *
  * `lat`/`lon` are inputs *and* outputs: callers that already know the
  * coordinates pass them so an address that DAWA can't parse still yields
@@ -193,13 +244,15 @@ export async function lookupAddressCadastral(
     let results = await search(address, postalCode, false);
     if (results.length === 0) results = await search(address, postalCode, true);
 
-    const parsed = results.length > 0 ? parseAdgangsadresse(results[0]) : null;
+    const match = results[0];
+    const parsed = results.length > 0 ? parseAdgangsadresse(match) : null;
     if (parsed === null || parsed.idLokalid === null) {
       return sourceFailed(`no address match for "${address}"${postalCode ? ` (${postalCode})` : ""}`);
     }
 
     return sourceOk({
       ...parsed,
+      bfeNummer: parsed.bfeNummer ?? (await fetchBfeNummer(parcelUrl(match))),
       lat: parsed.lat ?? fallbackLat,
       lon: parsed.lon ?? fallbackLon,
       postalCode: parsed.postalCode ?? postalCode,

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { lookupProperty } from "./property-lookup.handler.js";
-import { stubFetch } from "../test-support/stub-fetch.js";
 import type { PropertyLookupInput } from "../../../../../packages/shared/src/types/property-lookup.js";
 
 const input: PropertyLookupInput = {
@@ -12,14 +11,18 @@ const input: PropertyLookupInput = {
 };
 
 const dawaRecord = {
-  id: "0a3f507b-83d6-32b8-e044-0003ba298018",
+  id: "0a3f509c-38ed-32b8-e044-0003ba298018",
   husnr: "6",
   vejstykke: { navn: "Floravej" },
   postnummer: { nr: "9000", navn: "Aalborg" },
-  adgangspunkt: { koordinater: [9.9187, 57.048] },
-  jordstykke: { matrikelnr: "481i", ejerlav: { kode: 620551, navn: "Sofiendal, Aalborg Jorder" }, bfenummer: 2340871 },
-  zone: "Byzone",
+  adgangspunkt: { koordinater: [9.87640126, 57.04591973] },
+  ejerlav: { kode: 610452, navn: "Gl. Hasseris By, Hasseris" },
+  matrikelnr: "42q",
+  jordstykke: { href: "https://api.dataforsyningen.dk/jordstykker/610452/42q", matrikelnr: "42q" },
+  zone: "Udfaset",
 };
+
+const parcelRecord = { bfenummer: 2340871 };
 
 const bbrBody = {
   data: {
@@ -53,24 +56,17 @@ const noiseBody = { features: [{ properties: { lden: 57 } }] };
  * position in the queue.
  */
 function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown } = {}) {
-  const responses = [
-    { body: [dawaRecord] },
-    { body: overrides.bbr ?? bbrBody },
-    { body: overrides.valuation ?? valuationBody },
-    { body: overrides.noise ?? noiseBody },
-  ];
-  const stub = stubFetch([]);
-  stub.restore();
-
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown) => {
     const href = String(url);
     const body = href.includes("adgangsadresser")
-      ? responses[0]!.body
-      : href.includes("/DAR/")
-        ? responses[1]!.body
-        : href.includes("/VUR/")
-          ? responses[2]!.body
-          : responses[3]!.body;
+      ? [dawaRecord]
+      : href.includes("/jordstykker/")
+        ? parcelRecord
+        : href.includes("/DAR/")
+          ? (overrides.bbr ?? bbrBody)
+          : href.includes("/VUR/")
+            ? (overrides.valuation ?? valuationBody)
+            : (overrides.noise ?? noiseBody);
     return { ok: true, status: 200, headers: new Headers(), json: async () => body };
   }) as unknown as typeof fetch);
 }
@@ -89,9 +85,9 @@ describe("lookupProperty (live)", () => {
 
     expect(result.dataMode).toBe("live");
     expect(result.sources.every((s) => s.mode === "live")).toBe(true);
-    expect(result.resolved.matrikelnr).toBe("481i");
+    expect(result.resolved.matrikelnr).toBe("42q");
+    expect(result.resolved.ejerlav).toBe("Gl. Hasseris By, Hasseris");
     expect(result.resolved.bfeNummer).toBe("2340871");
-    expect(result.resolved.zone).toBe("byzone");
     expect(result.bbrData?.yearBuilt).toBe(1962);
     expect(result.bbrData?.areaSqm).toBe(142);
     expect(result.bbrData?.heatingInstallation).toBe("fjernvarme");
@@ -106,8 +102,8 @@ describe("lookupProperty (live)", () => {
 
     const result = await lookupProperty(input);
 
-    expect(result.resolved.lat).toBeCloseTo(57.048);
-    expect(result.resolved.lon).toBeCloseTo(9.9187);
+    expect(result.resolved.lat).toBeCloseTo(57.0459);
+    expect(result.resolved.lon).toBeCloseTo(9.8764);
     const noiseCall = fetchSpy.mock.calls.map((c) => String(c[0])).find((u) => u.includes("wfs"));
     expect(noiseCall).toBeDefined();
     expect(noiseCall).not.toContain("bbox=0,0");
@@ -127,7 +123,7 @@ describe("lookupProperty (live)", () => {
     expect(bbr?.error).toContain("DATAFORDELER_API_KEY");
     // The credential-free source still resolves.
     expect(result.sources.find((s) => s.key === "address")?.mode).toBe("live");
-    expect(result.resolved.matrikelnr).toBe("481i");
+    expect(result.resolved.matrikelnr).toBe("42q");
   });
 
   it("skips the noise lookup rather than querying it at 0,0 when the address is unresolvable", async () => {
