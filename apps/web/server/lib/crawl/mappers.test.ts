@@ -58,6 +58,7 @@ describe("mapBoligaRecord", () => {
       images: [],
       description: null,
       agent_name: null,
+      sold_price_history: [],
     });
   });
 
@@ -101,6 +102,7 @@ describe("mapBoligsidenCase", () => {
       images: [],
       description: null,
       agent_name: "EDC Aarhus",
+      sold_price_history: [],
     });
   });
 
@@ -113,6 +115,65 @@ describe("mapBoligsidenCase", () => {
 
   it("normalizes unknown address types to 'other'", () => {
     expect(mapBoligsidenCase({ ...boligsidenCase, addressType: "castle" })?.property_type).toBe("other");
+  });
+
+  it("maps the address's registered sales, newest first", () => {
+    // Registration shape captured from a live response (2026-08-01).
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [
+          { amount: 1_495_000, area: 201, date: "2004-08-23", registrationID: "2736865", type: "normal" },
+          {
+            amount: 2_050_000,
+            area: 190,
+            date: "2021-08-30",
+            livingArea: 201,
+            perAreaPrice: 10199,
+            registrationID: "5654008",
+            type: "normal",
+          },
+        ],
+      },
+    });
+
+    expect(listing?.sold_price_history).toEqual([
+      { soldDate: "2021-08-30", price: 2_050_000, pricePerSqm: 10199, saleType: "normal" },
+      // No perAreaPrice on the older row — derived from amount/area instead.
+      { soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: Math.round(1_495_000 / 201), saleType: "normal" },
+    ]);
+  });
+
+  it("carries the registration type through so a family sale isn't read as a market price", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [{ amount: 900_000, livingArea: 120, date: "2020-01-01", type: "family" }],
+      },
+    });
+    expect(listing?.sold_price_history[0]?.saleType).toBe("family");
+  });
+
+  it("skips registrations with no date, price or usable area rather than emitting NaN", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [
+          { amount: 1_000_000, type: "normal" },
+          { date: "2020-01-01", type: "normal" },
+          { amount: 1_000_000, date: "2020-01-01", type: "normal" },
+          "not an object",
+        ],
+      },
+    });
+    expect(listing?.sold_price_history).toEqual([]);
+  });
+
+  it("treats a missing registrations array as no history, not as a failure", () => {
+    expect(mapBoligsidenCase(boligsidenCase)?.sold_price_history).toEqual([]);
   });
 
   it("parses images with categories and sized variants", () => {

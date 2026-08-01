@@ -1,4 +1,4 @@
-import type { BbrData, PublicValuation, ZoneStatus } from "./index.js";
+import type { BbrData, PublicValuation, SoldPriceEntry, ZoneStatus } from "./index.js";
 
 /**
  * `/api/property-lookup` output. Every symbol/value here is an automated
@@ -77,7 +77,7 @@ export interface PropertyLookupResolved {
 export type PropertyLookupDataMode = "live" | "mock" | "unavailable";
 
 export interface PropertyLookupSourceStatus {
-  key: "address" | "bbr" | "publicValuation" | "noise";
+  key: "address" | "bbr" | "publicValuation" | "noise" | "sales";
   /** The register behind this field group, e.g. "DAR/DAWA", "BBR", "VUR". */
   register: string;
   mode: PropertyLookupDataMode;
@@ -85,11 +85,34 @@ export interface PropertyLookupSourceStatus {
   error: string | null;
 }
 
+/**
+ * One recently registered sale near the subject address ("salg i nærheden").
+ * `saleType` is carried rather than filtered: only `normal` is an arm's-length
+ * market price, so a family transfer or a forced auction has to be visible as
+ * such instead of being averaged into a neighbourhood figure.
+ */
+export interface NearbySaleEntry {
+  address: string;
+  soldDate: string;
+  price: number;
+  pricePerSqm: number;
+  saleType: "normal" | "family" | "auction" | "other";
+  areaSqm: number | null;
+  propertyType: string | null;
+  distanceMeters: number;
+  lat: number;
+  lon: number;
+}
+
 export interface PropertyLookupResult {
   address: string;
   resolved: PropertyLookupResolved;
   bbrData: BbrData | null;
   publicValuation: PublicValuation | null;
+  /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */
+  priceHistory: SoldPriceEntry[];
+  /** Recent registered sales around this address, nearest first. */
+  nearbySales: NearbySaleEntry[];
   renovationCategory: RenovationCategoryResult;
   screening: ScreeningCriterionResult[];
   scoringInputs: ScoringInputs;

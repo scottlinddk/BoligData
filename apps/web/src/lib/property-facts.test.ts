@@ -57,6 +57,8 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
     },
     bbrData: null,
     publicValuation: null,
+    priceHistory: [],
+    nearbySales: [],
     renovationCategory: { category: "D", isEstimate: true, symbol: "~", reason: "", source: "ai" },
     screening: [],
     scoringInputs: {

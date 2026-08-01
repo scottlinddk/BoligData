@@ -1,4 +1,4 @@
-import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
+import type { ListingImage, SaleType, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
 import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
@@ -93,6 +93,47 @@ function mapImage(img: unknown): ListingImage | null {
   return { url, category, sources };
 }
 
+const SALE_TYPES: readonly SaleType[] = ["normal", "family", "auction", "other"];
+
+/**
+ * Maps `address.registrations[]` — the registered sales of the address, which
+ * Boligsiden already embeds in every case record, so the property's price
+ * history costs no extra request. Shape confirmed against a live response
+ * (2026-08-01):
+ *
+ *   { amount, area, date, livingArea, perAreaPrice, registrationID, type }
+ *
+ * `perAreaPrice` is only present on newer registrations, so it falls back to
+ * amount/area — and `livingArea` is preferred over `area` where both exist,
+ * because `area` on older rows is the whole-property figure rather than the
+ * dwelling's. Entries are returned newest-first. `type` is carried through
+ * rather than filtered: a family transfer or a forced auction is *not* a
+ * market price, and the reader needs to know that instead of seeing it
+ * averaged in silently.
+ */
+export function mapRegistrations(raw: unknown): SoldPriceEntry[] {
+  const registrations = Array.isArray(raw) ? raw : [];
+
+  return registrations
+    .map((entry): SoldPriceEntry | null => {
+      const soldDate = asIsoDate(get(entry, "date"));
+      const price = asPositiveNumber(get(entry, "amount"));
+      if (soldDate === null || price === null) return null;
+
+      const area = asPositiveNumber(get(entry, "livingArea")) ?? asPositiveNumber(get(entry, "area"));
+      const pricePerSqm =
+        asPositiveInt(get(entry, "perAreaPrice")) ?? (area !== null ? Math.round(price / area) : null);
+      if (pricePerSqm === null) return null;
+
+      const typeRaw = asNonEmptyString(get(entry, "type"))?.toLowerCase() ?? "";
+      const saleType = SALE_TYPES.find((t) => t === typeRaw) ?? "other";
+
+      return { soldDate, price, pricePerSqm, saleType };
+    })
+    .filter((entry): entry is SoldPriceEntry => entry !== null)
+    .sort((a, b) => b.soldDate.localeCompare(a.soldDate));
+}
+
 export function mapBoligsidenCase(raw: unknown): RawListing | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -156,6 +197,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     images,
     description: asNonEmptyString(r.descriptionTitle),
     agent_name: asNonEmptyString(get(r, "realtor", "name")),
+    sold_price_history: mapRegistrations(get(r, "address", "registrations")),
   };
 }
 
@@ -176,7 +218,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
-    const all = fixtures as RawListing[];
+    const all = fixtures as unknown as RawListing[];
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsSkipped = excluded;

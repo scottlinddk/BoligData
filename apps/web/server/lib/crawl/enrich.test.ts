@@ -21,6 +21,7 @@ const listing: RawListing = {
   images: [],
   description: null,
   agent_name: null,
+  sold_price_history: [],
 };
 
 const cadastral: AddressCadastral = {

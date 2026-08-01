@@ -146,7 +146,11 @@ export async function enrichProperty(
       toiletCount: bbrBuilding?.toiletCount ?? null,
       bathroomCount: bbrBuilding?.bathroomCount ?? null,
     },
-    sold_price_history: [],
+    // Straight from the Boligsiden case record the listing was mapped from —
+    // no extra request. Note `listingContentHash` doesn't cover registrations,
+    // so a new sale on an otherwise-unchanged listing won't trigger a
+    // re-enrich until something else about the listing moves.
+    sold_price_history: listing.sold_price_history ?? [],
     calculated_metrics: {
       pricePerSqm,
       neighborhoodPricePerSqm: pricePerSqm,

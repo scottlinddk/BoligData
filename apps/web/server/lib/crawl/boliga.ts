@@ -92,6 +92,9 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
     images: asStringArray(r.images).map((url): ListingImage => ({ url, category: "photo", sources: [] })),
     description: null,
     agent_name: null,
+    // Boliga's listing payload carries no registered-sale history; only
+    // Boligsiden embeds one (see boligsiden.ts#mapRegistrations).
+    sold_price_history: [],
   };
 }
 
@@ -112,7 +115,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
   const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
-    const all = fixtures as RawListing[];
+    const all = fixtures as unknown as RawListing[];
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsSkipped = excluded;

@@ -8,6 +8,7 @@ import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js"
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
+import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import { isDanishCoordinate } from "../crawl/map-utils.js";
 import { DEFAULT_FINANCING_ASSUMPTIONS, type FinancingAssumptions } from "../screening/config/financing-assumptions.js";
@@ -69,7 +70,7 @@ export async function lookupProperty(
   const lon = cadastral?.lon ?? input.lon ?? null;
   const hasCoordinates = lat !== null && lon !== null && isDanishCoordinate(lat, lon);
 
-  const [bbrResult, valuationResult, noiseResult] = await Promise.all([
+  const [bbrResult, valuationResult, noiseResult, salesResult] = await Promise.all([
     lookupBbr(cadastral?.idLokalid ?? null),
     lookupEjendomsvurdering(
       cadastral?.matrikelnr ?? null,
@@ -80,11 +81,15 @@ export async function lookupProperty(
     // for a point in the Atlantic, so an unresolvable address skips the call
     // rather than answering it wrongly.
     hasCoordinates ? lookupNoiseExposure(lat, lon) : null,
+    // Same reasoning: a polygon around 0,0 is a box in the Atlantic, and an
+    // empty "no sales nearby" is indistinguishable from a real answer.
+    hasCoordinates ? lookupBoligsidenSales(lat, lon) : null,
   ]);
 
   const bbrBuilding = bbrResult.ok ? bbrResult.data : null;
   const publicValuation = valuationResult.ok ? valuationResult.data : null;
   const noiseExposureLden = noiseResult?.ok ? noiseResult.data.ldenDb : null;
+  const sales = salesResult?.ok ? salesResult.data : null;
 
   const sources: PropertyLookupSourceStatus[] = [
     status("address", "DAR via DAWA (api.dataforsyningen.dk)", "ADDRESS_LOOKUP_MOCK_MODE", cadastralResult),
@@ -98,6 +103,14 @@ export async function lookupProperty(
           error: "no usable coordinates for the address",
         }
       : status("noise", "Miljøstyrelsens støjkort (WFS)", "STOEJKORT_MOCK_MODE", noiseResult),
+    salesResult === null
+      ? {
+          key: "sales" as const,
+          register: "Boligsiden (registrerede handler)",
+          mode: "unavailable" as const,
+          error: "no usable coordinates for the address",
+        }
+      : status("sales", "Boligsiden (registrerede handler)", "BOLIGSIDEN_SALES_MOCK_MODE", salesResult),
   ];
 
   const renovationCategory = classifyRenovationCategory({
@@ -162,6 +175,8 @@ export async function lookupProperty(
           valuationYear: publicValuation.valuationYear,
         }
       : null,
+    priceHistory: sales?.priceHistory ?? [],
+    nearbySales: sales?.nearbySales ?? [],
     renovationCategory,
     screening,
     scoringInputs,
