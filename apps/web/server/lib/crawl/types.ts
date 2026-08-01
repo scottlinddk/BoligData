@@ -34,6 +34,15 @@ export interface SourceCrawlStats {
   recordsSeen: number;
   /** Records that failed defensive mapping (missing/invalid required fields). */
   recordsSkipped: number;
+  /**
+   * Records dropped by the CRAWL_ZIP_RANGES filter — the crawl fetches
+   * nationwide and discards what's outside the configured ranges, so this is
+   * the filter working, not a failure. Counted separately from
+   * recordsSkipped: with a single-region range the number dwarfs everything
+   * else (899 of 1018 on 2026-08-01), and folding the two together made a
+   * healthy run look like a mapper falling apart.
+   */
+  recordsFiltered: number;
   /** Non-fatal error summaries, bounded to the first few. */
   errors: string[];
 }

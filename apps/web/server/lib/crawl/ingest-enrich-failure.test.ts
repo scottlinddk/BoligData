@@ -66,6 +66,9 @@ describe("runIngest when enrichProperty throws", () => {
     // runIngest (which would turn into the handler's 500 crash path).
     expect(result.ok).toBe(false);
     for (const report of result.reports) {
+      // The per-source line must agree with the total: a source whose writes
+      // errored is not ok, even though its fetcher resolved fine.
+      expect(report.ok).toBe(false);
       expect(report.upserted).toBe(report.fetched);
       expect(report.enriched).toBe(0);
       expect(report.dbErrors).toBeGreaterThan(0);
