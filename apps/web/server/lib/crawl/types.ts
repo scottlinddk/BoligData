@@ -21,6 +21,12 @@ export interface RawListing {
   description: string | null;
   agent_name: string | null;
   /**
+   * Absolute http(s) URL of the listing on the source site, for the detail
+   * page's "go to broker listing" link. Null when the record carried nothing
+   * usable — the UI hides the link rather than link to a guessed 404.
+   */
+  listing_url: string | null;
+  /**
    * Registered sales of this address, mapped from the same Boligsiden case
    * record the rest of the listing comes from — no extra request. Empty for
    * sources that don't carry it (Boliga) and for fixture data.

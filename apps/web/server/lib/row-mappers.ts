@@ -46,6 +46,7 @@ export function rowToProperty(
     images: row.images ?? [],
     description: row.description,
     agentName: row.agent_name,
+    listingUrl: row.listing_url ?? null,
     agentUserId: row.agent_user_id ?? null,
     isPromoted: row.is_promoted ?? false,
     promotedAt: row.promoted_at ?? null,

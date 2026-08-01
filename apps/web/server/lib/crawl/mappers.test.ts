@@ -58,6 +58,7 @@ describe("mapBoligaRecord", () => {
       images: [],
       description: null,
       agent_name: null,
+      listing_url: "https://www.boliga.dk/bolig/123456",
       sold_price_history: [],
     });
   });
@@ -102,6 +103,7 @@ describe("mapBoligsidenCase", () => {
       images: [],
       description: null,
       agent_name: "EDC Aarhus",
+      listing_url: null,
       sold_price_history: [],
     });
   });
@@ -226,6 +228,52 @@ describe("mapBoligsidenCase", () => {
     expect(listing?.images).toEqual([
       { url: "https://cdn.example/photo-unsized.jpg", category: "photo", sources: [] },
     ]);
+  });
+});
+
+describe("listing_url mapping", () => {
+  it("prefers a URL the Boliga record states outright", () => {
+    const listing = mapBoligaRecord({ ...boligaRecord, url: "https://www.boliga.dk/bolig/999/testgade-12" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/999/testgade-12");
+  });
+
+  it("resolves a relative Boliga path against boliga.dk", () => {
+    const listing = mapBoligaRecord({ ...boligaRecord, detailUrl: "/bolig/123456/testgade-12" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/123456/testgade-12");
+  });
+
+  it("falls back to the id-based Boliga route when the record carries no link", () => {
+    expect(mapBoligaRecord(boligaRecord)!.listing_url).toBe("https://www.boliga.dk/bolig/123456");
+  });
+
+  it("builds a Boligsiden link from the case slug", () => {
+    const listing = mapBoligsidenCase({ ...boligsidenCase, slug: "villa/proevevej-7-8000-aarhus" });
+    expect(listing!.listing_url).toBe("https://www.boligsiden.dk/villa/proevevej-7-8000-aarhus");
+  });
+
+  it("falls back to the address slug when the case has none", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: { ...boligsidenCase.address, slug: "/adresse/proevevej-7-8000-aarhus" },
+    });
+    expect(listing!.listing_url).toBe("https://www.boligsiden.dk/adresse/proevevej-7-8000-aarhus");
+  });
+
+  it("leaves the Boligsiden link null rather than guessing a route from the case id", () => {
+    expect(mapBoligsidenCase(boligsidenCase)!.listing_url).toBeNull();
+  });
+
+  // The value lands in an href, so a non-http scheme from an undocumented
+  // upstream API must never survive mapping.
+  it("rejects a javascript: URL instead of storing it", () => {
+    // eslint-disable-next-line no-script-url
+    const listing = mapBoligaRecord({ ...boligaRecord, url: "javascript:alert(1)" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/123456");
+  });
+
+  it("rejects a slug that resolves off the source's origin", () => {
+    const listing = mapBoligsidenCase({ ...boligsidenCase, slug: "//evil.example/pwned" });
+    expect(listing!.listing_url).toBeNull();
   });
 });
 

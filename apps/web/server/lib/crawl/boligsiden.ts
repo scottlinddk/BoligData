@@ -3,7 +3,9 @@ import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import {
+  absoluteUrl,
   asFiniteNumber,
+  asHttpUrl,
   asIsoDate,
   asNonEmptyString,
   asPositiveInt,
@@ -91,6 +93,27 @@ function mapImage(img: unknown): ListingImage | null {
       : "other";
 
   return { url, category, sources };
+}
+
+/** Origin the listing link is built against, and the guard `absoluteUrl` keeps a relative slug on. */
+const SITE_ORIGIN = "https://www.boligsiden.dk";
+
+/**
+ * The listing's URL on boligsiden.dk. Unlike Boliga there's no id-based route
+ * to fall back on — boligsiden.dk addresses listings by slug — so this only
+ * ever returns a link the record actually carried, and null otherwise. The
+ * candidate field names are unverified against the live API (this repo has
+ * never had network access to it), which is exactly why they're tried in
+ * order and why a miss is a null rather than a constructed guess: the detail
+ * page hides the button, instead of shipping a 404 to every listing.
+ */
+function mapListingUrl(r: Record<string, unknown>): string | null {
+  return (
+    asHttpUrl(r.url) ??
+    asHttpUrl(get(r, "case", "url")) ??
+    absoluteUrl(SITE_ORIGIN, asNonEmptyString(r.slug)) ??
+    absoluteUrl(SITE_ORIGIN, asNonEmptyString(get(r, "address", "slug")))
+  );
 }
 
 const SALE_TYPES: readonly SaleType[] = ["normal", "family", "auction", "other"];
@@ -197,6 +220,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     images,
     description: asNonEmptyString(r.descriptionTitle),
     agent_name: asNonEmptyString(get(r, "realtor", "name")),
+    listing_url: mapListingUrl(r),
     sold_price_history: mapRegistrations(get(r, "address", "registrations")),
   };
 }
