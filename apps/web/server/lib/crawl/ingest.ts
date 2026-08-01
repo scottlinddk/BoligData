@@ -64,6 +64,40 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+/**
+ * The `properties` columns carried by a RawListing, listed one by one rather
+ * than spread. RawListing is deliberately *not* one-to-one with the table:
+ * `sold_price_history` is enrichment data and lives on `enrichments`
+ * (001_init_schema.sql), where enrich.ts writes it. Spreading the listing
+ * into the upsert therefore handed PostgREST a column `properties` doesn't
+ * have, and it rejects the *whole chunk* — "Could not find the
+ * 'sold_price_history' column of 'properties' in the schema cache" — so a
+ * field added for enrichment silently took the entire nightly crawl to zero
+ * rows written. An explicit projection keeps the next RawListing field from
+ * doing the same.
+ */
+function toPropertyColumns(l: RawListing) {
+  return {
+    address: l.address,
+    municipality: l.municipality,
+    postal_code: l.postal_code,
+    price: l.price,
+    sqm: l.sqm,
+    listing_date: l.listing_date,
+    listing_source: l.listing_source,
+    external_id: l.external_id,
+    lat: l.lat,
+    lon: l.lon,
+    status: l.status,
+    building_year: l.building_year,
+    property_type: l.property_type,
+    rooms: l.rooms,
+    images: l.images,
+    description: l.description,
+    agent_name: l.agent_name,
+  };
+}
+
 async function ingestSource(
   client: SupabaseClient,
   source: ListingSource,
@@ -201,7 +235,7 @@ async function ingestSource(
     const rows = listingChunk.map((l) => {
       const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
       return {
-        ...l,
+        ...toPropertyColumns(l),
         content_hash: hashByExternalId.get(l.external_id),
         last_seen_at: now,
         id_lokalid: cadastral?.idLokalid ?? null,
