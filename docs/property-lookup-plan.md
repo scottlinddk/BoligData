@@ -103,7 +103,7 @@ defaults to `B`), `energyLabel`.
 
 | Source | Provides | Access | Status |
 |---|---|---|---|
-| **DAR** (via Dataforsyningen/DAWA) | Resolves free-text address → husnummer UUID, matrikelnr, ejerlav, BFE-nummer, zone, coordinates | `api.dataforsyningen.dk/adgangsadresser`, **no credential** | **Live by default** (`address-lookup.ts`); also the geocoder. DAWA closes 2026-08-17 — see `ADDRESS_LOOKUP_API_BASE` |
+| **DAR** (via Dataforsyningen/DAWA) | Resolves free-text address → husnummer UUID, matrikelnr, ejerlav, coordinates, plus BFE-nummer from the linked `jordstykker` record | `api.dataforsyningen.dk/adgangsadresser`, **no credential** | **Live and verified** (`address-lookup.ts`); also the geocoder. Zone status is gone — DAWA answers `"Udfaset"`. DAWA closes 2026-08-17 — see `ADDRESS_LOOKUP_API_BASE` |
 | **BBR** (via Datafordeler) | Build year, renovation year, floor area, floors, roof/wall material, heating installation | Datafordeler **GraphQL**, entered via DAR `Husnummer` → `husnummerGiverAdgangTilBygning` (`graphql.datafordeler.dk/DAR/<version>`), `DATAFORDELER_API_KEY` | **Live by default** (`bbr.ts`). Two-tier query: an extended field set falling back to the set verified against Datafordeler's published DAR→BBR example |
 | **OIS / public valuation** | Assessed property value, assessed land value, valuation year | Datafordeler VUR GraphQL, same API key | Implemented as `ejendomsvurdering.ts` — there is no separate "OIS" client; VUR fills this role. `EnrichmentSource` still has an unused `"ois"` literal (dead enum value, cosmetic) |
 | **Matriklen (cadastral)** | Registered parcel area | Datafordeler GraphQL, same API key | Implemented (`matrikel.ts`); field name unverified against live schema |
