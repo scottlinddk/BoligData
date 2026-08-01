@@ -41,6 +41,8 @@ export interface IngestSourceReport {
   created: number;
   /** Records the fetcher saw but could not map to a valid RawListing. */
   skippedInvalid: number;
+  /** Records that mapped fine but sit outside CRAWL_ZIP_RANGES — the filter working, not a fault. */
+  skippedOutOfArea: number;
   enriched: number;
   /** Listings whose content_hash was unchanged and enrichment already exists. */
   enrichSkippedUnchanged: number;
@@ -112,6 +114,7 @@ async function ingestSource(
     upserted: 0,
     created: 0,
     skippedInvalid: 0,
+    skippedOutOfArea: 0,
     enriched: 0,
     enrichSkippedUnchanged: 0,
     cadastralLookupFailed: 0,
@@ -151,6 +154,7 @@ async function ingestSource(
   const { listings, stats } = settled.value;
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
+  report.skippedOutOfArea = stats.recordsOutOfArea;
   for (const err of stats.errors) pushFetchError(err);
 
   // A page-fetch error (blocked, drifted API, network failure) makes the

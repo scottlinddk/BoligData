@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { filterByZipRanges, getZipRanges, isInZipRange, parseZipRanges } from "./map-utils";
+import { fetchBoligsidenListings } from "./boligsiden";
+import { fetchBoligaListings } from "./boliga";
 import type { RawListing } from "./types";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -128,4 +130,32 @@ describe("filterByZipRanges", () => {
     expect(kept.map((l) => l.postal_code)).toEqual(["9000", "6300"]);
     expect(excluded).toBe(2);
   });
+});
+
+/**
+ * Out-of-area records used to be added into `recordsSkipped`, the counter the
+ * daily Action prints as `skippedInvalid`. With the default range covering
+ * North Jutland alone, a nationwide page put ~90% of its records there and a
+ * healthy run reported "skippedInvalid=899" — indistinguishable from the
+ * upstream API having drifted. The two counters stay separate so the number
+ * that means "investigate this" only moves when something is actually wrong.
+ */
+describe("fetch stats separate out-of-area records from unmappable ones", () => {
+  for (const [name, fetcher] of [
+    ["boligsiden", fetchBoligsidenListings],
+    ["boliga", fetchBoligaListings],
+  ] as const) {
+    it(`${name} counts zip-filtered fixtures as out-of-area, not invalid`, async () => {
+      delete process.env.CRAWL_ZIP_RANGES;
+      delete process.env.CRAWL_ZIP_MIN;
+      delete process.env.CRAWL_ZIP_MAX;
+
+      const { listings, stats } = await fetcher();
+
+      expect(stats.recordsSkipped).toBe(0);
+      expect(stats.recordsOutOfArea).toBe(stats.recordsSeen - listings.length);
+      expect(stats.recordsOutOfArea).toBeGreaterThan(0);
+      expect(listings.every((l) => isInZipRange(l.postal_code, [{ min: 9000, max: 9900 }]))).toBe(true);
+    });
+  }
 });

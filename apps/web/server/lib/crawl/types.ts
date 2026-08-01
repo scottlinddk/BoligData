@@ -40,6 +40,16 @@ export interface SourceCrawlStats {
   recordsSeen: number;
   /** Records that failed defensive mapping (missing/invalid required fields). */
   recordsSkipped: number;
+  /**
+   * Records that mapped fine but fell outside the configured zip ranges.
+   * Counted apart from `recordsSkipped` because the two mean opposite
+   * things operationally: this one is the filter doing its job (the default
+   * range is North Jutland alone, so most of a nationwide page is expected
+   * to land here), while `recordsSkipped` means the upstream shape drifted
+   * and is worth investigating. Summed together they read as "899 invalid
+   * records" on a run that was in fact healthy.
+   */
+  recordsOutOfArea: number;
   /** Non-fatal error summaries, bounded to the first few. */
   errors: string[];
 }
