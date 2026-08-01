@@ -8,13 +8,41 @@ export const CRAWLER_USER_AGENT =
 
 const RETRY_AFTER_CAP_MS = 30_000;
 
+/**
+ * Query parameters that carry a credential. Datafordeler authenticates with
+ * `apiKey` in the query string, so any error message that quotes a request URL
+ * verbatim quotes the key with it.
+ */
+const SECRET_PARAMS = /^(api[-_]?key|key|token|password|passwd|pwd|secret|username|user)$/i;
+
+/**
+ * Strips credentials out of a URL before it goes into an error message.
+ *
+ * Every error thrown here reaches a caller that shows it: the per-register
+ * `sources[].error` strings on `/api/property-lookup` are rendered verbatim in
+ * the listing's "Registerkilder" panel, and that endpoint is public. Without
+ * this, one upstream 404 published the deployment's `DATAFORDELER_API_KEY` to
+ * anyone who opened a listing.
+ */
+export function redactUrl(url: string): string {
+  // Rewritten textually rather than through `new URL`: this runs on strings
+  // that are already known to be error-adjacent (a malformed URL is exactly
+  // the kind of thing that ends up in a message), and round-tripping through
+  // the parser would re-encode the untouched parameters as a side effect.
+  return url
+    .replace(/(\/\/[^/@\s:]+):[^/@\s]*@/, "$1:redacted@")
+    .replace(/([?&])([^=&\s]+)=([^&\s]*)/g, (match, sep: string, name: string) =>
+      SECRET_PARAMS.test(name) ? `${sep}${name}=redacted` : match,
+    );
+}
+
 export class HttpError extends Error {
   constructor(
     public readonly status: number,
     public readonly url: string,
     message?: string,
   ) {
-    super(message ?? `HTTP ${status} from ${url}`);
+    super(message ?? `HTTP ${status} from ${redactUrl(url)}`);
     this.name = "HttpError";
   }
 
@@ -103,7 +131,7 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOptions
         return (await res.json()) as T;
       } catch (parseErr) {
         throw new Error(
-          `Invalid JSON from ${url}: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+          `Invalid JSON from ${redactUrl(url)}: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
         );
       }
     } catch (err) {
@@ -112,12 +140,12 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOptions
       if (err instanceof HttpError && !err.retryable) throw err;
       if (err instanceof Error && err.message.startsWith("Invalid JSON from")) throw err;
       lastError = err instanceof Error && err.name === "AbortError"
-        ? new Error(`Timeout after ${timeoutMs}ms fetching ${url}`)
+        ? new Error(`Timeout after ${timeoutMs}ms fetching ${redactUrl(url)}`)
         : err;
     } finally {
       clearTimeout(timer);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${url}`);
+  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${redactUrl(url)}`);
 }
