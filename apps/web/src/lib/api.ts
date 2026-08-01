@@ -32,6 +32,7 @@ import type {
   UpdateProfileBody,
 } from "@shared/types/api";
 import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
+import type { PropertyLookupResult } from "@shared/types/property-lookup";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -77,6 +78,34 @@ export function getProperty(id: string): Promise<PropertyDetailResponse> {
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
   return request(`/properties?id=${id}&comparables=true`);
+}
+
+export interface PropertyLookupQuery {
+  address: string;
+  askingPrice: number;
+  postalCode?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  roomCount?: number | null;
+  energyLabel?: string | null;
+}
+
+/**
+ * Live register read for one address: DAR/DAWA identifiers and coordinates,
+ * BBR building facts, and the public valuation. Open endpoint — no bearer
+ * token required — so this resolves for signed-out visitors too, and the
+ * response is CDN-cached per query string.
+ *
+ * `energyLabel` and `roomCount` are pass-throughs: no register in the pipeline
+ * resolves either, so the endpoint screens against whatever the caller knows
+ * from the listing and echoes it back.
+ */
+export function getPropertyLookup(query: PropertyLookupQuery): Promise<PropertyLookupResult> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== null && value !== undefined && value !== "") params.set(key, String(value));
+  }
+  return request(`/property-lookup?${params.toString()}`);
 }
 
 export function listSearches(): Promise<SavedSearch[]> {

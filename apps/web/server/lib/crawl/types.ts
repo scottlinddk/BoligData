@@ -1,4 +1,4 @@
-import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
+import type { ListingImage, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
 
 export type ListingSource = "boligsiden" | "boliga";
 
@@ -20,6 +20,12 @@ export interface RawListing {
   images: ListingImage[];
   description: string | null;
   agent_name: string | null;
+  /**
+   * Registered sales of this address, mapped from the same Boligsiden case
+   * record the rest of the listing comes from — no extra request. Empty for
+   * sources that don't carry it (Boliga) and for fixture data.
+   */
+  sold_price_history: SoldPriceEntry[];
 }
 
 export interface SourceCrawlStats {

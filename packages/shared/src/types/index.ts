@@ -80,10 +80,21 @@ export interface Property {
   updatedAt: string;
 }
 
+/**
+ * One registered sale of the property (OIS/tinglysning, via Boligsiden).
+ * `saleType` matters for due diligence: only `normal` is an arm's-length
+ * market price — a `family` transfer or an `auction` says little about what
+ * the property is worth, so the UI must be able to tell them apart rather
+ * than averaging them together. Optional because rows written before the
+ * Boligsiden registration mapping existed don't carry it.
+ */
+export type SaleType = "normal" | "family" | "auction" | "other";
+
 export interface SoldPriceEntry {
   soldDate: string; // ISO date
   price: number;
   pricePerSqm: number;
+  saleType?: SaleType;
 }
 
 export interface CalculatedMetrics {

@@ -162,6 +162,7 @@ describe("lookupProperty (mock mode)", () => {
     vi.stubEnv("BBR_MOCK_MODE", "true");
     vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "true");
     vi.stubEnv("STOEJKORT_MOCK_MODE", "true");
+    vi.stubEnv("BOLIGSIDEN_SALES_MOCK_MODE", "true");
 
     const first = await lookupProperty(input);
     const second = await lookupProperty(input);
