@@ -38,6 +38,7 @@ const cadastral: AddressCadastral = {
   postalName: "Aalborg",
   municipalityCode: "851",
   formattedAddress: "Testvej 1, 9000 Aalborg",
+  resolvedVia: "dawa",
 };
 
 afterEach(() => {

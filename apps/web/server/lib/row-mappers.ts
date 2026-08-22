@@ -55,6 +55,7 @@ export function rowToProperty(
     matrikelnr: row.matrikelnr ?? null,
     ejerlav: row.ejerlav ?? null,
     zone: row.zone ?? null,
+    bfeNummer: row.bfe_nummer ?? null,
     registeredAreaSqm: row.registered_area_sqm !== null && row.registered_area_sqm !== undefined ? Number(row.registered_area_sqm) : null,
     bbrData,
     riskFlags,

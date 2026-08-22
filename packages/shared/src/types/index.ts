@@ -70,6 +70,8 @@ export interface Property {
   /** Cadastral district (ejerlav), from DAWA/DAR. */
   ejerlav: string | null;
   zone: ZoneStatus | null;
+  /** BFE (Bestemt Fast Ejendom) number — the identifier VUR indexes valuations by, from DAWA/DAR. */
+  bfeNummer: string | null;
   /** Registered land area (sqm) from Matriklen's Jordstykke entity, joined via matrikelnr/ejerlav. */
   registeredAreaSqm: number | null;
   /**

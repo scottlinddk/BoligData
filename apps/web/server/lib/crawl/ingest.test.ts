@@ -34,6 +34,7 @@ const PROPERTY_COLUMNS = new Set([
   "matrikelnr",
   "ejerlav",
   "zone",
+  "bfe_nummer",
   "registered_area_sqm",
 ]);
 

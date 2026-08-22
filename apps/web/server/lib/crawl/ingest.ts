@@ -191,11 +191,11 @@ async function ingestSource(
     }
   }
 
-  // Cadastral lookup (id_lokalid/matrikelnr/ejerlav/zone) is per-property,
-  // not per-enrichment-source — it's needed both on the properties row and
-  // later (Fase 3/4) as input to enrichProperty, so it's resolved once here
-  // rather than inside enrich.ts. A failed lookup doesn't block the upsert;
-  // the four columns simply stay null for that property.
+  // Cadastral lookup (id_lokalid/matrikelnr/ejerlav/zone/bfe_nummer) is
+  // per-property, not per-enrichment-source — it's needed both on the
+  // properties row and later (Fase 3/4) as input to enrichProperty, so it's
+  // resolved once here rather than inside enrich.ts. A failed lookup doesn't
+  // block the upsert; the five columns simply stay null for that property.
   const cadastralByExternalId = new Map<string, AddressCadastral | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const results = await Promise.all(
@@ -247,6 +247,7 @@ async function ingestSource(
         matrikelnr: cadastral?.matrikelnr ?? null,
         ejerlav: cadastral?.ejerlav ?? null,
         zone: cadastral?.zone ?? null,
+        bfe_nummer: cadastral?.bfeNummer ?? null,
         registered_area_sqm: registeredAreaByExternalId.get(l.external_id) ?? null,
       };
     });
