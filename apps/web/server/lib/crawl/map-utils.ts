@@ -188,3 +188,24 @@ export function overallZipBounds(ranges: ZipRange[]): ZipRange {
     max: Math.max(...ranges.map((r) => r.max)),
   };
 }
+
+/**
+ * Every postal code across the configured ranges, ascending — for a
+ * best-effort exact-match upstream filter param, unlike overallZipBounds()'s
+ * single from/to span. Boligsiden's response shape (confirmed live) carries
+ * zip as a discrete `{ name, slug, zipCode }` area object rather than a bare
+ * numeric field, suggesting its search likely filters by exact codes rather
+ * than a contiguous range. Capped at `cap` (deterministically, ascending —
+ * truncation still narrows correctly even if a huge span is configured)
+ * since an uncapped list could balloon the request URL past what a server or
+ * intermediary will accept for a wide-enough range.
+ */
+export function enumerateZipCodes(ranges: ZipRange[], cap = 300): number[] {
+  const codes = new Set<number>();
+  for (const range of ranges) {
+    for (let zip = range.min; zip <= range.max && codes.size < cap; zip++) {
+      codes.add(zip);
+    }
+  }
+  return [...codes].sort((a, b) => a - b);
+}
