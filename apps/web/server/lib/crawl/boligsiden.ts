@@ -294,6 +294,27 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
 
     stats.pagesFetched += 1;
     const cases = Array.isArray(body.cases) ? body.cases : [];
+    // TEMPORARY diagnostic (page 1 only): confirms whether zipCodeFrom/
+    // zipCodeTo actually narrowed the response server-side, and surfaces the
+    // real zip-related field name/shape on a live case record so a correct
+    // param name can be picked instead of guessed again. Remove once the
+    // real param name is confirmed and wired in.
+    if (page === 1) {
+      const first = cases[0] as Record<string, unknown> | undefined;
+      const zipKeys = first
+        ? Object.entries(first).filter(([k]) => /zip|postal|postnr/i.test(k))
+        : [];
+      const addressZipKeys = first && typeof first.address === "object" && first.address !== null
+        ? Object.entries(first.address as Record<string, unknown>).filter(([k]) => /zip|postal|postnr/i.test(k))
+        : [];
+      logEvent("crawl.boligsiden.debug_page1", {
+        totalHits: body.totalHits,
+        total: body.total,
+        casesLength: cases.length,
+        topLevelZipKeys: zipKeys,
+        addressZipKeys,
+      });
+    }
     for (const record of cases) {
       stats.recordsSeen += 1;
       const listing = mapBoligsidenCase(record);
