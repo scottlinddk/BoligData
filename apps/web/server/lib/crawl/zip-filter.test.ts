@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { filterByZipRanges, getZipRanges, isInZipRange, parseZipRanges } from "./map-utils";
+import { enumerateZipCodes, filterByZipRanges, getZipRanges, isInZipRange, parseZipRanges } from "./map-utils";
 import { fetchBoligsidenListings } from "./boligsiden";
 import { fetchBoligaListings } from "./boliga";
 import type { RawListing } from "./types";
@@ -117,6 +117,23 @@ describe("isInZipRange", () => {
   it("rejects missing or malformed postal codes", () => {
     expect(isInZipRange(null, ranges)).toBe(false);
     expect(isInZipRange("abc", ranges)).toBe(false);
+  });
+});
+
+describe("enumerateZipCodes", () => {
+  it("lists every code across all ranges, ascending and deduped", () => {
+    expect(enumerateZipCodes([{ min: 9000, max: 9003 }])).toEqual([9000, 9001, 9002, 9003]);
+    expect(
+      enumerateZipCodes([
+        { min: 9000, max: 9001 },
+        { min: 6000, max: 6001 },
+      ]),
+    ).toEqual([6000, 6001, 9000, 9001]);
+  });
+
+  it("caps the total count so a wide range can't balloon the request", () => {
+    const codes = enumerateZipCodes([{ min: 1000, max: 9999 }], 5);
+    expect(codes).toEqual([1000, 1001, 1002, 1003, 1004]);
   });
 });
 

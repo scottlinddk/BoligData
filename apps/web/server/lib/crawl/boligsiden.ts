@@ -11,10 +11,10 @@ import {
   asPositiveInt,
   asPositiveNumber,
   dedupeByExternalId,
+  enumerateZipCodes,
   filterByZipRanges,
   getZipRanges,
   isDanishCoordinate,
-  overallZipBounds,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
 
@@ -270,15 +270,21 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       sortBy: "timeOnMarket",
       sortAscending: "true", // newest listings first
     });
-    // Best-effort server-side narrowing (undocumented param name, may be a
-    // no-op, and — like Boliga's zipcodeFrom/zipcodeTo — only supports one
-    // contiguous span even with multiple configured ranges) so pagination
-    // isn't spent on nationwide results outside the configured area.
-    // filterByZipRanges() below is the source of truth either way, so a
-    // wrong guess costs nothing but wasted pages, never correctness.
-    const bounds = overallZipBounds(zipRanges);
-    params.set("zipCodeFrom", String(bounds.min));
-    params.set("zipCodeTo", String(bounds.max));
+    // Best-effort server-side narrowing (undocumented param, may be a
+    // no-op) so pagination isn't spent on nationwide results outside the
+    // configured area. A live diagnostic (2026-08-22) confirmed
+    // zipCodeFrom/zipCodeTo — a contiguous-range param modeled on Boliga's —
+    // did nothing: totalHits stayed at the full nationwide count. It also
+    // showed Boligsiden's own case shape carries zip as a discrete
+    // `address.zip.zipCode` area object rather than a bare range-filterable
+    // field, so this tries an exact-match list instead: repeated `zipCodes`
+    // params, one per configured postal code (capped — see
+    // enumerateZipCodes). filterByZipRanges() below is the source of truth
+    // either way, so a wrong guess still costs nothing but wasted pages,
+    // never correctness.
+    for (const zip of enumerateZipCodes(zipRanges)) {
+      params.append("zipCodes", String(zip));
+    }
     const url = `${API_BASE}?${params}`;
 
     let body: BoligsidenPage;
@@ -294,25 +300,18 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
 
     stats.pagesFetched += 1;
     const cases = Array.isArray(body.cases) ? body.cases : [];
-    // TEMPORARY diagnostic (page 1 only): confirms whether zipCodeFrom/
-    // zipCodeTo actually narrowed the response server-side, and surfaces the
-    // real zip-related field name/shape on a live case record so a correct
-    // param name can be picked instead of guessed again. Remove once the
-    // real param name is confirmed and wired in.
+    // TEMPORARY diagnostic (page 1 only), round 2: confirms whether the new
+    // `zipCodes` exact-match param actually narrows totalHits from the
+    // nationwide count (43,885 confirmed on 2026-08-22 with no zip param
+    // applying at all). Remove once confirmed working (or found to still be
+    // a no-op, in which case server-side narrowing gets abandoned in favor
+    // of raising CRAWL_MAX_PAGES/CRAWL_MAX_LISTINGS instead).
     if (page === 1) {
-      const first = cases[0] as Record<string, unknown> | undefined;
-      const zipKeys = first
-        ? Object.entries(first).filter(([k]) => /zip|postal|postnr/i.test(k))
-        : [];
-      const addressZipKeys = first && typeof first.address === "object" && first.address !== null
-        ? Object.entries(first.address as Record<string, unknown>).filter(([k]) => /zip|postal|postnr/i.test(k))
-        : [];
       logEvent("crawl.boligsiden.debug_page1", {
         totalHits: body.totalHits,
         total: body.total,
         casesLength: cases.length,
-        topLevelZipKeys: zipKeys,
-        addressZipKeys,
+        zipCodesSent: params.getAll("zipCodes").length,
       });
     }
     for (const record of cases) {
