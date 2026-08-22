@@ -14,6 +14,7 @@ import {
   filterByZipRanges,
   getZipRanges,
   isDanishCoordinate,
+  overallZipBounds,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
 
@@ -266,6 +267,15 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       sortBy: "timeOnMarket",
       sortAscending: "true", // newest listings first
     });
+    // Best-effort server-side narrowing (undocumented param name, may be a
+    // no-op, and — like Boliga's zipcodeFrom/zipcodeTo — only supports one
+    // contiguous span even with multiple configured ranges) so pagination
+    // isn't spent on nationwide results outside the configured area.
+    // filterByZipRanges() below is the source of truth either way, so a
+    // wrong guess costs nothing but wasted pages, never correctness.
+    const bounds = overallZipBounds(zipRanges);
+    params.set("zipCodeFrom", String(bounds.min));
+    params.set("zipCodeTo", String(bounds.max));
     const url = `${API_BASE}?${params}`;
 
     let body: BoligsidenPage;
