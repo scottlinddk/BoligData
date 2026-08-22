@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { runIngest } from "./ingest";
+import { resolveListingDate, runIngest } from "./ingest";
 
 /**
  * Writable columns of the two tables, mirroring packages/supabase/migrations.
@@ -201,6 +201,26 @@ describe("runIngest (mock mode, stubbed DB)", () => {
     for (const row of enrichments.values()) {
       expect(row).toHaveProperty("sold_price_history");
     }
+  });
+});
+
+// Regression: a re-crawled listing whose source date field can't be parsed
+// (an undocumented/drifted upstream shape — see boligsiden.ts/boliga.ts)
+// used to fall back to `new Date()` at mapping time, so it got bumped to
+// "today" on *every* run rather than just its first. That silently pushed
+// genuinely older listings above genuinely new ones in a newest-first sort,
+// making real new listings look "missing" further down the results.
+describe("resolveListingDate", () => {
+  it("keeps the mapper's parsed date when it found one", () => {
+    expect(resolveListingDate("2026-06-01", "2026-08-20", "2026-08-22")).toBe("2026-06-01");
+  });
+
+  it("falls back to the property's previously stored date, not today, on an unparseable re-crawl", () => {
+    expect(resolveListingDate(null, "2026-06-01", "2026-08-22")).toBe("2026-06-01");
+  });
+
+  it("falls back to today only for a brand-new property with no stored date", () => {
+    expect(resolveListingDate(null, null, "2026-08-22")).toBe("2026-08-22");
   });
 });
 

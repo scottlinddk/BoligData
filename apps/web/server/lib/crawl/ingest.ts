@@ -60,6 +60,23 @@ export interface IngestResult {
   reports: IngestSourceReport[];
 }
 
+/**
+ * The listing_date actually written to `properties` (a not-null column):
+ * the mapper's parsed date when it found one, otherwise the property's own
+ * previously stored date — so a re-crawled listing whose source date can't
+ * be parsed doesn't get bumped to "today" on every run (see
+ * boligsiden.ts/boliga.ts, whose mappers return null rather than guess).
+ * Only a brand-new property (no prior stored date) falls back to today,
+ * which is a reasonable first-seen date for it.
+ */
+export function resolveListingDate(
+  mappedDate: string | null,
+  existingDate: string | null,
+  todayDate: string,
+): string {
+  return mappedDate ?? existingDate ?? todayDate;
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
@@ -78,14 +95,14 @@ function chunk<T>(items: T[], size: number): T[][] {
  * rows written. An explicit projection keeps the next RawListing field from
  * doing the same.
  */
-function toPropertyColumns(l: RawListing) {
+function toPropertyColumns(l: RawListing, listingDate: string) {
   return {
     address: l.address,
     municipality: l.municipality,
     postal_code: l.postal_code,
     price: l.price,
     sqm: l.sqm,
-    listing_date: l.listing_date,
+    listing_date: listingDate,
     listing_source: l.listing_source,
     external_id: l.external_id,
     lat: l.lat,
@@ -170,11 +187,11 @@ async function ingestSource(
 
   // Existing fingerprints, fetched before the upsert overwrites them — the
   // basis for deciding which listings actually need (re-)enrichment.
-  const existing = new Map<string, { id: string; content_hash: string | null }>();
+  const existing = new Map<string, { id: string; content_hash: string | null; listing_date: string | null }>();
   for (const ids of chunk([...hashByExternalId.keys()], CHUNK_SIZE)) {
     const { data, error } = await client
       .from("properties")
-      .select("id, external_id, content_hash")
+      .select("id, external_id, content_hash, listing_date")
       .eq("listing_source", source)
       .in("external_id", ids);
     if (error) {
@@ -187,9 +204,12 @@ async function ingestSource(
       existing.set(row.external_id as string, {
         id: row.id as string,
         content_hash: (row.content_hash as string | null) ?? null,
+        listing_date: (row.listing_date as string | null) ?? null,
       });
     }
   }
+
+  const todayDate = now.slice(0, 10);
 
   // Cadastral lookup (id_lokalid/matrikelnr/ejerlav/zone/bfe_nummer) is
   // per-property, not per-enrichment-source — it's needed both on the
@@ -239,8 +259,9 @@ async function ingestSource(
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const rows = listingChunk.map((l) => {
       const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
+      const listingDate = resolveListingDate(l.listing_date, existing.get(l.external_id)?.listing_date ?? null, todayDate);
       return {
-        ...toPropertyColumns(l),
+        ...toPropertyColumns(l, listingDate),
         content_hash: hashByExternalId.get(l.external_id),
         last_seen_at: now,
         id_lokalid: cadastral?.idLokalid ?? null,

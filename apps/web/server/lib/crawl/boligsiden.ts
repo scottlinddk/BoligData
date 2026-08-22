@@ -205,11 +205,14 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     postal_code: zip !== null ? String(zip) : null,
     price,
     sqm,
+    // Null (rather than a "today" guess) when none of these parse — a
+    // fallback to today here would re-stamp every re-crawled listing with
+    // the current date each run, since the same unparseable source field
+    // fails the same way every time, permanently masquerading as freshest.
+    // ingest.ts resolves the final value: an existing property keeps its
+    // previously stored date, a new one gets first-seen-today.
     listing_date:
-      asIsoDate(r.timeOnMarket) ??
-      asIsoDate(get(r, "status", "createdDate")) ??
-      asIsoDate(r.createdDate) ??
-      new Date().toISOString().slice(0, 10),
+      asIsoDate(r.timeOnMarket) ?? asIsoDate(get(r, "status", "createdDate")) ?? asIsoDate(r.createdDate),
     listing_source: "boligsiden",
     external_id: externalId,
     lat,
