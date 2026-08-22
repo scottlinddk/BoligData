@@ -8,7 +8,13 @@ export interface RawListing {
   postal_code: string | null;
   price: number;
   sqm: number;
-  listing_date: string;
+  /**
+   * Null when the source record carried no parseable listing/creation date
+   * (see boligsiden.ts / boliga.ts mappers) — ingest.ts fills this in rather
+   * than the mapper guessing "today", which would silently push a listing's
+   * apparent freshness forward on every re-crawl.
+   */
+  listing_date: string | null;
   listing_source: ListingSource;
   external_id: string;
   lat: number;
