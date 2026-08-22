@@ -85,7 +85,9 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
     postal_code: zip !== null ? String(zip) : null,
     price,
     sqm,
-    listing_date: asIsoDate(r.createdDate) ?? new Date().toISOString().slice(0, 10),
+    // Null (not a "today" guess) when unparseable — see boligsiden.ts for why;
+    // ingest.ts resolves the final stored value.
+    listing_date: asIsoDate(r.createdDate),
     listing_source: "boliga",
     external_id: String(id),
     lat,
