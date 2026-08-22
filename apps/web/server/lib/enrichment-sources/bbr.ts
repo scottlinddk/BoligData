@@ -31,7 +31,7 @@ const MOCK_FLAG = "BBR_MOCK_MODE";
  * versions newest-first, so a register release costs one wasted request rather
  * than an outage. `DATAFORDELER_DAR_VERSION` pins one when that is wanted.
  */
-const DAR_SERVICE: DatafordelerService = {
+export const DAR_SERVICE: DatafordelerService = {
   register: "DAR",
   versionEnv: "DATAFORDELER_DAR_VERSION",
   baseEnv: "DATAFORDELER_DAR_API_BASE",

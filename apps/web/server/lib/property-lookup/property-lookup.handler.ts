@@ -91,8 +91,13 @@ export async function lookupProperty(
   const noiseExposureLden = noiseResult?.ok ? noiseResult.data.ldenDb : null;
   const sales = salesResult?.ok ? salesResult.data : null;
 
+  const addressRegisterLabel =
+    cadastral?.resolvedVia === "dar_fallback"
+      ? "DAR via Datafordeler GraphQL (DAWA fallback)"
+      : "DAR via DAWA (api.dataforsyningen.dk)";
+
   const sources: PropertyLookupSourceStatus[] = [
-    status("address", "DAR via DAWA (api.dataforsyningen.dk)", "ADDRESS_LOOKUP_MOCK_MODE", cadastralResult),
+    status("address", addressRegisterLabel, "ADDRESS_LOOKUP_MOCK_MODE", cadastralResult),
     status("bbr", "BBR via Datafordeler GraphQL", "BBR_MOCK_MODE", bbrResult),
     status("publicValuation", "VUR via Datafordeler GraphQL", "EJENDOMSVURDERING_MOCK_MODE", valuationResult),
     noiseResult === null

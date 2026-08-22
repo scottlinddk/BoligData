@@ -1,5 +1,6 @@
 import { fetchJson } from "../crawl/http.js";
 import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../crawl/map-utils.js";
+import { lookupAddressCadastralViaDar } from "./address-lookup-dar-fallback.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 const MOCK_FLAG = "ADDRESS_LOOKUP_MOCK_MODE";
@@ -45,6 +46,15 @@ export interface AddressCadastral {
   municipalityCode: string | null;
   /** The address as the register spells it, e.g. "Floravej 6, 9000 Aalborg". */
   formattedAddress: string | null;
+  /**
+   * Which upstream actually resolved this address. `"dar_fallback"` means DAWA
+   * was unreachable (see the sunset note above) and the Datafordeler DAR
+   * fallback (`address-lookup-dar-fallback.ts`) answered instead — in that
+   * case `matrikelnr`/`ejerlav`/`ejerlavskode`/`bfeNummer`/`zone` stay `null`,
+   * since resolving those from DAR alone needs a spatial join this repo
+   * doesn't do yet.
+   */
+  resolvedVia: "dawa" | "dar_fallback";
 }
 
 function apiBase(): string {
@@ -118,6 +128,7 @@ function mockCadastral(address: string, postalCode: string | null): AddressCadas
     postalName: null,
     municipalityCode: null,
     formattedAddress: address,
+    resolvedVia: "dawa",
   };
 }
 
@@ -169,6 +180,7 @@ export function parseAdgangsadresse(raw: unknown): AddressCadastral | null {
     postalName,
     municipalityCode: asCodeString(kommune?.kode) ?? asCodeString(record.kommunekode),
     formattedAddress: asNonEmptyString(record.betegnelse) ?? asNonEmptyString(record.adressebetegnelse) ?? composed,
+    resolvedVia: "dawa",
   };
 }
 
@@ -224,7 +236,14 @@ async function search(address: string, postalCode: string | null, fuzzy: boolean
  * `lat`/`lon` are inputs *and* outputs: callers that already know the
  * coordinates pass them so an address that DAWA can't parse still yields
  * something usable, and callers that don't get the register's own access
- * point back. Only fails outright when the address matched nothing.
+ * point back.
+ *
+ * DAWA is past its announced sunset (2026-08-17), so a DAWA failure (network
+ * error, non-2xx, or no match) falls back to `lookupAddressCadastralViaDar`
+ * when `DATAFORDELER_API_KEY` is configured — narrower in what it resolves
+ * (see that module's doc), but keeps address resolution and geocoding
+ * working, which everything downstream (BBR, VUR, noise, sales) depends on.
+ * Only fails outright when both paths come up empty.
  */
 export async function lookupAddressCadastral(
   address: string,
@@ -237,6 +256,24 @@ export async function lookupAddressCadastral(
   const fallbackLat = isDanishCoordinate(lat, lon) ? lat : null;
   const fallbackLon = isDanishCoordinate(lat, lon) ? lon : null;
 
+  const dawaResult = await lookupViaDawa(address, postalCode, fallbackLat, fallbackLon);
+  if (dawaResult.ok) return dawaResult;
+
+  const apiKey = process.env.DATAFORDELER_API_KEY?.trim();
+  if (!apiKey) return dawaResult;
+
+  const fallbackResult = await lookupAddressCadastralViaDar(address, postalCode, apiKey);
+  if (fallbackResult.ok) return fallbackResult;
+
+  return sourceFailed(`DAWA: ${dawaResult.error}; DAR fallback: ${fallbackResult.error}`);
+}
+
+async function lookupViaDawa(
+  address: string,
+  postalCode: string | null,
+  fallbackLat: number | null,
+  fallbackLon: number | null,
+): Promise<SourceResult<AddressCadastral>> {
   try {
     // Exact search first: DAWA's `q` is already case-insensitive and matches
     // across vejnavn/husnr/postnr, so fuzzy is only worth the extra call when
