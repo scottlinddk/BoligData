@@ -56,7 +56,19 @@ export function DashboardPage() {
 
       <div className="mb-8">
         <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.favoritesTitle")}</h2>
-        {favoritesLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
+        {favoritesLoading && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="overflow-hidden rounded-2xl border border-border bg-surface">
+                <div className="h-[140px] animate-pulse bg-surface-alt" />
+                <div className="flex flex-col gap-2 p-4">
+                  <div className="h-3.5 w-2/3 animate-pulse rounded bg-surface-alt" />
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-surface-alt" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {!favoritesLoading && favoriteProperties.length === 0 && (
           <p className="font-semibold text-ink-soft">{t("dashboard.favoritesEmpty")}</p>
         )}
@@ -72,7 +84,13 @@ export function DashboardPage() {
       <div>
         <h2 className="mb-2 font-semibold text-ink-soft">{t("dashboard.title")}</h2>
 
-        {isLoading && <p className="font-semibold text-ink-soft">{t("dashboard.loading")}</p>}
+        {isLoading && (
+          <ul className="flex flex-col gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <li key={i} className="h-[70px] animate-pulse rounded-2xl border border-border bg-surface" />
+            ))}
+          </ul>
+        )}
         {!isLoading && searches.length === 0 && (
           <p className="font-semibold text-ink-soft">{t("dashboard.empty")}</p>
         )}
