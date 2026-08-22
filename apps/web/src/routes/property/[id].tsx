@@ -114,7 +114,7 @@ export function PropertyDetailPage() {
     retry: 1,
   });
 
-  if (detailQuery.isLoading) return <p className="p-6 font-semibold text-ink-soft">{t("detail.loading")}</p>;
+  if (detailQuery.isLoading) return <PropertyDetailSkeleton />;
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) {
     return (
       <p className="p-6 font-semibold text-danger">
@@ -394,6 +394,47 @@ export function PropertyDetailPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PropertyDetailSkeleton() {
+  return (
+    <div className="mx-auto max-w-[900px] px-4 py-4 pb-24 md:pb-6">
+      <div className="mb-1.5 h-[17px] w-24 animate-pulse rounded bg-surface-alt" />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="h-9 w-64 animate-pulse rounded bg-surface-alt md:h-10 md:w-96" />
+          <div className="mt-2 h-4 w-40 animate-pulse rounded bg-surface-alt" />
+        </div>
+        <div className="hidden gap-2 md:flex">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-[42px] w-32 animate-pulse rounded-full bg-surface-alt" />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 h-8 w-48 animate-pulse rounded-full bg-surface-alt" />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-[34px] w-28 animate-pulse rounded-full bg-surface-alt" />
+        ))}
+      </div>
+
+      <div className="relative mt-6 h-[300px] animate-pulse rounded-[20px] bg-surface-alt sm:h-[420px] lg:h-[520px]" />
+
+      <div className="mt-4 h-[190px] animate-pulse rounded-[20px] bg-surface-alt" />
+
+      <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <div className="h-64 animate-pulse rounded-[20px] bg-surface-alt" />
+        <div className="h-64 animate-pulse rounded-[20px] bg-surface-alt" />
+      </div>
+
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <div className="h-48 animate-pulse rounded-[20px] bg-surface-alt" />
+        <div className="h-48 animate-pulse rounded-[20px] bg-surface-alt" />
+      </div>
     </div>
   );
 }
