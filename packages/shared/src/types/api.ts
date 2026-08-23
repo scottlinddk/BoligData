@@ -34,6 +34,8 @@ export interface SearchPropertiesQuery extends Partial<PropertyFilters> {
   offset?: number;
   /** ISO timestamp; only match listings created after this (used by the notification cron). */
   createdAfter?: string;
+  /** `minLon,minLat,maxLon,maxLat` — restricts results to a map viewport (PropertyMap's live viewport fetch; not part of PropertyFilters since it's transient view state, never saved with a search). */
+  bbox?: string;
 }
 
 export interface SearchPropertiesResponse {

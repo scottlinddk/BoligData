@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { searchProperties, splitLocationQuery } from "./search";
+import { parseBbox, searchProperties, splitLocationQuery } from "./search";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -97,10 +97,12 @@ function fakeClient(
         ilike() {
           return builder;
         },
-        gte() {
+        gte(...args: unknown[]) {
+          calls.push({ method: "gte", args });
           return builder;
         },
-        lte() {
+        lte(...args: unknown[]) {
+          calls.push({ method: "lte", args });
           return builder;
         },
         order() {
@@ -219,6 +221,34 @@ describe("searchProperties", () => {
     await searchProperties(fakeClient(ROWS, [], calls), { location: "Aalborg" }, true);
     expect(calls).toContainEqual({ method: "or", args: ["address.ilike.%Aalborg%,municipality.ilike.%Aalborg%"] });
     expect(calls.some((c) => c.method === "eq" && c.args[0] === "postal_code")).toBe(false);
+  });
+
+  it("filters by lon/lat when bbox is set", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { bbox: "9.8,57.0,9.95,57.05" }, true);
+    expect(calls).toContainEqual({ method: "gte", args: ["lon", 9.8] });
+    expect(calls).toContainEqual({ method: "lte", args: ["lon", 9.95] });
+    expect(calls).toContainEqual({ method: "gte", args: ["lat", 57.0] });
+    expect(calls).toContainEqual({ method: "lte", args: ["lat", 57.05] });
+  });
+
+  it("ignores a malformed bbox", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { bbox: "not-a-bbox" }, true);
+    expect(calls.some((c) => c.args[0] === "lon" || c.args[0] === "lat")).toBe(false);
+  });
+});
+
+describe("parseBbox", () => {
+  it("parses a well-formed bbox string", () => {
+    expect(parseBbox("9.8,57.0,9.95,57.05")).toEqual({ minLon: 9.8, minLat: 57.0, maxLon: 9.95, maxLat: 57.05 });
+  });
+
+  it("returns null for a missing, malformed, or short bbox", () => {
+    expect(parseBbox(undefined)).toBeNull();
+    expect(parseBbox("")).toBeNull();
+    expect(parseBbox("1,2,3")).toBeNull();
+    expect(parseBbox("a,b,c,d")).toBeNull();
   });
 });
 

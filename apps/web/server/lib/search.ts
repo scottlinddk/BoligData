@@ -49,6 +49,23 @@ export function splitLocationQuery(raw: string): { text: string; postalCode: str
   return { text, postalCode };
 }
 
+/**
+ * Parses a `minLon,minLat,maxLon,maxLat` bbox string (the map view's current
+ * viewport) into numeric bounds, or null when malformed/absent. Used by
+ * PropertyMap's live viewport fetch so panning/zooming into a specific
+ * street shows every matching listing there, not just whichever page the
+ * list's own pagination happens to be showing.
+ */
+export function parseBbox(
+  raw: string | undefined,
+): { minLon: number; minLat: number; maxLon: number; maxLat: number } | null {
+  if (!raw) return null;
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [minLon, minLat, maxLon, maxLat] = parts as [number, number, number, number];
+  return { minLon, minLat, maxLon, maxLat };
+}
+
 function resolveSort(sortField: string, sortDirection: string) {
   const column = SORT_COLUMNS[sortField] ?? "listing_date";
   let ascending = sortDirection === "asc";
@@ -100,6 +117,14 @@ export async function searchProperties(
     builder = builder.gte("listing_date", cutoff.toISOString().slice(0, 10));
   }
   if (query.createdAfter) builder = builder.gt("created_at", query.createdAfter);
+  const bbox = parseBbox(query.bbox);
+  if (bbox) {
+    builder = builder
+      .gte("lon", bbox.minLon)
+      .lte("lon", bbox.maxLon)
+      .gte("lat", bbox.minLat)
+      .lte("lat", bbox.maxLat);
+  }
 
   const { data, count, error } = await builder
     .order(column, { ascending })
