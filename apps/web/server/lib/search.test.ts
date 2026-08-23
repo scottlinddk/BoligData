@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { searchProperties } from "./search";
+import { searchProperties, splitLocationQuery } from "./search";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -51,7 +51,11 @@ function toResponseRow(row: FakeRow, columns: string): Record<string, unknown> {
 }
 
 /** Minimal chainable stand-in for PostgrestFilterBuilder, thenable like the real thing. */
-function fakeClient(rows: FakeRow[], enrichmentRows: Record<string, unknown>[] = []): SupabaseClient {
+function fakeClient(
+  rows: FakeRow[],
+  enrichmentRows: Record<string, unknown>[] = [],
+  calls: { method: string; args: unknown[] }[] = [],
+): SupabaseClient {
   const client = {
     from(table: string) {
       if (table === "enrichments") {
@@ -78,10 +82,12 @@ function fakeClient(rows: FakeRow[], enrichmentRows: Record<string, unknown>[] =
           selectedColumns = columns;
           return builder;
         },
-        eq() {
+        eq(...args: unknown[]) {
+          calls.push({ method: "eq", args });
           return builder;
         },
-        or() {
+        or(...args: unknown[]) {
+          calls.push({ method: "or", args });
           return builder;
         },
         ilike() {
@@ -176,5 +182,44 @@ describe("searchProperties", () => {
   it("leaves bbrData null for anonymous summaries (no enrichments lookup needed)", async () => {
     const result = await searchProperties(fakeClient(ROWS), {}, false);
     expect(result.summaries.every((s) => !("bbrData" in s))).toBe(true);
+  });
+
+  it("filters by both address text and postal code when location includes a zip", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { location: "Rundvejen 7, 9000" }, true);
+    expect(calls).toContainEqual({ method: "or", args: ["address.ilike.%Rundvejen 7%,municipality.ilike.%Rundvejen 7%"] });
+    expect(calls).toContainEqual({ method: "eq", args: ["postal_code", "9000"] });
+  });
+
+  it("filters by postal code alone when location is only a zip code", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { location: "9000" }, true);
+    expect(calls.some((c) => c.method === "or")).toBe(false);
+    expect(calls).toContainEqual({ method: "eq", args: ["postal_code", "9000"] });
+  });
+
+  it("filters by address/municipality text alone when location has no zip", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { location: "Aalborg" }, true);
+    expect(calls).toContainEqual({ method: "or", args: ["address.ilike.%Aalborg%,municipality.ilike.%Aalborg%"] });
+    expect(calls.some((c) => c.method === "eq" && c.args[0] === "postal_code")).toBe(false);
+  });
+});
+
+describe("splitLocationQuery", () => {
+  it("splits trailing zip code from the address text", () => {
+    expect(splitLocationQuery("Rundvejen 7, 9000")).toEqual({ text: "Rundvejen 7,", postalCode: "9000" });
+  });
+
+  it("splits a leading zip code from the address text", () => {
+    expect(splitLocationQuery("9000 Aalborg")).toEqual({ text: "Aalborg", postalCode: "9000" });
+  });
+
+  it("returns just the postal code when the query is only a zip code", () => {
+    expect(splitLocationQuery("9000")).toEqual({ text: "", postalCode: "9000" });
+  });
+
+  it("returns just the text when there is no zip code", () => {
+    expect(splitLocationQuery("Aalborg")).toEqual({ text: "Aalborg", postalCode: null });
   });
 });
