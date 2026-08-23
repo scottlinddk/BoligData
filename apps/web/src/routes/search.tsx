@@ -157,13 +157,13 @@ export function SearchPage() {
 
         {showMap && !mapFullScreen && (
           <div className="overflow-hidden rounded-[20px] border border-border md:h-72">
-            <PropertyMap properties={properties} />
+            <PropertyMap properties={properties} filters={filters} />
           </div>
         )}
 
         {mapFullScreen && (
           <div className="fixed inset-x-0 bottom-0 top-[61px] z-30">
-            <PropertyMap properties={properties} />
+            <PropertyMap properties={properties} filters={filters} />
 
             <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex gap-2">
               <div className="pointer-events-auto flex flex-1 gap-2">{locationFilterFields}</div>

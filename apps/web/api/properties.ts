@@ -63,6 +63,7 @@ function parseQuery(req: VercelRequest): SearchPropertiesQuery {
     sortDirection: str(q.sortDirection) as SortDirection | undefined,
     limit: num(q.limit),
     offset: num(q.offset),
+    bbox: str(q.bbox),
   };
 }
 

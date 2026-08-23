@@ -18,6 +18,15 @@ export const DENMARK_BOUNDS: [[number, number], [number, number]] = [
 export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 /**
+ * How many listings PropertyMap asks for when it re-queries the visible
+ * viewport on pan/zoom (search.ts's own SEARCH_MAX_PAGE_SIZE, default 100,
+ * still clamps the actual result — this is just a generous ask so a
+ * zoomed-in street sees every match instead of whatever the list's page
+ * size happens to be).
+ */
+export const MAP_VIEWPORT_LIMIT = 300;
+
+/**
  * Sort option values. Each value doubles as a translation key suffix
  * (`sort.<value>`) so labels are resolved through i18n at render time.
  */
