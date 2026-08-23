@@ -31,6 +31,24 @@ function sanitizeForOrFilter(value: string): string {
   return value.replace(/[,().]/g, "").trim();
 }
 
+/**
+ * Splits a free-text location query into its street/city text and an
+ * optional 4-digit Danish postal code, e.g. "Rundvejen 7, 9000" -> address
+ * text "Rundvejen 7" + postal code "9000". Without this split, a query that
+ * includes a zip code never matched anything: sanitizeForOrFilter() strips
+ * the comma (PostgREST `or()` syntax) but left the zip digits appended to
+ * the address term, so "Rundvejen 7 9000" was searched as one substring
+ * against a stored `address` column that only ever holds "Rundvejen 7" —
+ * the zip lives in its own `postal_code` column and was never checked at
+ * all.
+ */
+export function splitLocationQuery(raw: string): { text: string; postalCode: string | null } {
+  const match = raw.match(/\b(\d{4})\b/);
+  const postalCode = match ? match[1] : null;
+  const text = (postalCode ? raw.replace(match![0], " ") : raw).trim();
+  return { text, postalCode };
+}
+
 function resolveSort(sortField: string, sortDirection: string) {
   const column = SORT_COLUMNS[sortField] ?? "listing_date";
   let ascending = sortDirection === "asc";
@@ -58,8 +76,13 @@ export async function searchProperties(
   let builder = client.from("properties").select(columns, { count: "exact" }).eq("status", "active");
 
   if (query.location) {
-    const term = sanitizeForOrFilter(query.location);
+    const { text, postalCode } = splitLocationQuery(query.location);
+    const term = sanitizeForOrFilter(text);
     if (term) builder = builder.or(`address.ilike.%${term}%,municipality.ilike.%${term}%`);
+    if (postalCode) builder = builder.eq("postal_code", postalCode);
+  }
+  if (query.propertyTypes && query.propertyTypes.length > 0) {
+    builder = builder.in("property_type", query.propertyTypes);
   }
   if (query.postnummer) {
     const term = sanitizeForOrFilter(query.postnummer);

@@ -67,7 +67,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function searchProperties(query: SearchPropertiesQuery): Promise<SearchPropertiesResponse> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== null && value !== undefined) params.set(key, String(value));
+    if (value === null || value === undefined) continue;
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(key, value.join(","));
+      continue;
+    }
+    params.set(key, String(value));
   }
   return request(`/properties?${params.toString()}`);
 }

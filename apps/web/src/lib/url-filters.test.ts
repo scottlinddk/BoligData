@@ -27,4 +27,21 @@ describe("url-filters", () => {
     const params = serializeFilters({ location: "" });
     expect(params.has("location")).toBe(false);
   });
+
+  it("round-trips propertyTypes as a comma-separated list", () => {
+    const filters = { ...defaultFilters(), propertyTypes: ["villa", "cooperative"] as ("villa" | "cooperative")[] };
+    const params = serializeFilters(filters);
+    expect(params.get("propertyTypes")).toBe("villa,cooperative");
+    expect(parseFilters(params)).toEqual(filters);
+  });
+
+  it("ignores an empty propertyTypes array on serialize", () => {
+    const params = serializeFilters({ propertyTypes: [] });
+    expect(params.has("propertyTypes")).toBe(false);
+  });
+
+  it("drops unknown propertyTypes values on parse", () => {
+    const params = new URLSearchParams({ propertyTypes: "villa,not-a-real-type" });
+    expect(parseFilters(params).propertyTypes).toEqual(["villa"]);
+  });
 });
