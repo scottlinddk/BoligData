@@ -81,6 +81,9 @@ export async function searchProperties(
     if (term) builder = builder.or(`address.ilike.%${term}%,municipality.ilike.%${term}%`);
     if (postalCode) builder = builder.eq("postal_code", postalCode);
   }
+  if (query.propertyTypes && query.propertyTypes.length > 0) {
+    builder = builder.in("property_type", query.propertyTypes);
+  }
   if (query.postnummer) {
     const term = sanitizeForOrFilter(query.postnummer);
     if (term) builder = builder.ilike("postal_code", `${term}%`);

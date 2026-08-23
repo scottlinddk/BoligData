@@ -31,3 +31,22 @@ export const SORT_OPTIONS = [
 ] as const;
 
 export type SortOptionValue = (typeof SORT_OPTIONS)[number];
+
+/**
+ * The "boligtype" values offered in the property-type filter. Each value
+ * doubles as a translation key suffix (`propertyType.<value>`) and must stay
+ * in sync with the `PropertyType` union and the `properties.property_type`
+ * CHECK constraint (022_property_type_boligtype.sql).
+ */
+export const PROPERTY_TYPE_OPTIONS = [
+  "villa",
+  "terraced_house",
+  "apartment",
+  "villa_apartment",
+  "summer_house",
+  "cooperative",
+  "farm",
+  "holiday_plot",
+  "residential_plot",
+  "houseboat",
+] as const;

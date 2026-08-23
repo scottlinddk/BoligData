@@ -58,6 +58,7 @@ const da = {
   "filters.minBuildingYear": "Byggeår fra",
   "filters.maxBuildingYear": "Byggeår til",
   "filters.maxDaysOnMarket": "Maks. dage til salg",
+  "filters.propertyType": "Boligtype",
   "filters.sortBy": "Sortér efter",
 
   "sort.listingDate:desc": "Nyeste først",
@@ -80,10 +81,15 @@ const da = {
   "property.viewListing": "Se bolig",
 
   "propertyType.villa": "Villa",
-  "propertyType.apartment": "Lejlighed",
+  "propertyType.apartment": "Ejerlejlighed",
   "propertyType.terraced_house": "Rækkehus",
-  "propertyType.summer_house": "Sommerhus",
+  "propertyType.summer_house": "Fritidsbolig",
   "propertyType.farm": "Landejendom",
+  "propertyType.villa_apartment": "Villalejlighed",
+  "propertyType.cooperative": "Andelsbolig",
+  "propertyType.holiday_plot": "Fritidsgrund",
+  "propertyType.residential_plot": "Helårsgrund",
+  "propertyType.houseboat": "Husbåd",
   "propertyType.other": "Andet",
 
   "detail.back": "Tilbage",
@@ -485,6 +491,7 @@ const en: Translations = {
   "filters.minBuildingYear": "Min year built",
   "filters.maxBuildingYear": "Max year built",
   "filters.maxDaysOnMarket": "Max days on market",
+  "filters.propertyType": "Property type",
   "filters.sortBy": "Sort by",
 
   "sort.listingDate:desc": "Newest first",
@@ -509,8 +516,13 @@ const en: Translations = {
   "propertyType.villa": "Villa",
   "propertyType.apartment": "Apartment",
   "propertyType.terraced_house": "Terraced house",
-  "propertyType.summer_house": "Summer house",
+  "propertyType.summer_house": "Holiday home",
   "propertyType.farm": "Farm",
+  "propertyType.villa_apartment": "Villa apartment",
+  "propertyType.cooperative": "Cooperative housing",
+  "propertyType.holiday_plot": "Holiday plot",
+  "propertyType.residential_plot": "Residential plot",
+  "propertyType.houseboat": "Houseboat",
   "propertyType.other": "Other",
 
   "detail.back": "Back",

@@ -8,6 +8,11 @@ export type PropertyType =
   | "terraced_house"
   | "summer_house"
   | "farm"
+  | "villa_apartment"
+  | "cooperative"
+  | "holiday_plot"
+  | "residential_plot"
+  | "houseboat"
   | "other";
 
 /** What an anonymous (not signed-in) search result shows — name only, no price/location/etc. */
@@ -337,6 +342,7 @@ export interface ListingRecommendation {
 export interface PropertyFilters {
   location: string | null;
   postnummer: string | null;
+  propertyTypes: PropertyType[] | null;
   minPrice: number | null;
   maxPrice: number | null;
   minSqm: number | null;

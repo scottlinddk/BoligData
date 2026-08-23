@@ -29,7 +29,13 @@ const MAX_ERRORS_REPORTED = 10;
  */
 const API_BASE = process.env.BOLIGSIDEN_API_BASE ?? "https://api.boligsiden.dk/search/cases";
 
-/** Boligsiden addressType strings → our CHECK-constrained enum (001_init_schema.sql). */
+/**
+ * Boligsiden addressType strings → our CHECK-constrained enum
+ * (022_property_type_boligtype.sql). Unknown strings fall back to "other"
+ * (see the call site below), so a wrong or missing guess degrades data
+ * quality but never fails an upsert — same defensive posture as Boliga's
+ * PROPERTY_TYPE_BY_CODE.
+ */
 const PROPERTY_TYPE_BY_ADDRESS_TYPE: Record<string, RawListing["property_type"]> = {
   villa: "villa",
   condo: "apartment",
@@ -40,9 +46,23 @@ const PROPERTY_TYPE_BY_ADDRESS_TYPE: Record<string, RawListing["property_type"]>
   "holiday house": "summer_house",
   fritidshus: "summer_house",
   sommerhus: "summer_house",
+  fritidsbolig: "summer_house",
   farm: "farm",
   landejendom: "farm",
-  "villa apartment": "apartment",
+  "villa apartment": "villa_apartment",
+  villalejlighed: "villa_apartment",
+  "cooperative housing": "cooperative",
+  andelsbolig: "cooperative",
+  "holiday plot": "holiday_plot",
+  fritidsgrund: "holiday_plot",
+  sommerhusgrund: "holiday_plot",
+  "residential plot": "residential_plot",
+  helårsgrund: "residential_plot",
+  helaarsgrund: "residential_plot",
+  villagrund: "residential_plot",
+  houseboat: "houseboat",
+  husbåd: "houseboat",
+  husbaad: "houseboat",
 };
 
 interface BoligsidenPage {

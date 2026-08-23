@@ -4,6 +4,7 @@ import type {
   SortDirection,
   SortField,
 } from "../../../packages/shared/src/types/api.js";
+import type { PropertyType } from "../../../packages/shared/src/types/index.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { getOptionalUser, requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
@@ -23,11 +24,34 @@ function num(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+const PROPERTY_TYPES: readonly PropertyType[] = [
+  "villa",
+  "apartment",
+  "terraced_house",
+  "summer_house",
+  "farm",
+  "villa_apartment",
+  "cooperative",
+  "holiday_plot",
+  "residential_plot",
+  "houseboat",
+  "other",
+];
+
+/** Comma-separated `propertyTypes=villa,apartment` — unknown values are dropped rather than sent to the DB. */
+function propertyTypes(v: unknown): PropertyType[] | undefined {
+  const s = str(v);
+  if (!s) return undefined;
+  const values = s.split(",").filter((t): t is PropertyType => (PROPERTY_TYPES as readonly string[]).includes(t));
+  return values.length > 0 ? values : undefined;
+}
+
 function parseQuery(req: VercelRequest): SearchPropertiesQuery {
   const q = req.query;
   return {
     location: str(q.location),
     postnummer: str(q.postnummer),
+    propertyTypes: propertyTypes(q.propertyTypes),
     minPrice: num(q.minPrice),
     maxPrice: num(q.maxPrice),
     minSqm: num(q.minSqm),

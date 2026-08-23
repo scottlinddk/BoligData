@@ -1,5 +1,6 @@
+import type { PropertyType } from "@shared/types/index";
 import type { FiltersWithSort } from "@/lib/url-filters";
-import { SORT_OPTIONS } from "@/lib/constants";
+import { PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
 import { useI18n } from "@/i18n/i18n";
 
 interface FilterFieldsProps {
@@ -71,6 +72,37 @@ export function FilterFields({
           />
         </label>
       </div>
+
+      <fieldset className={label}>
+        <legend className="mb-1">{t("filters.propertyType")}</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {PROPERTY_TYPE_OPTIONS.map((type) => {
+            const checked = filters.propertyTypes?.includes(type) ?? false;
+            return (
+              <label
+                key={type}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium normal-case tracking-normal ${
+                  checked ? "border-cta bg-cta text-cta-text" : "border-border bg-paper text-ink"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const current = filters.propertyTypes ?? [];
+                    const next: PropertyType[] = checked
+                      ? current.filter((t) => t !== type)
+                      : [...current, type];
+                    onChange({ propertyTypes: next.length > 0 ? next : null });
+                  }}
+                  className="sr-only"
+                />
+                {t(`propertyType.${type}`)}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <div className="grid grid-cols-2 gap-2">
         <NumberField

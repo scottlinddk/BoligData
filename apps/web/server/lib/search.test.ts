@@ -90,6 +90,10 @@ function fakeClient(
           calls.push({ method: "or", args });
           return builder;
         },
+        in(...args: unknown[]) {
+          calls.push({ method: "in", args });
+          return builder;
+        },
         ilike() {
           return builder;
         },
@@ -196,6 +200,18 @@ describe("searchProperties", () => {
     await searchProperties(fakeClient(ROWS, [], calls), { location: "9000" }, true);
     expect(calls.some((c) => c.method === "or")).toBe(false);
     expect(calls).toContainEqual({ method: "eq", args: ["postal_code", "9000"] });
+  });
+
+  it("filters by property_type when propertyTypes is set", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { propertyTypes: ["villa", "cooperative"] }, true);
+    expect(calls).toContainEqual({ method: "in", args: ["property_type", ["villa", "cooperative"]] });
+  });
+
+  it("does not filter by property_type when propertyTypes is empty", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { propertyTypes: [] }, true);
+    expect(calls.some((c) => c.method === "in")).toBe(false);
   });
 
   it("filters by address/municipality text alone when location has no zip", async () => {
