@@ -10,7 +10,7 @@ import { getOptionalUser, requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 import { isUuid, sendError, setPublicCache } from "../server/lib/http-helpers.js";
 import { rowToEnrichment, rowToProperty } from "../server/lib/row-mappers.js";
-import { searchProperties } from "../server/lib/search.js";
+import { InvalidSearchBoundaryError, searchProperties } from "../server/lib/search.js";
 import { getComparables } from "../server/lib/comparables.js";
 
 function str(v: unknown): string | undefined {
@@ -48,7 +48,9 @@ function propertyTypes(v: unknown): PropertyType[] | undefined {
 
 function parseQuery(req: VercelRequest): SearchPropertiesQuery {
   const q = req.query;
+  if (q.polygon !== undefined && typeof q.polygon !== "string") throw new InvalidSearchBoundaryError();
   return {
+    polygon: str(q.polygon),
     location: str(q.location),
     postnummer: str(q.postnummer),
     propertyTypes: propertyTypes(q.propertyTypes),
@@ -146,6 +148,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     res.status(200).json(result);
   } catch (err) {
-    sendError(res, 500, "Failed to search properties", err);
+    if (err instanceof InvalidSearchBoundaryError || (req.query.polygon !== undefined && (err as { code?: string })?.code === "22023")) {
+      sendError(res, 400, "Invalid map boundary: use a simple area with 3–64 distinct points");
+    } else sendError(res, 500, "Failed to search properties", err);
   }
 }

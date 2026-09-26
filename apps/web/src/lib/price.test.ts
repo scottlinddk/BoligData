@@ -19,6 +19,15 @@ describe("daysBetween", () => {
   it("never returns a negative value", () => {
     expect(daysBetween("2026-01-11", "2026-01-01")).toBe(0);
   });
+
+  it("does not advance a listing's day group in the afternoon", () => {
+    expect(daysBetween("2026-01-01", "2026-01-31T19:30:00Z")).toBe(30);
+    expect(daysBetween("2026-01-01", "2026-01-01T23:59:59Z")).toBe(0);
+  });
+
+  it("counts source calendar dates consistently across a daylight-saving change", () => {
+    expect(daysBetween("2026-03-28T23:00:00Z", "2026-03-30T01:00:00Z")).toBe(2);
+  });
 });
 
 describe("estimateYield", () => {

@@ -320,7 +320,7 @@ export function PropertyDetailPage() {
             <p className="font-semibold text-danger">{t("comparables.error")}</p>
             <button
               onClick={() => comparablesQuery.refetch()}
-              className="rounded-full bg-danger px-4 py-1.5 text-sm font-bold text-white"
+              className="rounded-full bg-cta px-4 py-1.5 text-sm font-bold text-cta-text transition-colors hover:bg-cta-hover"
             >
               {t("common.retry")}
             </button>

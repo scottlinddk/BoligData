@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n";
 import { ThemeProvider } from "@/theme/theme";
@@ -33,10 +33,11 @@ import { UpdatePasswordPage } from "@/routes/auth/update-password";
 import "./index.css";
 
 function RootLayout() {
+  const { pathname } = useLocation();
   return (
-    <div className="min-h-full overflow-x-hidden font-sans text-ink">
+    <div className="min-h-full overflow-x-clip font-sans text-ink">
       <Header />
-      <main className="mx-auto max-w-6xl">
+      <main className={pathname === "/" ? "w-full" : "mx-auto max-w-6xl"}>
         <Outlet />
       </main>
       <RecommendationAlerts />

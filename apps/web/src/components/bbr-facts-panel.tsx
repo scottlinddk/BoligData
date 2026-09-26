@@ -61,7 +61,7 @@ export function BbrFactsPanel({
       {source !== null && (
         <span
           className={`ds-mono rounded-[5px] px-1.5 py-0.5 text-[9px] ${
-            source === "register" ? "bg-success-soft text-success" : "bg-surface-alt text-ink-faint"
+            source === "register" ? "bg-success-soft text-success-text" : "bg-surface-alt text-ink-faint"
           }`}
         >
           {source === "register" ? t("register.badgeLive") : t("register.badgeStored")}

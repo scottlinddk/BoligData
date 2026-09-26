@@ -13,34 +13,61 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/**
- * Resolves the initial theme. Kept in sync with the inline bootstrap script in
- * index.html, which applies the same logic before React mounts to avoid a
- * flash of the wrong theme.
- */
+function readPreference(): Theme | null {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === "light" || stored === "dark" ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function systemTheme(): Theme {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/** Keep initial resolution in sync with the pre-paint bootstrap in index.html. */
 export function resolveInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return readPreference() ?? systemTheme();
 }
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0e141e" : "#ffffff");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(resolveInitialTheme);
+  const [preference, setPreference] = useState<Theme | null>(readPreference);
+  const [system, setSystem] = useState<Theme>(systemTheme);
+  const theme = preference ?? system;
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystem = () => setSystem(media.matches ? "dark" : "light");
+    const updatePreference = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY || event.key === null) setPreference(readPreference());
+    };
+    updateSystem();
+    media.addEventListener("change", updateSystem);
+    window.addEventListener("storage", updatePreference);
+    return () => {
+      media.removeEventListener("change", updateSystem);
+      window.removeEventListener("storage", updatePreference);
+    };
+  }, []);
 
   useEffect(() => {
     applyTheme(theme);
-    window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  const setTheme = useCallback((next: Theme) => setThemeState(next), []);
+  const setTheme = useCallback((next: Theme) => {
+    setPreference(next);
+    try { window.localStorage.setItem(STORAGE_KEY, next); } catch { /* Keep the in-memory choice when storage is blocked. */ }
+  }, []);
   const toggleTheme = useCallback(
-    () => setThemeState((prev) => (prev === "dark" ? "light" : "dark")),
-    [],
+    () => setTheme(theme === "dark" ? "light" : "dark"),
+    [theme, setTheme],
   );
 
   const value = useMemo<ThemeContextValue>(

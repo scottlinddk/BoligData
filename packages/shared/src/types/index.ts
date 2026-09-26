@@ -352,6 +352,8 @@ export interface ListingRecommendation {
 }
 
 export interface PropertyFilters {
+  /** JSON of a simple 3–64 vertex [longitude,latitude] ring. Null removes the drawn-area filter. */
+  polygon?: string | null;
   location: string | null;
   postnummer: string | null;
   propertyTypes: PropertyType[] | null;

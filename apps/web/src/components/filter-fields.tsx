@@ -184,5 +184,5 @@ export function FilterFields({
 /** Number of PropertyFilters (excluding sort) currently set — used for the mobile filter badge. */
 export function countActiveFilters(filters: FiltersWithSort): number {
   const { sortField: _sortField, sortDirection: _sortDirection, ...rest } = filters;
-  return Object.values(rest).filter((v) => v !== null && v !== "").length;
+  return Object.values(rest).filter((v) => v !== null && v !== undefined && v !== "" && (!Array.isArray(v) || v.length > 0)).length;
 }

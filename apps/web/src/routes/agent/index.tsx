@@ -44,7 +44,7 @@ export function AgentPage() {
               <div className="text-xs font-semibold text-ink-soft">
                 {formatDkk(property.price)}
                 {property.isPromoted && (
-                  <span className="ml-2 rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  <span className="ml-2 rounded-md bg-cta px-1.5 py-0.5 text-[10px] font-bold text-cta-text">
                     {t("agent.promoted")}
                   </span>
                 )}

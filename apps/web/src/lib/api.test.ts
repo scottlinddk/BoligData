@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getPropertyLookup } from "./api";
+import { getPropertyLookup, searchProperties } from "./api";
 
 vi.mock("./supabase", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: null } }) } },
@@ -66,5 +66,24 @@ describe("getPropertyLookup", () => {
     await getPropertyLookup({ address: "X", askingPrice: 1, lat: 0, lon: 0 });
     const params = new URLSearchParams(String(fetchSpy.mock.calls[0]?.[0]).split("?")[1]);
     expect(params.get("lat")).toBe("0");
+  });
+});
+
+describe("searchProperties drawn boundary", () => {
+  it("sends the entire JSON ring alongside viewport, ordinary filters and page offsets", async () => {
+    const fetchSpy = stubFetch();
+    const polygon = "[[9,57],[10,57],[10,58],[9,58]]";
+    await searchProperties({ polygon, bbox: "9,57,9.8,57.8", minPrice: 1_000_000, limit: 25, offset: 50 });
+    const params = new URLSearchParams(String(fetchSpy.mock.calls[0]?.[0]).split("?")[1]);
+    expect(params.get("polygon")).toBe(polygon);
+    expect(params.get("bbox")).toBe("9,57,9.8,57.8");
+    expect(params.get("minPrice")).toBe("1000000");
+    expect(params.get("offset")).toBe("50");
+  });
+
+  it("does not drop a provided empty polygon before the API can reject it", async () => {
+    const fetchSpy = stubFetch();
+    await searchProperties({ polygon: "" });
+    expect(new URLSearchParams(String(fetchSpy.mock.calls[0]?.[0]).split("?")[1]).has("polygon")).toBe(true);
   });
 });
