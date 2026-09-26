@@ -10,8 +10,8 @@ interface RegisterSourcesPanelProps {
 }
 
 const MODE_CLASS: Record<SourceSummaryEntry["mode"], string> = {
-  live: "bg-success-soft text-success",
-  mock: "bg-warning-soft text-warning",
+  live: "bg-success-soft text-success-text",
+  mock: "bg-warning-soft text-warning-text",
   unavailable: "bg-surface-alt text-ink-faint",
 };
 
@@ -38,7 +38,7 @@ export function RegisterSourcesPanel({ sources, isLoading, isError, onRetry }: R
         {title}
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="text-[12.5px] font-semibold text-danger">{t("register.error")}</p>
-          <button onClick={onRetry} className="rounded-full bg-danger px-4 py-1.5 text-sm font-bold text-white">
+          <button onClick={onRetry} className="rounded-full bg-cta px-4 py-1.5 text-sm font-bold text-cta-text transition-colors hover:bg-cta-hover">
             {t("common.retry")}
           </button>
         </div>

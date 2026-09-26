@@ -16,6 +16,7 @@ export const DENMARK_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+export const MAP_DARK_STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 
 /**
  * How many listings PropertyMap asks for when it re-queries the visible

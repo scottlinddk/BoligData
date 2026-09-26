@@ -1,30 +1,48 @@
+.property-map {
+  --map-pin-border: #285fbd;
+  --map-pin-text: #214f9b;
+  --map-focus: #729fe8;
+  background: var(--color-surface-alt);
+}
+:root.dark .property-map {
+  --map-pin-border: #8bb7ff;
+  --map-pin-text: #d5e4ff;
+  --map-focus: #8bb7ff;
+}
+.property-map-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-lift);
+}
+.property-map-caption { color: var(--color-text-secondary); }
+.property-map-error { color: var(--color-danger); }
 .property-map-price {
-  border: 1.5px solid #285fbd;
+  border: 1.5px solid var(--map-pin-border);
   border-radius: 999px;
-  background: #fff;
-  color: #214f9b;
+  background: var(--color-surface);
+  color: var(--map-pin-text);
   padding: 5px 10px;
   font-family: inherit;
   font-size: 12px;
   line-height: 1.25;
   font-weight: 700;
   white-space: nowrap;
-  box-shadow: 0 2px 6px #193f762a;
+  box-shadow: var(--shadow-lift);
   cursor: pointer;
 }
 .property-map-price:hover,
 .property-map-price:focus-visible {
-  background: #285fbd;
-  color: #fff;
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   z-index: 2;
-  outline: 3px solid #b8d1ff;
+  outline: 3px solid var(--map-focus);
   outline-offset: 2px;
 }
 .property-map-control {
   min-height: 40px;
   padding: 8px 11px;
   border-radius: 8px;
-  color: #334155;
+  color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -39,10 +57,61 @@
   font-weight: 700;
   cursor: pointer;
 }
-.property-map-cluster:focus-visible { outline: 3px solid #b8d1ff; outline-offset: 3px; }
-.property-map-control:hover { background: #eff4fc; }
-.property-map-control:focus-visible { outline: 3px solid #b8d1ff; outline-offset: 2px; }
-.property-map-control:disabled { opacity: .45; cursor: not-allowed; }
-.property-map-control.property-map-primary { background: #285fbd; color: white; }
-.property-map-control.property-map-primary:hover:not(:disabled) { background: #214f9b; }
-.property-map .maplibregl-popup-content { border-radius: 12px; padding: 16px; }
+.property-map-cluster:focus-visible { outline: 3px solid var(--map-focus); outline-offset: 3px; }
+.property-map-control:hover { background: var(--color-surface-hover); }
+.property-map-control:focus-visible { outline: 3px solid var(--map-focus); outline-offset: 2px; }
+.property-map-control:disabled { opacity: .5; cursor: not-allowed; }
+.property-map-control.property-map-primary { background: var(--color-cta); color: var(--color-cta-text); }
+.property-map-control.property-map-primary:hover:not(:disabled) { background: var(--color-cta-hover); }
+.property-map .maplibregl-popup-content {
+  border-radius: 12px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 16px;
+  box-shadow: var(--shadow-lift);
+}
+.property-map .maplibregl-popup-close-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+}
+.property-map .maplibregl-popup-close-button:hover { background: var(--color-surface-hover); }
+.property-map .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.property-map .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--color-surface); }
+.property-map .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.property-map .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--color-surface); }
+
+/* Native MapLibre controls are shared by listing and transaction maps. */
+.maplibregl-ctrl-group,
+.maplibregl-ctrl-attrib {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
+}
+.maplibregl-ctrl-group:not(:empty) { box-shadow: 0 0 0 1px var(--color-border-strong), var(--shadow-card); }
+.maplibregl-ctrl-group button + button { border-top-color: var(--color-border-strong); }
+.maplibregl-ctrl-group button:not(:disabled):hover { background-color: var(--color-surface-hover); }
+.maplibregl-ctrl-group button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: -3px; }
+.maplibregl-ctrl-attrib a { color: var(--color-text-secondary); }
+.maplibregl-ctrl-attrib a:hover { color: var(--color-text-primary); }
+.maplibregl-ctrl-attrib.maplibregl-compact { background: var(--color-surface); }
+:root.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+:root.dark .maplibregl-ctrl-attrib-button { filter: invert(1); }
+.research-map-point {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  background: var(--color-brand);
+  box-shadow: 0 0 0 1px var(--color-brand), var(--shadow-card);
+}
+.research-map-vertex {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--color-brand);
+  border-radius: 50%;
+  background: var(--color-surface);
+  pointer-events: none;
+}

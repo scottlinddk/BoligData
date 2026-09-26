@@ -5,11 +5,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./property-map.css";
 import type { Property, PropertyFilters } from "@shared/types/index";
 import { parseSearchBoundary, searchBoundaryBbox, serializeSearchBoundary, type SearchBoundaryPoint } from "@shared/utils/search-boundary";
-import { DENMARK_BOUNDS, MAP_STYLE_URL, MAP_VIEWPORT_LIMIT } from "@/lib/constants";
+import { DENMARK_BOUNDS, MAP_VIEWPORT_LIMIT } from "@/lib/constants";
 import { searchProperties } from "@/lib/api";
 import { boundaryMapData, mapPriceLabel, propertyMapData, validMapProperty, viewportSearchBoundary } from "@/lib/property-map-data";
 import { useI18n, type TranslateFn } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
+import { useTheme, type Theme } from "@/theme/theme";
+import { mapStyleUrl } from "@/lib/map-theme";
+import { useMapStyleTheme } from "@/lib/use-map-style-theme";
 
 interface PropertyMapProps {
   properties: Property[];
@@ -24,6 +27,20 @@ const PROPERTY_SOURCE = "search-properties";
 const CLUSTER_LAYER = "property-clusters";
 const POINT_LAYER = "property-points";
 const BLUE = "#285fbd";
+const OVERLAY_SOURCES = [BOUNDARY_SOURCE, PROPERTY_SOURCE];
+
+function applyOverlayTheme(map: maplibregl.Map, theme: Theme) {
+  const dark = theme === "dark";
+  if (!map.getLayer("boundary-fill")) return;
+  const line = dark ? "#8bb7ff" : BLUE;
+  map.setPaintProperty("boundary-fill", "fill-color", line);
+  map.setPaintProperty("boundary-fill", "fill-opacity", ["case", ["==", ["get", "kind"], "saved"], dark ? 0.18 : 0.13, dark ? 0.12 : 0.09]);
+  for (const id of ["boundary-saved-line", "boundary-draft-line"]) map.setPaintProperty(id, "line-color", line);
+  map.setPaintProperty("boundary-vertices", "circle-color", dark ? "#151e2b" : "#fff");
+  map.setPaintProperty("boundary-vertices", "circle-stroke-color", line);
+  map.setPaintProperty(CLUSTER_LAYER, "circle-color", dark ? "#2d64cd" : BLUE);
+  map.setPaintProperty(CLUSTER_LAYER, "circle-stroke-color", dark ? "#b7d1ff" : "#fff");
+}
 
 function createPopupContent(property: Property, t: TranslateFn, language: "da" | "en", onNavigate: (path: string) => void) {
   const wrapper = document.createElement("div");
@@ -76,6 +93,9 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
   const locationKey = JSON.stringify([filters?.location, filters?.postnummer]);
   const fittedLocationRef = useRef(locationKey);
   const { t, language } = useI18n();
+  const { theme } = useTheme();
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   const navigate = useNavigate();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [ready, setReady] = useState(false);
@@ -89,6 +109,10 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
   const [drawError, setDrawError] = useState<"invalid" | "limit" | "viewport" | null>(null);
   const canDraw = Boolean(filters && onBoundaryChange);
   const polygon = filters?.polygon ?? null;
+  const polygonRef = useRef(polygon);
+  const displayedPropertiesRef = useRef(displayedProperties);
+  polygonRef.current = polygon;
+  displayedPropertiesRef.current = displayedProperties;
   const filterKey = JSON.stringify(filters ? Object.entries(filters).sort(([left], [right]) => left.localeCompare(right)) : null);
   const invalidSavedBoundary = polygon !== null && !parseSearchBoundary(polygon);
   const mappedCount = new Set(displayedProperties.filter(validMapProperty).map((property) => property.id)).size;
@@ -101,7 +125,7 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     const initialBoundary = searchBoundaryBbox(polygon);
     try {
       map = new maplibregl.Map({
-        container: containerRef.current, style: MAP_STYLE_URL, renderWorldCopies: false,
+        container: containerRef.current, style: mapStyleUrl(theme), renderWorldCopies: false,
         bounds: initialBoundary ? [[initialBoundary[0], initialBoundary[1]], [initialBoundary[2], initialBoundary[3]]] : DENMARK_BOUNDS,
         fitBoundsOptions: { padding: 48 },
       });
@@ -111,8 +135,14 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.on("load", () => {
       installLayers(map);
+      applyOverlayTheme(map, themeRef.current);
       setReady(true);
       map.getCanvas().setAttribute("aria-label", language === "da" ? "Boligkort. Brug piletasterne til at flytte kortet." : "Property map. Use arrow keys to move the map.");
+    });
+    map.on("style.load", () => {
+      applyOverlayTheme(map, themeRef.current);
+      (map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(boundaryMapData(parseSearchBoundary(polygonRef.current), draftRef.current));
+      (map.getSource(PROPERTY_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(propertyMapData(displayedPropertiesRef.current));
     });
     map.on("error", () => setMapError(true));
     map.on("movestart", (event) => { if (event.originalEvent) cameraSetRef.current = true; });
@@ -152,6 +182,17 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     // The map is created once. Later filters change sources, never the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const mapStyleTheme = useMapStyleTheme(mapRef, ready, theme, OVERLAY_SOURCES);
+  const wasChangingTheme = useRef(false);
+  useEffect(() => {
+    if (wasChangingTheme.current && ready && !mapStyleTheme.changing && !mapStyleTheme.error) setMapError(false);
+    wasChangingTheme.current = mapStyleTheme.changing;
+    // Only a completed recovery clears an old warning; later tile errors stay visible.
+  }, [ready, mapStyleTheme.changing, mapStyleTheme.error]);
+  useEffect(() => {
+    if (ready && mapRef.current) applyOverlayTheme(mapRef.current, theme);
+  }, [ready, theme]);
 
   useEffect(() => {
     // Search maps use the viewport response. Detail maps use their supplied properties.
@@ -215,7 +256,7 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    (map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource).setData(boundaryMapData(parseSearchBoundary(polygon), draft));
+    (map.getSource(BOUNDARY_SOURCE) as maplibregl.GeoJSONSource | undefined)?.setData(boundaryMapData(parseSearchBoundary(polygon), draft));
   }, [polygon, draft, ready]);
 
   useEffect(() => {
@@ -226,10 +267,10 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     const markers = markersRef.current;
     markers.forEach((marker) => marker.remove());
     markers.clear();
-    source.setData(propertyMapData(displayedProperties));
+    source?.setData(propertyMapData(displayedProperties));
     let alive = true;
     const syncMarkers = () => {
-      if (!alive || !map.isSourceLoaded(PROPERTY_SOURCE)) return;
+      if (!alive || !map.getSource(PROPERTY_SOURCE) || !map.getLayer(POINT_LAYER) || !map.getLayer(CLUSTER_LAYER) || !map.isSourceLoaded(PROPERTY_SOURCE)) return;
       const visible = new Set<string>();
       map.queryRenderedFeatures(undefined, { layers: [POINT_LAYER, CLUSTER_LAYER] }).forEach((feature) => {
         if (feature.properties.cluster && feature.geometry.type === "Point") {
@@ -246,7 +287,8 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
           button.addEventListener("click", (event) => {
             event.stopPropagation();
             if (drawingRef.current) return;
-            source.getClusterExpansionZoom(Number(feature.properties.cluster_id)).then((zoom) => {
+            const currentSource = map.getSource(PROPERTY_SOURCE) as maplibregl.GeoJSONSource | undefined;
+            currentSource?.getClusterExpansionZoom(Number(feature.properties.cluster_id)).then((zoom) => {
               if (alive && !drawingRef.current) map.easeTo({ center, zoom });
             }).catch(() => { /* This cluster was replaced by a newer response. */ });
           });
@@ -339,9 +381,9 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     cancelDrawing();
   };
 
-  return <div className={`property-map relative h-full min-h-[280px] w-full overflow-hidden bg-slate-100 ${filters ? "rounded-none" : "rounded-2xl"}`}>
+  return <div data-map-theme={mapStyleTheme.appliedTheme} aria-busy={!ready || mapStyleTheme.changing} className={`property-map relative h-full min-h-[280px] w-full overflow-hidden ${filters ? "rounded-none" : "rounded-2xl"}`}>
     <div ref={containerRef} className="h-full w-full" />
-    {canDraw && <div className="absolute left-3 top-3 z-10 max-w-[calc(100%-68px)] rounded-xl border border-slate-200 bg-white/95 p-2 shadow-md backdrop-blur-sm">
+    {canDraw && <div className="property-map-panel absolute left-3 top-3 z-10 max-w-[calc(100%-68px)] rounded-xl p-2 backdrop-blur-sm">
       <div className="flex flex-wrap items-center gap-1.5">
         {!drawing ? <>
           <button ref={drawButtonRef} type="button" className="property-map-control property-map-primary" disabled={!ready} onClick={() => { setDraft([]); setDrawError(null); setDrawing(true); }}>{tx("Tegn område", "Draw area")}</button>
@@ -353,14 +395,16 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
           <button type="button" className="property-map-control" onClick={cancelDrawing}>{tx("Annuller", "Cancel")}</button>
         </>}
       </div>
-      <div aria-live="polite" aria-atomic="true" className="max-w-sm text-xs leading-relaxed text-slate-600">
+      <div aria-live="polite" aria-atomic="true" className="property-map-caption max-w-sm text-xs leading-relaxed">
         {drawing && <p className="px-1 pt-2">{tx(`Klik eller tryk på kortet: ${draft.length} punkter. Mindst 3. Afslut for at søge; Esc annullerer.`, `Click or tap the map: ${draft.length} points. At least 3. Finish to search; Esc cancels.`)}</p>}
-        {drawError && <p className="px-1 pt-2 font-medium text-red-700">{drawError === "limit" ? tx("Højst 64 punkter. Fortryd et punkt for at fortsætte.", "At most 64 points. Undo a point to continue.") : drawError === "viewport" ? tx("Zoom ind, så kortudsnittet er et gyldigt område.", "Zoom in so the visible map forms a valid area.") : tx("Området skal have mindst 3 forskellige punkter uden krydsende linjer. Ret punkterne og prøv igen.", "The area needs at least 3 distinct points without crossing lines. Adjust the points and try again.")}</p>}
-        {invalidSavedBoundary && <p className="px-1 pt-2 font-medium text-red-700">{tx("Området i linket er ugyldigt. Tegn et nyt område eller fjern det.", "The area in this link is invalid. Draw a new area or remove it.")}</p>}
+        {drawError && <p className="property-map-error px-1 pt-2 font-medium">{drawError === "limit" ? tx("Højst 64 punkter. Fortryd et punkt for at fortsætte.", "At most 64 points. Undo a point to continue.") : drawError === "viewport" ? tx("Zoom ind, så kortudsnittet er et gyldigt område.", "Zoom in so the visible map forms a valid area.") : tx("Området skal have mindst 3 forskellige punkter uden krydsende linjer. Ret punkterne og prøv igen.", "The area needs at least 3 distinct points without crossing lines. Adjust the points and try again.")}</p>}
+        {invalidSavedBoundary && <p className="property-map-error px-1 pt-2 font-medium">{tx("Området i linket er ugyldigt. Tegn et nyt område eller fjern det.", "The area in this link is invalid. Draw a new area or remove it.")}</p>}
       </div>
     </div>}
-    {!ready && <div role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-slate-600"><span className="rounded-lg bg-white/95 px-4 py-3 shadow-sm">{mapError ? tx("Kortet kunne ikke indlæses. Boligerne kan stadig ses i listen.", "The map could not load. Listings remain available in the list.") : tx("Indlæser kort…", "Loading map…")}</span></div>}
-    {ready && <div aria-live="polite" className="pointer-events-none absolute bottom-7 left-3 z-10 max-w-[calc(100%-24px)] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm">
+    {!ready && <div role="status" className="property-map-caption pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm"><span className="property-map-panel rounded-lg px-4 py-3">{mapError ? tx("Kortet kunne ikke indlæses. Boligerne kan stadig ses i listen.", "The map could not load. Listings remain available in the list.") : tx("Indlæser kort…", "Loading map…")}</span></div>}
+    {ready && <div aria-live="polite" className="property-map-panel property-map-caption pointer-events-none absolute bottom-7 left-3 z-10 max-w-[calc(100%-24px)] rounded-lg px-3 py-2 text-xs">
+      {mapStyleTheme.changing && <p>{tx("Opdaterer korttema…", "Updating map theme…")}</p>}
+      {mapStyleTheme.error && <p>{tx("Korttemaet kunne ikke indlæses fuldt. Prøv at skifte tema igen.", "The map theme could not fully load. Try switching the theme again.")}</p>}
       {mapError && <p>{tx("Nogle kortdata kunne ikke indlæses.", "Some map data could not load.")}</p>}
       {searchError ? <p>{tx("Boligerne kunne ikke opdateres. Prøv at flytte kortet eller ændre filtrene.", "Listings could not refresh. Try moving the map or changing filters.")}</p> : searching ? <p>{tx("Opdaterer boliger i kortudsnittet…", "Updating listings in this map area…")}</p> : <p>{filters && viewportTotal !== null && viewportTotal > mappedCount ? tx(`Viser ${mappedCount} af ${viewportTotal} boliger. Zoom ind for flere.`, `Showing ${mappedCount} of ${viewportTotal} listings. Zoom in for more.`) : tx(`${mappedCount} boliger på kortet`, `${mappedCount} listings on the map`)}{polygon && !invalidSavedBoundary ? tx(" · Tegnet område aktivt", " · Drawn area active") : ""}</p>}
     </div>}

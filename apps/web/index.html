@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
     <title>BoligData</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,22 +15,25 @@
       // Apply the persisted (or system) theme and language before React mounts
       // to avoid a flash of the wrong theme / lang attribute.
       (function () {
+        var storedTheme;
+        var storedLang;
         try {
-          var storedTheme = localStorage.getItem("boligdata.theme");
-          var theme =
-            storedTheme === "light" || storedTheme === "dark"
-              ? storedTheme
-              : window.matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light";
-          document.documentElement.classList.toggle("dark", theme === "dark");
-
-          var storedLang = localStorage.getItem("boligdata.lang");
-          document.documentElement.lang =
-            storedLang === "da" || storedLang === "en" ? storedLang : "da";
+          storedTheme = localStorage.getItem("boligdata.theme");
+          storedLang = localStorage.getItem("boligdata.lang");
         } catch (e) {
-          /* localStorage unavailable — fall back to markup defaults. */
+          /* Storage may be blocked; system theme still applies. */
         }
+        var theme =
+          storedTheme === "light" || storedTheme === "dark"
+            ? storedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#0e141e" : "#ffffff";
+        document.documentElement.lang =
+          storedLang === "da" || storedLang === "en" ? storedLang : "da";
       })();
     </script>
   </head>

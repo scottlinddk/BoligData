@@ -26,7 +26,7 @@ function SaleTypeTag({ saleType }: { saleType: SoldPriceEntry["saleType"] }) {
   const { t } = useI18n();
   if (saleType === undefined || saleType === "normal") return null;
   return (
-    <span className="ds-mono ml-1.5 rounded-[5px] bg-warning-soft px-1.5 py-0.5 text-[9px] text-warning">
+    <span className="ds-mono ml-1.5 rounded-[5px] bg-warning-soft px-1.5 py-0.5 text-[9px] text-warning-text">
       {t(`saleType.${saleType}` as TranslationKey)}
     </span>
   );
@@ -58,7 +58,7 @@ export function ComparablesPanel({
         {priceHistorySource !== null && (
           <span
             className={`ds-mono rounded-[5px] px-1.5 py-0.5 text-[9px] ${
-              priceHistorySource === "register" ? "bg-success-soft text-success" : "bg-surface-alt text-ink-faint"
+              priceHistorySource === "register" ? "bg-success-soft text-success-text" : "bg-surface-alt text-ink-faint"
             }`}
           >
             {priceHistorySource === "register" ? t("register.badgeLive") : t("register.badgeStored")}

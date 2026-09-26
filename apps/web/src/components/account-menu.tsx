@@ -52,7 +52,7 @@ export function AccountMenu() {
       >
         {initial}
         {totalUnread > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-brand text-[9px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-[15px] w-[15px] items-center justify-center rounded-full bg-cta text-[9px] font-bold text-cta-text">
             {totalUnread}
           </span>
         )}
@@ -77,7 +77,7 @@ export function AccountMenu() {
               >
                 <span>{t(item.labelKey)}</span>
                 {item.badge !== undefined && (
-                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-[9.5px] font-bold text-white">
+                  <span className="rounded-full bg-cta px-1.5 py-0.5 text-[9.5px] font-bold text-cta-text">
                     {item.badge}
                   </span>
                 )}

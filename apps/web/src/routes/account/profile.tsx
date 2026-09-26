@@ -119,7 +119,7 @@ export function AccountProfilePage() {
         type="button"
         disabled={saveMutation.isPending}
         onClick={() => saveMutation.mutate()}
-        className="rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        className="rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-cta-text transition-colors hover:bg-cta-hover disabled:opacity-50"
       >
         {saveMutation.isPending ? t("common.saving") : t("common.save")}
       </button>

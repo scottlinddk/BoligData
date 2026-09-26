@@ -40,6 +40,10 @@ body,
   --color-unknown: #748091;
   --color-unknown-soft: #eef2f6;
   --color-unknown-text: #627084;
+  --color-footer-bg: #1b1f24;
+  --color-footer-border: #30363d;
+  --color-footer-text: #ffffff;
+  --color-footer-muted: #b8bec8;
   --shadow-card: 0 1px 3px rgba(11, 31, 67, 0.05);
   --shadow-lift: 0 8px 28px rgba(11, 31, 67, 0.12);
 }
@@ -47,36 +51,40 @@ body,
 :root.dark {
   color-scheme: dark;
 
-  --color-bg: #101827;
+  --color-bg: #0e141e;
   --gradient-bg: none;
-  --color-surface: #152033;
-  --color-surface-alt: #1d2b41;
-  --color-surface-hover: #273953;
-  --color-border: #2b3a50;
-  --color-border-strong: #42546e;
-  --color-text-primary: #f1f5ff;
-  --color-text-secondary: #b1bed0;
-  --color-text-tertiary: #99a8bd;
-  --color-cta: #346fdd;
-  --color-cta-hover: #427deb;
+  --color-surface: #151e2b;
+  --color-surface-alt: #1c2839;
+  --color-surface-hover: #25344a;
+  --color-border: #2a384c;
+  --color-border-strong: #52657f;
+  --color-text-primary: #f4f7fd;
+  --color-text-secondary: #b7c4d8;
+  --color-text-tertiary: #98a9c0;
+  --color-cta: #2d67d8;
+  --color-cta-hover: #326cdd;
   --color-cta-text: #ffffff;
-  --color-brand: #7ca9ff;
-  --color-brand-hover: #a1c1ff;
-  --color-brand-soft: #1b3459;
-  --color-brand-text: #a1c1ff;
+  --color-brand: #8bb7ff;
+  --color-brand-hover: #b6d1ff;
+  --color-brand-soft: #1c3354;
+  --color-brand-text: #adcfff;
   --color-success: #6fd68a;
   --color-success-soft: #142a1e;
   --color-success-text: #8fe3a4;
   --color-warning: #e9be74;
   --color-warning-soft: #3c301b;
   --color-warning-text: #f3cd8e;
-  --color-danger: #e2685a;
-  --color-danger-soft: #2a1616;
-  --color-unknown: #99a8bd;
+  --color-danger: #ff9c90;
+  --color-danger-soft: #3b2227;
+  --color-unknown: #98a9c0;
   --color-unknown-soft: #223046;
-  --color-unknown-text: #b1bed0;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.15);
-  --shadow-lift: 0 8px 28px rgba(0, 0, 0, 0.25);
+  --color-unknown-text: #b7c4d8;
+  --color-footer-bg: #0b1018;
+  --color-footer-border: #243043;
+  --color-footer-text: #f4f7fd;
+  --color-footer-muted: #a7b5c9;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 :root.dark body {
@@ -115,6 +123,19 @@ body {
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: color 0.25s ease;
+}
+
+::selection {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-text);
+}
+
+input, select, textarea {
+  accent-color: var(--color-cta);
+}
+
+:root.dark dialog::backdrop {
+  background: rgba(3, 8, 16, 0.72);
 }
 
 .ds-mono {

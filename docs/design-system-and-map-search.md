@@ -4,6 +4,14 @@ BoligData now follows the supplied listing-page reference: a white background, n
 
 The search page shows a two-column listing grid beside a full-height sticky map on screens at least 900px wide. The list toggle expands the listing grid. Phones have separate list/map views with the same filters and boundary. Advanced filters use a native modal dialog for focus containment, Escape dismissal and returning focus to the opener. Header navigation collapses below 1024px. Reduced-motion preferences and visible keyboard focus are supported.
 
+## Dark appearance
+
+The sun/moon control in the header switches between the matching light and dark designs. Dark mode uses a deep navy canvas, raised slate surfaces, soft white text and the same royal-blue actions. Listing photos retain their original colors. Filters, menus, research tables, status badges, the footer, map popups and map controls all share the theme.
+
+Without a saved choice, the app follows the operating system's appearance, including changes while the page is open. Choosing a theme saves that preference across visits and synchronizes other open tabs. The initial theme is applied before React mounts; blocked theme storage still allows an in-memory choice. Native form controls and the browser theme color follow the active appearance.
+
+Search, property and research maps use OpenFreeMap's matching light/dark base styles. Switching theme preserves the current map camera, selected area and drawing in progress. Price markers, clusters and boundary lines retain clear contrast against the darker geography.
+
 ## Search a drawn area
 
 1. Sign in, open the map and choose **Tegn område / Draw area**.
@@ -22,3 +30,5 @@ Apply `packages/supabase/migrations/024_drawn_search_boundary.sql`, then `packag
 Run the normal typechecks, test suite and production build. The CI workflow also runs `scripts/verify-search-boundary.sql` in a disposable PostgreSQL/PostGIS service: it applies both migrations in order and verifies saved-search boundary storage, concavity, edge inclusion, input rejection, RLS, filters, counts and pagination, then rolls back the fixture transaction. The script refuses to run where the application's properties or searches table already exists.
 
 For browser checks, start the local web server with `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5174 --mode production` from `apps/web`, then run `node scripts/map-search-browser-smoke.cjs` from the repository root. The test uses the real MapLibre canvas with synthetic listings, images, geography and auth; all remote requests are intercepted. It exercises drawing, invalid shapes, undo/cancel, panning, URL reload, saving/removal, desktop/tablet/mobile layouts, touch input, keyboard dialog behavior and dark mode. `scripts/research-browser-smoke.cjs` checks the research workflow against the shared design tokens.
+
+The map smoke also verifies system appearance, persisted choices, cross-tab updates, text contrast, preservation of unfinished drawings and recovery from a failed map-theme load. Set `SMOKE_THEME=dark` when running the research smoke to check the dark workspace, sales map, status badges and print output; its default remains light. Screenshots and reports are saved under the ignored `node_modules/.cache` directory.
