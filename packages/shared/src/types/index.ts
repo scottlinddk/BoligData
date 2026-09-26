@@ -43,7 +43,9 @@ export interface Property {
   postalCode: string | null;
   price: number;
   sqm: number;
-  listingDate: string; // ISO date
+  listingDate: string | null; // Documented ISO date; never the crawler's first observation
+  dataMode?: "real" | "demo" | "mock" | "unknown";
+  firstSeenAt?: string | null;
   listingSource: ListingSource;
   externalId: string;
   lat: number;
@@ -109,8 +111,11 @@ export type SaleType = "normal" | "family" | "auction" | "other";
 export interface SoldPriceEntry {
   soldDate: string; // ISO date
   price: number;
-  pricePerSqm: number;
+  pricePerSqm: number | null;
   saleType?: SaleType;
+  registrationId?: string;
+  residentialArea?: number;
+  areaDefinition?: "residential" | "weighted" | "unknown";
 }
 
 export interface CalculatedMetrics {
@@ -118,7 +123,7 @@ export interface CalculatedMetrics {
   neighborhoodPricePerSqm: number | null;
   priceTrendPercent: number | null; // vs neighborhood, last 12mo
   estimatedYieldPercent: number | null;
-  daysOnMarket: number;
+  daysOnMarket: number | null;
 }
 
 export type SoilContaminationClassification = "v1" | "v2" | "none" | "unknown";
@@ -198,6 +203,13 @@ export interface Enrichment {
   publicValuation: PublicValuation | null;
   source: EnrichmentSource;
   enrichedAt: string;
+  sourceStatus?: Record<string, {
+    dataMode: "real" | "mock" | "unavailable";
+    observedAt: string;
+    method: string;
+    verificationStatus: "unverified" | "unavailable";
+    reason: string | null;
+  }>;
 }
 
 export type UserRole = "admin" | "user" | "advisor" | "agent";

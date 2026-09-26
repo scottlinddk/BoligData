@@ -7,6 +7,8 @@ import { listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
+import { mockModeEnabled } from "../enrichment-sources/types.js";
+import { buildHistoryRows, persistHistoryRows, type PreviousListingObservation } from "./history.js";
 
 const CHUNK_SIZE = 500;
 // Fetch-stage errors (e.g. "skipped unmappable record") are capped separately
@@ -35,6 +37,9 @@ export interface IngestSourceReport {
   source: ListingSource;
   /** False when the fetcher itself rejected — nothing was ingested for this source. */
   ok: boolean;
+  complete: boolean;
+  dataMode: "real" | "mock" | "unknown";
+  quarantinedSales: number;
   fetched: number;
   upserted: number;
   /** Of `upserted`, how many were brand new rows (not previously in `properties`). */
@@ -61,20 +66,14 @@ export interface IngestResult {
 }
 
 /**
- * The listing_date actually written to `properties` (a not-null column):
- * the mapper's parsed date when it found one, otherwise the property's own
- * previously stored date — so a re-crawled listing whose source date can't
- * be parsed doesn't get bumped to "today" on every run (see
- * boligsiden.ts/boliga.ts, whose mappers return null rather than guess).
- * Only a brand-new property (no prior stored date) falls back to today,
- * which is a reasonable first-seen date for it.
+ * Only source-documented dates belong in listing_date. A technical first
+ * observation is not evidence that the property was first listed that day.
  */
 export function resolveListingDate(
   mappedDate: string | null,
   existingDate: string | null,
-  todayDate: string,
-): string {
-  return mappedDate ?? existingDate ?? todayDate;
+): string | null {
+  return mappedDate ?? existingDate;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -95,7 +94,7 @@ function chunk<T>(items: T[], size: number): T[][] {
  * rows written. An explicit projection keeps the next RawListing field from
  * doing the same.
  */
-function toPropertyColumns(l: RawListing, listingDate: string) {
+function toPropertyColumns(l: RawListing, listingDate: string | null) {
   return {
     address: l.address,
     municipality: l.municipality,
@@ -103,6 +102,8 @@ function toPropertyColumns(l: RawListing, listingDate: string) {
     price: l.price,
     sqm: l.sqm,
     listing_date: listingDate,
+    listing_date_definition: listingDate ? "source_reported" : "unknown",
+    data_mode: l.data_mode ?? "unknown",
     listing_source: l.listing_source,
     external_id: l.external_id,
     lat: l.lat,
@@ -127,6 +128,9 @@ async function ingestSource(
   const report: IngestSourceReport = {
     source,
     ok: true,
+    complete: false,
+    dataMode: "unknown",
+    quarantinedSales: 0,
     fetched: 0,
     upserted: 0,
     created: 0,
@@ -169,6 +173,8 @@ async function ingestSource(
   }
 
   const { listings, stats } = settled.value;
+  report.complete = stats.complete === true;
+  report.dataMode = stats.dataMode ?? "unknown";
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
   report.skippedOutOfArea = stats.recordsOutOfArea;
@@ -178,7 +184,7 @@ async function ingestSource(
   // fetcher return a resolved promise with zero listings rather than reject
   // — otherwise a total upstream failure would look identical to "no new
   // listings this run" and the daily Action would go green on empty output.
-  if (listings.length === 0 && stats.errors.length > 0) {
+  if (stats.errors.length > 0) {
     report.ok = false;
   }
 
@@ -187,29 +193,38 @@ async function ingestSource(
 
   // Existing fingerprints, fetched before the upsert overwrites them — the
   // basis for deciding which listings actually need (re-)enrichment.
-  const existing = new Map<string, { id: string; content_hash: string | null; listing_date: string | null }>();
+  const existing = new Map<string, PreviousListingObservation & { id: string; content_hash: string | null; listing_date: string | null; first_seen_at: string | null }>();
+  const blockedExternalIds = new Set<string>();
   for (const ids of chunk([...hashByExternalId.keys()], CHUNK_SIZE)) {
     const { data, error } = await client
       .from("properties")
-      .select("id, external_id, content_hash, listing_date")
+      .select("id, external_id, content_hash, listing_date, listing_date_definition, price, status, last_seen_at, first_seen_at, current_episode_key")
       .eq("listing_source", source)
       .in("external_id", ids);
     if (error) {
       report.dbErrors += 1;
       pushDbError(`prefetch: ${error.message}`);
       logError("crawl.db.prefetch_failed", error, { source });
+      // Without the previous snapshot we cannot safely preserve history or
+      // technical first-seen metadata. Leave those rows intact for a retry.
+      for (const id of ids) blockedExternalIds.add(id);
       continue;
     }
     for (const row of data ?? []) {
       existing.set(row.external_id as string, {
         id: row.id as string,
         content_hash: (row.content_hash as string | null) ?? null,
-        listing_date: (row.listing_date as string | null) ?? null,
+        price: Number(row.price),
+        status: String(row.status),
+        last_seen_at: row.last_seen_at ?? null,
+        first_seen_at: row.first_seen_at ?? null,
+        current_episode_key: row.current_episode_key ?? null,
+        // Legacy dates may have been synthesized from first_seen; do not
+        // carry them forward as documented source dates.
+        listing_date: row.listing_date_definition === "source_reported" ? (row.listing_date as string | null) ?? null : null,
       });
     }
   }
-
-  const todayDate = now.slice(0, 10);
 
   // Cadastral lookup (id_lokalid/matrikelnr/ejerlav/zone/bfe_nummer) is
   // per-property, not per-enrichment-source — it's needed both on the
@@ -219,7 +234,9 @@ async function ingestSource(
   const cadastralByExternalId = new Map<string, AddressCadastral | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const results = await Promise.all(
-      listingChunk.map((l) => lookupAddressCadastral(l.address, l.postal_code, l.lat, l.lon)),
+      listingChunk.map((l) => l.data_mode !== "real" || mockModeEnabled("ADDRESS_LOOKUP_MOCK_MODE")
+        ? Promise.resolve({ ok: false as const, error: "Non-live cadastral source omitted" })
+        : lookupAddressCadastral(l.address, l.postal_code, l.lat, l.lon)),
     );
     results.forEach((result, i) => {
       const listing = listingChunk[i]!;
@@ -241,7 +258,10 @@ async function ingestSource(
     const results = await Promise.all(
       listingChunk.map((l) => {
         const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
-        return lookupMatrikelParcel(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
+        if (!cadastral || process.env.MATRIKEL_MOCK_MODE !== "false") {
+          return Promise.resolve({ ok: false as const, error: "Non-live or unavailable cadastral source omitted" });
+        }
+        return lookupMatrikelParcel(cadastral.matrikelnr, cadastral.ejerlav);
       }),
     );
     results.forEach((result, i) => {
@@ -256,14 +276,39 @@ async function ingestSource(
   }
 
   const propertyIdByExternalId = new Map<string, string>();
+  async function persistListingHistory(listing: RawListing, propertyId: string): Promise<boolean> {
+    const before = existing.get(listing.external_id) ?? null;
+    const rows = buildHistoryRows({ ...listing,
+      listing_date: resolveListingDate(listing.listing_date, before?.listing_date ?? null),
+    }, propertyId, now, before);
+    report.quarantinedSales += rows.quarantinedSales;
+    try {
+      const errors = await persistHistoryRows(client, rows);
+      for (const error of errors) { report.dbErrors += 1; pushDbError(error); }
+      return errors.length === 0;
+    } catch (error) {
+      report.dbErrors += 1;
+      pushDbError(`history: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+  // Persist existing-record history before replacing its previous price or
+  // status. If history fails, a retry must still see the original transition.
+  for (const listing of listings) {
+    const before = existing.get(listing.external_id);
+    if (!before || blockedExternalIds.has(listing.external_id)) continue;
+    if (!(await persistListingHistory(listing, before.id))) blockedExternalIds.add(listing.external_id);
+  }
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
-    const rows = listingChunk.map((l) => {
+    const rows = listingChunk.filter((listing) => !blockedExternalIds.has(listing.external_id)).map((l) => {
       const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
-      const listingDate = resolveListingDate(l.listing_date, existing.get(l.external_id)?.listing_date ?? null, todayDate);
+      const listingDate = resolveListingDate(l.listing_date, existing.get(l.external_id)?.listing_date ?? null);
       return {
         ...toPropertyColumns(l, listingDate),
         content_hash: hashByExternalId.get(l.external_id),
         last_seen_at: now,
+        first_seen_at: existing.has(l.external_id) ? existing.get(l.external_id)!.first_seen_at : now,
+        current_episode_key: buildHistoryRows({ ...l, listing_date: listingDate }, existing.get(l.external_id)?.id ?? "new", now, existing.get(l.external_id) ?? null).episode.ingest_key,
         id_lokalid: cadastral?.idLokalid ?? null,
         matrikelnr: cadastral?.matrikelnr ?? null,
         ejerlav: cadastral?.ejerlav ?? null,
@@ -272,6 +317,7 @@ async function ingestSource(
         registered_area_sqm: registeredAreaByExternalId.get(l.external_id) ?? null,
       };
     });
+    if (rows.length === 0) continue;
     const { data, error } = await client
       .from("properties")
       .upsert(rows, { onConflict: "listing_source,external_id" })
@@ -286,6 +332,16 @@ async function ingestSource(
       propertyIdByExternalId.set(row.external_id as string, row.id as string);
     }
     report.upserted += data?.length ?? 0;
+  }
+
+  // This runs for every observed listing, independent of enrichment hashes.
+  // Only positively observed listings are touched: an incomplete or bounded
+  // crawl provides no evidence that an unseen listing was removed or sold.
+  for (const listing of listings) {
+    if (existing.has(listing.external_id)) continue;
+    const propertyId = propertyIdByExternalId.get(listing.external_id);
+    if (!propertyId) continue;
+    await persistListingHistory(listing, propertyId);
   }
 
   // Change detection: enrich listings that are new or whose content changed.

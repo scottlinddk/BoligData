@@ -73,7 +73,9 @@ export function absoluteUrl(origin: string, path: unknown): string | null {
 export function asIsoDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const date = value.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : null;
 }
 
 /** Denmark (incl. Bornholm) plausibility bounds. */
@@ -107,6 +109,11 @@ export function listingContentHash(l: RawListing): string {
         l.rooms,
         l.description,
         l.agent_name,
+        // Registrations change independently of the current asking price.
+        // Sorting prevents an upstream reorder from causing needless writes.
+        [...(l.sold_price_history ?? [])].sort((a, b) =>
+          `${a.soldDate}|${a.price}|${a.saleType}`.localeCompare(`${b.soldDate}|${b.price}|${b.saleType}`)),
+        l.data_mode ?? "unknown",
       ]),
     )
     .digest("hex");

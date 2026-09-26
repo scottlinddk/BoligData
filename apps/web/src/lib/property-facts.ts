@@ -7,9 +7,8 @@ type Enrichment = PropertyDetailResponse["enrichment"];
 /**
  * Where a value on the detail page came from.
  * - `register` — this request's live `/api/property-lookup` read.
- * - `stored` — the property's `enrichments` row, written by the nightly
- *   crawl. Rows ingested before the sources went live still hold mock values,
- *   which is exactly why the two are labelled differently in the UI.
+ * - `stored` — a cached real-source response with explicit group provenance.
+ *   Legacy rows without provenance and fabricated values are not facts.
  */
 export type FactSource = "register" | "stored";
 
@@ -46,45 +45,27 @@ function hasAnyValue(bbr: BbrData | null): boolean {
 /**
  * Register-first merge of everything the detail page renders.
  *
- * The live lookup wins field by field rather than object by object: BBR can
- * answer `yearBuilt` while `basementSqm` stays null (it lives on a different
- * entity), and dropping the stored value in that case would lose data the
- * page used to show. Price and price/m² are deliberately *not* touched — they
- * are the listing's own numbers, and re-deriving them from a register area
- * would silently change what the rest of the page means.
+ * A coherent source group wins. Missing live fields stay unknown rather than
+ * promoting cached values under a live-source badge. Source availability is
+ * checked per group; a live address lookup cannot validate a mock BBR result.
+ * Listing prices are never re-derived using a different area definition.
  */
 export function mergePropertyFacts(
   property: Property,
   enrichment: Enrichment,
   lookup: PropertyLookupResult | null,
 ): MergedPropertyFacts {
-  const stored = enrichment?.bbrData ?? null;
-  const live = lookup?.bbrData ?? null;
+  const lookupIsLive = (key: PropertyLookupResult["sources"][number]["key"]) =>
+    lookup?.sources.some((source) => source.key === key && source.mode === "live") === true;
+  const storedIsReal = (key: string) => enrichment?.sourceStatus?.[key]?.dataMode === "real";
+  const stored = storedIsReal("bbr") ? enrichment?.bbrData ?? null : null;
+  const live = lookupIsLive("bbr") && lookup?.bbrData ? { ...lookup.bbrData, energyLabel: null } : null;
   const liveIsUsable = hasAnyValue(live);
-
-  const bbrData: BbrData | null =
-    live === null && stored === null
-      ? null
-      : {
-          yearBuilt: live?.yearBuilt ?? stored?.yearBuilt ?? null,
-          renovationYear: live?.renovationYear ?? stored?.renovationYear ?? null,
-          // The lookup only echoes back the energy label its caller supplied,
-          // so it is never a better source for this field than the stored row.
-          energyLabel: stored?.energyLabel ?? live?.energyLabel ?? null,
-          areaSqm: live?.areaSqm ?? stored?.areaSqm ?? null,
-          buildingType: live?.buildingType ?? stored?.buildingType ?? null,
-          heatingInstallation: live?.heatingInstallation ?? stored?.heatingInstallation ?? null,
-          floors: live?.floors ?? stored?.floors ?? null,
-          roofMaterial: live?.roofMaterial ?? stored?.roofMaterial ?? null,
-          wallMaterial: live?.wallMaterial ?? stored?.wallMaterial ?? null,
-          basementSqm: live?.basementSqm ?? stored?.basementSqm ?? null,
-          toiletCount: live?.toiletCount ?? stored?.toiletCount ?? null,
-          bathroomCount: live?.bathroomCount ?? stored?.bathroomCount ?? null,
-        };
-
-  const liveValuation = lookup?.publicValuation ?? null;
-  const storedValuation = enrichment?.publicValuation ?? null;
-  const valuationIsLive = liveValuation !== null && liveValuation.assessedPropertyValueDkk !== null;
+  // The lookup's energy label is caller-supplied, not a register observation.
+  const bbrData = liveIsUsable ? { ...live!, energyLabel: null } : hasAnyValue(stored) ? stored : null;
+  const liveValuation = lookupIsLive("publicValuation") ? lookup?.publicValuation ?? null : null;
+  const storedValuation = storedIsReal("valuation") ? enrichment?.publicValuation ?? null : null;
+  const valuationIsLive = liveValuation !== null && Object.values(liveValuation).some((value) => value !== null);
 
   const registerArea = live?.areaSqm ?? null;
 
@@ -94,8 +75,8 @@ export function mergePropertyFacts(
   // listing, and `listingContentHash` doesn't change when a *neighbour*
   // transacts — or when this address does, if nothing else about the listing
   // moved.
-  const livePriceHistory = lookup?.priceHistory ?? [];
-  const storedPriceHistory = enrichment?.soldPriceHistory ?? [];
+  const livePriceHistory = lookupIsLive("sales") ? lookup?.priceHistory ?? [] : [];
+  const storedPriceHistory = storedIsReal("sales") ? enrichment?.soldPriceHistory ?? [] : [];
   const priceHistory = livePriceHistory.length > 0 ? livePriceHistory : storedPriceHistory;
 
   return {
@@ -103,20 +84,18 @@ export function mergePropertyFacts(
     bbrSource: bbrData === null ? null : liveIsUsable ? "register" : "stored",
     publicValuation: valuationIsLive ? liveValuation : storedValuation,
     valuationSource: valuationIsLive ? "register" : storedValuation !== null ? "stored" : null,
-    // The address register retired its zone field, so `zone` comes back null
-    // from the lookup for every address today; the stored column still holds
-    // whatever the earlier ingest resolved.
-    zone: lookup?.resolved.zone ?? property.zone ?? null,
-    matrikelnr: lookup?.resolved.matrikelnr ?? property.matrikelnr ?? null,
-    ejerlav: lookup?.resolved.ejerlav ?? property.ejerlav ?? null,
-    bfeNummer: lookup?.resolved.bfeNummer ?? null,
-    buildingYear: live?.yearBuilt ?? property.buildingYear ?? stored?.yearBuilt ?? null,
-    renovationYear: live?.renovationYear ?? stored?.renovationYear ?? null,
+    // Unprovenanced cached cadastral fields cannot become live register facts.
+    zone: lookupIsLive("address") ? lookup?.resolved.zone ?? null : null,
+    matrikelnr: lookupIsLive("address") ? lookup?.resolved.matrikelnr ?? null : null,
+    ejerlav: lookupIsLive("address") ? lookup?.resolved.ejerlav ?? null : null,
+    bfeNummer: lookupIsLive("address") ? lookup?.resolved.bfeNummer ?? null : null,
+    buildingYear: bbrData?.yearBuilt ?? (property.dataMode === "real" ? property.buildingYear : null) ?? null,
+    renovationYear: bbrData?.renovationYear ?? null,
     registerAreaSqm: registerArea !== null && registerArea !== property.sqm ? registerArea : null,
     priceHistory,
     priceHistorySource:
       priceHistory.length === 0 ? null : livePriceHistory.length > 0 ? "register" : "stored",
-    nearbySales: lookup?.nearbySales ?? [],
+    nearbySales: lookupIsLive("sales") ? lookup?.nearbySales ?? [] : [],
   };
 }
 

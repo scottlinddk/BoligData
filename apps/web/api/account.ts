@@ -12,6 +12,7 @@ import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient, getAuthAdmin, getServiceRoleClient } from "../server/lib/supabase.js";
 import { isUuid, sendError } from "../server/lib/http-helpers.js";
 import { rowToConversation, rowToMessage, rowToProfile } from "../server/lib/row-mappers.js";
+import { handleResearch } from "../server/lib/research/handlers.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
@@ -44,6 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
   const resource = str(req.query.resource);
+  if (resource?.startsWith("research-")) {
+    await handleResearch(req, res, client, auth.userId, resource);
+    return;
+  }
   switch (resource) {
     case "conversations":
       await handleConversations(req, res, client, auth.userId);

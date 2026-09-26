@@ -41,6 +41,7 @@ describe("mapBoligaRecord", () => {
   it("maps a valid record to a RawListing", () => {
     const listing = mapBoligaRecord(boligaRecord);
     expect(listing).toEqual({
+      data_mode: "real",
       address: "Testgade 12, 2. th",
       municipality: "Aalborg",
       postal_code: "9000",
@@ -86,6 +87,7 @@ describe("mapBoligsidenCase", () => {
   it("maps a valid case to a RawListing", () => {
     const listing = mapBoligsidenCase(boligsidenCase);
     expect(listing).toEqual({
+      data_mode: "real",
       address: "Prøvevej 7",
       municipality: "Aarhus",
       postal_code: "8000",
@@ -141,9 +143,9 @@ describe("mapBoligsidenCase", () => {
     });
 
     expect(listing?.sold_price_history).toEqual([
-      { soldDate: "2021-08-30", price: 2_050_000, pricePerSqm: 10199, saleType: "normal" },
+      { soldDate: "2021-08-30", price: 2_050_000, pricePerSqm: 10199, saleType: "normal", registrationId: "5654008", residentialArea: 201, areaDefinition: "residential" },
       // No perAreaPrice on the older row — derived from amount/area instead.
-      { soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: Math.round(1_495_000 / 201), saleType: "normal" },
+      { soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: Math.round(1_495_000 / 201), saleType: "normal", registrationId: "2736865", areaDefinition: "unknown" },
     ]);
   });
 
@@ -158,7 +160,7 @@ describe("mapBoligsidenCase", () => {
     expect(listing?.sold_price_history[0]?.saleType).toBe("family");
   });
 
-  it("skips registrations with no date, price or usable area rather than emitting NaN", () => {
+  it("rejects invalid registrations but preserves sales with unknown area", () => {
     const listing = mapBoligsidenCase({
       ...boligsidenCase,
       address: {
@@ -171,7 +173,7 @@ describe("mapBoligsidenCase", () => {
         ],
       },
     });
-    expect(listing?.sold_price_history).toEqual([]);
+    expect(listing?.sold_price_history).toEqual([{ soldDate: "2020-01-01", price: 1_000_000, pricePerSqm: null, saleType: "normal", areaDefinition: "unknown" }]);
   });
 
   it("treats a missing registrations array as no history, not as a failure", () => {

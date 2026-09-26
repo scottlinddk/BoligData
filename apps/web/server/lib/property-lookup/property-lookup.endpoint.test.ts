@@ -1,102 +1,86 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-// Lives here rather than next to the handler in api/, because Vercel turns
-// every file it uploads under api/ into a Serverless Function — including
-// *.test.ts — and the Hobby plan caps a deployment at 12. See .vercelignore.
 import handler from "../../../api/property-lookup.js";
+import { requireUser } from "../../middleware/auth.js";
+import { lookupProperty } from "./property-lookup.handler.js";
 
-interface Captured {
-  statusCode: number | null;
-  body: unknown;
-  headers: Record<string, string>;
-  res: VercelResponse;
-}
+const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
+vi.mock("../../middleware/auth.js", () => ({ requireUser: vi.fn() }));
+vi.mock("../supabase.js", () => ({ getAnonClient: () => ({ rpc }) }));
+vi.mock("./property-lookup.handler.js", () => ({ lookupProperty: vi.fn() }));
 
-function mockRes(): Captured {
-  const captured: Captured = { statusCode: null, body: undefined, headers: {}, res: null as never };
+function response() {
+  const result = { statusCode: 0, body: undefined as unknown, headers: {} as Record<string, string> };
   const res = {
-    setHeader(name: string, value: string) {
-      captured.headers[name.toLowerCase()] = value;
-      return res;
-    },
-    status(code: number) {
-      captured.statusCode = code;
-      return res;
-    },
-    json(payload: unknown) {
-      captured.body = payload;
-      return res;
-    },
-    end() {
-      return res;
-    },
+    setHeader(name: string, value: string) { result.headers[name.toLowerCase()] = value; return res; },
+    status(code: number) { result.statusCode = code; return res; },
+    json(body: unknown) { result.body = body; return res; }, end() { return res; },
   };
-  captured.res = res as unknown as VercelResponse;
-  return captured;
+  return { result, res: res as unknown as VercelResponse };
+}
+const query = { address: "Testvej 1, 9000 Aalborg", askingPrice: "2000000" };
+function request(values: Record<string, string> = query): VercelRequest {
+  return { method: "GET", query: values, headers: { authorization: "Bearer token" } } as unknown as VercelRequest;
 }
 
-function mockReq(query: Record<string, string>, headers: Record<string, string> = {}): VercelRequest {
-  return { method: "GET", query, headers } as unknown as VercelRequest;
-}
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(requireUser).mockResolvedValue({ userId: "user-1", jwt: "token" });
+  rpc.mockResolvedValue({ data: true, error: null });
+  vi.mocked(lookupProperty).mockResolvedValue({ address: query.address, source: "ai" } as Awaited<ReturnType<typeof lookupProperty>>);
+});
 
-const query = { address: "Skomagergyden 4, 9000 Aalborg", askingPrice: "2000000" };
-
-describe("GET /api/property-lookup", () => {
-  // These assert the endpoint's HTTP contract, not its data. Pinning every
-  // source to mock keeps them hermetic — otherwise each case would reach for
-  // the live registers and the "same payload with or without a bearer token"
-  // comparison would turn on upstream availability.
-  beforeEach(() => {
-    vi.stubEnv("ADDRESS_LOOKUP_MOCK_MODE", "true");
-    vi.stubEnv("BBR_MOCK_MODE", "true");
-    vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "true");
-    vi.stubEnv("STOEJKORT_MOCK_MODE", "true");
-    vi.stubEnv("BOLIGSIDEN_SALES_MOCK_MODE", "true");
+describe("authenticated register lookup", () => {
+  it("rejects unauthenticated callers before spending upstream or quota requests", async () => {
+    vi.mocked(requireUser).mockImplementation(async (_req, res) => { res.status(401).json({ error: "Missing bearer token" }); return null; });
+    const { res, result } = response();
+    await handler(request(), res);
+    expect(result.statusCode).toBe(401);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(lookupProperty).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
+  it("consumes the persistent account quota and never publicly caches private inputs", async () => {
+    const { res, result } = response();
+    await handler(request(), res);
+    expect(result.statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("consume_register_lookup_budget");
+    expect(result.headers["cache-control"]).toBe("private, no-store");
+    expect(lookupProperty).toHaveBeenCalledOnce();
   });
 
-  it("answers without an Authorization header", async () => {
-    const captured = mockRes();
-    await handler(mockReq(query), captured.res);
-
-    expect(captured.statusCode).toBe(200);
-    expect(captured.body).toMatchObject({ address: query.address, source: "ai" });
+  it("rejects an exhausted quota without making register calls", async () => {
+    rpc.mockResolvedValue({ data: false, error: null });
+    const { res, result } = response();
+    await handler(request(), res);
+    expect(result.statusCode).toBe(429);
+    expect(result.headers["retry-after"]).toBe("3600");
+    expect(lookupProperty).not.toHaveBeenCalled();
   });
 
-  it("sends a public, CDN-cacheable response rather than private/no-store", async () => {
-    const captured = mockRes();
-    await handler(mockReq(query), captured.res);
-
-    expect(captured.headers["cache-control"]).toBe("public, s-maxage=300, stale-while-revalidate=3600");
+  it("fails closed when the quota database is unavailable", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "database unavailable" } });
+    const { res, result } = response();
+    await handler(request(), res);
+    expect(result.statusCode).toBe(503);
+    expect(lookupProperty).not.toHaveBeenCalled();
   });
 
-  it("returns the same payload with or without a bearer token", async () => {
-    const anonymous = mockRes();
-    const withToken = mockRes();
-    await handler(mockReq(query), anonymous.res);
-    await handler(mockReq(query, { authorization: "Bearer not-a-real-jwt" }), withToken.res);
-
-    expect(anonymous.body).toEqual(withToken.body);
+  it.each([
+    { address: query.address }, { ...query, askingPrice: "-1" },
+    { ...query, address: "x".repeat(301) }, { ...query, lat: "57" },
+    { ...query, lat: "0", lon: "10" },
+  ])("rejects malformed lookup input before quota consumption", async (values) => {
+    const { res, result } = response();
+    await handler(request(values), res);
+    expect(result.statusCode).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(lookupProperty).not.toHaveBeenCalled();
   });
 
-  it("still 400s on a missing required query param", async () => {
-    const captured = mockRes();
-    await handler(mockReq({ address: query.address }), captured.res);
-
-    expect(captured.statusCode).toBe(400);
-    expect(captured.body).toEqual({
-      error: "address and askingPrice query parameters are required",
-    });
-  });
-
-  it("still 405s on a non-GET method", async () => {
-    const captured = mockRes();
-    const req = { ...mockReq(query), method: "POST" } as VercelRequest;
-    await handler(req, captured.res);
-
-    expect(captured.statusCode).toBe(405);
+  it("rejects non-GET methods", async () => {
+    const { res, result } = response();
+    await handler({ ...request(), method: "POST" } as VercelRequest, res);
+    expect(result.statusCode).toBe(405);
   });
 });

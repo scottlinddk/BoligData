@@ -80,6 +80,7 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
   const zip = asPositiveInt(r.zipCode);
   const typeCode = asPositiveInt(r.propertyType);
   return {
+    data_mode: "real",
     address: street,
     municipality,
     postal_code: zip !== null ? String(zip) : null,
@@ -119,6 +120,8 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
 export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
   const stats: SourceCrawlStats = {
     source: "boliga",
+    complete: false,
+    dataMode: MOCK_MODE ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
@@ -129,10 +132,11 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
   const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
-    const all = fixtures as unknown as RawListing[];
+    const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsOutOfArea = excluded;
+    stats.complete = true;
     return { listings: kept, stats };
   }
 
@@ -177,8 +181,14 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     }
 
     stats.pagesFetched += 1;
-    const results = Array.isArray(body.results) ? body.results : [];
+    if (!Array.isArray(body.results)) {
+      stats.errors.push(`page ${page}: missing results array`);
+      break;
+    }
+    const results = body.results;
+    let processed = 0;
     for (const record of results) {
+      processed += 1;
       stats.recordsSeen += 1;
       const listing = mapBoligaRecord(record);
       if (listing === null) {
@@ -193,9 +203,10 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     }
 
     const pageCount = asPositiveInt(body.meta?.pageCount);
-    if (pageCount !== null && page >= pageCount) break;
-    // No trustworthy page count — stop when a page comes back short.
-    if (pageCount === null && results.length < pageSize) break;
+    if ((pageCount !== null && page >= pageCount) || (pageCount === null && results.length < pageSize)) {
+      stats.complete = processed === results.length && stats.recordsSkipped === 0;
+      break;
+    }
   }
 
   const { kept, excluded } = filterByZipRanges(listings, zipRanges);

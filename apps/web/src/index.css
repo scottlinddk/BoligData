@@ -137,3 +137,16 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+@media print {
+  body { background: white !important; color: black !important; }
+  body:has(.research-print) *:not(:has(.research-print)):not(.research-print):not(.research-print *) { display: none !important; }
+  body:has(.research-print), body:has(.research-print) #root { height: auto; }
+  .research-print { display: block !important; padding: .5cm; color: black; background: white; font-size: 10pt; }
+  .research-print h1 { font-size: 20pt; margin-bottom: .4cm; }
+  .research-print h2 { font-size: 16pt; margin: .4cm 0; }
+  .research-print h3 { font-size: 12pt; margin: .5cm 0 .2cm; break-after: avoid; }
+  .research-print li { margin-bottom: .15cm; break-inside: avoid; }
+  .research-print ul { padding-left: .5cm; list-style: disc; }
+  .research-screen, header, button { display: none !important; }
+}

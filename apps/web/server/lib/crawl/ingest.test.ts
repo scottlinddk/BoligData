@@ -16,6 +16,8 @@ const PROPERTY_COLUMNS = new Set([
   "price",
   "sqm",
   "listing_date",
+  "listing_date_definition",
+  "data_mode",
   "listing_source",
   "external_id",
   "lat",
@@ -30,6 +32,8 @@ const PROPERTY_COLUMNS = new Set([
   "listing_url",
   "content_hash",
   "last_seen_at",
+  "first_seen_at",
+  "current_episode_key",
   "id_lokalid",
   "matrikelnr",
   "ejerlav",
@@ -48,6 +52,7 @@ const ENRICHMENT_COLUMNS = new Set([
   "public_valuation",
   "source",
   "enriched_at",
+  "source_status",
 ]);
 
 /** The PostgREST error a write to a non-existent column actually returns. */
@@ -108,6 +113,12 @@ function fakeDb() {
           }),
         };
       }
+      if (table !== "enrichments") return {
+        upsert: () => Object.assign(Promise.resolve({ error: null }), {
+          select: () => ({ single: () => Promise.resolve({ data: { id: `${table}-id` }, error: null }) }),
+        }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      };
       return {
         select: () => ({
           in: (_c: string, ids: string[]) =>
@@ -212,15 +223,15 @@ describe("runIngest (mock mode, stubbed DB)", () => {
 // making real new listings look "missing" further down the results.
 describe("resolveListingDate", () => {
   it("keeps the mapper's parsed date when it found one", () => {
-    expect(resolveListingDate("2026-06-01", "2026-08-20", "2026-08-22")).toBe("2026-06-01");
+    expect(resolveListingDate("2026-06-01", "2026-08-20")).toBe("2026-06-01");
   });
 
   it("falls back to the property's previously stored date, not today, on an unparseable re-crawl", () => {
-    expect(resolveListingDate(null, "2026-06-01", "2026-08-22")).toBe("2026-06-01");
+    expect(resolveListingDate(null, "2026-06-01")).toBe("2026-06-01");
   });
 
-  it("falls back to today only for a brand-new property with no stored date", () => {
-    expect(resolveListingDate(null, null, "2026-08-22")).toBe("2026-08-22");
+  it("keeps a new property listing date unknown rather than substituting first observation", () => {
+    expect(resolveListingDate(null, null)).toBeNull();
   });
 });
 

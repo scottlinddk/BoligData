@@ -1,132 +1,81 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { enrichProperty } from "./enrich.js";
+import { lookupBbr } from "../enrichment-sources/bbr.js";
+import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import type { RawListing } from "./types.js";
-import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
+
+vi.mock("../enrichment-sources/bbr.js", () => ({ lookupBbr: vi.fn() }));
+vi.mock("../enrichment-sources/ejendomsvurdering.js", () => ({ lookupEjendomsvurdering: vi.fn() }));
+vi.mock("../enrichment-sources/stoejkort.js", () => ({ lookupNoiseExposure: vi.fn() }));
+vi.mock("../enrichment-sources/geus-jordart.js", () => ({ lookupSoilType: vi.fn().mockResolvedValue({ ok: false, error: "source unavailable" }) }));
+vi.mock("../enrichment-sources/miljoeportalen-v1v2.js", () => ({ lookupSoilContamination: vi.fn().mockResolvedValue({ ok: false, error: "source unavailable" }) }));
 
 const listing: RawListing = {
-  address: "Testvej 1",
-  municipality: "Aalborg",
-  postal_code: "9000",
-  price: 2000000,
-  sqm: 100,
-  listing_date: "2026-01-01",
-  listing_source: "boligsiden",
-  external_id: "bs-test-1",
-  lat: 57.05,
-  lon: 9.92,
-  status: "active",
-  building_year: 1960,
-  property_type: "villa",
-  rooms: 4,
-  images: [],
-  description: null,
-  agent_name: null,
-  listing_url: null,
-  sold_price_history: [],
+  address: "Testvej 1", municipality: "Aalborg", postal_code: "9000", price: 2_000_000,
+  sqm: 116, listing_date: null, listing_source: "boligsiden", external_id: "test-1",
+  lat: 57.05, lon: 9.92, status: "active", building_year: 1960, property_type: "villa",
+  rooms: 4, images: [], description: null, agent_name: null, listing_url: null,
+  sold_price_history: [], data_mode: "real",
 };
 
-const cadastral: AddressCadastral = {
-  idLokalid: "test-uuid-1",
-  matrikelnr: "12a",
-  ejerlav: "Testby Ejerlav",
-  ejerlavskode: "620551",
-  bfeNummer: "1234567",
-  zone: "byzone",
-  lat: 57.05,
-  lon: 9.92,
-  postalCode: "9000",
-  postalName: "Aalborg",
-  municipalityCode: "851",
-  formattedAddress: "Testvej 1, 9000 Aalborg",
-  resolvedVia: "dawa",
-};
-
-afterEach(() => {
-  vi.unstubAllEnvs();
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.stubEnv("ENRICH_MOCK_MODE", "false");
+  vi.stubEnv("BBR_MOCK_MODE", "false");
+  vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "false");
+  vi.stubEnv("STOEJKORT_MOCK_MODE", "false");
+  vi.mocked(lookupBbr).mockResolvedValue({ ok: false, error: "missing credential" });
+  vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: false, error: "missing credential" });
+  vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: false, error: "not configured" });
 });
+afterEach(() => vi.unstubAllEnvs());
 
-describe("enrichProperty (mock mode)", () => {
-  it("derives a deterministic price-per-sqm and flags a pre-1970 oil tank risk via the building-year heuristic", async () => {
+describe("register provenance in crawl enrichment", () => {
+  it("keeps unavailable register facts unknown and avoids fabricated metrics", async () => {
     const result = await enrichProperty(listing);
-    expect(result.calculated_metrics.pricePerSqm).toBe(20000);
+    expect(Object.values(result.bbr_data).every((value) => value === null)).toBe(true);
+    expect(result.public_valuation).toBeNull();
+    expect(result.risk_flags.noiseExposureLden).toBeNull();
+    expect(result.risk_flags.soilContamination.classification).toBe("unknown");
+    expect(result.calculated_metrics.daysOnMarket).toBeNull();
+    expect(result.calculated_metrics.neighborhoodPricePerSqm).toBeNull();
+    expect(result.source_status.bbr).toMatchObject({ dataMode: "unavailable", verificationStatus: "unavailable", reason: "missing credential" });
+  });
+
+  it("omits synthetic register data even when a different register is live", async () => {
+    vi.stubEnv("BBR_MOCK_MODE", "true");
+    vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: true, data: { assessedPropertyValueDkk: 2_000_000, assessedLandValueDkk: 500_000, valuationYear: 2024 } });
+    const result = await enrichProperty(listing);
+    expect(result.source).toBe("datafordeler");
+    expect(result.source_status.bbr?.dataMode).toBe("mock");
+    expect(result.source_status.valuation?.dataMode).toBe("real");
+    expect(result.bbr_data.areaSqm).toBeNull();
+    expect(result.bbr_data.renovationYear).toBeNull();
+    expect(result.bbr_data.energyLabel).toBeNull();
+    expect(lookupBbr).not.toHaveBeenCalled();
+  });
+
+  it("does not call registers or expose synthetic measurements for demo listings", async () => {
+    const result = await enrichProperty({ ...listing, data_mode: "mock" });
+    expect(Object.values(result.source_status).every((status) => status.dataMode === "mock")).toBe(true);
+    expect(result.risk_flags.noiseExposureLden).toBeNull();
+    expect(lookupBbr).not.toHaveBeenCalled();
+    expect(lookupEjendomsvurdering).not.toHaveBeenCalled();
+  });
+
+  it("preserves advisory risk checks without calling a heuristic verified BBR", async () => {
+    const result = await enrichProperty(listing);
     expect(result.risk_flags.oilTankRisk).toBe(true);
     expect(result.risk_flags.oilTankRiskSource).toBe("heuristic");
-    expect(result.source).toBe("mock");
-  });
-
-  it("is deterministic across repeated calls for the same external_id", async () => {
-    const first = await enrichProperty(listing);
-    const second = await enrichProperty(listing);
-    expect(first.risk_flags).toEqual(second.risk_flags);
-    expect(first.bbr_data).toEqual(second.bbr_data);
-  });
-
-  it("always marks encumbranceCheckRequired (advisory, tinglysning.dk has no open API)", async () => {
-    const result = await enrichProperty(listing);
     expect(result.risk_flags.encumbranceCheckRequired).toBe(true);
-  });
-
-  it("builds a tinglysning.dk lookup URL when cadastral data is available", async () => {
-    const result = await enrichProperty(listing, cadastral);
-    expect(result.risk_flags.encumbranceLookupUrl).toBe("https://www.tinglysning.dk/");
-  });
-
-  it("builds a jordforureningsattest URL when cadastral data is available", async () => {
-    const result = await enrichProperty(listing, cadastral);
-    expect(result.risk_flags.soilContaminationAttestUrl).toBe(
-      "https://jord.miljoeportal.dk/report/?elav=620551&matrnr=12a",
-    );
-  });
-
-  it("leaves soilContaminationAttestUrl null without cadastral data", async () => {
-    const result = await enrichProperty(listing, null);
-    expect(result.risk_flags.soilContaminationAttestUrl).toBeNull();
-  });
-
-  it("leaves encumbranceLookupUrl null without cadastral data", async () => {
-    const result = await enrichProperty(listing, null);
-    expect(result.risk_flags.encumbranceLookupUrl).toBeNull();
-  });
-
-  it("derives noise exposure from the listing's coordinates, independent of cadastral input", async () => {
-    const withCadastral = await enrichProperty(listing, cadastral);
-    const withoutCadastral = await enrichProperty(listing, null);
-    expect(withCadastral.risk_flags.noiseExposureLden).toBe(withoutCadastral.risk_flags.noiseExposureLden);
-    expect(withCadastral.risk_flags.noiseExposureLden).not.toBeNull();
-  });
-
-  it("always marks sewerSeparationCheckRequired (advisory, no unified municipal spildevandsplan API)", async () => {
-    const result = await enrichProperty(listing);
     expect(result.risk_flags.sewerSeparationCheckRequired).toBe(true);
   });
 
-  it("builds a spildevandsplan lookup URL for a municipality in the lookup table", async () => {
-    const result = await enrichProperty(listing);
-    expect(result.risk_flags.sewerSeparationLookupUrl).toBe("https://www.aalborg.dk/");
-  });
-
-  it("populates BBR building facts (materials, heating, counts) when cadastral id_lokalid is available", async () => {
-    // BBR follows its own flag: ENRICH_MOCK_MODE alone no longer fabricates
-    // building facts, so the mock path has to be asked for explicitly.
-    vi.stubEnv("BBR_MOCK_MODE", "true");
-    const result = await enrichProperty(listing, cadastral);
-    expect(result.bbr_data.wallMaterial).not.toBeNull();
-    expect(result.bbr_data.roofMaterial).not.toBeNull();
-    expect(result.bbr_data.heatingInstallation).not.toBeNull();
-    expect(result.bbr_data.floors).not.toBeNull();
-    expect(result.bbr_data.toiletCount).not.toBeNull();
-    expect(result.bbr_data.bathroomCount).not.toBeNull();
-  });
-
-  it("falls back to listing-derived bbr_data without cadastral data", async () => {
-    const result = await enrichProperty(listing, null);
-    expect(result.bbr_data.yearBuilt).toBe(listing.building_year);
-    expect(result.bbr_data.areaSqm).toBe(listing.sqm);
-    expect(result.bbr_data.wallMaterial).toBeNull();
-  });
-
-  it("soilContamination classification is 'none' or 'v2' in mock mode, never left as boolean", async () => {
-    const result = await enrichProperty(listing);
-    expect(["none", "v2"]).toContain(result.risk_flags.soilContamination.classification);
+  it("isolates thrown upstream failures and keeps future registrations out of sale history", async () => {
+    vi.mocked(lookupBbr).mockRejectedValue(new Error("upstream down"));
+    const result = await enrichProperty({ ...listing, sold_price_history: [{ soldDate: "2999-01-01", price: 3_000_000, pricePerSqm: null }] });
+    expect(result.source_status.bbr?.dataMode).toBe("unavailable");
+    expect(result.sold_price_history).toEqual([]);
   });
 });

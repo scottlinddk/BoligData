@@ -3,3 +3,4 @@ export * from "./types/api.js";
 export * from "./types/property-lookup.js";
 export * from "./utils/price.js";
 export * from "./utils/image.js";
+export * from "./analysis/index.js";

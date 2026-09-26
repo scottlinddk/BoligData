@@ -4,6 +4,12 @@
 
 The UI is fully bilingual (Danish default, English) and ships with light and dark themes; both preferences persist in `localStorage`.
 
+## Property research before a viewing — 26 September 2026
+
+The private **Boligprojekt / Buying project** workspace adds project requirements, total purchase-and-work budgets, source-backed decisions, selectable historical sales, XLSX/CSV import, evidence notes, broker drafts and printable viewing packs. See [implementation, coverage and deployment instructions](docs/research-implementation.md) and the [original feature plan](docs/research-feature-plan.da.md).
+
+**Apply migration 023 before deploying this change.** Legacy provenance remains unknown until real source observations establish it. Register lookup now requires sign-in, uses an atomic 30-per-hour/account quota and returns private, uncached responses. This supersedes the earlier anonymous-lookup and public-cache descriptions below. New sales refresh independently of asking-price changes; missing listing dates and missing sale-area values remain unknown. No user workbook or production database was imported/modified during implementation.
+
 ## Stack
 
 - Frontend: React 19 + TypeScript + Vite, React Router v7 (data router mode), TanStack Query v5, MapLibre GL + OpenFreeMap tiles, Tailwind CSS.

@@ -1,5 +1,7 @@
 # Plan: Property Lookup Endpoint (BBR / OIS / DAR / Datafordeler)
 
+> **26 September 2026:** This document is historical. The implemented endpoint now requires a bearer session, enforces an atomic 30 lookups/hour/account quota and returns `private, no-store`. Apply migration 023 first. Source provenance and missing values remain explicit. See [current research implementation](research-implementation.md).
+
 > **Status update, 1 August 2026:** The enrichment sources no longer
 > default to mock. Every `*_MOCK_MODE` flag on the property-lookup path is
 > now opt-in (`"true"` to mock) and read at call time, the address lookup

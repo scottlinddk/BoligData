@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { MouseEvent } from "react";
-import type { Property, RiskFlags } from "@shared/types/index";
+import type { Property } from "@shared/types/index";
+import { overallRisk } from "@shared/utils/risk-status";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
@@ -25,23 +26,6 @@ const RISK_CHIP_KEY = {
   unknown: "riskChip.unknown",
 } as const;
 
-/**
- * Overall card risk: any due-diligence flag (or noise above 58 dB Lden) marks
- * the card "Bemærk"/Flagged. The advisory encumbrance/sewer checks are always
- * true in real data (no open registries), so they don't count here — otherwise
- * every enriched card would be flagged.
- */
-function overallRisk(riskFlags: RiskFlags | null): OverallRisk {
-  if (!riskFlags) return "unknown";
-  const soil = riskFlags.soilContamination?.classification;
-  const warn =
-    riskFlags.oilTankRisk ||
-    soil === "v1" ||
-    soil === "v2" ||
-    (riskFlags.noiseExposureLden !== null && riskFlags.noiseExposureLden > 58);
-  return warn ? "warning" : "ok";
-}
-
 interface PropertyCardProps {
   property: Property;
   selectable?: boolean;
@@ -53,7 +37,7 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
   const { t } = useI18n();
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
-  const daysOnMarket = daysBetween(property.listingDate);
+  const daysOnMarket = property.listingDate ? daysBetween(property.listingDate) : null;
   const photos = getPhotos(property.images);
   // The card image is full-bleed on phones and ~240-400px wide in the desktop
   // grid, so a single fixed size can't cover both. `sizes` + `srcSet` let the
@@ -146,7 +130,7 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
         <div className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-1 text-xs font-semibold text-ink-soft">
           <span>{t("property.sqm", { sqm: property.sqm })}</span>
           <span>{t("property.pricePerSqm", { price: formatDkk(pricePerSqm(property.price, property.sqm)) })}</span>
-          <span>{t("property.daysOnMarket", { days: daysOnMarket })}</span>
+          <span>{daysOnMarket === null ? t("detail.empty") : t("property.daysOnMarket", { days: daysOnMarket })}</span>
         </div>
         {property.bbrData && (property.bbrData.energyLabel || property.bbrData.heatingInstallation) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
