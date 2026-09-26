@@ -7,8 +7,8 @@ import { logError } from "../server/lib/crawl/log.js";
 /**
  * Daily ingest entry point, triggered by .github/workflows/crawl.yml.
  * Requires SUPABASE_SERVICE_ROLE_KEY and CRON_SECRET to be set in the
- * Vercel project's environment variables. With CRAWL_MOCK_MODE=true (the
- * default), it upserts the fixture listings under server/lib/crawl/fixtures/
+ * Vercel project's environment variables. Only with CRAWL_MOCK_MODE=true
+ * does it upsert fixture listings under server/lib/crawl/fixtures/
  * instead of calling the live Boliga/Boligsiden APIs.
  *
  * Response contract (relied on by the workflow's `curl --fail-with-body`):

@@ -48,7 +48,7 @@ export async function enrichProperty(
       reason: listing.data_mode === "real" ? null : "Listing registration provenance is not live",
     },
   };
-  const mockRun = process.env.ENRICH_MOCK_MODE !== "false" || listing.data_mode === "mock" || listing.data_mode === "demo";
+  const mockRun = mockModeEnabled("ENRICH_MOCK_MODE") || listing.data_mode === "mock" || listing.data_mode === "demo";
 
   async function read<T>(key: string, isMock: boolean, lookup: () => Promise<SourceResult<T>>): Promise<T | null> {
     if (mockRun || isMock) {
@@ -71,8 +71,8 @@ export async function enrichProperty(
   const [bbr, valuation, soil, contamination, noise] = await Promise.all([
     read("bbr", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbr(cadastral?.idLokalid ?? null)),
     read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null)),
-    read("soil_type", process.env.GEUS_MOCK_MODE !== "false", () => lookupSoilType(listing.lat, listing.lon)),
-    read("soil_contamination", process.env.MILJOEPORTALEN_MOCK_MODE !== "false", () => lookupSoilContamination(listing.lat, listing.lon)),
+    read("soil_type", mockModeEnabled("GEUS_MOCK_MODE"), () => lookupSoilType(listing.lat, listing.lon)),
+    read("soil_contamination", mockModeEnabled("MILJOEPORTALEN_MOCK_MODE"), () => lookupSoilContamination(listing.lat, listing.lon)),
     read("noise", mockModeEnabled("STOEJKORT_MOCK_MODE"), () => lookupNoiseExposure(listing.lat, listing.lon)),
   ]);
   const heatingKnown = bbr?.heatingInstallation != null;

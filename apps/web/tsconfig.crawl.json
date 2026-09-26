@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "../..",
+    "outDir": "./.crawl-build"
+  },
+  "include": ["server/lib/crawl/run-cli.ts"]
+}

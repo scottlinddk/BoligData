@@ -1,8 +1,6 @@
 import { asPositiveNumber } from "../crawl/map-utils.js";
 import { postGraphQl, type DatafordelerService } from "./datafordeler.js";
-import { hashSeed, sourceFailed, sourceOk, type SourceResult } from "./types.js";
-
-const MOCK_MODE = process.env.MATRIKEL_MOCK_MODE !== "false";
+import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 /**
  * Matriklen (the cadastral register, "Matrikel"/"MAT2" in Datafordeler's
@@ -56,7 +54,7 @@ export async function lookupMatrikelParcel(
 ): Promise<SourceResult<{ registeredAreaSqm: number | null }>> {
   if (!matrikelnr || !ejerlav) return sourceFailed("no matrikelnr/ejerlav to look up");
 
-  if (MOCK_MODE) {
+  if (mockModeEnabled("MATRIKEL_MOCK_MODE")) {
     const seed = hashSeed(`${matrikelnr}|${ejerlav}`);
     return sourceOk({ registeredAreaSqm: 400 + (seed % 2000) });
   }

@@ -163,6 +163,7 @@ describe("fetch stats separate out-of-area records from unmappable ones", () => 
     ["boliga", fetchBoligaListings],
   ] as const) {
     it(`${name} counts zip-filtered fixtures as out-of-area, not invalid`, async () => {
+      process.env.CRAWL_MOCK_MODE = "true";
       delete process.env.CRAWL_ZIP_RANGES;
       delete process.env.CRAWL_ZIP_MIN;
       delete process.env.CRAWL_ZIP_MAX;

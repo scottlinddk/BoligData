@@ -1,8 +1,7 @@
 import { fetchJson } from "../crawl/http.js";
-import { hashSeed, sourceFailed, sourceOk, type SourceResult } from "./types.js";
+import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 import type { SoilContaminationClassification } from "../../../../../packages/shared/src/types/index.js";
 
-const MOCK_MODE = process.env.MILJOEPORTALEN_MOCK_MODE !== "false";
 
 /**
  * Danmarks Miljøportal "Forurenede grunde" (V1/V2 kortlagt jord) WFS — the
@@ -42,7 +41,7 @@ export async function lookupSoilContamination(
   lat: number,
   lon: number,
 ): Promise<SourceResult<{ classification: SoilContaminationClassification }>> {
-  if (MOCK_MODE) return sourceOk({ classification: mockClassification(lat, lon) });
+  if (mockModeEnabled("MILJOEPORTALEN_MOCK_MODE")) return sourceOk({ classification: mockClassification(lat, lon) });
 
   try {
     const params = new URLSearchParams({
@@ -53,10 +52,9 @@ export async function lookupSoilContamination(
       bbox: `${lon - 0.0005},${lat - 0.0005},${lon + 0.0005},${lat + 0.0005},EPSG:4326`,
     });
     const body = await fetchJson<MiljoeportalenResponse>(`${API_BASE}?${params}`);
-    const feature = body.features?.[0];
-    const raw = String(feature?.properties?.klassificering ?? "").toLowerCase();
-    const classification: SoilContaminationClassification =
-      raw === "v1" || raw === "v2" ? raw : feature ? "unknown" : "none";
+    if (!Array.isArray(body.features)) return sourceFailed("Contamination source did not return a feature collection");
+    const classes = body.features.map((feature) => String(feature.properties?.klassificering ?? "").toLowerCase());
+    const classification: SoilContaminationClassification = classes.includes("v2") ? "v2" : classes.includes("v1") ? "v1" : classes.length ? "unknown" : "none";
     return sourceOk({ classification });
   } catch (err) {
     return sourceFailed(err);

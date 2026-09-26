@@ -3,11 +3,12 @@ import type { ResearchProjectResponse, ResearchAssessmentResponse, ResearchAsses
 import { supabase } from "./supabase";
 import { ApiError } from "./api";
 
-async function request<T>(resource: string, method = "GET", body?: unknown, propertyId?: string): Promise<T> {
+async function request<T>(resource: string, method = "GET", body?: unknown, propertyId?: string, marketForPropertyId?: string): Promise<T> {
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new ApiError("Sign in to access private research", 401);
   const params = new URLSearchParams({ resource });
   if (propertyId) params.set("propertyId", propertyId);
+  if (marketForPropertyId) params.set("marketForPropertyId", marketForPropertyId);
   const res = await fetch(`/api/account?${params}`, { method, cache: "no-store", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: body === undefined ? undefined : JSON.stringify(body) });
   const value = await res.json();
   if (!res.ok) throw new ApiError(value.error ?? "Research request failed", res.status);
@@ -19,6 +20,7 @@ export const getResearchAssessment = (id: string) => request<ResearchAssessmentR
 export const saveResearchAssessment = (assessment: ResearchAssessment) => request<ResearchAssessmentResponse>("research-assessment", "PUT", { assessment }, assessment.propertyId);
 export const getResearchAssessments = () => request<ResearchAssessmentsResponse>("research-assessments");
 export const getResearchHistory = (id?: string) => request<ResearchHistoryResponse>("research-history", "GET", undefined, id);
+export const getResearchMarketHistory = (id: string) => request<ResearchHistoryResponse>("research-history", "GET", undefined, undefined, id);
 export const previewResearchImport = (body: ResearchImportRequest) => request<ResearchImportPreviewResponse>("research-import-preview", "POST", body);
 export const commitResearchImport = (batchId: string) => request<{ batchId: string; imported?: number; duplicates?: number; alreadyCommitted: boolean }>("research-import-commit", "POST", { batchId });
 

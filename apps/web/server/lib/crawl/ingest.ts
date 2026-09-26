@@ -9,6 +9,9 @@ import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sou
 import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
 import { buildHistoryRows, persistHistoryRows, type PreviousListingObservation } from "./history.js";
+import { enrichmentNeedsRefresh } from "./enrichment-refresh.js";
+import { mapConcurrent } from "./concurrency.js";
+import { envInt } from "./http.js";
 
 const CHUNK_SIZE = 500;
 // Fetch-stage errors (e.g. "skipped unmappable record") are capped separately
@@ -25,7 +28,7 @@ const ALL_SOURCES: readonly ListingSource[] = ["boligsiden", "boliga"];
  * attempted-and-failed browser-header workaround) can be disabled without a
  * code change, instead of the whole run reporting ok=false every night.
  */
-function enabledSources(): ListingSource[] {
+export function enabledSources(): ListingSource[] {
   const raw = process.env.CRAWL_SOURCES?.trim();
   if (!raw) return [...ALL_SOURCES];
   const requested = raw.split(",").map((s) => s.trim().toLowerCase());
@@ -125,6 +128,7 @@ async function ingestSource(
   settled: PromiseSettledResult<SourceCrawlResult>,
 ): Promise<IngestSourceReport> {
   const startedAt = Date.now();
+  const concurrency = envInt("CRAWL_CONCURRENCY", 8, 1, 20);
   const report: IngestSourceReport = {
     source,
     ok: true,
@@ -233,10 +237,10 @@ async function ingestSource(
   // block the upsert; the five columns simply stay null for that property.
   const cadastralByExternalId = new Map<string, AddressCadastral | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
-    const results = await Promise.all(
-      listingChunk.map((l) => l.data_mode !== "real" || mockModeEnabled("ADDRESS_LOOKUP_MOCK_MODE")
+    const results = await mapConcurrent(
+      listingChunk, concurrency, (l) => l.data_mode !== "real" || mockModeEnabled("ADDRESS_LOOKUP_MOCK_MODE")
         ? Promise.resolve({ ok: false as const, error: "Non-live cadastral source omitted" })
-        : lookupAddressCadastral(l.address, l.postal_code, l.lat, l.lon)),
+        : lookupAddressCadastral(l.address, l.postal_code, l.lat, l.lon),
     );
     results.forEach((result, i) => {
       const listing = listingChunk[i]!;
@@ -255,14 +259,14 @@ async function ingestSource(
   // whose cadastral lookup above already succeeded.
   const registeredAreaByExternalId = new Map<string, number | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
-    const results = await Promise.all(
-      listingChunk.map((l) => {
+    const results = await mapConcurrent(
+      listingChunk, concurrency, (l) => {
         const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
-        if (!cadastral || process.env.MATRIKEL_MOCK_MODE !== "false") {
+        if (!cadastral || mockModeEnabled("MATRIKEL_MOCK_MODE")) {
           return Promise.resolve({ ok: false as const, error: "Non-live or unavailable cadastral source omitted" });
         }
         return lookupMatrikelParcel(cadastral.matrikelnr, cadastral.ejerlav);
-      }),
+      },
     );
     results.forEach((result, i) => {
       const listing = listingChunk[i]!;
@@ -294,11 +298,11 @@ async function ingestSource(
   }
   // Persist existing-record history before replacing its previous price or
   // status. If history fails, a retry must still see the original transition.
-  for (const listing of listings) {
+  await mapConcurrent(listings, concurrency, async (listing) => {
     const before = existing.get(listing.external_id);
-    if (!before || blockedExternalIds.has(listing.external_id)) continue;
+    if (!before || blockedExternalIds.has(listing.external_id)) return;
     if (!(await persistListingHistory(listing, before.id))) blockedExternalIds.add(listing.external_id);
-  }
+  });
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const rows = listingChunk.filter((listing) => !blockedExternalIds.has(listing.external_id)).map((l) => {
       const cadastral = cadastralByExternalId.get(l.external_id) ?? null;
@@ -337,12 +341,12 @@ async function ingestSource(
   // This runs for every observed listing, independent of enrichment hashes.
   // Only positively observed listings are touched: an incomplete or bounded
   // crawl provides no evidence that an unseen listing was removed or sold.
-  for (const listing of listings) {
-    if (existing.has(listing.external_id)) continue;
+  await mapConcurrent(listings, concurrency, async (listing) => {
+    if (existing.has(listing.external_id)) return;
     const propertyId = propertyIdByExternalId.get(listing.external_id);
-    if (!propertyId) continue;
+    if (!propertyId) return;
     await persistListingHistory(listing, propertyId);
-  }
+  });
 
   // Change detection: enrich listings that are new or whose content changed.
   // Unchanged listings still need enrichment if their enrichment row is
@@ -360,20 +364,20 @@ async function ingestSource(
     }
   }
 
-  const enrichedPropertyIds = new Set<string>();
+  const existingEnrichments = new Map<string, Record<string, unknown>>();
   for (const unchangedChunk of chunk(unchanged, CHUNK_SIZE)) {
     const ids = unchangedChunk.map((l) => propertyIdByExternalId.get(l.external_id)!);
-    const { data, error } = await client.from("enrichments").select("property_id").in("property_id", ids);
+    const { data, error } = await client.from("enrichments").select("property_id, source_status, enriched_at").in("property_id", ids);
     if (error) {
       report.dbErrors += 1;
       pushDbError(`enrichments check: ${error.message}`);
       logError("crawl.db.enrichment_check_failed", error, { source });
       continue;
     }
-    for (const row of data ?? []) enrichedPropertyIds.add(row.property_id as string);
+    for (const row of data ?? []) existingEnrichments.set(row.property_id as string, row);
     for (const listing of unchangedChunk) {
       const propertyId = propertyIdByExternalId.get(listing.external_id)!;
-      if (enrichedPropertyIds.has(propertyId)) {
+      if (!enrichmentNeedsRefresh(existingEnrichments.get(propertyId), listing, now)) {
         report.enrichSkippedUnchanged += 1;
       } else {
         toEnrich.push(listing);
@@ -381,18 +385,28 @@ async function ingestSource(
     }
   }
 
-  for (const enrichChunk of chunk(toEnrich, CHUNK_SIZE)) {
+  // Persist small batches as they complete, so a slow register or interrupted
+  // runner does not discard hundreds of successful lookups. On a retry, old
+  // or missing snapshots are handled before recently attempted rows.
+  toEnrich.sort((left, right) => {
+    const stamp = (listing: RawListing) => {
+      const value = existingEnrichments.get(propertyIdByExternalId.get(listing.external_id)!)?.enriched_at;
+      return typeof value === "string" ? Date.parse(value) || 0 : 0;
+    };
+    return stamp(left) - stamp(right);
+  });
+  for (const enrichChunk of chunk(toEnrich, concurrency)) {
     // enrichProperty throwing (e.g. not-implemented real clients, upstream
     // API failure) must not abort the whole run — properties are already
     // upserted; a missing enrichment row is healed by the next run's
     // "unchanged but unenriched" pass above.
     let rows: Array<{ property_id: string } & Awaited<ReturnType<typeof enrichProperty>>>;
     try {
-      rows = await Promise.all(
-        enrichChunk.map(async (listing) => ({
+      rows = await mapConcurrent(
+        enrichChunk, concurrency, async (listing) => ({
           property_id: propertyIdByExternalId.get(listing.external_id)!,
           ...(await enrichProperty(listing, cadastralByExternalId.get(listing.external_id) ?? null)),
-        })),
+        }),
       );
     } catch (err) {
       report.dbErrors += 1;

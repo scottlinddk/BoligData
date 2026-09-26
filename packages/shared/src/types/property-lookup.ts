@@ -95,7 +95,7 @@ export interface NearbySaleEntry {
   address: string;
   soldDate: string;
   price: number;
-  pricePerSqm: number;
+  pricePerSqm: number | null;
   saleType: "normal" | "family" | "auction" | "other";
   areaSqm: number | null;
   propertyType: string | null;

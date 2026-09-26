@@ -45,7 +45,7 @@ export function ComparablesPanel({
 
   // Only arm's-length sales belong in a neighbourhood average; a family
   // transfer at half price would drag it somewhere meaningless.
-  const marketSales = nearbySales.filter((sale) => sale.saleType === "normal" && Number.isFinite(sale.pricePerSqm) && sale.pricePerSqm > 0);
+  const marketSales = nearbySales.filter((sale): sale is NearbySaleEntry & { pricePerSqm: number } => sale.saleType === "normal" && sale.pricePerSqm !== null && Number.isFinite(sale.pricePerSqm) && sale.pricePerSqm > 0);
   const nearbyAvgPricePerSqm =
     marketSales.length > 0
       ? Math.round(marketSales.reduce((sum, s) => sum + s.pricePerSqm, 0) / marketSales.length)

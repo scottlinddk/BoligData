@@ -17,8 +17,8 @@ import {
   isDanishCoordinate,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
+import { mockModeEnabled } from "../enrichment-sources/types.js";
 
-const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 const MAX_ERRORS_REPORTED = 10;
 
 /**
@@ -260,10 +260,11 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
  * beats none; the gap is visible in stats.errors.
  */
 export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
+  const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
   const stats: SourceCrawlStats = {
     source: "boligsiden",
     complete: false,
-    dataMode: MOCK_MODE ? "mock" : "real",
+    dataMode: mockMode ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
@@ -273,7 +274,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
 
   const zipRanges = getZipRanges();
 
-  if (MOCK_MODE) {
+  if (mockMode) {
     const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;

@@ -4,10 +4,21 @@ on:
   schedule:
     # 03:00 UTC daily — off-peak, well before the Danish business day starts.
     - cron: "0 3 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "API crawl, full runner refresh (avoids function timeout), or read-only verification"
+        type: choice
+        default: api
+        options: [api, runner, verify]
+      full_scan:
+        description: "Runner only: up to 100 pages / 5000 listings per source, keeping configured area and sources"
+        type: boolean
+        default: false
 
 jobs:
   crawl:
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'api'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger /api/crawl and report results
@@ -72,3 +83,41 @@ jobs:
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  runner:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'api'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate and compile the ingest runner
+        run: |
+          pnpm --filter @boligdata/web exec tsc -p tsconfig.crawl.json
+          pnpm --filter @boligdata/web exec vitest run server/lib/crawl server/lib/enrichment-sources
+      - name: Read the existing production environment
+        run: |
+          umask 077
+          npx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Refresh live source observations or verify counts
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "$RUN_MODE" = "verify" ]; then args+=(--verify-only); fi
+          if [ "$RUN_FULL_SCAN" = "true" ]; then args+=(--full-scan); fi
+          node --env-file=.vercel/.env.production.local apps/web/.crawl-build/apps/web/server/lib/crawl/run-cli.js "${args[@]}"
+        env:
+          RUN_MODE: ${{ inputs.mode }}
+          RUN_FULL_SCAN: ${{ inputs.full_scan }}
+      - name: Remove downloaded environment
+        if: always()
+        run: rm -f .vercel/.env.production.local

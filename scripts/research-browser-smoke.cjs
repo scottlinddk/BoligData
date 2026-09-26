@@ -1,6 +1,7 @@
 /* Run against a local Vite server: node scripts/research-browser-smoke.cjs
  * Every API, Supabase, map and external request is mocked or blocked. No production login or write occurs.
  * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL, SMOKE_OUTPUT_DIR and SMOKE_THEME can override local defaults.
+ * SMOKE_SCENARIO=sparse covers fresh accounts and missing/partial evidence.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -12,7 +13,9 @@ const baseUrl = process.env.SMOKE_BASE_URL || "http://127.0.0.1:5174";
 assert(["127.0.0.1", "localhost"].includes(new URL(baseUrl).hostname), "Only a local development server is allowed");
 const theme = process.env.SMOKE_THEME || "light";
 assert(["light", "dark"].includes(theme), "SMOKE_THEME must be light or dark");
-const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${theme === "dark" ? "-dark" : ""}`);
+const scenario = process.env.SMOKE_SCENARIO || "complete";
+assert(["complete", "sparse"].includes(scenario), "SMOKE_SCENARIO must be complete or sparse");
+const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${scenario === "sparse" ? "-sparse" : ""}${theme === "dark" ? "-dark" : ""}`);
 fs.mkdirSync(outputDir, { recursive: true });
 let playwright;
 try { playwright = require(process.env.PLAYWRIGHT_MODULE || "playwright"); }
@@ -64,11 +67,37 @@ const lookup = {
   sources: ["address", "bbr", "publicValuation", "noise", "sales"].map(key => ({ key, register: key, mode: "unavailable", error: "Local browser fixture" })), dataMode: "unavailable", source: "ai",
 };
 
+// Fresh accounts must not rely on the happy-path fixture's saved budget,
+// verified bedrooms, populated campaign or imported duration-matched sales.
+const emptyHistory = () => ({ campaigns: [], episodes: [], events: [], transactions: [], observations: [], conditionEvidence: [], dataVersion: "browser-sparse-fixture", retrievedAt: now, truncated: false });
+const sparseProperties = [
+  { ...property, address: "Legacyvej 14, 9000 Aalborg", externalId: "legacy-case", dataMode: "unknown", listingDate: null, firstSeenAt: `${dayBefore(20)}T12:00:00Z` },
+  { ...property, id: "00000000-0000-4000-8000-000000000003", address: "Kildevej 8, 9000 Aalborg", externalId: "live-case", price: 3_650_000, sqm: 125, rooms: 5, listingDate: dayBefore(60) },
+  { ...property, id: "00000000-0000-4000-8000-000000000004", address: "Tidsløsvej 6, 9000 Aalborg", externalId: "baseline-case", listingDate: null },
+  { ...property, id: "00000000-0000-4000-8000-000000000005", address: "Demovej 9, 9000 Aalborg", externalId: "mock-case", dataMode: "mock" },
+];
+const sparseLookup = subject => {
+  const result = { ...lookup, address: subject.address, resolved: { ...lookup.resolved, formattedAddress: subject.address }, sources: lookup.sources.map(source => ({ ...source })) };
+  if (subject.id === sparseProperties[1].id) {
+    // The overall lookup stays unavailable because BBR/noise failed. Its sales
+    // group independently carries real evidence and must remain visible.
+    result.sources = result.sources.map(source => source.key === "sales" ? { ...source, register: "Boligsiden registered sales fixture", mode: "live", error: null } : source);
+    result.priceHistory = [{ soldDate: dayBefore(600), price: 2_750_000, pricePerSqm: null, saleType: "normal", registrationId: "fixture-own-registered-sale" }];
+    result.nearbySales = [{ address: "Nabovej 12, 9000 Aalborg", soldDate: dayBefore(90), price: 3_050_000, pricePerSqm: 23828, saleType: "normal", areaSqm: 128, propertyType: "villa", distanceMeters: 180, lat: 57.041, lon: 9.871 }];
+  }
+  return result;
+};
+const scopedHistory = subject => ({ ...emptyHistory(),
+  transactions: [sparseProperties[2].id, sparseProperties[3].id].includes(subject.id) ? transactions.slice(0, 5).map(row => ({ ...row })) : [],
+  marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 },
+});
+let activeSparseProperty = sparseProperties[0];
+
 async function main() {
   const browserPath = process.env.BROWSER_EXECUTABLE || ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Google/Chrome/Application/chrome.exe"].find(p => fs.existsSync(p));
   const browser = await playwright.chromium.launch({ headless: true, executablePath: browserPath, args: ["--disable-background-networking", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, serviceWorkers: "block", locale: "da-DK" });
-  const report = { theme, checks: [], apiWrites: [], mockedExternalRequests: 0, unmockedApiRequests: [], pageErrors: [], screenshots: [], contrast: [] };
+  const report = { theme, scenario, checks: [], apiWrites: [], apiReads: [], mockedExternalRequests: 0, unmockedApiRequests: [], pageErrors: [], screenshots: [], contrast: [] };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await context.addInitScript(({ key, value, theme }) => { localStorage.setItem(key, JSON.stringify(value)); localStorage.setItem("boligdata.lang", "da"); localStorage.setItem("boligdata.theme", theme); }, { key: authStorageKey, value: session, theme });
   if (context.routeWebSocket) await context.routeWebSocket("**/*", socket => socket.close());
@@ -86,24 +115,31 @@ async function main() {
     if (!url.pathname.startsWith("/api/")) return route.continue();
     const resource = url.searchParams.get("resource");
     if (request.method() !== "GET") report.apiWrites.push({ path: url.pathname, resource, method: request.method(), body: request.postDataJSON() });
+    else report.apiReads.push({ path: url.pathname, ...Object.fromEntries(url.searchParams) });
     if (url.pathname === "/api/account" && resource === "research-project") {
+      if (scenario === "sparse") return json(route, { project: null, updatedAt: null });
       if (request.method() === "PUT") project = request.postDataJSON().project;
       return json(route, { project, updatedAt: now });
     }
     if (url.pathname === "/api/account" && resource === "research-assessment") {
+      if (scenario === "sparse") return json(route, { assessment: null, revision: 0, updatedAt: null, revisions: [] });
       if (request.method() === "PUT") assessment = request.postDataJSON().assessment;
       return json(route, { assessment, revision: 1, updatedAt: now, revisions: [] });
     }
-    if (resource === "research-assessments") return json(route, { assessments: [{ assessment, revision: 1, updatedAt: now, property }] });
-    if (resource === "research-history") return json(route, history);
+    if (resource === "research-assessments") return json(route, { assessments: scenario === "sparse" ? [] : [{ assessment, revision: 1, updatedAt: now, property }] });
+    if (resource === "research-history") {
+      const marketId = url.searchParams.get("marketForPropertyId");
+      if (scenario === "sparse") return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : emptyHistory());
+      return json(route, marketId ? { ...history, campaigns: [], episodes: [], events: [], observations: [], marketScope: { propertyId: marketId, municipality: property.municipality, propertyType: property.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 } } : history);
+    }
     if (resource === "connections") return json(route, { connections: [] });
     if (resource === "conversations") return json(route, { conversations: [] });
     if (url.pathname === "/api/properties") {
       if (url.searchParams.get("comparables")) return json(route, { comparables: [], neighborhoodAvgPricePerSqm: null });
-      if (url.searchParams.get("id")) return json(route, { property, enrichment: null });
+      if (url.searchParams.get("id")) return json(route, { property: scenario === "sparse" ? sparseProperties.find(row => row.id === url.searchParams.get("id")) ?? activeSparseProperty : property, enrichment: null });
       return json(route, { authenticated: true, properties: [property], summaries: [], total: 1, limit: 8, offset: 0, page: 1, totalPages: 1 });
     }
-    if (url.pathname === "/api/property-lookup") return json(route, lookup);
+    if (url.pathname === "/api/property-lookup") return json(route, scenario === "sparse" ? sparseLookup(sparseProperties.find(row => row.address === url.searchParams.get("address")) ?? activeSparseProperty) : lookup);
     if (url.pathname === "/api/favorites") return json(route, { favorites: [], properties: [] });
     if (url.pathname === "/api/notifications") return json(route, { notifications: [] });
     if (url.pathname === "/api/recommendations") return json(route, { recommendations: [] });
@@ -114,7 +150,7 @@ async function main() {
   });
   const page = await context.newPage();
   page.on("pageerror", error => report.pageErrors.push(error.message));
-  const screenshot = async (name, locator) => { const target = path.join(outputDir, `${name}.png`); await (locator ?? page).screenshot({ path: target, animations: "disabled", ...(locator ? {} : { fullPage: true }) }); report.screenshots.push(target); };
+  const screenshot = async (name, locator, fullPage = true) => { const target = path.join(outputDir, `${name}.png`); await (locator ?? page).screenshot({ path: target, animations: "disabled", ...(locator ? {} : { fullPage }) }); report.screenshots.push(target); };
   const waitText = async (text, scope = page) => scope.getByText(text, { exact: true }).first().waitFor();
   const darkContrast = async (label, locator) => {
     if (theme !== "dark") return;
@@ -132,6 +168,72 @@ async function main() {
     assert(colors.ratio >= 4.5, `${label} contrast must be 4.5:1: ${JSON.stringify(colors)}`);
   };
   try {
+    if (scenario === "sparse") {
+      const openSparse = async index => {
+        activeSparseProperty = sparseProperties[index];
+        const marketResponse = page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return url.pathname === "/api/account" && url.searchParams.get("resource") === "research-history" && url.searchParams.get("marketForPropertyId") === activeSparseProperty.id;
+        });
+        await page.goto(`${baseUrl}/property/${activeSparseProperty.id}`);
+        await marketResponse;
+        await page.getByTestId("listing-evidence-overview").waitFor();
+        await page.getByTestId("research-project-setup").waitFor();
+        assert.equal(await page.locator("#research").getByRole("tablist").count(), 0, "Private research editor must not open before a fresh user opts in");
+        assert.equal(await page.locator("#research").getByRole("heading", { name: "Afklar dokumentation først", exact: true }).count(), 0, "An empty private profile must not become a generic property verdict");
+        assert.equal(await page.locator(".research-print").count(), 0, "Suggested default requirements must not become a private print decision before setup");
+        assert.equal(report.apiWrites.length, 0, "Opening a listing must not create a project or assessment");
+        return page.getByTestId("listing-evidence-overview");
+      };
+      const legacy = await openSparse(0);
+      const legacyText = await legacy.innerText();
+      for (const value of ["4.900.000", "140", "35.000"]) assert(legacyText.includes(value), `Legacy advertised fact ${value} must remain visible`);
+      assert(!/20\s*dage/.test(legacyText), "Crawler first-seen must not become marketing time");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Missing transactions must not produce an actionable estimate");
+      await screenshot("research-fresh-legacy", page.locator("#research"));
+      report.checks.push("Fresh legacy listing shows its advertised asking price, area and price per m² without a generic verdict or invented market time");
+      await page.getByTestId("research-project-setup").getByRole("button", { name: "Tilpas dit boligprojekt", exact: true }).click();
+      await page.getByLabel("Samlet projektloft (kr.)", { exact: true }).waitFor();
+      assert.equal(await page.locator(".research-print").count(), 0, "Opening setup must not turn suggested defaults into a saved print basis");
+      assert.equal(report.apiWrites.length, 0, "Opting into the private editor must remain unsaved until an explicit save");
+      report.checks.push("Fresh-account setup explicitly reveals the private project editor without writing an account record");
+
+      const live = await openSparse(1);
+      await live.getByText(/3\.050\.000/).waitFor();
+      const liveText = await live.innerText();
+      for (const value of ["3.650.000", "125", "29.200", "2.750.000", "3.050.000", "Nabovej 12"]) assert(liveText.includes(value), `Live listing evidence ${value} must remain visible`);
+      assert(!liveText.includes("4.900.000"), "Navigating to another listing must replace the previous asking price");
+      assert(/60\s*(?:kalender)?dage/i.test(liveText), "The source-reported listing date must provide this listing's known elapsed time");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Two observed sales must not bypass the five-sale reference threshold");
+      await screenshot("research-fresh-live-sales", page.locator("#research"));
+      report.checks.push("A different live listing shows distinct asking/area/time and real own/nearby sales even when other register groups are unavailable");
+      await page.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Sparse mobile detail must not overflow");
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+      await screenshot("research-fresh-mobile", null, false);
+      report.checks.push("Fresh-account evidence and setup fit a 390px viewport");
+      await page.setViewportSize({ width: 1365, height: 900 });
+
+      await openSparse(2);
+      const baseline = page.getByTestId("listing-price-baseline");
+      await baseline.getByText(/4\.000\.000/).waitFor();
+      assert(/uden.*(?:liggetid|tids)|ikke.*tidsjusteret/i.test(await baseline.locator('..').innerText()), "A baseline with missing duration must be explicitly labelled without time matching");
+      assert(!(await page.getByTestId("listing-price-median").innerText()).includes("4.000.000"), "The primary time-matched result must remain unavailable");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "The primary reference action must not appear for a baseline-only estimate");
+      await page.getByRole("button", { name: "Brug basisreference som budgetscenario", exact: true }).waitFor();
+      await screenshot("research-fresh-baseline", page.locator("#research"));
+      report.checks.push("Five real area-matched sales expose a labelled baseline while missing market time still blocks a time-adjusted estimate");
+
+      await openSparse(3);
+      const mockPrice = await page.getByTestId("listing-price-reference").innerText();
+      assert(!mockPrice.includes("4.000.000"), "A mock subject must not receive a real price reference even with sufficient real comparison sales");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0);
+      assert.equal(report.apiWrites.length, 0);
+      assert.deepEqual(report.pageErrors, []);
+      assert.deepEqual(report.unmockedApiRequests, []);
+      report.checks.push("Mock subjects remain ineligible and all fresh-account browsing/setup produces zero API writes");
+      return;
+    }
     await page.goto(`${baseUrl}/research`); await waitText("Mit boligprojekt");
     assert.equal(await page.locator("html").evaluate(element => element.classList.contains("dark")), theme === "dark");
     await page.getByRole("button", { name: "Projektprofil", exact: true }).click();
@@ -169,7 +271,7 @@ async function main() {
     await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
     await timeDefinition.selectOption("calendar_days");
     await page.waitForFunction(() => !document.querySelector('[data-testid="listing-price-median"]')?.textContent?.includes("4.000.000"));
-    assert(!(await priceReference.innerText()).includes("4.000.000"), "Missing calendar-time evidence must not retain the previous numerical estimate");
+    assert(!(await priceMedian.innerText()).includes("4.000.000"), "Missing calendar-time evidence must not retain the previous time-matched numerical estimate");
     await timeDefinition.selectOption("latest_episode_days");
     await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
     report.checks.push("Changing time definitions recalculates the cohort; missing calendar evidence suppresses the estimate");
@@ -179,7 +281,8 @@ async function main() {
     await comparisonRow.getByLabel("Begrundelse for udvalg", { exact: true }).fill("Fixture exclusion to verify minimum sample");
     await comparisonRow.getByRole("checkbox", { name: "Medtag", exact: true }).uncheck();
     await page.waitForFunction(() => !document.querySelector('[data-testid="listing-price-median"]')?.textContent?.includes("4.000.000"));
-    assert(!(await priceReference.innerText()).includes("4.000.000"), "Four eligible comparables must not produce an estimate");
+    assert(!(await priceMedian.innerText()).includes("4.000.000"), "Four duration-matched comparables must not produce a time-matched estimate");
+    assert.equal(await priceReference.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "A separate baseline must not retain the primary reference action");
     await comparisonRow.getByRole("checkbox", { name: "Medtag", exact: true }).check();
     await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
     report.checks.push("Manual exclusion removes a price reference below five sales; restoring the sale restores the estimate");

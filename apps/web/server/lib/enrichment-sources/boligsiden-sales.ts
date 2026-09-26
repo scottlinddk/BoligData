@@ -45,7 +45,7 @@ export interface NearbySale {
   address: string;
   soldDate: string;
   price: number;
-  pricePerSqm: number;
+  pricePerSqm: number | null;
   saleType: NonNullable<SoldPriceEntry["saleType"]>;
   areaSqm: number | null;
   propertyType: string | null;
@@ -163,7 +163,9 @@ export interface NearbySalesOptions {
 }
 
 async function search(params: URLSearchParams): Promise<ParsedAddress[]> {
-  return parseAddresses(await fetchJson<AddressSearchResponse>(`${apiBase()}?${params}`));
+  const body = await fetchJson<AddressSearchResponse>(`${apiBase()}?${params}`);
+  if (!Array.isArray(body.addresses)) throw new Error("Sales source did not return an address collection");
+  return parseAddresses(body);
 }
 
 /**
@@ -228,14 +230,15 @@ export async function lookupBoligsidenSales(
       .map((entry): NearbySale | null => {
         const latest = entry.history[0];
         const address = formatAddress(entry.record);
-        if (!latest || latest.pricePerSqm === null || address === null) return null;
+        if (!latest || address === null) return null;
+        const area = latest.areaDefinition === "residential" ? latest.residentialArea ?? null : null;
         return {
           address,
           soldDate: latest.soldDate,
           price: latest.price,
-          pricePerSqm: latest.pricePerSqm,
+          pricePerSqm: area !== null && area > 0 ? Math.round(latest.price / area) : null,
           saleType: latest.saleType ?? "other",
-          areaSqm: latest.areaDefinition === "residential" ? latest.residentialArea ?? null : null,
+          areaSqm: area,
           propertyType: asNonEmptyString(entry.record.addressType),
           distanceMeters: Math.round(haversineMeters(lat, lon, entry.lat, entry.lon)),
           lat: entry.lat,
