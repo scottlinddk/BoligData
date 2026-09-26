@@ -5,11 +5,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Space Grotesk"', "system-ui", "sans-serif"],
-        // Display type is Space Grotesk too — kept as `serif` so legacy
-        // `font-serif` call sites resolve to the new heading face.
-        serif: ['"Space Grotesk"', "system-ui", "sans-serif"],
-        mono: ['"Geist Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ['"Inter"', "system-ui", "sans-serif"],
+        // Legacy heading call sites share the same readable sans-serif face.
+        serif: ['"Inter"', "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         paper: "var(--color-bg)",

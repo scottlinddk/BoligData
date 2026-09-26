@@ -20,6 +20,6 @@ export function usePropertySearch(
         limit: pageSize,
         offset,
       }),
-    placeholderData: (prev) => prev,
+    // A previous page or area must not appear to match a newly drawn boundary.
   });
 }

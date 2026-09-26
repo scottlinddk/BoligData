@@ -6,6 +6,11 @@ import type {
 } from "../../../../packages/shared/src/types/api.js";
 import { rowToProperty, rowToPropertySummary } from "./row-mappers.js";
 import { safeBbrData, safeRiskFlags } from "./source-facts.js";
+import { parseSearchBoundary } from "../../../../packages/shared/src/utils/search-boundary.js";
+
+export class InvalidSearchBoundaryError extends Error {
+  constructor() { super("Invalid map boundary: use a simple area with 3–64 distinct points"); this.name = "InvalidSearchBoundaryError"; }
+}
 
 const SORT_COLUMNS: Record<string, string> = {
   listingDate: "listing_date",
@@ -91,7 +96,13 @@ export async function searchProperties(
   const { column, ascending } = resolveSort(query.sortField ?? "listingDate", query.sortDirection ?? "desc");
 
   const columns = authenticated ? "*" : "id, address";
-  let builder = client.from("properties").select(columns, { count: "exact" }).eq("status", "active");
+  const boundary = typeof query.polygon === "string" ? parseSearchBoundary(query.polygon) : null;
+  if (query.polygon !== undefined && query.polygon !== null && !boundary) throw new InvalidSearchBoundaryError();
+  // Spatial filtering happens before count/range, never on an already-paginated browser result.
+  let builder = (boundary
+    ? client.rpc("properties_in_boundary", { boundary }, { count: "exact" }).select(columns)
+    : client.from("properties").select(columns, { count: "exact" }))
+    .eq("status", "active");
 
   if (query.location) {
     const { text, postalCode } = splitLocationQuery(query.location);
@@ -134,6 +145,8 @@ export async function searchProperties(
   if (error) throw error;
 
   const total = count ?? 0;
+  // Both sources return property rows; the dynamic projection is not represented in the untyped client's RPC inference.
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { id: string }>;
 
   // BBR data lives on a separate enrichments row (Fase 2 enrichment, not a
   // properties column) — batch-fetch it for the page's property ids, same
@@ -141,8 +154,8 @@ export async function searchProperties(
   // energy label/heating without a per-card round trip.
   const bbrByPropertyId = new Map<string, BbrData>();
   const riskByPropertyId = new Map<string, RiskFlags>();
-  if (authenticated && (data ?? []).length > 0) {
-    const propertyIds = (data as any[]).map((row) => row.id);
+  if (authenticated && rows.length > 0) {
+    const propertyIds = rows.map((row) => row.id);
     const { data: enrichments } = await client
       .from("enrichments")
       .select("property_id, bbr_data, risk_flags, source_status")
@@ -158,11 +171,11 @@ export async function searchProperties(
   return {
     authenticated,
     properties: authenticated
-      ? (data as any[]).map((row) =>
+      ? rows.map((row) =>
           rowToProperty(row, bbrByPropertyId.get(row.id) ?? null, riskByPropertyId.get(row.id) ?? null),
         )
       : [],
-    summaries: authenticated ? [] : (data ?? []).map(rowToPropertySummary),
+    summaries: authenticated ? [] : rows.map(rowToPropertySummary),
     total,
     limit,
     offset,

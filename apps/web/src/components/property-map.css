@@ -1,0 +1,48 @@
+.property-map-price {
+  border: 1.5px solid #285fbd;
+  border-radius: 999px;
+  background: #fff;
+  color: #214f9b;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px #193f762a;
+  cursor: pointer;
+}
+.property-map-price:hover,
+.property-map-price:focus-visible {
+  background: #285fbd;
+  color: #fff;
+  z-index: 2;
+  outline: 3px solid #b8d1ff;
+  outline-offset: 2px;
+}
+.property-map-control {
+  min-height: 40px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+.property-map-cluster {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.property-map-cluster:focus-visible { outline: 3px solid #b8d1ff; outline-offset: 3px; }
+.property-map-control:hover { background: #eff4fc; }
+.property-map-control:focus-visible { outline: 3px solid #b8d1ff; outline-offset: 2px; }
+.property-map-control:disabled { opacity: .45; cursor: not-allowed; }
+.property-map-control.property-map-primary { background: #285fbd; color: white; }
+.property-map-control.property-map-primary:hover:not(:disabled) { background: #214f9b; }
+.property-map .maplibregl-popup-content { border-radius: 12px; padding: 16px; }

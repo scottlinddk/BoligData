@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import type { FiltersWithSort } from "@/lib/url-filters";
+import { defaultFilters } from "@/lib/url-filters";
 import { FilterFields } from "@/components/filter-fields";
 import { useI18n } from "@/i18n/i18n";
 
@@ -8,61 +10,28 @@ interface FiltersSheetProps {
   onClose: () => void;
 }
 
-const SHEET_FIELD_LABEL = "flex flex-col gap-2 text-xs font-bold text-ink-soft";
-const SHEET_FIELD_INPUT =
-  "w-full rounded-full border border-border bg-paper px-3.5 py-3 text-[13px] font-medium text-ink placeholder:text-ink-faint";
-
+/** Native modal keeps keyboard focus inside and restores it to the opener. */
 export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) {
-  const { t } = useI18n();
-
-  return (
-    <div className="fixed inset-0 z-50">
-      <div onClick={onClose} className="absolute inset-0 animate-fade-up bg-black/50" />
-      <div className="absolute inset-x-0 bottom-0 flex max-h-[82vh] flex-col gap-5 overflow-y-auto rounded-t-[20px] bg-surface p-6 pb-[90px] shadow-lift animate-fade-up">
-        <div className="flex items-center justify-between">
-          <span className="text-base font-extrabold text-ink">{t("filters.title")}</span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("filters.close")}
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-surface-alt text-ink-soft"
-          >
-            ✕
-          </button>
-        </div>
-
-        <FilterFields filters={filters} onChange={onChange} fieldLabelClassName={SHEET_FIELD_LABEL} fieldInputClassName={SHEET_FIELD_INPUT} />
-
-        <div className="mt-2 flex gap-2.5">
-          <button
-            type="button"
-            onClick={() =>
-              onChange({
-                location: null,
-                postnummer: null,
-                propertyTypes: null,
-                minPrice: null,
-                maxPrice: null,
-                minSqm: null,
-                maxSqm: null,
-                maxDaysOnMarket: null,
-                minBuildingYear: null,
-                maxBuildingYear: null,
-              })
-            }
-            className="flex-1 rounded-full border border-border-strong bg-surface px-3 py-3 text-sm font-bold text-ink"
-          >
-            {t("filters.reset")}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-[2] rounded-full bg-cta px-3 py-3 text-sm font-bold text-cta-text"
-          >
-            {t("filters.title")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const { t, language } = useI18n();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return <dialog ref={dialogRef} aria-labelledby="search-filters-title" onCancel={onClose}
+    onKeyDown={event => {
+      if (event.key !== "Tab") return;
+      const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])')].filter(control => control.getClientRects().length > 0);
+      const first = controls[0], last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }}
+    onClick={e => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) onClose(); } }}
+    className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-2xl border border-border bg-surface p-0 text-ink shadow-lift backdrop:bg-black/35 sm:inset-0 sm:m-auto sm:max-h-[85dvh] sm:max-w-[680px] sm:rounded-2xl">
+    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-6 py-4"><h2 id="search-filters-title" className="text-xl font-semibold">{t("filters.title")}</h2><button type="button" onClick={onClose} aria-label={t("filters.close")} className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-alt text-ink-soft">✕</button></div>
+    <div className="grid items-start gap-5 p-6 sm:grid-cols-2"><FilterFields filters={filters} onChange={onChange} fieldLabelClassName="flex flex-col gap-2 text-xs font-medium text-ink-soft" fieldInputClassName="w-full min-w-0 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint" /></div>
+    {filters.polygon && <p className="mx-6 mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{language === "da" ? "Søgningen er afgrænset af dit markerede område på kortet." : "This search is limited to your drawn map boundary."}</p>}
+    <div className="sticky bottom-0 flex gap-3 border-t border-border bg-surface px-6 py-4"><button type="button" onClick={() => onChange({ ...defaultFilters(), polygon: null })} className="flex-1 rounded-full border border-border bg-surface px-4 py-3 text-sm font-semibold">{t("filters.reset")}</button><button type="button" onClick={onClose} className="flex-[2] rounded-full bg-cta px-4 py-3 text-sm font-semibold text-cta-text">{language === "da" ? "Vis boliger" : "Show homes"}</button></div>
+  </dialog>;
 }

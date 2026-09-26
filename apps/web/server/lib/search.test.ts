@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseBbox, searchProperties, splitLocationQuery } from "./search";
+import { InvalidSearchBoundaryError, parseBbox, searchProperties, splitLocationQuery } from "./search";
+import { searchBoundaryContains } from "../../../../packages/shared/src/utils/search-boundary";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -13,6 +14,8 @@ interface FakeRow {
   address: string;
   price: number;
   status: string;
+  lon?: number;
+  lat?: number;
 }
 
 const ROWS: FakeRow[] = [
@@ -35,8 +38,8 @@ function toResponseRow(row: FakeRow, columns: string): Record<string, unknown> {
       listing_date: "2026-01-01",
       listing_source: "boliga",
       external_id: row.id,
-      lat: 57,
-      lon: 9.9,
+      lat: row.lat ?? 57,
+      lon: row.lon ?? 9.9,
       building_year: null,
       property_type: "other",
       rooms: null,
@@ -57,6 +60,12 @@ function fakeClient(
   calls: { method: string; args: unknown[] }[] = [],
 ): SupabaseClient {
   const client = {
+    rpc(name: string, args: { boundary: [number, number][] }, options: unknown) {
+      calls.push({ method: "rpc", args: [name, args, options] });
+      // Model the DB set-returning function before outer projection/count/range.
+      const spatialRows = rows.filter(row => searchBoundaryContains([row.lon ?? 9.9, row.lat ?? 57], args.boundary));
+      return fakeClient(spatialRows, enrichmentRows, calls).from("properties");
+    },
     from(table: string) {
       if (table === "enrichments") {
         const enrichmentBuilder = {
@@ -79,6 +88,7 @@ function fakeClient(
 
       const builder = {
         select(columns: string, _opts?: unknown) {
+          calls.push({ method: "select", args: [columns, _opts] });
           selectedColumns = columns;
           return builder;
         },
@@ -105,10 +115,12 @@ function fakeClient(
           calls.push({ method: "lte", args });
           return builder;
         },
-        order() {
+        order(...args: unknown[]) {
+          calls.push({ method: "order", args });
           return builder;
         },
         range(from: number, to: number) {
+          calls.push({ method: "range", args: [from, to] });
           rangeStart = from;
           rangeEnd = to;
           return builder;
@@ -246,6 +258,48 @@ describe("searchProperties", () => {
     const calls: { method: string; args: unknown[] }[] = [];
     await searchProperties(fakeClient(ROWS, [], calls), { bbox: "not-a-bbox" }, true);
     expect(calls.some((c) => c.args[0] === "lon" || c.args[0] === "lat")).toBe(false);
+  });
+
+  it("uses the full server-side polygon set before count, projection and pagination", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    const polygon = "[[9,57],[10,57],[10,58],[9.5,57.5],[9,58]]";
+    const rows = [
+      { ...ROWS[0]!, id: "outside-concavity", lon: 9.5, lat: 57.8 },
+      { ...ROWS[1]!, id: "inside", lon: 9.5, lat: 57.25 },
+      { ...ROWS[2]!, id: "edge", lon: 9.5, lat: 57 },
+      { ...ROWS[0]!, id: "later-page", lon: 9.2, lat: 57.2 },
+    ];
+    const result = await searchProperties(fakeClient(rows, [], calls), { polygon, limit: 2, offset: 2, sortField: "price", sortDirection: "asc", minPrice: 1_000_000, bbox: "9,57,10,58", propertyTypes: ["villa"] }, true);
+    expect(result.total).toBe(3);
+    expect(result.totalPages).toBe(2);
+    expect(result.properties.map(property => property.id)).toEqual(["later-page"]);
+    expect(calls[0]).toEqual({ method: "rpc", args: ["properties_in_boundary", { boundary: JSON.parse(polygon) }, { count: "exact" }] });
+    expect(calls).toContainEqual({ method: "eq", args: ["status", "active"] });
+    expect(calls).toContainEqual({ method: "gte", args: ["price", 1_000_000] });
+    expect(calls).toContainEqual({ method: "in", args: ["property_type", ["villa"]] });
+    expect(calls).toContainEqual({ method: "lte", args: ["lat", 58] });
+    expect(calls).toContainEqual({ method: "order", args: ["price", { ascending: true }] });
+    expect(calls).toContainEqual({ method: "range", args: [2, 3] });
+  });
+
+  it("keeps polygon searches address-only for anonymous callers and includes polygon edges", async () => {
+    const calls: { method: string; args: unknown[] }[] = [];
+    const result = await searchProperties(fakeClient(ROWS, [], calls), { polygon: "[[9,57],[10,57],[10,58],[9,58]]" }, false);
+    expect(result.properties).toEqual([]);
+    expect(result.summaries).toHaveLength(3);
+    expect(result.summaries[0]).not.toHaveProperty("price");
+    expect(calls).toContainEqual({ method: "select", args: ["id, address", undefined] });
+  });
+
+  it("rejects invalid provided polygons before querying instead of returning unrestricted results", async () => {
+    for (const polygon of ["", "invalid-json", "[]", "[[1,1],[2,2],[3,3]]", "[[0,0],[2,2],[0,2],[2,0]]"]) {
+      const calls: { method: string; args: unknown[] }[] = [];
+      await expect(searchProperties(fakeClient(ROWS, [], calls), { polygon }, true)).rejects.toBeInstanceOf(InvalidSearchBoundaryError);
+      expect(calls).toEqual([]);
+    }
+    const calls: { method: string; args: unknown[] }[] = [];
+    await searchProperties(fakeClient(ROWS, [], calls), { polygon: null }, true);
+    expect(calls.some(call => call.method === "rpc")).toBe(false);
   });
 });
 

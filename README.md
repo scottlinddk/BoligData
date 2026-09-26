@@ -4,6 +4,12 @@
 
 The UI is fully bilingual (Danish default, English) and ships with light and dark themes; both preferences persist in `localStorage`.
 
+## Listing design and map search
+
+Search now uses the supplied photo-led design reference: a white/navy/blue palette, compact filters, a split listing/map layout and a charcoal footer. Draw an area with clicks or taps to filter listings; boundaries persist in URLs and saved searches. Spatial matching runs before counts and pagination. Listings also offer historical price references based on comparable sales and documented time on market.
+
+**Apply migration 024 before deploying drawn-area search.** See [design, map interaction and verification](docs/design-system-and-map-search.md). No production migration is applied by the implementation task.
+
 ## Property research before a viewing — 26 September 2026
 
 The private **Boligprojekt / Buying project** workspace adds project requirements, total purchase-and-work budgets, source-backed decisions, selectable historical sales, XLSX/CSV import, evidence notes, broker drafts and printable viewing packs. See [implementation, coverage and deployment instructions](docs/research-implementation.md) and the [original feature plan](docs/research-feature-plan.da.md).

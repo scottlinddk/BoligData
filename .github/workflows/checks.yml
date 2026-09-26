@@ -19,3 +19,27 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  boundary-database:
+    name: Verify drawn-area search in PostGIS
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_DB: boundary_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d boundary_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate migration, polygon boundaries, pagination and RLS
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d boundary_test -v ON_ERROR_STOP=1 -f scripts/verify-search-boundary.sql
