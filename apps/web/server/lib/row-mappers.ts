@@ -16,6 +16,7 @@ import type {
   SavedSearch,
   UserProfile,
 } from "../../../../packages/shared/src/types/index.js";
+import { emptyBbrData, safeBbrData, safeRiskFlags, sourceIsReal, unknownRiskFlags } from "./source-facts.js";
 
 export function rowToPropertySummary(row: Record<string, any>): PropertySummary {
   return { id: row.id, address: row.address };
@@ -34,7 +35,9 @@ export function rowToProperty(
     postalCode: row.postal_code,
     price: Number(row.price),
     sqm: Number(row.sqm),
-    listingDate: row.listing_date,
+    listingDate: row.listing_date_definition === "source_reported" ? row.listing_date ?? null : null,
+    dataMode: row.data_mode ?? "unknown",
+    firstSeenAt: row.first_seen_at ?? null,
     listingSource: row.listing_source,
     externalId: row.external_id,
     lat: Number(row.lat),
@@ -68,14 +71,15 @@ export function rowToEnrichment(row: Record<string, any>): Enrichment {
   return {
     id: row.id,
     propertyId: row.property_id,
-    bbrData: row.bbr_data,
-    soldPriceHistory: row.sold_price_history ?? [],
+    bbrData: safeBbrData(row) ?? emptyBbrData(),
+    soldPriceHistory: sourceIsReal(row, "sales") ? row.sold_price_history ?? [] : [],
     calculatedMetrics: row.calculated_metrics,
-    riskFlags: row.risk_flags,
+    riskFlags: safeRiskFlags(row) ?? unknownRiskFlags(),
     schoolTransport: row.school_transport,
-    publicValuation: row.public_valuation ?? null,
+    publicValuation: sourceIsReal(row, "valuation") ? row.public_valuation ?? null : null,
     source: row.source,
     enrichedAt: row.enriched_at,
+    sourceStatus: row.source_status ?? {},
   };
 }
 

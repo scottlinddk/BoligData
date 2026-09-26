@@ -84,22 +84,23 @@ describe("lookupBoligsidenSales (live)", () => {
     // neighbourhood query, which the old sale would never have ranked into.
     stubFetch([{ body: body([subject]) }, { body: body([addressRecord()]) }]);
 
-    const result = await lookupBoligsidenSales(LAT, LON);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddressId: "a1" });
     if (!result.ok) throw new Error("expected ok");
     expect(result.data.priceHistory[0]?.soldDate).toBe("2004-08-23");
     expect(result.data.nearbySales.map((s) => s.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
   });
 
-  it("separates the subject address from its neighbours by coordinate", async () => {
+  it("uses the explicit source identity for subject history", async () => {
     const subject = addressRecord({
       coordinates: { lat: LAT, lon: LON },
       houseNumber: "6",
+      addressID: "subject-1",
       registrations: [{ amount: 3_000_000, date: "2019-02-01", livingArea: 150, type: "normal" }],
     });
     stubFetch([{ body: body([subject, addressRecord()]) }]);
     // Both queries see the subject; it must be the history, never a neighbour.
 
-    const result = await lookupBoligsidenSales(LAT, LON);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddressId: "subject-1" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -107,6 +108,13 @@ describe("lookupBoligsidenSales (live)", () => {
     expect(result.data.priceHistory[0]?.price).toBe(3_000_000);
     // The subject must not also show up as one of its own neighbours.
     expect(result.data.nearbySales.map((s) => s.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
+  });
+
+  it("does not attach a same-coordinate property's sale history without verified identity", async () => {
+    stubFetch([{ body: body([addressRecord({ coordinates: { lat: LAT, lon: LON } })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.priceHistory).toEqual([]);
   });
 
   it("reports the neighbour's most recent sale, with distance and sale type", async () => {
@@ -119,7 +127,7 @@ describe("lookupBoligsidenSales (live)", () => {
     expect(sale.price).toBe(4_100_000);
     expect(sale.pricePerSqm).toBe(22778);
     expect(sale.saleType).toBe("normal");
-    expect(sale.areaSqm).toBe(186);
+    expect(sale.areaSqm).toBe(180); // area documented on the transaction, not current/latestSoldArea
     expect(sale.propertyType).toBe("villa");
     expect(sale.distanceMeters).toBeGreaterThan(0);
     expect(sale.distanceMeters).toBeLessThan(500);

@@ -192,7 +192,7 @@ describe("lookupProperty (live)", () => {
 });
 
 describe("lookupProperty (mock mode)", () => {
-  it("is deterministic and flags every source as mock", async () => {
+  it("keeps mock data out of property facts and prevents mock identifiers feeding live sources", async () => {
     vi.stubEnv("ADDRESS_LOOKUP_MOCK_MODE", "true");
     vi.stubEnv("BBR_MOCK_MODE", "true");
     vi.stubEnv("EJENDOMSVURDERING_MOCK_MODE", "true");
@@ -203,9 +203,13 @@ describe("lookupProperty (mock mode)", () => {
     const second = await lookupProperty(input);
 
     expect(first).toEqual(second);
-    expect(first.dataMode).toBe("mock");
-    expect(first.sources.every((s) => s.mode === "mock")).toBe(true);
-    expect(first.bbrData).not.toBeNull();
-    expect(first.publicValuation).not.toBeNull();
+    expect(first.sources.find((s) => s.key === "address")?.mode).toBe("mock");
+    expect(first.resolved.idLokalid).toBeNull();
+    expect(first.resolved.lat).toBeNull();
+    expect(first.bbrData).toBeNull();
+    expect(first.publicValuation).toBeNull();
+    expect(first.priceHistory).toEqual([]);
+    expect(first.nearbySales).toEqual([]);
+    expect(first.scoringInputs.areaMarginSqm).toBeNull();
   });
 });

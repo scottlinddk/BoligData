@@ -48,7 +48,7 @@ const WALL_MATERIALS = ["mursten", "letbeton", "træbeklædning", "betonelemente
 export interface BbrBuildingData {
   yearBuilt: number | null;
   renovationYear: number | null;
-  /** Residential floor area (byg039) when BBR has one, otherwise the building's total area (byg038). */
+  /** Residential floor area (byg039). Total building area (byg038) is a different measure and never substitutes. */
   areaSqm: number | null;
   /** Raw BBR bygningsanvendelse code (e.g. "120" = fritliggende enfamiliehus). */
   buildingType: string | null;
@@ -250,9 +250,7 @@ function mapBuilding(building: Record<string, unknown>): BbrBuildingData {
   return {
     yearBuilt: asPositiveInt(building.byg026Opfoerelsesaar),
     renovationYear: asPositiveInt(building.byg027OmTilbygningsaar),
-    areaSqm:
-      asPositiveNumber(building.byg039BygningensSamledeBoligAreal) ??
-      asPositiveNumber(building.byg038SamletBygningsareal),
+    areaSqm: asPositiveNumber(building.byg039BygningensSamledeBoligAreal),
     buildingType: asCode(building.byg021BygningensAnvendelse),
     floors: asPositiveInt(building.byg054AntalEtager),
     roofMaterial: asCode(building.byg033Tagdaekningsmateriale),

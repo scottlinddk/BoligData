@@ -4,12 +4,11 @@ import type { ListingSource } from "@shared/types/index";
 import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
-import { calculateDueDiligenceScore } from "@shared/utils/due-diligence-score";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
-import { DueDiligenceScoreBadge } from "@/components/due-diligence-score-badge";
+import { ResearchWorkbench } from "@/components/research/workbench";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
@@ -132,11 +131,6 @@ export function PropertyDetailPage() {
   const empty = t("detail.empty");
   const facts = mergePropertyFacts(property, enrichment, lookupQuery.data ?? null);
   const registerSources = summarizeLookupSources(lookupQuery.data ?? null);
-  const dueDiligenceScore = calculateDueDiligenceScore(
-    enrichment?.riskFlags ?? null,
-    pricePerSqm(property.price, property.sqm),
-    comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null,
-  );
   const saved = isSaved(property.id);
   const photos = getPhotos(property.images);
   const floorplan = getFloorplan(property.images);
@@ -147,7 +141,7 @@ export function PropertyDetailPage() {
   }
 
   function handleContactAgent() {
-    showToast(t("detail.contactAgentComingSoon"), "info");
+    document.getElementById("research")?.scrollIntoView({ behavior: "smooth" });
   }
 
   return (
@@ -207,15 +201,13 @@ export function PropertyDetailPage() {
         <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />
       )}
 
-      <div className="mt-4">
-        <DueDiligenceScoreBadge breakdown={dueDiligenceScore} />
-      </div>
+      <ResearchWorkbench property={property} />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Stat label={t("detail.price")} value={formatDkk(property.price)} />
         <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
         <Stat label={t("detail.pricePerSqm")} value={formatDkk(pricePerSqm(property.price, property.sqm))} />
-        <Stat label={t("detail.daysOnMarket")} value={String(daysBetween(property.listingDate))} />
+        <Stat label={t("detail.daysOnMarket")} value={property.listingDate ? String(daysBetween(property.listingDate)) : empty} />
         <Stat label={t("detail.rooms")} value={property.rooms ? String(property.rooms) : empty} />
         <Stat label={t("detail.built")} value={facts.buildingYear ? String(facts.buildingYear) : empty} />
         <Stat label={t("detail.energyLabel")} value={facts.bbrData?.energyLabel ?? empty} />

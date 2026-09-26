@@ -5,6 +5,7 @@ import type { PropertyLookupResult } from "@shared/types/property-lookup";
 
 const property = {
   id: "p1",
+  dataMode: "real",
   address: "Floravej 6, 9000 Aalborg",
   postalCode: "9000",
   price: 5_000_000,
@@ -40,6 +41,9 @@ const enrichment = {
   publicValuation: { assessedPropertyValueDkk: 2_000_000, assessedLandValueDkk: 500_000, valuationYear: 2023 },
   riskFlags: null,
   soldPriceHistory: storedHistory,
+  sourceStatus: Object.fromEntries(["bbr", "valuation", "sales"].map((key) => [key, {
+    dataMode: "real", observedAt: "2026-09-20T12:00:00Z", method: "register_lookup", verificationStatus: "unverified", reason: null,
+  }])),
 } as unknown as Enrichment;
 
 function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupResult {
@@ -75,9 +79,10 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
     },
     sources: [
       { key: "address", register: "DAR", mode: "live", error: null },
-      { key: "bbr", register: "BBR", mode: "unavailable", error: "DATAFORDELER_API_KEY not configured" },
-      { key: "publicValuation", register: "VUR", mode: "unavailable", error: "DATAFORDELER_API_KEY not configured" },
+      { key: "bbr", register: "BBR", mode: overrides.bbrData ? "live" : "unavailable", error: overrides.bbrData ? null : "DATAFORDELER_API_KEY not configured" },
+      { key: "publicValuation", register: "VUR", mode: overrides.publicValuation ? "live" : "unavailable", error: overrides.publicValuation ? null : "DATAFORDELER_API_KEY not configured" },
       { key: "noise", register: "Støj", mode: "unavailable", error: "HTTP 400" },
+      { key: "sales", register: "OIS/Boligsiden", mode: overrides.priceHistory?.length || overrides.nearbySales?.length ? "live" : "unavailable", error: null },
     ],
     dataMode: "unavailable",
     source: "ai",
@@ -117,14 +122,14 @@ describe("mergePropertyFacts", () => {
     expect(facts.bfeNummer).toBe("3300503");
   });
 
-  it("merges field by field, keeping stored values BBR's Bygning entity cannot answer", () => {
+  it("keeps an internally coherent live group instead of promoting cached fallback fields under a live badge", () => {
     const facts = mergePropertyFacts(property, enrichment, lookup({ bbrData: liveBbr }));
     // Live where BBR has an answer...
     expect(facts.bbrData?.areaSqm).toBe(142);
-    // ...stored where it structurally does not, rather than blanking the page.
-    expect(facts.bbrData?.basementSqm).toBe(40);
-    expect(facts.bbrData?.toiletCount).toBe(2);
-    expect(facts.bbrData?.energyLabel).toBe("C");
+    // A different source or date must not silently fill missing live fields.
+    expect(facts.bbrData?.basementSqm).toBeNull();
+    expect(facts.bbrData?.toiletCount).toBeNull();
+    expect(facts.bbrData?.energyLabel).toBeNull();
   });
 
   it("surfaces a register/listing area disagreement instead of hiding it", () => {
@@ -153,9 +158,9 @@ describe("mergePropertyFacts", () => {
     expect(facts.valuationSource).toBe("register");
   });
 
-  it("keeps the stored zone, since the address register retired that field", () => {
+  it("does not promote a cached zone without field provenance", () => {
     const facts = mergePropertyFacts(property, enrichment, lookup());
-    expect(facts.zone).toBe("landzone");
+    expect(facts.zone).toBeNull();
   });
 
   it("survives a property with no enrichment row at all", () => {
@@ -178,6 +183,34 @@ describe("mergePropertyFacts", () => {
     const facts = mergePropertyFacts(property, enrichment, lookup({ bbrData: allNull }));
     expect(facts.bbrSource).toBe("stored");
     expect(facts.bbrData?.yearBuilt).toBe(1970);
+  });
+
+  it("does not expose legacy cached facts with no per-source provenance", () => {
+    const facts = mergePropertyFacts(property, { ...enrichment, source: "datafordeler", sourceStatus: undefined }, null);
+    expect(facts.bbrData).toBeNull();
+    expect(facts.bbrSource).toBeNull();
+    expect(facts.publicValuation).toBeNull();
+    expect(facts.valuationSource).toBeNull();
+    expect(facts.priceHistory).toEqual([]);
+  });
+
+  it("does not let a live address source promote a mock or unavailable BBR payload", () => {
+    for (const mode of ["mock", "unavailable"] as const) {
+      const facts = mergePropertyFacts(property, null, lookup({ bbrData: liveBbr, sources: [
+        { key: "address", register: "DAR", mode: "live", error: null },
+        { key: "bbr", register: "BBR", mode, error: null },
+      ] }));
+      expect(facts.bbrData).toBeNull();
+      expect(facts.registerAreaSqm).toBeNull();
+      expect(facts.matrikelnr).toBe("42q");
+    }
+  });
+
+  it("does not treat an echoed energy label as a live BBR observation", () => {
+    const echoed = Object.fromEntries(Object.keys(storedBbr).map((key) => [key, key === "energyLabel" ? "A" : null])) as unknown as BbrData;
+    const facts = mergePropertyFacts(property, null, lookup({ bbrData: echoed }));
+    expect(facts.bbrData).toBeNull();
+    expect(facts.bbrSource).toBeNull();
   });
 });
 
@@ -223,6 +256,14 @@ describe("mergePropertyFacts — sales", () => {
     expect(mergePropertyFacts(property, enrichment, lookup({ nearbySales: nearby })).nearbySales).toEqual(nearby);
     expect(mergePropertyFacts(property, enrichment, null).nearbySales).toEqual([]);
   });
+
+  it("does not promote mock sales or change missing square-metre prices to zero", () => {
+    const missingArea = [{ ...liveHistory[0]!, pricePerSqm: null }];
+    expect(mergePropertyFacts(property, null, lookup({ priceHistory: missingArea })).priceHistory[0]?.pricePerSqm).toBeNull();
+    const mock = lookup({ priceHistory: liveHistory, nearbySales: nearby, sources: [{ key: "sales", register: "OIS", mode: "mock", error: null }] });
+    expect(mergePropertyFacts(property, null, mock).priceHistory).toEqual([]);
+    expect(mergePropertyFacts(property, null, mock).nearbySales).toEqual([]);
+  });
 });
 
 describe("summarizeLookupSources", () => {
@@ -232,7 +273,7 @@ describe("summarizeLookupSources", () => {
 
   it("carries each register's mode and error through", () => {
     const summary = summarizeLookupSources(lookup());
-    expect(summary).toHaveLength(4);
+    expect(summary).toHaveLength(5);
     expect(summary[0]).toEqual({ key: "address", mode: "live", error: null });
     expect(summary[1]?.error).toContain("DATAFORDELER_API_KEY");
   });

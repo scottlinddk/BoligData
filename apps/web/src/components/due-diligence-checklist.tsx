@@ -1,4 +1,5 @@
 import type { RiskFlags } from "@shared/types/index";
+import { riskStatuses } from "@shared/utils/risk-status";
 import { useI18n, type TranslateFn } from "@/i18n/i18n";
 
 const MILJOEGIS_NOISE_MAP_URL = "https://miljoegis.mim.dk/spatialmap?profile=stoej";
@@ -32,12 +33,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
   // RiskFlags, so the stored JSON can still lack it — guard against that
   // instead of trusting the type to match what's actually in the DB.
   const soilClassification = riskFlags.soilContamination?.classification ?? "unknown";
-  const soilStatus: ChecklistItem["status"] =
-    soilClassification === "v1" || soilClassification === "v2"
-      ? "warning"
-      : soilClassification === "unknown"
-        ? "unknown"
-        : "ok";
+  const states = riskStatuses(riskFlags);
   const soilDetailKey =
     soilClassification === "v2"
       ? "dueDiligence.soil.v2"
@@ -50,11 +46,11 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
   return [
     {
       label: t("dueDiligence.noise.label"),
-      status: riskFlags.noiseExposureLden !== null && riskFlags.noiseExposureLden > 58 ? "warning" : "ok",
+      status: states.noise,
       detail:
-        riskFlags.noiseExposureLden !== null
-          ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden })
-          : t("dueDiligence.noise.none"),
+        states.noise !== "unknown"
+          ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden! })
+          : t("dueDiligence.noData"),
       source: t("dueDiligence.noise.source"),
       sourceHref: MILJOEGIS_NOISE_MAP_URL,
     },
@@ -80,8 +76,8 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     },
     {
       label: t("dueDiligence.oilTank.label"),
-      status: riskFlags.oilTankRisk ? "warning" : "ok",
-      detail: riskFlags.oilTankRisk ? t("dueDiligence.oilTank.warning") : t("dueDiligence.oilTank.ok"),
+      status: states.oilTank,
+      detail: states.oilTank === "unknown" ? t("dueDiligence.noData") : riskFlags.oilTankRisk ? t("dueDiligence.oilTank.warning") : t("dueDiligence.oilTank.ok"),
       source:
         riskFlags.oilTankRiskSource === "bbr"
           ? t("dueDiligence.oilTank.source.bbr")
@@ -90,7 +86,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     },
     {
       label: t("dueDiligence.soil.label"),
-      status: soilStatus,
+      status: states.soil,
       detail: t(soilDetailKey),
       // Deep link to the parcel's jordforureningsattest (jord.miljoeportal.dk)
       // when cadastral data allowed building one; the source line keeps the

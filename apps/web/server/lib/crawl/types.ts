@@ -3,6 +3,8 @@ import type { ListingImage, SoldPriceEntry } from "../../../../../packages/share
 export type ListingSource = "boligsiden" | "boliga";
 
 export interface RawListing {
+  /** Set by the fetcher; missing provenance must never count as real data. */
+  data_mode?: "real" | "mock" | "demo" | "unknown";
   address: string;
   municipality: string;
   postal_code: string | null;
@@ -10,9 +12,8 @@ export interface RawListing {
   sqm: number;
   /**
    * Null when the source record carried no parseable listing/creation date
-   * (see boligsiden.ts / boliga.ts mappers) — ingest.ts fills this in rather
-   * than the mapper guessing "today", which would silently push a listing's
-   * apparent freshness forward on every re-crawl.
+   * (see boligsiden.ts / boliga.ts mappers). First observation is recorded
+   * separately and never substitutes for a documented listing date.
    */
   listing_date: string | null;
   listing_source: ListingSource;
@@ -42,6 +43,9 @@ export interface RawListing {
 
 export interface SourceCrawlStats {
   source: ListingSource;
+  /** True only after the entire requested feed has been exhausted. */
+  complete?: boolean;
+  dataMode?: "real" | "mock";
   pagesFetched: number;
   recordsSeen: number;
   /** Records that failed defensive mapping (missing/invalid required fields). */

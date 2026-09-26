@@ -11,7 +11,7 @@ import { AccountMenu, useAccountMenuItems } from "@/components/account-menu";
 export function Header() {
   const { user, signOut } = useAuth();
   const { profile } = useUserProfile();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [menuOpen, setMenuOpen] = useState(false);
   const accountMenuItems = useAccountMenuItems();
@@ -30,6 +30,9 @@ export function Header() {
             </Link>
             {user ? (
               <>
+                <Link to="/research" className="font-semibold text-ink-soft hover:text-ink">
+                  {language === "da" ? "Boligprojekt" : "Buying project"}
+                </Link>
                 <Link to="/dashboard" className="font-semibold text-ink-soft hover:text-ink">
                   {t("nav.dashboard")}
                 </Link>
@@ -95,6 +98,9 @@ export function Header() {
           </Link>
           {user ? (
             <>
+              <Link to="/research" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">
+                {language === "da" ? "Boligprojekt" : "Buying project"}
+              </Link>
               <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="font-semibold text-ink-soft">
                 {t("nav.dashboard")}
               </Link>

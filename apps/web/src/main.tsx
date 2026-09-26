@@ -13,6 +13,7 @@ import { RoleGuard } from "@/components/role-guard";
 import { RouteErrorBoundary } from "@/components/error-boundary";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
+import { ResearchPage } from "@/routes/research";
 import { DashboardPage } from "@/routes/dashboard";
 import { RecommendationsPage } from "@/routes/recommendations";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { path: "/", element: <SearchPage /> },
+      { path: "/research", element: <AuthGuard><ResearchPage /></AuthGuard> },
       {
         path: "/property/:id",
         element: (

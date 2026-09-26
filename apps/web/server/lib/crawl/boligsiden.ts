@@ -167,12 +167,17 @@ export function mapRegistrations(raw: unknown): SoldPriceEntry[] {
       const area = asPositiveNumber(get(entry, "livingArea")) ?? asPositiveNumber(get(entry, "area"));
       const pricePerSqm =
         asPositiveInt(get(entry, "perAreaPrice")) ?? (area !== null ? Math.round(price / area) : null);
-      if (pricePerSqm === null) return null;
 
       const typeRaw = asNonEmptyString(get(entry, "type"))?.toLowerCase() ?? "";
       const saleType = SALE_TYPES.find((t) => t === typeRaw) ?? "other";
 
-      return { soldDate, price, pricePerSqm, saleType };
+      const residentialArea = asPositiveNumber(get(entry, "livingArea"));
+      const registrationId = asNonEmptyString(get(entry, "registrationID"));
+      return {
+        soldDate, price, pricePerSqm, saleType,
+        ...(registrationId ? { registrationId } : {}),
+        ...(residentialArea !== null ? { residentialArea, areaDefinition: "residential" as const } : { areaDefinition: "unknown" as const }),
+      };
     })
     .filter((entry): entry is SoldPriceEntry => entry !== null)
     .sort((a, b) => b.soldDate.localeCompare(a.soldDate));
@@ -214,12 +219,13 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   }
 
   const addressType = asNonEmptyString(r.addressType)?.toLowerCase() ?? "";
-  const zip = asPositiveInt(get(r, "address", "zipCode")) ?? asPositiveInt(r.zipCode);
+  const zip = asPositiveInt(get(r, "address", "zipCode")) ?? asPositiveInt(get(r, "address", "zip", "zipCode")) ?? asPositiveInt(r.zipCode);
   const images = (Array.isArray(r.images) ? r.images : [])
     .map(mapImage)
     .filter((img): img is ListingImage => img !== null);
 
   return {
+    data_mode: "real",
     address,
     municipality,
     postal_code: zip !== null ? String(zip) : null,
@@ -229,8 +235,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     // fallback to today here would re-stamp every re-crawled listing with
     // the current date each run, since the same unparseable source field
     // fails the same way every time, permanently masquerading as freshest.
-    // ingest.ts resolves the final value: an existing property keeps its
-    // previously stored date, a new one gets first-seen-today.
+    // The crawler's first observation is stored separately.
     listing_date:
       asIsoDate(r.timeOnMarket) ?? asIsoDate(get(r, "status", "createdDate")) ?? asIsoDate(r.createdDate),
     listing_source: "boligsiden",
@@ -257,6 +262,8 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
 export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   const stats: SourceCrawlStats = {
     source: "boligsiden",
+    complete: false,
+    dataMode: MOCK_MODE ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
@@ -267,10 +274,11 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   const zipRanges = getZipRanges();
 
   if (MOCK_MODE) {
-    const all = fixtures as unknown as RawListing[];
+    const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
     stats.recordsOutOfArea = excluded;
+    stats.complete = true;
     return { listings: kept, stats };
   }
 
@@ -319,7 +327,12 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     }
 
     stats.pagesFetched += 1;
-    const cases = Array.isArray(body.cases) ? body.cases : [];
+    if (!Array.isArray(body.cases)) {
+      stats.errors.push(`page ${page}: missing cases array`);
+      break;
+    }
+    const cases = body.cases;
+    let processed = 0;
     // TEMPORARY diagnostic (page 1 only), round 2: confirms whether the new
     // `zipCodes` exact-match param actually narrows totalHits from the
     // nationwide count (43,885 confirmed on 2026-08-22 with no zip param
@@ -335,6 +348,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       });
     }
     for (const record of cases) {
+      processed += 1;
       stats.recordsSeen += 1;
       const listing = mapBoligsidenCase(record);
       if (listing === null) {
@@ -349,9 +363,10 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     }
 
     const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
-    if (total !== null && page * pageSize >= total) break;
-    // No trustworthy total — stop when a page comes back short.
-    if (total === null && cases.length < pageSize) break;
+    if ((total !== null && page * pageSize >= total) || (total === null && cases.length < pageSize)) {
+      stats.complete = processed === cases.length && stats.recordsSkipped === 0;
+      break;
+    }
   }
 
   const { kept, excluded } = filterByZipRanges(listings, zipRanges);

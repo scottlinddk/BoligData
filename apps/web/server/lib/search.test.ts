@@ -177,12 +177,22 @@ describe("searchProperties", () => {
       wallMaterial: "mursten",
     };
     const result = await searchProperties(
-      fakeClient(ROWS, [{ property_id: "1", bbr_data: bbrData }]),
+      fakeClient(ROWS, [{ property_id: "1", bbr_data: bbrData, source_status: { bbr: { dataMode: "real" } } }]),
       {},
       true,
     );
-    expect(result.properties.find((p) => p.id === "1")?.bbrData).toEqual(bbrData);
+    expect(result.properties.find((p) => p.id === "1")?.bbrData).toMatchObject({ ...bbrData, energyLabel: null });
     expect(result.properties.find((p) => p.id === "2")?.bbrData).toBeNull();
+  });
+
+  it("omits legacy and mock enrichment facts from search cards", async () => {
+    const result = await searchProperties(fakeClient(ROWS, [
+      { property_id: "1", bbr_data: { areaSqm: 180 }, risk_flags: { noiseExposureLden: 40, oilTankRisk: false, oilTankRiskSource: "bbr", soilContamination: { classification: "none" } } },
+      { property_id: "2", bbr_data: { areaSqm: 180 }, source_status: { bbr: { dataMode: "mock" } } },
+    ]), {}, true);
+    expect(result.properties[0]?.bbrData).toBeNull();
+    expect(result.properties[1]?.bbrData).toBeNull();
+    expect(result.properties[0]?.riskFlags).toMatchObject({ noiseExposureLden: null, oilTankRiskSource: "heuristic", soilContamination: { classification: "unknown" } });
   });
 
   it("leaves bbrData null for anonymous summaries (no enrichments lookup needed)", async () => {

@@ -64,7 +64,9 @@ export async function lookupProperty(
     input.lat ?? 0,
     input.lon ?? 0,
   );
-  const cadastral = cadastralResult.ok ? cadastralResult.data : null;
+  // A successful mock lookup is still synthetic: its identifiers and
+  // coordinates must not seed subsequent live register requests.
+  const cadastral = cadastralResult.ok && !mockModeEnabled("ADDRESS_LOOKUP_MOCK_MODE") ? cadastralResult.data : null;
 
   const lat = cadastral?.lat ?? input.lat ?? null;
   const lon = cadastral?.lon ?? input.lon ?? null;
@@ -86,10 +88,10 @@ export async function lookupProperty(
     hasCoordinates ? lookupBoligsidenSales(lat, lon) : null,
   ]);
 
-  const bbrBuilding = bbrResult.ok ? bbrResult.data : null;
-  const publicValuation = valuationResult.ok ? valuationResult.data : null;
-  const noiseExposureLden = noiseResult?.ok ? noiseResult.data.ldenDb : null;
-  const sales = salesResult?.ok ? salesResult.data : null;
+  const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
+  const publicValuation = valuationResult.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE") ? valuationResult.data : null;
+  const noiseExposureLden = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data.ldenDb : null;
+  const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
 
   const addressRegisterLabel =
     cadastral?.resolvedVia === "dar_fallback"
@@ -161,7 +163,8 @@ export async function lookupProperty(
       ? {
           yearBuilt: bbrBuilding.yearBuilt,
           renovationYear: bbrBuilding.renovationYear,
-          energyLabel,
+          // Caller-supplied labels remain screening inputs, not BBR facts.
+          energyLabel: null,
           areaSqm: bbrBuilding.areaSqm,
           buildingType: bbrBuilding.buildingType,
           heatingInstallation: bbrBuilding.heatingInstallation,

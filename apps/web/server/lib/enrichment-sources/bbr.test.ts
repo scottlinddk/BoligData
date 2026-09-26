@@ -185,7 +185,7 @@ describe("lookupBbr (live)", () => {
     if (!result.ok) return;
     // Year and area survive the bad guess; heating does not.
     expect(result.data.yearBuilt).toBe(1962);
-    expect(result.data.areaSqm).toBe(168);
+    expect(result.data.areaSqm).toBeNull(); // Total building area is not residential area.
     expect(result.data.heatingInstallation).toBeNull();
     expect(stub.bodies[2]).not.toContain("byg057Opvarmningsmiddel");
   });

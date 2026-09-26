@@ -40,11 +40,12 @@ export function ComparablesPanel({
   neighborhoodAvgPricePerSqm,
 }: ComparablesPanelProps) {
   const { t } = useI18n();
+  const formatSquareMetrePrice = (value: number | null) => value !== null && Number.isFinite(value) && value > 0 ? formatDkk(value) : t("riskChip.unknown");
   const sortedHistory = [...soldPriceHistory].sort((a, b) => a.soldDate.localeCompare(b.soldDate));
 
   // Only arm's-length sales belong in a neighbourhood average; a family
   // transfer at half price would drag it somewhere meaningless.
-  const marketSales = nearbySales.filter((sale) => sale.saleType === "normal");
+  const marketSales = nearbySales.filter((sale) => sale.saleType === "normal" && Number.isFinite(sale.pricePerSqm) && sale.pricePerSqm > 0);
   const nearbyAvgPricePerSqm =
     marketSales.length > 0
       ? Math.round(marketSales.reduce((sum, s) => sum + s.pricePerSqm, 0) / marketSales.length)
@@ -68,14 +69,16 @@ export function ComparablesPanel({
         <p className="text-xs font-medium text-ink-faint">{t("comparables.noHistory")}</p>
       ) : (
         <>
-          <SparklineChart points={sortedHistory.map((h) => h.pricePerSqm)} />
+          {sortedHistory.some((entry) => entry.pricePerSqm !== null && Number.isFinite(entry.pricePerSqm) && entry.pricePerSqm > 0) && (
+            <SparklineChart points={sortedHistory.flatMap((entry) => entry.pricePerSqm !== null && Number.isFinite(entry.pricePerSqm) && entry.pricePerSqm > 0 ? [entry.pricePerSqm] : [])} />
+          )}
           <ul className="mt-2 flex flex-col gap-1 text-xs font-medium text-ink-soft">
             {sortedHistory.map((entry) => (
               <li key={`${entry.soldDate}-${entry.price}`}>
                 {t("comparables.historyEntry", {
                   date: entry.soldDate,
                   price: formatDkk(entry.price),
-                  pricePerSqm: formatDkk(entry.pricePerSqm),
+                  pricePerSqm: formatSquareMetrePrice(entry.pricePerSqm),
                 })}
                 <SaleTypeTag saleType={entry.saleType} />
               </li>
@@ -104,7 +107,7 @@ export function ComparablesPanel({
               {t("comparables.soldEntry", {
                 date: sale.soldDate,
                 price: formatDkk(sale.price),
-                pricePerSqm: formatDkk(sale.pricePerSqm),
+                pricePerSqm: formatSquareMetrePrice(sale.pricePerSqm),
                 distance: sale.distanceMeters,
               })}
             </div>
@@ -130,7 +133,7 @@ export function ComparablesPanel({
                   {t("comparables.soldEntry", {
                     date: entry.soldDate,
                     price: formatDkk(entry.price),
-                    pricePerSqm: formatDkk(entry.pricePerSqm),
+                    pricePerSqm: formatSquareMetrePrice(entry.pricePerSqm),
                     distance: Math.round(entry.distanceMeters),
                   })}
                 </div>

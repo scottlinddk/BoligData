@@ -19,6 +19,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Validate before deploying
+        run: |
+          pnpm typecheck
+          pnpm test
+
       - name: Pull Vercel environment
         run: npx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
         env:

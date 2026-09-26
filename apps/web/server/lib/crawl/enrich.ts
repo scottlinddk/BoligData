@@ -1,32 +1,26 @@
 import type {
-  BbrData,
-  CalculatedMetrics,
-  EnrichmentSource,
-  OilTankRiskSource,
-  PublicValuation,
-  RiskFlags,
-  SchoolTransportInfo,
-  SoilContaminationClassification,
-  SoldPriceEntry,
+  BbrData, CalculatedMetrics, EnrichmentSource, PublicValuation, RiskFlags,
+  SchoolTransportInfo, SoldPriceEntry,
 } from "../../../../../packages/shared/src/types/index.js";
 import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
-import { lookupBbr, type BbrBuildingData } from "../enrichment-sources/bbr.js";
-import { lookupEjendomsvurdering, type EjendomsvurderingData } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupBbr } from "../enrichment-sources/bbr.js";
+import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildJordforureningsattestUrl } from "../enrichment-sources/jordforureningsattest-link.js";
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
-import { lookupNoiseExposure, mockNoiseExposure } from "../enrichment-sources/stoejkort.js";
+import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { buildTinglysningUrl } from "../enrichment-sources/tinglysning-link.js";
-import { hashSeed } from "../enrichment-sources/types.js";
+import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import type { RawListing } from "./types.js";
 
-// Deliberately independent of CRAWL_MOCK_MODE: flipping the *fetchers* live
-// must not drag enrichment into a not-implemented branch, or a live crawl
-// trial crashes after upserting. Each real source below has its own
-// MOCK_MODE flag too, so this only gates whether enrichProperty *attempts*
-// real lookups at all.
-const MOCK_MODE = process.env.ENRICH_MOCK_MODE !== "false";
+export interface RegisterSourceStatus {
+  dataMode: "real" | "mock" | "unavailable";
+  observedAt: string;
+  method: "register_lookup";
+  verificationStatus: "unverified" | "unavailable";
+  reason: string | null;
+}
 
 export interface EnrichmentPayload {
   bbr_data: BbrData;
@@ -36,142 +30,92 @@ export interface EnrichmentPayload {
   school_transport: SchoolTransportInfo | null;
   public_valuation: PublicValuation | null;
   source: EnrichmentSource;
+  source_status: Record<string, RegisterSourceStatus>;
   enriched_at: string;
 }
 
-function mockSoilClassification(seed: number): SoilContaminationClassification {
-  return seed % 7 === 0 ? "v2" : "none";
-}
-
-/**
- * Enriches a raw listing with BBR/soil-contamination/risk-flag data.
- * `cadastral` (from address-lookup.ts, Fase 1) supplies matrikelnr/ejerlav
- * for the tinglysning.dk deep-link and id_lokalid for the BBR lookup — null
- * when the cadastral lookup hasn't run or failed for this property.
- */
+/** Each register keeps its own provenance. Synthetic register values never
+ * populate the property read model, even when another register is live. */
 export async function enrichProperty(
   listing: RawListing,
   cadastral: AddressCadastral | null = null,
 ): Promise<EnrichmentPayload> {
-  const seed = hashSeed(listing.external_id);
-  const pricePerSqm = Math.round(listing.price / listing.sqm);
-  const encumbranceLookupUrl = buildTinglysningUrl(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null);
-  const sewerSeparationLookupUrl = buildSpildevandsplanUrl(listing.municipality);
-  const soilContaminationAttestUrl = buildJordforureningsattestUrl(
-    cadastral?.ejerlavskode ?? null,
-    cadastral?.matrikelnr ?? null,
-  );
-  const oilTankHeuristic = (listing.building_year ?? 2000) < 1970;
+  const observedAt = new Date().toISOString();
+  const sourceStatus: Record<string, RegisterSourceStatus> = {
+    sales: {
+      dataMode: listing.data_mode === "real" ? "real" : listing.data_mode === "mock" || listing.data_mode === "demo" ? "mock" : "unavailable",
+      observedAt, method: "register_lookup", verificationStatus: listing.data_mode === "real" ? "unverified" : "unavailable",
+      reason: listing.data_mode === "real" ? null : "Listing registration provenance is not live",
+    },
+  };
+  const mockRun = process.env.ENRICH_MOCK_MODE !== "false" || listing.data_mode === "mock" || listing.data_mode === "demo";
 
-  let soilClassification: SoilContaminationClassification;
-  let jordart: string | null;
-  let bbrBuilding: BbrBuildingData | null = null;
-  let oilTankRisk: boolean;
-  let oilTankRiskSource: OilTankRiskSource;
-  let noiseExposureLden: number | null;
-  let source: EnrichmentSource;
-
-  // Independent of ENRICH_MOCK_MODE and the Promise.allSettled batch below:
-  // ejendomsvurdering.ts gates its own mock/real split internally (same as
-  // address-lookup.ts/matrikel.ts in ingest.ts), so this always resolves to
-  // either real or mock data on its own rather than being at the mercy of
-  // enrich.ts's overall mode.
-  const valuationResult = await lookupEjendomsvurdering(
-    cadastral?.matrikelnr ?? null,
-    cadastral?.ejerlav ?? null,
-    cadastral?.bfeNummer ?? null,
-  );
-  const publicValuation: EjendomsvurderingData | null = valuationResult.ok ? valuationResult.data : null;
-
-  if (MOCK_MODE) {
-    soilClassification = mockSoilClassification(seed);
-    jordart = null;
-    oilTankRisk = oilTankHeuristic;
-    oilTankRiskSource = "heuristic";
-    noiseExposureLden = mockNoiseExposure(listing.lat, listing.lon);
-    source = "mock";
-    // lookupBbr gates its own mock/real split (BBR_MOCK_MODE), which now
-    // defaults to *live*: with a Datafordeler key configured this returns
-    // real building facts even on a mock enrichment run, and without one it
-    // returns nothing rather than fabricating materials/heating/counts. Set
-    // BBR_MOCK_MODE=true for a fully offline run.
-    const bbrResult = await lookupBbr(cadastral?.idLokalid ?? null);
-    bbrBuilding = bbrResult.ok ? bbrResult.data : null;
-  } else {
-    // Each source is independently gated and failure-isolated: one lookup
-    // erroring must not blank out the others, mirroring ingest.ts's
-    // Promise.allSettled treatment of crawl sources.
-    const [soilTypeResult, contaminationResult, bbrResult, noiseResult] = await Promise.allSettled([
-      lookupSoilType(listing.lat, listing.lon),
-      lookupSoilContamination(listing.lat, listing.lon),
-      lookupBbr(cadastral?.idLokalid ?? null),
-      lookupNoiseExposure(listing.lat, listing.lon),
-    ]);
-
-    jordart =
-      soilTypeResult.status === "fulfilled" && soilTypeResult.value.ok ? soilTypeResult.value.data.jordart : null;
-    soilClassification =
-      contaminationResult.status === "fulfilled" && contaminationResult.value.ok
-        ? contaminationResult.value.data.classification
-        : "unknown";
-    noiseExposureLden =
-      noiseResult.status === "fulfilled" && noiseResult.value.ok ? noiseResult.value.data.ldenDb : null;
-
-    bbrBuilding = bbrResult.status === "fulfilled" && bbrResult.value.ok ? bbrResult.value.data : null;
-    const heatingInstallation = bbrBuilding?.heatingInstallation ?? null;
-
-    if (bbrBuilding !== null && heatingInstallation !== null) {
-      oilTankRisk = heatingInstallation === "oliefyr";
-      oilTankRiskSource = "bbr";
-      source = "datafordeler";
-    } else {
-      oilTankRisk = oilTankHeuristic;
-      oilTankRiskSource = "heuristic";
-      source = "mock";
+  async function read<T>(key: string, isMock: boolean, lookup: () => Promise<SourceResult<T>>): Promise<T | null> {
+    if (mockRun || isMock) {
+      sourceStatus[key] = { dataMode: "mock", observedAt, method: "register_lookup", verificationStatus: "unavailable", reason: "Demo/mock source: omitted from property facts" };
+      return null;
+    }
+    try {
+      const result = await lookup();
+      sourceStatus[key] = {
+        dataMode: result.ok ? "real" : "unavailable", observedAt, method: "register_lookup",
+        verificationStatus: result.ok ? "unverified" : "unavailable", reason: result.ok ? null : result.error,
+      };
+      return result.ok ? result.data : null;
+    } catch (error) {
+      sourceStatus[key] = { dataMode: "unavailable", observedAt, method: "register_lookup", verificationStatus: "unavailable", reason: error instanceof Error ? error.message : String(error) };
+      return null;
     }
   }
 
+  const [bbr, valuation, soil, contamination, noise] = await Promise.all([
+    read("bbr", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbr(cadastral?.idLokalid ?? null)),
+    read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null)),
+    read("soil_type", process.env.GEUS_MOCK_MODE !== "false", () => lookupSoilType(listing.lat, listing.lon)),
+    read("soil_contamination", process.env.MILJOEPORTALEN_MOCK_MODE !== "false", () => lookupSoilContamination(listing.lat, listing.lon)),
+    read("noise", mockModeEnabled("STOEJKORT_MOCK_MODE"), () => lookupNoiseExposure(listing.lat, listing.lon)),
+  ]);
+  const heatingKnown = bbr?.heatingInstallation != null;
   return {
     bbr_data: {
-      yearBuilt: bbrBuilding?.yearBuilt ?? listing.building_year,
-      renovationYear: bbrBuilding?.renovationYear ?? (seed % 3 === 0 ? (listing.building_year ?? 1970) + 20 : null),
-      energyLabel: ["A", "B", "C", "D", "E"][seed % 5] ?? null,
-      areaSqm: bbrBuilding?.areaSqm ?? listing.sqm,
-      buildingType: bbrBuilding?.buildingType ?? listing.property_type,
-      floors: bbrBuilding?.floors ?? null,
-      roofMaterial: bbrBuilding?.roofMaterial ?? null,
-      wallMaterial: bbrBuilding?.wallMaterial ?? null,
-      heatingInstallation: bbrBuilding?.heatingInstallation ?? null,
-      basementSqm: bbrBuilding?.basementSqm ?? null,
-      toiletCount: bbrBuilding?.toiletCount ?? null,
-      bathroomCount: bbrBuilding?.bathroomCount ?? null,
+      yearBuilt: bbr?.yearBuilt ?? null,
+      renovationYear: bbr?.renovationYear ?? null,
+      energyLabel: null, // No implemented source supplies an energy certificate.
+      areaSqm: bbr?.areaSqm ?? null,
+      buildingType: bbr?.buildingType ?? null,
+      floors: bbr?.floors ?? null,
+      roofMaterial: bbr?.roofMaterial ?? null,
+      wallMaterial: bbr?.wallMaterial ?? null,
+      heatingInstallation: bbr?.heatingInstallation ?? null,
+      basementSqm: bbr?.basementSqm ?? null,
+      toiletCount: bbr?.toiletCount ?? null,
+      bathroomCount: bbr?.bathroomCount ?? null,
     },
-    // Straight from the Boligsiden case record the listing was mapped from —
-    // no extra request. Note `listingContentHash` doesn't cover registrations,
-    // so a new sale on an otherwise-unchanged listing won't trigger a
-    // re-enrich until something else about the listing moves.
-    sold_price_history: listing.sold_price_history ?? [],
+    // Keep historic registrations independent of the current asking price;
+    // invalid/future observations are separately retained for review.
+    sold_price_history: (listing.sold_price_history ?? []).filter((sale) => sale.soldDate <= observedAt.slice(0, 10)),
     calculated_metrics: {
-      pricePerSqm,
-      neighborhoodPricePerSqm: pricePerSqm,
+      pricePerSqm: Math.round(listing.price / listing.sqm),
+      neighborhoodPricePerSqm: null,
       priceTrendPercent: null,
       estimatedYieldPercent: null,
-      daysOnMarket: 0,
+      daysOnMarket: null,
     },
     risk_flags: {
-      noiseExposureLden,
+      noiseExposureLden: noise?.ldenDb ?? null,
       encumbranceCheckRequired: true,
-      encumbranceLookupUrl,
+      encumbranceLookupUrl: buildTinglysningUrl(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null),
       sewerSeparationCheckRequired: true,
-      sewerSeparationLookupUrl,
-      oilTankRisk,
-      oilTankRiskSource,
-      soilContamination: { classification: soilClassification, jordart },
-      soilContaminationAttestUrl,
+      sewerSeparationLookupUrl: buildSpildevandsplanUrl(listing.municipality),
+      oilTankRisk: heatingKnown ? bbr!.heatingInstallation === "oliefyr" : (listing.building_year ?? 2000) < 1970,
+      oilTankRiskSource: heatingKnown ? "bbr" : "heuristic",
+      soilContamination: { classification: contamination?.classification ?? "unknown", jordart: soil?.jordart ?? null },
+      soilContaminationAttestUrl: buildJordforureningsattestUrl(cadastral?.ejerlavskode ?? null, cadastral?.matrikelnr ?? null),
     },
     school_transport: null,
-    public_valuation: publicValuation,
-    source,
-    enriched_at: new Date().toISOString(),
+    public_valuation: valuation,
+    source: bbr || valuation ? "datafordeler" : "mock",
+    source_status: sourceStatus,
+    enriched_at: observedAt,
   };
 }

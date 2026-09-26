@@ -42,6 +42,12 @@ function fakeDb() {
           }),
         };
       }
+      if (table !== "enrichments") return {
+        upsert: () => Object.assign(Promise.resolve({ error: null }), {
+          select: () => ({ single: () => Promise.resolve({ data: { id: `${table}-id` }, error: null }) }),
+        }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      };
       return {
         select: () => ({
           in: () => Promise.resolve({ data: [], error: null }),

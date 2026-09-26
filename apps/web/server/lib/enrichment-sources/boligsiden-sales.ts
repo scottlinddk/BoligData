@@ -157,6 +157,9 @@ function mockSales(lat: number, lon: number): BoligsidenSales {
 export interface NearbySalesOptions {
   radiusMeters?: number;
   limit?: number;
+  /** An explicitly resolved Boligsiden address/unit identifier. Coordinates
+   * alone cannot distinguish apartments or neighbouring properties. */
+  subjectAddressId?: string;
 }
 
 async function search(params: URLSearchParams): Promise<ParsedAddress[]> {
@@ -174,9 +177,8 @@ async function search(params: URLSearchParams): Promise<ParsedAddress[]> {
  * the history comes back empty for no visible reason. So the subject is found
  * with its own tight box instead, where ranking can't hide it.
  *
- * Both queries are matched to the subject by coordinate rather than by address
- * string: the register and the listing spell the same address differently
- * often enough that string matching would be the fragile part.
+ * The subject history requires a verified source address identifier. Nearby
+ * coordinates are only a search window, never an identity match.
  *
  * `saleType` is carried through rather than filtered, so a family transfer or
  * a forced auction can be shown as what it is instead of being averaged into
@@ -216,24 +218,24 @@ export async function lookupBoligsidenSales(
       ),
     ]);
 
-    const subject = subjectMatches
-      .map((entry) => ({ entry, distance: haversineMeters(lat, lon, entry.lat, entry.lon) }))
-      .filter(({ distance }) => distance <= SUBJECT_MATCH_METERS)
-      .sort((a, b) => a.distance - b.distance)[0]?.entry;
+    const identityMatches = options.subjectAddressId
+      ? subjectMatches.filter((entry) => entry.record.addressID === options.subjectAddressId)
+      : [];
+    const subject = identityMatches.length === 1 ? identityMatches[0] : undefined;
 
     const nearbySales: NearbySale[] = neighbourhood
       .filter((entry) => haversineMeters(lat, lon, entry.lat, entry.lon) > SUBJECT_MATCH_METERS)
       .map((entry): NearbySale | null => {
         const latest = entry.history[0];
         const address = formatAddress(entry.record);
-        if (!latest || address === null) return null;
+        if (!latest || latest.pricePerSqm === null || address === null) return null;
         return {
           address,
           soldDate: latest.soldDate,
           price: latest.price,
           pricePerSqm: latest.pricePerSqm,
           saleType: latest.saleType ?? "other",
-          areaSqm: asPositiveInt(asRecord(entry.record.boligsidenInfo)?.latestSoldArea),
+          areaSqm: latest.areaDefinition === "residential" ? latest.residentialArea ?? null : null,
           propertyType: asNonEmptyString(entry.record.addressType),
           distanceMeters: Math.round(haversineMeters(lat, lon, entry.lat, entry.lon)),
           lat: entry.lat,

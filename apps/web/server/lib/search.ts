@@ -5,6 +5,7 @@ import type {
   SearchPropertiesResponse,
 } from "../../../../packages/shared/src/types/api.js";
 import { rowToProperty, rowToPropertySummary } from "./row-mappers.js";
+import { safeBbrData, safeRiskFlags } from "./source-facts.js";
 
 const SORT_COLUMNS: Record<string, string> = {
   listingDate: "listing_date",
@@ -44,7 +45,7 @@ function sanitizeForOrFilter(value: string): string {
  */
 export function splitLocationQuery(raw: string): { text: string; postalCode: string | null } {
   const match = raw.match(/\b(\d{4})\b/);
-  const postalCode = match ? match[1] : null;
+  const postalCode = match?.[1] ?? null;
   const text = (postalCode ? raw.replace(match![0], " ") : raw).trim();
   return { text, postalCode };
 }
@@ -144,11 +145,13 @@ export async function searchProperties(
     const propertyIds = (data as any[]).map((row) => row.id);
     const { data: enrichments } = await client
       .from("enrichments")
-      .select("property_id, bbr_data, risk_flags")
+      .select("property_id, bbr_data, risk_flags, source_status")
       .in("property_id", propertyIds);
     for (const row of enrichments ?? []) {
-      if (row.bbr_data) bbrByPropertyId.set(row.property_id, row.bbr_data);
-      if (row.risk_flags) riskByPropertyId.set(row.property_id, row.risk_flags);
+      const bbr = safeBbrData(row);
+      const risk = safeRiskFlags(row);
+      if (bbr) bbrByPropertyId.set(row.property_id, bbr);
+      if (risk) riskByPropertyId.set(row.property_id, risk);
     }
   }
 
