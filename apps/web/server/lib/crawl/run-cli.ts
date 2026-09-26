@@ -1,7 +1,7 @@
 import { getServiceRoleClient } from "../supabase.js";
 import { enabledSources, runIngest } from "./ingest.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
-import { configureRunner } from "./runner-config.js";
+import { assertRunnerDatabaseConfiguration, configureRunner, isSensitivePlaceholder } from "./runner-config.js";
 import { verifyCrawlData } from "./runner-verification.js";
 
 /** Actions entry point: Node's --env-file loads the existing Vercel production
@@ -10,6 +10,10 @@ async function main() {
   const verifyOnly = process.argv.includes("--verify-only");
   const configuration = configureRunner(!verifyOnly && process.argv.includes("--full-scan"));
   console.log(JSON.stringify({ event: "crawl.runner_config", verifyOnly, sources: enabledSources(), ...configuration }));
+  assertRunnerDatabaseConfiguration();
+  // A protected optional register credential is unavailable to this runner;
+  // never send Vercel's redaction marker to the register as an API key.
+  if (isSensitivePlaceholder(process.env.DATAFORDELER_API_KEY)) delete process.env.DATAFORDELER_API_KEY;
   const client = getServiceRoleClient();
   async function verify() {
     console.log(JSON.stringify({ event: "crawl.verification", ...await verifyCrawlData(client) }));

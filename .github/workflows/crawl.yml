@@ -114,10 +114,18 @@ jobs:
           args=()
           if [ "$RUN_MODE" = "verify" ]; then args+=(--verify-only); fi
           if [ "$RUN_FULL_SCAN" = "true" ]; then args+=(--full-scan); fi
+          # Vercel does not export protected production values. Optional runner
+          # secrets take precedence over the downloaded placeholders.
+          if [ -n "$RUNNER_SUPABASE_URL" ]; then export SUPABASE_URL="$RUNNER_SUPABASE_URL"; fi
+          if [ -n "$RUNNER_SUPABASE_SERVICE_ROLE_KEY" ]; then export SUPABASE_SERVICE_ROLE_KEY="$RUNNER_SUPABASE_SERVICE_ROLE_KEY"; fi
+          if [ -n "$RUNNER_DATAFORDELER_API_KEY" ]; then export DATAFORDELER_API_KEY="$RUNNER_DATAFORDELER_API_KEY"; fi
           node --env-file=.vercel/.env.production.local apps/web/.crawl-build/apps/web/server/lib/crawl/run-cli.js "${args[@]}"
         env:
           RUN_MODE: ${{ inputs.mode }}
           RUN_FULL_SCAN: ${{ inputs.full_scan }}
+          RUNNER_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          RUNNER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNNER_DATAFORDELER_API_KEY: ${{ secrets.DATAFORDELER_API_KEY }}
       - name: Remove downloaded environment
         if: always()
         run: rm -f .vercel/.env.production.local

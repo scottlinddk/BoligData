@@ -24,7 +24,13 @@ The **Daily property crawl** GitHub Actions workflow provides:
 - `mode=verify`: read-only production provenance counts and a small sample of public listing facts.
 - `mode=runner`: the same ingest pipeline on an Actions runner, avoiding the API function's execution limit. Its optional full scan increases bounded pagination within the configured source/postcode scope.
 
-The runner pulls the existing Vercel production environment using existing repository secrets. It does not print environment values or upload them as artifacts, and removes the downloaded environment in an always-run cleanup step. Verification can run before refreshing. Refresh refuses explicit global mock crawl/enrichment settings. No new database migration is required.
+The runner pulls the existing Vercel production configuration using existing repository secrets. Vercel substitutes `[SENSITIVE]` for protected values, so deployments with protected database credentials also require repository Actions secrets named `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. These override the downloaded placeholders. `DATAFORDELER_API_KEY` is optional for register enrichment; without an available key those registers remain unavailable. Add credentials through GitHub's secret settings, never a commit or workflow log. Verification refuses missing protected database values before making any database request.
+
+The workflow does not print environment values or upload them as artifacts, and removes the downloaded environment in an always-run cleanup step. Verification can run before refreshing. Refresh refuses explicit global mock crawl/enrichment settings. No new database migration is required.
+
+After the runner secrets are configured, dispatch `crawl.yml` with `mode=verify` on the reviewed branch. Check provenance counts and the target listing's `last_seen_at`. Then dispatch `mode=runner` with `full_scan=true` for recovery; compare the before/after counts and samples. Full scan is bounded to 100 pages / 5,000 listings per source and preserves configured source/postcode filters. The routine API crawl does not require these additional Actions secrets.
+
+Production verification attempted on 26 September 2026 confirmed the protected-value limitation before any database access. Consequently, this change does not claim a completed production refresh.
 
 ## Checks
 
