@@ -14,6 +14,18 @@ The budget has base and stress scenarios, explicit VAT treatment, assumption/est
 
 Broker drafts support first contact, price discussion, relisting and follow-up. They accept an independently entered discussion price only after an explicit checkbox. They do not automatically disclose the ceiling, maximum purchase price, reserve or financing assumptions, and there is no send operation. The print pack and downloaded research JSON are **private** and deliberately contain the buyer's budget; they are distinct from the broker draft.
 
+## Listing price reference
+
+Each active real listing now shows an indicative purchase price from comparable completed sales and its documented time on market. The primary reference is the median sold price per residential m² multiplied by the listing's residential area. It uses the same recorded property type and municipality, an area range of ±25%, sales within the previous 24 months, and the same time definition and duration bracket (0–30, 31–90, 91–180, 181–365 or over 365 days). These fixed rules are recorded in the exported method snapshot; the buyer's minimum-area requirement, budget and current asking price do not enter the calculation.
+
+The estimate requires at least five unique eligible transactions, with a warning for fewer than ten. The middle 50% of area-adjusted historical prices supplies the Q1–Q3 range. The card shows transaction and property counts, the asking-price gap, the supporting sales, and a separate reference without time matching. Missing duration data does not silently turn that baseline into a time-adjusted estimate. A separate first-asking-price calculation is available only with a documented first price in the current campaign and at least five historical first-asking/sold pairs. It is never added to the m² result or applied as another reduction to today's asking price.
+
+Only real, normal, completed sales with a usable residential area documented at the sale date qualify. Duplicate or conflicting identities, the subject's own earlier sales, unknown/mock data, future observations and manually excluded transactions are withheld. Source dates and current listing identities determine the latest episode; overlapping active periods count once, pauses are excluded, unknown periods stay unknown, and technical first-seen timestamps never become listing dates. Truncated history cannot establish a first asking price or a complete active total. The UI lets the user choose the documented time definition; a missing definition or too few matching sales gives an explicit insufficient-data result.
+
+The comparison relates an ongoing listing's elapsed age to completed sales' durations. It is descriptive evidence, not a causal discount for waiting, a predicted selling time, a confidence interval or a probability of bid acceptance. Condition, plot size, exact location within the municipality and market price changes are not adjusted. Current source feeds often lack historical marketing durations and sale-date area, so references can remain unavailable until suitable historical data is imported. No sample transactions are inserted into production.
+
+The price reference appears in the private print pack and JSON snapshot. The snapshot includes the subject inputs, method/data versions, calculation date, filters, exact source transactions and exclusions so the calculation can be reproduced. **Use as budget scenario** is an explicit local choice; the estimate does not automatically alter the purchase scenario, family requirements or broker draft. Saving remains explicit.
+
 ## Coverage of the plan
 
 | Plan | Implemented behavior |
@@ -54,7 +66,7 @@ Do not enable mock flags for production references. Crawls report `complete` sep
 
 ## Validation
 
-Final local check on 26 September 2026: **397 tests in 44 files passed**, shared/frontend/server TypeScript checks passed, and the production build passed. Vite reports a bundle-size advisory; ExcelJS is loaded only when opening an XLSX import. Eight mocked browser checks passed, including the 4 million purchase cap, hard rejection at 116 m², draft privacy, private save requests, a 390-pixel mobile layout without document overflow and the printable viewing pack. No real account or upstream network response was used by the browser test.
+Final local check on 26 September 2026: **447 tests in 46 files passed**, shared/frontend/server TypeScript checks passed, and the production build passed. Vite reports a bundle-size advisory; ExcelJS is loaded only when opening an XLSX import. Thirteen mocked browser checks passed, including the time-matched 4 million price reference and 3.9–4.1 million historical range, minimum-sample suppression and manual exclusions, snapshot export, explicit budget selection, the 4 million purchase cap, hard rejection at 116 m², draft privacy, private save requests, a 390-pixel mobile layout without document overflow and the printable viewing pack. No real account or upstream network response was used by the browser test.
 
 Standard checks: `pnpm typecheck`, `pnpm test`, `pnpm build`. The repository pins pnpm 10.33.0. On environments whose wrapper uses a different pnpm version, the same installed tools can be invoked directly from `apps/web`: `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json`, repeat for `tsconfig.api.json`, `node node_modules/vitest/vitest.mjs run`, and `node node_modules/vite/bin/vite.js build`.
 

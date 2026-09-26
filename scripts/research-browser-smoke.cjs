@@ -21,6 +21,8 @@ const publicUrl = envFile.match(/^VITE_SUPABASE_URL\s*=\s*["']?([^\r\n"']+)/m)?.
 assert(publicUrl, "The local frontend needs its public Supabase URL to determine the test storage key");
 const authStorageKey = `sb-${new URL(publicUrl).hostname.split(".")[0]}-auth-token`;
 const now = new Date().toISOString();
+const dayBefore = days => new Date(Date.parse(`${now.slice(0, 10)}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+const listingDate = dayBefore(240);
 const userId = "00000000-0000-4000-8000-000000000001";
 const propertyId = "00000000-0000-4000-8000-000000000002";
 const testUser = { id: userId, aud: "authenticated", role: "authenticated", email: "fixture@example.invalid", email_confirmed_at: now, app_metadata: { provider: "email", providers: ["email"] }, user_metadata: {}, created_at: now };
@@ -30,11 +32,11 @@ const token = `${Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toStr
 const session = { access_token: token, refresh_token: "local-test-only", token_type: "bearer", expires_in: 3600, expires_at: exp, user: testUser };
 const property = {
   id: propertyId, address: "Testvej 1, 9000 Aalborg", municipality: "Aalborg", postalCode: "9000", price: 4_900_000, sqm: 140,
-  listingDate: "2026-01-01", listingSource: "boligsiden", externalId: "fixture-case", dataMode: "real", lat: 57.04, lon: 9.87,
+  listingDate, listingSource: "boligsiden", externalId: "fixture-case", dataMode: "real", lat: 57.04, lon: 9.87,
   status: "active", buildingYear: 1970, propertyType: "villa", rooms: 4, images: [], description: "Kræver totalrenovering. Dødsbo.",
   agentName: "Fixture agent", listingUrl: null, agentUserId: null, isPromoted: false, promotedAt: null, promotedBy: null,
   idLokalid: null, matrikelnr: null, ejerlav: null, zone: null, bfeNummer: null, registeredAreaSqm: null, bbrData: null, riskFlags: null,
-  createdAt: "2026-01-01T12:00:00Z", updatedAt: now,
+  createdAt: `${listingDate}T12:00:00Z`, updatedAt: now,
 };
 let project = { name: "Privat testprojekt", totalBudget: 5_000_000, minResidentialArea: 130, minBedrooms: 3, acceptedPropertyTypes: ["villa"], primaryAreas: ["Aalborg"], secondaryAreas: [], excludedAddresses: [], excludedRoads: [], excludedAreas: [], preferences: [], tracks: ["move_in_ready", "renovation"] };
 const cost = (id, label, amount, category) => ({ id, label, category, low: amount, high: amount, vat: "included", vatRate: null, status: "assumption", source: "Browser fixture", observedAt: now.slice(0, 10), necessary: true, include: true, coveredByItemId: null });
@@ -45,14 +47,14 @@ let assessment = {
   selectedPurchasePrice: null, questions: [{ id: "q1", text: "Kan I sende den godkendte plantegning?", resolved: false }], notes: "Privat testnote — må ikke indgå i mæglerudkast", comparables: [], documents: [], brokerDraft: "", budgetScenario: "base",
 };
 const transactions = Array.from({ length: 6 }, (_, i) => ({
-  id: `transaction-${i}`, transactionIdentity: `verified-transaction-${i}`, propertyId, unitId: null, address: `Referencevej ${i + 1}, Aalborg`,
-  municipality: "Aalborg", postalCode: "9000", propertyType: "villa", saleType: "normal", saleDate: "2025-05-01", observedAt: "2026-09-20T12:00:00Z",
-  firstAsking: 4_600_000 + i * 100_000, lastAsking: 4_300_000 + i * 100_000, soldPrice: 4_000_000 + i * 100_000, residentialArea: 140 + i,
-  areaDefinition: "residential", areaAtSale: true, areaEvidence: "verified", activeDays: 200 + i, latestEpisodeDays: 91 + i,
-  calendarDays: 240 + i, condition: null, dataMode: "live", status: "sold", source: "Browser fixture", datePrecision: "day", saleDateEnd: null, sourceUrl: null,
+  id: `transaction-${i}`, transactionIdentity: `verified-transaction-${i}`, propertyId: `00000000-0000-4000-8000-${String(i + 10).padStart(12, "0")}`, unitId: null, address: `Referencevej ${i + 1}, Aalborg`,
+  municipality: "Aalborg", postalCode: "9000", propertyType: "villa", saleType: "normal", saleDate: dayBefore(365), observedAt: now,
+  firstAsking: 4_600_000 + i * 100_000, lastAsking: 4_300_000 + i * 100_000, soldPrice: i === 5 ? 6_000_000 : 3_800_000 + i * 100_000, residentialArea: 140,
+  areaDefinition: "residential", areaAtSale: true, areaEvidence: "verified", activeDays: i === 5 ? 20 : 240, latestEpisodeDays: i === 5 ? 20 : 240,
+  calendarDays: null, condition: null, dataMode: "live", status: "sold", source: "Browser fixture", datePrecision: "day", saleDateEnd: null, sourceUrl: null,
   lat: 57.04 + i * 0.001, lon: 9.87 + i * 0.001,
 }));
-const history = { campaigns: [], episodes: [], events: [], transactions, observations: [], conditionEvidence: [], dataVersion: "browser-fixture-v1", retrievedAt: now, truncated: false };
+const history = { campaigns: [{ id: "current-campaign", propertyId, linkReason: "Exact fixture listing identity", source: "boligsiden", sourceUrl: null, observedAt: now }], episodes: [{ id: "current-episode", propertyId, campaignId: "current-campaign", source: "boligsiden", sourceListingId: property.externalId, sourceUrl: null, startDate: listingDate, endDate: null, datePrecision: "day", status: "active", agentName: property.agentName, observedAt: now, dataMode: "real" }], events: [], transactions, observations: [], conditionEvidence: [], dataVersion: "browser-fixture-v2", retrievedAt: now, truncated: false };
 const lookup = {
   address: property.address, resolved: { idLokalid: null, matrikelnr: null, ejerlav: null, ejerlavskode: null, bfeNummer: null, zone: null, formattedAddress: property.address, postalCode: "9000", lat: 57.04, lon: 9.87 },
   bbrData: null, publicValuation: null, priceHistory: [], nearbySales: [], renovationCategory: { category: "D", isEstimate: true, symbol: "~", reason: "Unknown", source: "ai" }, screening: [],
@@ -127,6 +129,54 @@ async function main() {
     await page.goto(`${baseUrl}/property/${propertyId}`);
     const workbench = page.locator("#research");
     await waitText("Afklar pris først", workbench);
+    const priceReference = workbench.getByTestId("listing-price-reference");
+    const priceMedian = priceReference.getByTestId("listing-price-median");
+    const timeDefinition = priceReference.getByLabel("Tidsdefinition til prisreference", { exact: true });
+    await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
+    const rangeText = await priceReference.getByTestId("listing-price-range").innerText();
+    assert(rangeText.includes("3.900.000") && rangeText.includes("4.100.000"), "Five duration-matched sales should give a DKK 3.9m–4.1m Q1/Q3 range");
+    assert((await priceReference.innerText()).includes("900.000"), "Asking price should be DKK 900k above the historical median");
+    assert((await priceReference.innerText()).includes("4.050.000"), "The six-sale baseline must remain separate from the five-sale time-matched reference");
+    assert.equal(await timeDefinition.inputValue(), "latest_episode_days");
+    report.checks.push("Five comparable sales in the 181–365-day cohort yield DKK 4m, Q1/Q3 3.9m–4.1m, and a 900k asking gap");
+    await screenshot("research-price-reference-desktop", priceReference);
+
+    await timeDefinition.selectOption("active_days");
+    await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
+    await timeDefinition.selectOption("calendar_days");
+    await page.waitForFunction(() => !document.querySelector('[data-testid="listing-price-median"]')?.textContent?.includes("4.000.000"));
+    assert(!(await priceReference.innerText()).includes("4.000.000"), "Missing calendar-time evidence must not retain the previous numerical estimate");
+    await timeDefinition.selectOption("latest_episode_days");
+    await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
+    report.checks.push("Changing time definitions recalculates the cohort; missing calendar evidence suppresses the estimate");
+
+    await workbench.getByRole("tab", { name: "Sammenligninger", exact: true }).click();
+    const comparisonRow = page.getByRole("tabpanel").getByRole("row").filter({ hasText: "Referencevej 1," });
+    await comparisonRow.getByLabel("Begrundelse for udvalg", { exact: true }).fill("Fixture exclusion to verify minimum sample");
+    await comparisonRow.getByRole("checkbox", { name: "Medtag", exact: true }).uncheck();
+    await page.waitForFunction(() => !document.querySelector('[data-testid="listing-price-median"]')?.textContent?.includes("4.000.000"));
+    assert(!(await priceReference.innerText()).includes("4.000.000"), "Four eligible comparables must not produce an estimate");
+    await comparisonRow.getByRole("checkbox", { name: "Medtag", exact: true }).check();
+    await priceMedian.filter({ hasText: "4.000.000" }).waitFor();
+    report.checks.push("Manual exclusion removes a price reference below five sales; restoring the sale restores the estimate");
+
+    const snapshotDownloaded = page.waitForEvent("download");
+    await workbench.getByRole("button", { name: "Gem snapshot", exact: true }).click();
+    const snapshotFile = await snapshotDownloaded;
+    const snapshot = JSON.parse(fs.readFileSync(await snapshotFile.path(), "utf8"));
+    assert(snapshot.priceReference, "Private research JSON must include the reproducible price reference");
+    assert(JSON.stringify(snapshot.priceReference).includes("transaction-0"), "Export must identify the underlying sales");
+    assert.equal(snapshot.assessment.selectedPurchasePrice, null, "Historical price estimate must not replace the private purchase scenario");
+    report.checks.push("Private export includes the price reference and selected sale identities without changing the buyer's chosen price");
+
+    await priceReference.getByRole("button", { name: "Brug som budgetscenario", exact: true }).click();
+    const scenarioPrice = page.getByLabel("Valgt købspris i scenario (tom = dagens udbud)", { exact: true });
+    assert.equal(await scenarioPrice.inputValue(), "4000000", "The reference enters the budget only after the user explicitly chooses it");
+    assert((await page.getByRole("tabpanel").innerText()).includes("5.000.000"), "Explicit 4m purchase scenario plus1m costs should total5m");
+    assert.equal(report.apiWrites.length, 0, "Choosing the historical reference must remain an unsaved private scenario");
+    await scenarioPrice.fill("");
+    report.checks.push("Use as budget scenario explicitly selects4m without saving; clearing restores today's asking price");
+
     await workbench.getByRole("tab", { name: "Projektbudget", exact: true }).click();
     await waitText("Projektbudget", page.getByRole("tabpanel"));
     const budgetText = await page.getByRole("tabpanel").innerText();
@@ -165,6 +215,7 @@ async function main() {
     await page.emulateMedia({ media: "print" });
     assert.equal(await page.locator(".research-print").isVisible(), true);
     assert((await page.locator(".research-print").innerText()).includes("Privat fremvisningspakke"));
+    assert((await page.locator(".research-print").innerText()).includes("Prisreference"), "Print pack must include the historical price reference");
     const pdf = await page.pdf({ path: path.join(outputDir, "research-print.pdf"), format: "A4", printBackground: true });
     report.printPages = (pdf.toString("latin1").match(/\/Type\s*\/Page\b/g) || []).length;
     await screenshot("research-print", page.locator(".research-print"));

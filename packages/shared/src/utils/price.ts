@@ -12,9 +12,11 @@ export function formatDkk(amount: number): string {
 }
 
 export function daysBetween(fromIso: string, toIso: string = new Date().toISOString()): number {
-  const from = new Date(fromIso).getTime();
-  const to = new Date(toIso).getTime();
-  return Math.max(0, Math.round((to - from) / (1000 * 60 * 60 * 24)));
+  // Listing dates have day precision. The afternoon must not add another day
+  // or place the same listing in a different bracket than its research card.
+  const from = new Date(`${fromIso.slice(0, 10)}T00:00:00.000Z`).getTime();
+  const to = new Date(`${toIso.slice(0, 10)}T00:00:00.000Z`).getTime();
+  return Math.max(0, (to - from) / (1000 * 60 * 60 * 24));
 }
 
 /**
