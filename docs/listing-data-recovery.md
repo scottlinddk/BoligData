@@ -20,17 +20,19 @@ Normalized history writes use bounded concurrency. Enrichment writes persist in 
 
 The **Daily property crawl** GitHub Actions workflow provides:
 
-- `mode=api`: the existing scheduled API invocation.
-- `mode=verify`: read-only production provenance counts and a small sample of public listing facts.
+- `mode=api`: the scheduled API refresh, eight listings per request. Stable source identities determine the batch order; each successful response supplies the next offset. Database/source failures do not advance it. An interrupted manual run can resume using `start_offset` from the last log entry.
+- `mode=verify`: read-only production provenance counts and a small sample of public listing facts through the same authenticated API. This uses existing runtime credentials; no extra Actions secrets are needed.
 - `mode=runner`: the same ingest pipeline on an Actions runner, avoiding the API function's execution limit. Its optional full scan increases bounded pagination within the configured source/postcode scope.
 
 The runner pulls the existing Vercel production configuration using existing repository secrets. Vercel substitutes `[SENSITIVE]` for protected values, so deployments with protected database credentials also require repository Actions secrets named `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. These override the downloaded placeholders. `DATAFORDELER_API_KEY` is optional for register enrichment; without an available key those registers remain unavailable. Add credentials through GitHub's secret settings, never a commit or workflow log. Verification refuses missing protected database values before making any database request.
 
 The workflow does not print environment values or upload them as artifacts, and removes the downloaded environment in an always-run cleanup step. Verification can run before refreshing. Refresh refuses explicit global mock crawl/enrichment settings. No new database migration is required.
 
-After the runner secrets are configured, dispatch `crawl.yml` with `mode=verify` on the reviewed branch. Check provenance counts and the target listing's `last_seen_at`. Then dispatch `mode=runner` with `full_scan=true` for recovery; compare the before/after counts and samples. Full scan is bounded to 100 pages / 5,000 listings per source and preserves configured source/postcode filters. The routine API crawl does not require these additional Actions secrets.
+Deploy the API batching change before dispatching the updated workflow. Run `mode=verify` and check provenance counts and the target listing's `last_seen_at`, then `mode=api` to refresh within the configured source/postcode scope. The workflow verifies counts and samples again when all batches finish. API refresh and full runner jobs share a concurrency group to prevent overlapping writes. The loop is bounded to 625 batches and 45 minutes. Each batch refetches the current feed, so membership changes during a run can shift offsets; incomplete coverage never establishes a removal.
 
-Production verification attempted on 26 September 2026 confirmed the protected-value limitation before any database access. Consequently, this change does not claim a completed production refresh.
+For the optional full runner, configure its separate credentials and dispatch `mode=runner` with `full_scan=true`. Full scan is bounded to 100 pages / 5,000 listings per source and preserves configured source/postcode filters. The routine API crawl and API verification do not require these additional Actions secrets.
+
+Production runner verification attempted on 26 September 2026 confirmed the protected-value limitation before any database access. A subsequent full API refresh hit `FUNCTION_INVOCATION_TIMEOUT` at 60 seconds, confirming the need for batching. Neither attempt establishes a completed production refresh; writes made before the timeout may persist.
 
 ## Checks
 
