@@ -240,7 +240,6 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
           button.type = "button";
           button.className = "property-map-cluster";
           button.textContent = String(feature.properties.point_count_abbreviated);
-          button.setAttribute("aria-label", language === "da" ? `Zoom ind på ${feature.properties.point_count} boliger` : `Zoom in on ${feature.properties.point_count} listings`);
           button.tabIndex = drawingRef.current ? -1 : 0;
           button.style.pointerEvents = drawingRef.current ? "none" : "auto";
           const center = feature.geometry.coordinates as [number, number];
@@ -252,6 +251,8 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
             }).catch(() => { /* This cluster was replaced by a newer response. */ });
           });
           markers.set(id, new maplibregl.Marker({ element: button, anchor: "center" }).setLngLat(center).addTo(map));
+          // Marker.addTo installs a generic label; apply the meaningful label afterwards.
+          button.setAttribute("aria-label", language === "da" ? `Zoom ind på ${feature.properties.point_count} boliger` : `Zoom in on ${feature.properties.point_count} listings`);
           return;
         }
         const id = String(feature.properties.propertyId);
@@ -266,7 +267,6 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
         const accessiblePrice = Number.isFinite(property.price) && property.price > 0
           ? new Intl.NumberFormat(language === "da" ? "da-DK" : "en-GB", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(property.price)
           : mapPriceLabel(property.price, language);
-        button.setAttribute("aria-label", `${property.address}, ${accessiblePrice}`);
         button.tabIndex = drawingRef.current ? -1 : 0;
         button.style.pointerEvents = drawingRef.current ? "none" : "auto";
         // MapLibre handles Enter/Space for its popup. Prevent the native button's
@@ -279,6 +279,7 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
         });
         const popup = new maplibregl.Popup({ offset: 20, maxWidth: "270px" }).setDOMContent(createPopupContent(property, t, language, navigate));
         const marker = new maplibregl.Marker({ element: button, anchor: "center" }).setLngLat([property.lon, property.lat]).setPopup(popup).addTo(map);
+        button.setAttribute("aria-label", `${property.address}, ${accessiblePrice}`);
         button.addEventListener("click", () => { if (!drawingRef.current) onSelect?.(property); });
         markers.set(id, marker);
       });
