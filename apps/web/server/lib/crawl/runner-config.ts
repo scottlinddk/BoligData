@@ -10,6 +10,22 @@ const CAP_DEFAULTS = {
   CRAWL_CONCURRENCY: [8, 1, 20],
 } as const;
 
+const CONFIGURATION_NAMES = ["SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DATAFORDELER_API_KEY", "STOEJKORT_TYPENAME"];
+
+/** Vercel intentionally redacts sensitive production variables in `pull`.
+ * These markers are not credentials and must never be sent to a service. */
+export function isSensitivePlaceholder(value: string | undefined): boolean {
+  return value?.trim() === "[SENSITIVE]";
+}
+
+export function assertRunnerDatabaseConfiguration(): void {
+  const urlName = process.env.SUPABASE_URL === undefined ? "VITE_SUPABASE_URL" : "SUPABASE_URL";
+  const unavailable = [urlName, "SUPABASE_SERVICE_ROLE_KEY"].filter((name) => isSensitivePlaceholder(process.env[name]));
+  if (unavailable.length > 0) {
+    throw new Error(`Runner cannot access ${unavailable.join(", ")}: Vercel pull replaces sensitive production variables with placeholders. Configure authorized runner credentials separately; no database request was made.`);
+  }
+}
+
 /** Only this manual runner changes these two limits. Source, ZIP, page size,
  * delay and concurrency remain the deployment's settings. ZIP defaults are
  * already restricted to 9000–9900 when no explicit scope is configured. */
@@ -35,7 +51,8 @@ export function configureRunner(fullScan: boolean) {
     zipRanges: getZipRanges(),
     explicitZipScope: Boolean(process.env.CRAWL_ZIP_RANGES || process.env.CRAWL_ZIP_MIN || process.env.CRAWL_ZIP_MAX),
     mockFlags: Object.fromEntries(flags.map((flag) => [flag, mockModeEnabled(flag)])),
-    configured: Object.fromEntries(["SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DATAFORDELER_API_KEY", "STOEJKORT_TYPENAME"]
-      .map((name) => [name, Boolean(process.env[name]?.trim())])),
+    configured: Object.fromEntries(CONFIGURATION_NAMES
+      .map((name) => [name, Boolean(process.env[name]?.trim()) && !isSensitivePlaceholder(process.env[name])])),
+    sensitivePlaceholders: Object.fromEntries(CONFIGURATION_NAMES.map((name) => [name, isSensitivePlaceholder(process.env[name])])),
   };
 }

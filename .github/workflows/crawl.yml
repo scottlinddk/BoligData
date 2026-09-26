@@ -7,10 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "API crawl, full runner refresh (avoids function timeout), or read-only verification"
+        description: "Batched API crawl, optional runner refresh, or read-only API verification"
         type: choice
         default: api
         options: [api, runner, verify]
+      start_offset:
+        description: "API batch offset to resume (0 starts from the beginning)"
+        type: number
+        default: 0
       full_scan:
         description: "Runner only: up to 100 pages / 5000 listings per source, keeping configured area and sources"
         type: boolean
@@ -18,76 +22,29 @@ on:
 
 jobs:
   crawl:
-    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'api'
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'api' || inputs.mode == 'verify'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: boligdata-crawl-${{ inputs.mode == 'verify' && 'verification' || 'production' }}
+      cancel-in-progress: false
     steps:
-      - name: Trigger /api/crawl and report results
-        run: |
-          set -uo pipefail
-
-          headers=(-H "Authorization: Bearer ${CRON_SECRET}")
-          if [ -n "${BYPASS_SECRET}" ]; then
-            # Vercel Deployment Protection blocks unauthenticated requests with a
-            # redirect to a login page instead of reaching the handler. This header
-            # bypasses that when the project has protection enabled. Generate it in
-            # the Vercel dashboard: Project Settings -> Deployment Protection ->
-            # Protection Bypass for Automation.
-            headers+=(-H "x-vercel-protection-bypass: ${BYPASS_SECRET}" -H "x-vercel-set-bypass-cookie: true")
-          fi
-
-          http_code=$(curl -sS -X POST "${VERCEL_URL}/api/crawl" "${headers[@]}" \
-            -o response.json -w '%{http_code}')
-          curl_status=$?
-
-          if [ "$curl_status" -ne 0 ]; then
-            echo "::error::curl failed to reach ${VERCEL_URL}/api/crawl (exit $curl_status)."
-            exit 1
-          fi
-
-          echo "HTTP status: $http_code"
-
-          if ! jq empty response.json 2>/dev/null; then
-            echo "::error::Response body was not JSON — the request likely never reached the crawl handler."
-            echo "This usually means Vercel Deployment Protection redirected the request to a login page."
-            echo "Set the VERCEL_AUTOMATION_BYPASS_SECRET repo secret, or disable protection for this deployment."
-            echo "--- raw response ---"
-            cat response.json
-            exit 1
-          fi
-
-          if ! jq -e '.reports' response.json > /dev/null 2>&1; then
-            echo "::error::Response has no \"reports\" field (unexpected shape, or a 500 { error } crash response)."
-            echo "--- raw response ---"
-            cat response.json
-            exit 1
-          fi
-
-          echo ""
-          echo "== Crawl summary =="
-          jq -r '
-            .reports[] |
-            "[\(.source)] found=\(.fetched) new=\(.created) updated=\(.upserted - .created) enriched=\(.enriched) skippedInvalid=\(.skippedInvalid) outOfArea=\(.skippedOutOfArea // 0) dbErrors=\(.dbErrors) ok=\(.ok)" +
-            (if (.errors | length) > 0 then "\n  errors: " + (.errors | join("; ")) else "" end)
-          ' response.json
-          echo ""
-          jq -r '
-            "TOTAL: found=\([.reports[].fetched] | add) new=\([.reports[].created] | add) updated=\(([.reports[].upserted] | add) - ([.reports[].created] | add)) ok=\(.ok)"
-          ' response.json
-
-          ok=$(jq -r '.ok' response.json)
-          if [ "$http_code" != "200" ] || [ "$ok" != "true" ]; then
-            echo "::error::Crawl reported failure (HTTP $http_code, ok=$ok) — see per-source errors above."
-            exit 1
-          fi
+      - uses: actions/checkout@v4
+      - name: Refresh in bounded API batches or verify production data
+        run: bash scripts/crawl-api.sh
         env:
+          RUN_MODE: ${{ inputs.mode }}
+          RUN_START_OFFSET: ${{ inputs.start_offset }}
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
   runner:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'api'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'runner'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      group: boligdata-crawl-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -108,16 +65,22 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      - name: Refresh live source observations or verify counts
+      - name: Refresh live source observations
         run: |
           set -euo pipefail
           args=()
-          if [ "$RUN_MODE" = "verify" ]; then args+=(--verify-only); fi
           if [ "$RUN_FULL_SCAN" = "true" ]; then args+=(--full-scan); fi
+          # Vercel does not export protected production values. Optional runner
+          # secrets take precedence over the downloaded placeholders.
+          if [ -n "$RUNNER_SUPABASE_URL" ]; then export SUPABASE_URL="$RUNNER_SUPABASE_URL"; fi
+          if [ -n "$RUNNER_SUPABASE_SERVICE_ROLE_KEY" ]; then export SUPABASE_SERVICE_ROLE_KEY="$RUNNER_SUPABASE_SERVICE_ROLE_KEY"; fi
+          if [ -n "$RUNNER_DATAFORDELER_API_KEY" ]; then export DATAFORDELER_API_KEY="$RUNNER_DATAFORDELER_API_KEY"; fi
           node --env-file=.vercel/.env.production.local apps/web/.crawl-build/apps/web/server/lib/crawl/run-cli.js "${args[@]}"
         env:
-          RUN_MODE: ${{ inputs.mode }}
           RUN_FULL_SCAN: ${{ inputs.full_scan }}
+          RUNNER_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          RUNNER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNNER_DATAFORDELER_API_KEY: ${{ secrets.DATAFORDELER_API_KEY }}
       - name: Remove downloaded environment
         if: always()
         run: rm -f .vercel/.env.production.local

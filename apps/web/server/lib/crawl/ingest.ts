@@ -3,7 +3,7 @@ import type { ListingSource, RawListing, SourceCrawlResult } from "./types.js";
 import { fetchBoligsidenListings } from "./boligsiden.js";
 import { fetchBoligaListings } from "./boliga.js";
 import { enrichProperty } from "./enrich.js";
-import { listingContentHash } from "./map-utils.js";
+import { dedupeByExternalId, listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
@@ -66,6 +66,12 @@ export interface IngestSourceReport {
 export interface IngestResult {
   ok: boolean;
   reports: IngestSourceReport[];
+  batch?: IngestBatchOptions & { total: number; nextOffset: number | null };
+}
+
+export interface IngestBatchOptions {
+  offset: number;
+  batchSize: number;
 }
 
 /**
@@ -438,15 +444,33 @@ const FETCHERS: Record<ListingSource, () => Promise<SourceCrawlResult>> = {
  * doesn't abort the other), batch-upsert properties, and enrich only
  * new/changed listings (see properties.content_hash, migration 005).
  */
-export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
+export async function runIngest(client: SupabaseClient, options?: IngestBatchOptions): Promise<IngestResult> {
+  if (options && (!Number.isSafeInteger(options.offset) || options.offset < 0 || !Number.isSafeInteger(options.batchSize) || options.batchSize < 1 || options.batchSize > 50)) {
+    throw new RangeError("Ingest batch requires a nonnegative integer offset and batchSize between 1 and 50");
+  }
   const sources = enabledSources();
   const settled = await Promise.allSettled(sources.map((source) => FETCHERS[source]()));
+  let total = 0;
+  const selected = options ? settled.map((result): PromiseSettledResult<SourceCrawlResult> => {
+    if (result.status === "rejected") return result;
+    // Provider ordering can vary between requests. Deduplicate before slicing
+    // so one source identity consumes exactly one slot in the stable order.
+    const candidates = dedupeByExternalId(result.value.listings).sort((left, right) =>
+      left.external_id < right.external_id ? -1 : left.external_id > right.external_id ? 1 : 0,
+    );
+    total = Math.max(total, candidates.length);
+    return { status: "fulfilled", value: {
+      listings: candidates.slice(options.offset, options.offset + options.batchSize),
+      // A processed slice never proves absence elsewhere in the source feed.
+      stats: { ...result.value.stats, complete: false },
+    } };
+  }) : settled;
 
   // Sources ingest sequentially on purpose: bounded memory and a simpler DB
   // contention profile matter more than wall-clock here.
   const reports: IngestSourceReport[] = [];
   for (let i = 0; i < sources.length; i++) {
-    reports.push(await ingestSource(client, sources[i]!, settled[i]!));
+    reports.push(await ingestSource(client, sources[i]!, selected[i]!));
   }
 
   for (const report of reports) logEvent("crawl.source.done", { ...report });
@@ -460,5 +484,10 @@ export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
     enriched: reports.reduce((sum, r) => sum + r.enriched, 0),
     skippedUnchanged: reports.reduce((sum, r) => sum + r.enrichSkippedUnchanged, 0),
   });
-  return { ok, reports };
+  const batch = options ? { ...options, total,
+    // Retrying a failed slice is idempotent. Never advertise progress past
+    // source-fetch or database errors, even when part of that slice persisted.
+    nextOffset: !ok ? options.offset : options.offset + options.batchSize < total ? options.offset + options.batchSize : null,
+  } : undefined;
+  return { ok, reports, ...(batch ? { batch } : {}) };
 }

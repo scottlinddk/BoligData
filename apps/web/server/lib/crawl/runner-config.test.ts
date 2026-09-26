@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { configureRunner } from "./runner-config.js";
+import { assertRunnerDatabaseConfiguration, configureRunner } from "./runner-config.js";
 
 afterEach(() => vi.unstubAllEnvs());
 describe("manual runner configuration", () => {
@@ -28,5 +28,24 @@ describe("manual runner configuration", () => {
     expect(result.mockFlags.ENRICH_MOCK_MODE).toBe(true);
     expect(JSON.stringify(result)).not.toContain("private-test-credential");
     expect(JSON.stringify(result)).not.toContain("not-a-number-sensitive-value");
+  });
+  it("identifies pulled sensitive placeholders and fails before creating a database client", () => {
+    vi.stubEnv("SUPABASE_URL", "[SENSITIVE]");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "[SENSITIVE]");
+    vi.stubEnv("DATAFORDELER_API_KEY", "[SENSITIVE]");
+    const result = configureRunner(false);
+    expect(result.configured.SUPABASE_URL).toBe(false);
+    expect(result.configured.DATAFORDELER_API_KEY).toBe(false);
+    expect(result.sensitivePlaceholders.SUPABASE_SERVICE_ROLE_KEY).toBe(true);
+    expect(() => assertRunnerDatabaseConfiguration()).toThrow("Vercel pull replaces sensitive production variables");
+  });
+  it("checks the effective database URL and does not print supplied credential values", () => {
+    vi.stubEnv("SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("VITE_SUPABASE_URL", "[SENSITIVE]");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "private-test-key");
+    expect(() => assertRunnerDatabaseConfiguration()).not.toThrow();
+    expect(JSON.stringify(configureRunner(false))).not.toContain("private-test-key");
+    vi.stubEnv("SUPABASE_URL", undefined);
+    expect(() => assertRunnerDatabaseConfiguration()).toThrow("VITE_SUPABASE_URL");
   });
 });

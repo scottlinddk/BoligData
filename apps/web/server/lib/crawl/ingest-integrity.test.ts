@@ -2,9 +2,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runIngest } from "./ingest.js";
 import { fetchBoligsidenListings } from "./boligsiden.js";
+import { fetchBoligaListings } from "./boliga.js";
+import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js";
 import type { RawListing, SourceCrawlResult } from "./types.js";
 
 vi.mock("./boligsiden.js", () => ({ fetchBoligsidenListings: vi.fn() }));
+vi.mock("./boliga.js", () => ({ fetchBoligaListings: vi.fn() }));
 vi.mock("../enrichment-sources/address-lookup.js", () => ({ lookupAddressCadastral: vi.fn().mockResolvedValue({ ok: false, error: "offline" }) }));
 
 const base: RawListing = {
@@ -58,8 +61,74 @@ function database() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.stubEnv("CRAWL_SOURCES", "boligsiden");
   vi.stubEnv("ENRICH_MOCK_MODE", "true");
+});
+
+describe("bounded ingest slices", () => {
+  it("deduplicates and sorts before heavy work, covering every identity across batches", async () => {
+    const db = database();
+    const records = ["c", "a", "b", "a", "e", "d"].map((external_id) => ({ ...base, external_id, address: external_id }));
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result(records));
+    const first = await runIngest(db.client, { offset: 0, batchSize: 2 });
+    expect(first.batch).toEqual({ offset: 0, batchSize: 2, total: 5, nextOffset: 2 });
+    expect(first.reports[0]).toMatchObject({ fetched: 2, complete: false });
+    expect([...db.table("properties").keys()]).toEqual(["a", "b"]);
+    expect(vi.mocked(lookupAddressCadastral).mock.calls.map(([address]) => address)).toEqual(["a", "b"]);
+    // The next request sees the same feed in a different provider order.
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([...records].reverse()));
+    expect((await runIngest(db.client, { offset: 2, batchSize: 2 })).batch?.nextOffset).toBe(4);
+    expect((await runIngest(db.client, { offset: 4, batchSize: 2 })).batch?.nextOffset).toBeNull();
+    expect([...db.table("properties").keys()]).toEqual(["a", "b", "c", "d", "e"]);
+    expect(vi.mocked(lookupAddressCadastral).mock.calls).toHaveLength(5);
+    expect([...db.table("properties").values()].every((row) => row.status === "active")).toBe(true);
+    expect([...db.table("listing_events").values()].some((event) => ["removed", "sold"].includes(String(event.event_type)))).toBe(false);
+    const beyond = await runIngest(db.client, { offset: 6, batchSize: 2 });
+    expect(beyond.batch?.nextOffset).toBeNull();
+    expect(beyond.reports[0]?.upserted).toBe(0);
+  });
+
+  it("uses the largest source candidate count and retains errors without advancing", async () => {
+    vi.stubEnv("CRAWL_SOURCES", "boligsiden,boliga");
+    const db = database();
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([base]));
+    const other = ["boliga-1", "boliga-2", "boliga-3"].map((external_id) => ({ ...base, external_id, listing_source: "boliga" as const }));
+    vi.mocked(fetchBoligaListings).mockResolvedValue({ ...result(other), stats: { ...result(other).stats, source: "boliga" } });
+    expect((await runIngest(db.client, { offset: 0, batchSize: 2 })).batch).toEqual({ offset: 0, batchSize: 2, total: 3, nextOffset: 2 });
+    vi.mocked(fetchBoligsidenListings).mockRejectedValue(new Error("source unavailable"));
+    const failed = await runIngest(db.client, { offset: 2, batchSize: 2 });
+    expect(failed.ok).toBe(false);
+    expect(failed.batch).toEqual({ offset: 2, batchSize: 2, total: 3, nextOffset: 2 });
+    expect(failed.reports[0]?.errors).toContain("source unavailable");
+    expect(db.table("properties").get("boliga-3")?.status).toBe("active");
+  });
+
+  it("retries the same slice after a partial source fetch or database failure", async () => {
+    const db = database();
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([base], true));
+    const partial = await runIngest(db.client, { offset: 0, batchSize: 8 });
+    expect(partial.ok).toBe(false);
+    expect(partial.batch?.nextOffset).toBe(0);
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([base]));
+    db.failures.add("listing_events");
+    const failed = await runIngest(db.client, { offset: 0, batchSize: 8 });
+    expect(failed.ok).toBe(false);
+    expect(failed.batch?.nextOffset).toBe(0);
+    db.failures.clear();
+    expect((await runIngest(db.client, { offset: 0, batchSize: 8 })).batch?.nextOffset).toBeNull();
+  });
+
+  it("keeps ordinary full-ingest behavior and rejects invalid internal batch options", async () => {
+    const db = database();
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([base]));
+    const full = await runIngest(db.client);
+    expect(full).not.toHaveProperty("batch");
+    expect(full.reports[0]?.complete).toBe(true);
+    for (const options of [{ offset: -1, batchSize: 8 }, { offset: 0, batchSize: 51 }, { offset: 0.5, batchSize: 8 }]) {
+      await expect(runIngest(db.client, options)).rejects.toThrow(RangeError);
+    }
+  });
 });
 afterEach(() => vi.unstubAllEnvs());
 
