@@ -152,6 +152,22 @@ describe("lookupBoligsidenSales (live)", () => {
     if (!result.ok) throw new Error("expected ok");
     expect(result.data.nearbySales).toEqual([]);
   });
+  it("keeps a real sale price/date when no documented at-sale residential area exists", async () => {
+    stubFetch([{ body: body([addressRecord({ registrations: [{ amount: 3_100_000, date: "2025-02-01", type: "normal" }] })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales[0]).toMatchObject({ price: 3_100_000, soldDate: "2025-02-01", areaSqm: null, pricePerSqm: null });
+  });
+  it("does not treat a weighted or unspecified source denominator as residential area", async () => {
+    stubFetch([{ body: body([addressRecord({ registrations: [{ amount: 3_100_000, date: "2025-02-01", area: 175, perAreaPrice: 17714, type: "normal" }] })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales[0]).toMatchObject({ price: 3_100_000, areaSqm: null, pricePerSqm: null });
+  });
+  it("reports malformed JSON responses as unavailable, not an empty sales market", async () => {
+    stubFetch([{ body: { error: "temporarily unavailable" } }]);
+    expect((await lookupBoligsidenSales(LAT, LON)).ok).toBe(false);
+  });
 
   it("orders neighbours by distance, nearest first", async () => {
     stubFetch([

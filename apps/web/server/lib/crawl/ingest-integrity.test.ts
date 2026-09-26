@@ -64,6 +64,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("ingest integrity across crawls", () => {
+  it("refreshes an unchanged legacy enrichment with no source provenance", async () => {
+    const db = database();
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(result([base]));
+    await runIngest(db.client);
+    const enrichment = [...db.table("enrichments").values()][0]!;
+    enrichment.source_status = {};
+    const rerun = await runIngest(db.client);
+    expect(rerun.reports[0]?.enriched).toBe(1);
+    expect([...db.table("enrichments").values()][0]?.source_status).toHaveProperty("sales.dataMode", "real");
+  });
   it("does not mark a previously observed listing removed or sold after a partial crawl", async () => {
     const db = database();
     vi.mocked(fetchBoligsidenListings).mockResolvedValueOnce(result([base, { ...base, external_id: "case-2" }]));

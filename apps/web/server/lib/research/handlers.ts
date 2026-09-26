@@ -134,6 +134,11 @@ export function transactionFromRow(row: Row, evidenceRows: Row[] = []): Research
 }
 async function handleHistory(req: VercelRequest, res: VercelResponse, client: SupabaseClient) {
   if (!checkMethod(req, res, ["GET"])) return;
+  if (req.query.marketForPropertyId !== undefined) {
+    const id = req.query.marketForPropertyId;
+    if (!isUuid(id) || req.query.propertyId !== undefined) throw new ResearchValidationError("Vælg ét gyldigt bolig-id til markedsgrundlaget.");
+    return handleMarketHistory(res, client, id);
+  }
   const propertyId = propertyIdFromQuery(req, true);
   const tables = ["listing_campaigns", "listing_episodes", "listing_events", "sale_transactions", "source_observations", "condition_evidence"];
   const results = await Promise.all(tables.map((table) => {
@@ -151,6 +156,73 @@ async function handleHistory(req: VercelRequest, res: VercelResponse, client: Su
     transactions: transactions.map((r) => transactionFromRow(r, conditionEvidence)),
     observations: observations.map(camelRow) as ResearchHistoryResponse["observations"], conditionEvidence: conditionEvidence.map(camelRow) as ResearchHistoryResponse["conditionEvidence"],
     dataVersion, retrievedAt: new Date().toISOString(), truncated: rows.some((r) => r.length >= 500),
+  };
+  res.status(200).json(result);
+}
+
+export const RESEARCH_MARKET_LIMIT = 2000;
+const MARKET_PAGE_SIZE = 500;
+
+/** Locality/type/date selection must precede the cap, otherwise unrelated recent
+ * crawls evict the subject's comparable sales. Keep all sale types and areas until
+ * the analysis engine resolves duplicate-source conflicts; never filter those away here. */
+async function handleMarketHistory(res: VercelResponse, client: SupabaseClient, propertyId: string) {
+  const { data: property, error: propertyError } = await client.from("properties")
+    .select("id,municipality,property_type").eq("id", propertyId).maybeSingle();
+  if (propertyError) throw propertyError;
+  if (!property) { sendError(res, 404, "Boligen findes ikke."); return; }
+  const retrievedAt = new Date().toISOString();
+  const saleTo = retrievedAt.slice(0, 10);
+  const today = new Date(`${saleTo}T00:00:00Z`);
+  const year = today.getUTCFullYear() - 2;
+  const month = today.getUTCMonth();
+  const saleFrom = new Date(Date.UTC(year, month, Math.min(today.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate()))).toISOString().slice(0, 10);
+  const scope: NonNullable<ResearchHistoryResponse["marketScope"]> = {
+    propertyId, municipality: property.municipality?.trim() || null, propertyType: property.property_type ?? null,
+    saleFrom, saleTo, limit: RESEARCH_MARKET_LIMIT,
+  };
+  const empty = { campaigns: [], episodes: [], events: [], observations: [] };
+  if (!scope.municipality || !scope.propertyType) {
+    scope.unavailableReason = "missing_subject_location_or_type";
+    res.status(200).json({ ...empty, transactions: [], conditionEvidence: [], marketScope: scope,
+      dataVersion: `research-market/1:${createHash("sha256").update(JSON.stringify(scope)).digest("hex").slice(0, 24)}`, retrievedAt, truncated: false } satisfies ResearchHistoryResponse);
+    return;
+  }
+  const candidates: Row[] = [];
+  for (let offset = 0; offset <= RESEARCH_MARKET_LIMIT; offset += MARKET_PAGE_SIZE) {
+    const end = Math.min(offset + MARKET_PAGE_SIZE - 1, RESEARCH_MARKET_LIMIT);
+    const { data, error } = await client.from("sale_transactions")
+      .select("*,properties!inner(address,municipality,postal_code,property_type,lat,lon)")
+      .eq("properties.municipality", scope.municipality).eq("properties.property_type", scope.propertyType)
+      .eq("data_mode", "real").gte("sold_date", saleFrom).lte("sold_date", saleTo)
+      .order("sold_date", { ascending: false }).order("property_id", { ascending: true }).order("id", { ascending: true })
+      .range(offset, end);
+    if (error) throw error;
+    candidates.push(...(data ?? []));
+    if ((data?.length ?? 0) < end - offset + 1) break;
+  }
+  let truncated = candidates.length > RESEARCH_MARKET_LIMIT;
+  // A bounded response must never keep one source of a conflicting transaction
+  // while its duplicate was clipped. Discard the entire partial cutoff date.
+  const cutoffDate = truncated ? candidates[RESEARCH_MARKET_LIMIT - 1]!.sold_date : null;
+  const transactions = truncated ? candidates.slice(0, RESEARCH_MARKET_LIMIT).filter(row => row.sold_date > cutoffDate) : candidates;
+  const evidence: Row[] = [];
+  // Evidence belongs to selected transactions, not whichever 500 unrelated
+  // observations were most recently crawled anywhere in the country.
+  for (let offset = 0; offset < transactions.length; offset += 100) {
+    const ids = transactions.slice(offset, offset + 100).map(row => row.id);
+    const { data, error } = await client.from("condition_evidence").select("*")
+      .in("transaction_id", ids).eq("data_mode", "real")
+      .order("observed_at", { ascending: false }).order("id", { ascending: true }).limit(501);
+    if (error) throw error;
+    if ((data?.length ?? 0) > 500) truncated = true;
+    evidence.push(...(data ?? []).slice(0, 500));
+  }
+  const result: ResearchHistoryResponse = { ...empty,
+    transactions: transactions.map(row => transactionFromRow(row, evidence)),
+    conditionEvidence: evidence.map(camelRow) as ResearchHistoryResponse["conditionEvidence"],
+    marketScope: scope, retrievedAt, truncated,
+    dataVersion: `research-market/1:${createHash("sha256").update(JSON.stringify([scope, transactions, evidence])).digest("hex").slice(0, 24)}`,
   };
   res.status(200).json(result);
 }

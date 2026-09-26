@@ -1,4 +1,5 @@
 import type { BuyingProject, ResearchAssessment, ResearchTransaction } from "../analysis/types.js";
+import type { PropertyType } from "./index.js";
 
 export type DatePrecision = "day" | "month" | "interval" | "unknown";
 export type SourceDataMode = "real" | "mock" | "demo" | "unknown";
@@ -36,6 +37,12 @@ export interface ResearchHistoryResponse {
   dataVersion: string; retrievedAt: string;
   /** Pagination is explicit; a bounded response must never look like all market data. */
   truncated: boolean;
+  /** A property-specific sale population selected before the response limit. */
+  marketScope?: {
+    propertyId: string; municipality: string | null; propertyType: PropertyType | null;
+    saleFrom: string; saleTo: string; limit: number;
+    unavailableReason?: "missing_subject_location_or_type";
+  };
 }
 export interface ResearchProjectResponse { project: BuyingProject | null; updatedAt: string | null }
 export interface ResearchAssessmentResponse {

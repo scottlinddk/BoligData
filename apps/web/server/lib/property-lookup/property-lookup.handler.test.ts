@@ -82,6 +82,9 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
+    if (href.includes("api.boligsiden.dk/search/addresses")) {
+      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: [] }) };
+    }
     const body = href.includes("adgangsadresser")
       ? [dawaRecord]
       : href.includes("/jordstykker/")

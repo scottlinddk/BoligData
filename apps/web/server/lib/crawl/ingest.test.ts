@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveListingDate, runIngest } from "./ingest";
+
+beforeEach(() => vi.stubEnv("CRAWL_MOCK_MODE", "true"));
+afterEach(() => vi.unstubAllEnvs());
 
 /**
  * Writable columns of the two tables, mirroring packages/supabase/migrations.
@@ -73,8 +76,8 @@ function unknownColumnError(
 
 /**
  * In-memory stand-in for the two tables the ingest touches, faking the exact
- * PostgREST call chains ingest.ts uses. CRAWL_MOCK_MODE defaults to true in
- * tests, so the fetchers return the committed fixtures (3 listings each).
+ * PostgREST call chains ingest.ts uses. Tests explicitly select mock mode,
+ * so the fetchers return the committed fixtures (3 listings each).
  */
 function fakeDb() {
   const properties = new Map<string, Record<string, unknown> & { id: string }>();
@@ -123,7 +126,7 @@ function fakeDb() {
         select: () => ({
           in: (_c: string, ids: string[]) =>
             Promise.resolve({
-              data: ids.filter((id) => enrichments.has(id)).map((property_id) => ({ property_id })),
+              data: ids.filter((id) => enrichments.has(id)).map((property_id) => enrichments.get(property_id)),
               error: null,
             }),
         }),

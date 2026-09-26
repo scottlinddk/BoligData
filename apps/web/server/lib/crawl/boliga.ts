@@ -18,8 +18,8 @@ import {
   overallZipBounds,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boliga.sample.json" with { type: "json" };
+import { mockModeEnabled } from "../enrichment-sources/types.js";
 
-const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 const MAX_ERRORS_REPORTED = 10;
 
 /**
@@ -118,10 +118,11 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
  * partial data beats none; the gap is visible in stats.errors.
  */
 export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
+  const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
   const stats: SourceCrawlStats = {
     source: "boliga",
     complete: false,
-    dataMode: MOCK_MODE ? "mock" : "real",
+    dataMode: mockMode ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
@@ -131,7 +132,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
 
   const zipRanges = getZipRanges();
 
-  if (MOCK_MODE) {
+  if (mockMode) {
     const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
     const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;

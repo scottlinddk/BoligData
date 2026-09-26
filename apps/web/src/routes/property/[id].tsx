@@ -89,12 +89,8 @@ export function PropertyDetailPage() {
     enabled: !!id,
   });
 
-  // Live register read for this address. Deliberately a second request rather
-  // than something the detail endpoint inlines: /api/property-lookup is open
-  // and CDN-cached per query string, while /api/properties is per-caller, so
-  // folding it in would make every detail request pay for register latency and
-  // lose the shared cache. It also means the page renders immediately from the
-  // stored row and upgrades in place when the registers answer.
+  // An authenticated, separately rate-limited register read lets listing facts
+  // render immediately and upgrade in place when each live source answers.
   const listing = detailQuery.data?.property;
   const lookupQuery = useQuery({
     queryKey: ["property-lookup", listing?.id],
@@ -201,7 +197,7 @@ export function PropertyDetailPage() {
         <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />
       )}
 
-      <ResearchWorkbench property={property} />
+      <ResearchWorkbench property={property} facts={facts} />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Stat label={t("detail.price")} value={formatDkk(property.price)} />
@@ -443,6 +439,7 @@ function Stat({
   tone?: "neutral" | "warning";
   title?: string;
 }) {
+  if (value === "—") return null;
   const toneClass =
     tone === "warning" ? "border-warning-soft bg-warning-soft" : "border-border bg-surface";
   return (

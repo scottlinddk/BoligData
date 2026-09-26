@@ -4,9 +4,9 @@ Implementation of the supplied 26 September 2026 feature plan, reconciled agains
 
 ## Using the workflow
 
-Sign in and open **Boligprojekt / Buying project** (`/research`). Find an already collected listing by address or its exact stored listing URL, then open the property. The research card sits above the existing property information. It gives one of four next actions, with separate suitability, economy and documentation states.
+Sign in and open **Boligprojekt / Buying project** (`/research`). Find an already collected listing by address or its exact stored listing URL, then open the property. The property page starts with its available advertised price, area, price per m², listing time and registered sales. Advertised dates remain separate from documented marketing periods. Missing metrics are omitted. Personal suitability, economy and documentation decisions appear after the user configures a project.
 
-The private project starts with editable values of DKK 5,000,000 for the entire project, 130 residential m² and three legal bedrooms. These are initial values in a user's project, not global screening rules. Record accepted types, areas, personal exclusions, buying tracks and preferences. Changing the project recalculates candidates without rewriting observations.
+The project editor suggests editable values of DKK 5,000,000 for the entire project, 130 residential m² and three legal bedrooms. Until explicitly saved, those suggestions do not produce a personal verdict or printable decision pack. Record accepted types, areas, personal exclusions, buying tracks and preferences. Changing the project recalculates candidates without rewriting observations.
 
 Each property has editable budget lines, area and bedroom evidence with source references, hard requirements, questions, private notes, document links, comparable choices and an editable broker draft. Save explicitly. Every assessment save creates an immutable revision containing the project and the then-current listing snapshot. A later price or status change is shown in the property workspace with its budget impact. This is an in-app comparison on opening the page, not an email/push service.
 

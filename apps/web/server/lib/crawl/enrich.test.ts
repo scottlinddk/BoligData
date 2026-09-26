@@ -42,6 +42,12 @@ describe("register provenance in crawl enrichment", () => {
     expect(result.calculated_metrics.neighborhoodPricePerSqm).toBeNull();
     expect(result.source_status.bbr).toMatchObject({ dataMode: "unavailable", verificationStatus: "unavailable", reason: "missing credential" });
   });
+  it("attempts live enrichment when the global flag is unset", async () => {
+    vi.stubEnv("ENRICH_MOCK_MODE", undefined);
+    const result = await enrichProperty(listing);
+    expect(lookupBbr).toHaveBeenCalledOnce();
+    expect(result.source_status.bbr?.dataMode).toBe("unavailable");
+  });
 
   it("omits synthetic register data even when a different register is live", async () => {
     vi.stubEnv("BBR_MOCK_MODE", "true");
