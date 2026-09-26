@@ -43,6 +43,10 @@ const mapStyle = { version: 8, glyphs: `${base}/__fixtures__/glyphs/{fontstack}/
   {id:'park',type:'fill',source:'fixture',filter:['==','kind','park'],paint:{'fill-color':'#c5dab4'}},
   {id:'roads',type:'line',source:'fixture',filter:['==','kind','road'],paint:{'line-color':'#ffffff','line-width':4}},
 ] };
+// Distinct styles exercise actual MapLibre style replacement while staying offline.
+const darkMapStyle = structuredClone(mapStyle);
+const darkMapPaint = { background: ['background-color', '#101b27'], water: ['fill-color', '#152b3d'], park: ['fill-color', '#213c35'], roads: ['line-color', '#445467'] };
+for (const layer of darkMapStyle.layers) { const [property, color] = darkMapPaint[layer.id]; layer.paint[property] = color; }
 function inside(point, polygon) {
   let result = false;
   for(let i=0,j=polygon.length-1;i<polygon.length;j=i++) {
@@ -55,9 +59,14 @@ async function main() {
   const browserPath = process.env.BROWSER_EXECUTABLE || ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Google/Chrome/Application/chrome.exe'].find(fs.existsSync);
   const browser = await playwright.chromium.launch({headless:true, executablePath:browserPath,args:['--disable-background-networking','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const context = await browser.newContext({viewport:{width:1440,height:1000},locale:'da-DK',serviceWorkers:'block',hasTouch:true});
-  const report = {checks:[],pageErrors:[],requests:[],writes:[],unexpected:[],screenshots:[]};
+  const report = {checks:[],pageErrors:[],requests:[],writes:[],unexpected:[],screenshots:[],mapStyles:[],contrast:[]};
+  let invalidNextDarkStyle=false;
   const json = (route,body,status=200) => route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
-  await context.addInitScript(({key,session})=>{localStorage.setItem(key,JSON.stringify(session));localStorage.setItem('boligdata.lang','da');localStorage.setItem('boligdata.theme','light');},{key,session});
+  await context.addInitScript(({key,session})=>{
+    localStorage.setItem(key,JSON.stringify(session));localStorage.setItem('boligdata.lang','da');
+    // Seed once, allowing reloads to test persistence and system fallback accurately.
+    if(!localStorage.getItem('fixture.theme.seeded')) {localStorage.setItem('boligdata.theme','light');localStorage.setItem('fixture.theme.seeded','1');}
+  },{key,session});
   if(context.routeWebSocket) await context.routeWebSocket('**/*',socket=>socket.close());
   await context.route('**/*',async route=>{
     const req=route.request(),url=new URL(req.url());
@@ -65,7 +74,11 @@ async function main() {
       if(url.pathname.includes('/rest/v1/user_profiles'))return json(route,profile);
       if(url.pathname.includes('/auth/v1/user'))return json(route,user);
       if(url.pathname.includes('/auth/v1/'))return json(route,session);
-      if(url.hostname==='tiles.openfreemap.org')return json(route,mapStyle);
+      if(url.hostname==='tiles.openfreemap.org') {
+        report.mapStyles.push(url.pathname);
+        if(url.pathname.endsWith('/dark')&&invalidNextDarkStyle) {invalidNextDarkStyle=false;return json(route,{version:8,sources:{},layers:[{id:'bad',type:'invalid'}]});}
+        return json(route,url.pathname.endsWith('/dark')?darkMapStyle:mapStyle);
+      }
       return route.fulfill({status:204,body:''});
     }
     if(url.pathname.startsWith('/__fixtures__/glyphs/')) return route.fulfill({status:200,contentType:'application/x-protobuf',body:Buffer.alloc(0)});
@@ -96,6 +109,32 @@ async function main() {
   });
   const page=await context.newPage();page.on('pageerror',e=>report.pageErrors.push(e.message));
   const snap=async name=>{const file=path.join(output,name+'.png');await page.screenshot({path:file,fullPage:true,animations:'disabled'});report.screenshots.push(file);};
+  const settle=async()=>page.evaluate(async()=>{await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));});
+  const themeIs=async theme=>{
+    await page.waitForFunction(theme=>document.documentElement.classList.contains('dark')===(theme==='dark'),theme);
+    await settle();
+    assert.equal(await page.locator('html').evaluate(el=>getComputedStyle(el).colorScheme),theme,'Native controls must use the selected color scheme');
+    assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'),theme==='dark'?'#0e141e':'#ffffff','Browser chrome must match the selected theme');
+  };
+  const mapThemeIs=async theme=>{
+    await page.locator(`[data-map-theme="${theme}"][aria-busy="false"]`).waitFor();
+  };
+  const contrast=async(label,locator,minimum=4.5,pseudo=null)=>{
+    await settle();
+    const colors=await locator.first().evaluate((element,pseudo)=>{
+      const parse=color=>{const values=color.match(/[\d.]+/g)?.map(Number)||[];return [...values.slice(0,3),values[3]??1];};
+      const composite=(front,back)=>[...front.slice(0,3).map((value,i)=>value*front[3]+back[i]*(1-front[3])),1];
+      const chain=[];for(let node=element;node;node=node.parentElement)chain.unshift(node);
+      let background=[255,255,255,1];
+      for(const node of chain)background=composite(parse(getComputedStyle(node).backgroundColor),background);
+      const style=getComputedStyle(element,pseudo),foreground=composite(parse(style.color),background);
+      const lum=rgb=>rgb.slice(0,3).map(value=>{value/=255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;}).reduce((sum,value,i)=>sum+value*[.2126,.7152,.0722][i],0);
+      const a=lum(foreground),b=lum(background);
+      return {foreground:style.color,background:background.slice(0,3).map(Math.round),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+    },pseudo);
+    report.contrast.push({label,...colors,minimum});
+    assert(colors.ratio>=minimum,`${label} contrast ${colors.ratio.toFixed(2)} is below ${minimum}: ${JSON.stringify(colors)}`);
+  };
   try {
     await page.goto(base);
     await page.getByTestId('property-results').locator('a[href^="/property/"]').first().waitFor();
@@ -214,12 +253,112 @@ async function main() {
     await snap('search-mobile-list');
     report.checks.push('390px mobile list/map toggle and page have no horizontal overflow');
     await page.setViewportSize({width:1440,height:1000});
+    await page.goto(savedUrl);
+    await mapThemeIs('light');
+    await page.waitForFunction(n=>document.querySelectorAll('[data-testid="property-results"] a[href^="/property/"]').length===n,expected.length);
+    const mapCanvas=await page.locator('.maplibregl-canvas').elementHandle();
+    const darkBox=await page.locator('.maplibregl-canvas').boundingBox();assert(darkBox);
+    const beforeThemeBbox=report.requests.filter(request=>request.bbox).at(-1)?.bbox;
+    await page.getByRole('button',{name:'Tegn område',exact:true}).click();
+    for(const [x,y] of [[.2,.3],[.6,.3],[.6,.6]])await page.locator('.maplibregl-canvas').click({position:{x:darkBox.width*x,y:darkBox.height*y}});
     await page.getByRole('button',{name:'Skift til mørkt tema'}).click();
-    // Finish theme color transitions before evaluating contrast in the saved image.
-    await page.evaluate(async()=>{await Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})));});
+    await themeIs('dark');await mapThemeIs('dark');
+    await page.getByText(/Klik eller tryk på kortet: 3 punkter/).waitFor();
+    assert.equal(page.url(),savedUrl,'Theme change must retain the committed polygon');
+    assert.equal(await page.getByTestId('property-results').locator('a[href^="/property/"]').count(),expected.length);
+    assert.equal(await mapCanvas.evaluate(element=>element===document.querySelector('.maplibregl-canvas')),true,'Theme change must retain the map and camera');
+    assert.equal(report.requests.filter(request=>request.bbox).at(-1)?.bbox,beforeThemeBbox,'Theme change must not refit the viewport');
+    assert(report.mapStyles.some(style=>style.endsWith('/dark')),'Actual dark basemap must be requested');
+    await contrast('Dark map finish-area action',page.getByRole('button',{name:'Afslut område',exact:true}));
+    await page.getByRole('button',{name:'Annuller',exact:true}).click();
+    await page.getByRole('button',{name:'Fjern område',exact:true}).waitFor();
+    report.checks.push('Changing theme applies a dark basemap while retaining map, camera, committed polygon, draft vertices and results');
+    await contrast('Dark navigation active link',page.locator('header nav a[aria-current="page"]'));
+    await contrast('Dark navigation secondary link',page.locator('header nav a:not([aria-current])'));
+    await contrast('Dark card price',page.getByTestId('property-card').first().locator('p').first());
+    await contrast('Dark card address',page.getByTestId('property-card').first().locator('h3'));
+    await contrast('Dark card secondary metadata',page.getByTestId('property-card').first().locator('p').last());
+    await contrast('Dark card unknown risk badge',page.getByTestId('property-card').first().locator('span[title]').first());
+    await contrast('Dark search placeholder',page.getByRole('searchbox'),4.5,'::placeholder');
+    await contrast('Dark search filters',page.getByRole('button',{name:/Flere filtre/}));
+    await contrast('Dark map draw control',page.getByRole('button',{name:'Tegn område',exact:true}));
+    await contrast('Dark footer description',page.locator('footer p'));
+    await contrast('Dark footer navigation',page.locator('footer a[href="/account/profile"]'));
+    await contrast('Dark footer primary action',page.locator('footer').getByRole('link',{name:'Åbn dit boligprojekt',exact:true}));
     await snap('search-dark');
-    assert.equal(await page.locator('html').evaluate(el=>el.classList.contains('dark')),true);
-    report.checks.push('Dark theme remains available with the shared blue palette');
+    await page.getByRole('button',{name:/Flere filtre/}).click();
+    await contrast('Dark filter label',page.getByRole('dialog').locator('label').first());
+    await contrast('Dark filter input',page.getByRole('dialog').locator('input[type="text"]').first());
+    await contrast('Dark filter placeholder',page.getByRole('dialog').locator('input[type="text"]').first(),4.5,'::placeholder');
+    await contrast('Dark filter primary action',page.getByRole('dialog').getByRole('button',{name:'Vis boliger',exact:true}));
+    await snap('search-dark-filters');
+    await page.keyboard.press('Escape');
+    report.checks.push('Desktop dark navigation, card text, risk badge, filters, map controls and footer meet text contrast 4.5:1');
+    await page.emulateMedia({colorScheme:'light'});
+    await page.reload();await themeIs('dark');await mapThemeIs('dark');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('boligdata.theme')),'dark');
+    assert.equal(page.url(),savedUrl);
+    report.checks.push('Explicit dark choice survives reload with a light operating-system preference and preserved polygon');
+    await page.setViewportSize({width:390,height:844});
+    await page.getByTestId('property-card').first().waitFor();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Dark mobile document overflow');
+    await snap('search-dark-mobile-list');
+    const mobileMenu=page.locator('button[aria-controls="mobile-main-menu"]');
+    await mobileMenu.click();
+    await contrast('Dark mobile navigation',page.locator('#mobile-main-menu a').first());
+    await contrast('Dark mobile account navigation',page.locator('#mobile-main-menu a[href="/account/profile"]'));
+    await snap('search-dark-mobile-menu');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:/Flere filtre/}).click();
+    await contrast('Dark mobile filter action',page.getByRole('dialog').getByRole('button',{name:'Vis boliger',exact:true}));
+    await snap('search-dark-mobile-filters');await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'Kort',exact:true}).click();await mapThemeIs('dark');
+    await page.getByRole('button',{name:'Fjern område',exact:true}).waitFor();
+    await snap('search-dark-mobile-map');
+    assert.equal(new URL(page.url()).searchParams.get('polygon'),JSON.stringify(polygon));
+    report.checks.push('Dark 390px list, mobile menu, filters and map fit; boundary survives responsive map remount');
+    await page.getByRole('button',{name:'Skift til lyst tema'}).click();await themeIs('light');await mapThemeIs('light');
+    await page.emulateMedia({colorScheme:'dark'});
+    await page.reload();await themeIs('light');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('boligdata.theme')),'light');
+    report.checks.push('Explicit light choice persists and overrides a dark operating-system preference');
+    await page.evaluate(()=>localStorage.removeItem('boligdata.theme'));
+    await page.reload();await themeIs('dark');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('boligdata.theme')),null,'System preference must not become a saved explicit choice');
+    await page.emulateMedia({colorScheme:'light'});await themeIs('light');
+    await page.emulateMedia({colorScheme:'dark'});await themeIs('dark');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('boligdata.theme')),null);
+    report.checks.push('With no explicit choice, initial and live system appearance apply without writing a preference');
+    const secondPage=await context.newPage();
+    secondPage.on('pageerror',error=>report.pageErrors.push(error.message));
+    await secondPage.goto(`${base}/account/profile`);
+    await secondPage.getByRole('button',{name:'Gem',exact:true}).waitFor();
+    await secondPage.evaluate(()=>localStorage.setItem('boligdata.theme','light'));await themeIs('light');
+    await secondPage.evaluate(()=>localStorage.setItem('boligdata.theme','dark'));await themeIs('dark');
+    await secondPage.evaluate(()=>localStorage.removeItem('boligdata.theme'));await themeIs('dark');
+    await page.emulateMedia({colorScheme:'light'});await themeIs('light');
+    await secondPage.close();
+    report.checks.push('Cross-tab choice changes and removal synchronize; clearing restores live system appearance');
+    await page.setViewportSize({width:1440,height:1000});
+    await page.goto(savedUrl);await mapThemeIs('light');
+    const beforeFailedStyle=await page.locator('.maplibregl-canvas').elementHandle();
+    invalidNextDarkStyle=true;
+    await page.getByRole('button',{name:'Skift til mørkt tema'}).click();await themeIs('dark');
+    await page.getByText(/Korttemaet kunne ikke/).waitFor();
+    await mapThemeIs('light');
+    assert.equal(await beforeFailedStyle.evaluate(element=>element===document.querySelector('.maplibregl-canvas')),true,'Invalid provider style must preserve the previous map');
+    assert.equal(page.url(),savedUrl,'Failed theme change must preserve the search boundary');
+    assert.equal(await page.getByRole('button',{name:'Tegn område',exact:true}).isEnabled(),true,'Failed style must not leave map controls disabled');
+    await snap('search-dark-map-style-error');
+    await page.getByRole('button',{name:'Skift til lyst tema'}).click();await themeIs('light');
+    await page.getByRole('button',{name:'Skift til mørkt tema'}).click();await themeIs('dark');await mapThemeIs('dark');
+    await page.getByText(/Korttemaet kunne ikke/).waitFor({state:'hidden'});
+    await page.getByText('Nogle kortdata kunne ikke indlæses.',{exact:true}).waitFor({state:'hidden'});
+    report.checks.push('Invalid provider style retains the previous map, ends loading, explains the failure and allows a successful retry');
+    await page.goto(`${base}/account/profile`);
+    await contrast('Dark account profile save action',page.getByRole('button',{name:'Gem',exact:true}));
+    await snap('account-dark');
+    report.checks.push('Dark account form primary action retains readable text contrast');
     assert.deepEqual(report.pageErrors,[]);assert.deepEqual(report.unexpected,[]);
   } catch(error) {report.failure=error.stack;await snap('search-failure').catch(()=>{});throw error;}
   finally {fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({checks:report.checks,pageErrors:report.pageErrors,unexpected:report.unexpected,report:path.join(output,'report.json')},null,2));await browser.close();}

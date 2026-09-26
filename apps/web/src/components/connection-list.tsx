@@ -29,7 +29,7 @@ export function ConnectionList({
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-ink">
                   {c.otherUserEmail || c.otherUserId}
-                  <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand">
+                  <span className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand-text">
                     {t(c.otherUserRole === "agent" ? "role.agent" : c.otherUserRole === "advisor" ? "role.advisor" : "role.user")}
                   </span>
                 </div>

@@ -1,6 +1,6 @@
 /* Run against a local Vite server: node scripts/research-browser-smoke.cjs
  * Every API, Supabase, map and external request is mocked or blocked. No production login or write occurs.
- * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL and SMOKE_OUTPUT_DIR can override local defaults.
+ * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL, SMOKE_OUTPUT_DIR and SMOKE_THEME can override local defaults.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -10,7 +10,9 @@ const assert = require("node:assert/strict");
 const root = path.resolve(__dirname, "..");
 const baseUrl = process.env.SMOKE_BASE_URL || "http://127.0.0.1:5174";
 assert(["127.0.0.1", "localhost"].includes(new URL(baseUrl).hostname), "Only a local development server is allowed");
-const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, "node_modules/.cache/research-smoke");
+const theme = process.env.SMOKE_THEME || "light";
+assert(["light", "dark"].includes(theme), "SMOKE_THEME must be light or dark");
+const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${theme === "dark" ? "-dark" : ""}`);
 fs.mkdirSync(outputDir, { recursive: true });
 let playwright;
 try { playwright = require(process.env.PLAYWRIGHT_MODULE || "playwright"); }
@@ -64,11 +66,11 @@ const lookup = {
 
 async function main() {
   const browserPath = process.env.BROWSER_EXECUTABLE || ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C:/Program Files/Google/Chrome/Application/chrome.exe"].find(p => fs.existsSync(p));
-  const browser = await playwright.chromium.launch({ headless: true, executablePath: browserPath, args: ["--disable-background-networking"] });
+  const browser = await playwright.chromium.launch({ headless: true, executablePath: browserPath, args: ["--disable-background-networking", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
   const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, serviceWorkers: "block", locale: "da-DK" });
-  const report = { checks: [], apiWrites: [], mockedExternalRequests: 0, unmockedApiRequests: [], pageErrors: [], screenshots: [] };
+  const report = { theme, checks: [], apiWrites: [], mockedExternalRequests: 0, unmockedApiRequests: [], pageErrors: [], screenshots: [], contrast: [] };
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-  await context.addInitScript(({ key, value }) => { localStorage.setItem(key, JSON.stringify(value)); localStorage.setItem("boligdata.lang", "da"); }, { key: authStorageKey, value: session });
+  await context.addInitScript(({ key, value, theme }) => { localStorage.setItem(key, JSON.stringify(value)); localStorage.setItem("boligdata.lang", "da"); localStorage.setItem("boligdata.theme", theme); }, { key: authStorageKey, value: session, theme });
   if (context.routeWebSocket) await context.routeWebSocket("**/*", socket => socket.close());
   await context.route("**/*", async route => {
     const request = route.request(); const url = new URL(request.url());
@@ -78,7 +80,7 @@ async function main() {
       if (url.pathname.includes("/rest/v1/user_profiles")) return json(route, profile);
       if (url.pathname.includes("/auth/v1/user")) return json(route, testUser);
       if (url.pathname.includes("/auth/v1/")) return json(route, session);
-      if (url.hostname === "tiles.openfreemap.org") return json(route, { version: 8, sources: {}, layers: [{ id: "fixture-background", type: "background", paint: { "background-color": "#e4ebe4" } }] });
+      if (url.hostname === "tiles.openfreemap.org") return json(route, { version: 8, sources: {}, layers: [{ id: "fixture-background", type: "background", paint: { "background-color": url.pathname.endsWith("/dark") ? "#101b27" : "#e4ebe4" } }] });
       return route.fulfill({ status: 204, body: "" });
     }
     if (!url.pathname.startsWith("/api/")) return route.continue();
@@ -112,10 +114,26 @@ async function main() {
   });
   const page = await context.newPage();
   page.on("pageerror", error => report.pageErrors.push(error.message));
-  const screenshot = async (name, locator) => { const target = path.join(outputDir, `${name}.png`); await (locator ?? page).screenshot({ path: target, ...(locator ? {} : { fullPage: true }) }); report.screenshots.push(target); };
+  const screenshot = async (name, locator) => { const target = path.join(outputDir, `${name}.png`); await (locator ?? page).screenshot({ path: target, animations: "disabled", ...(locator ? {} : { fullPage: true }) }); report.screenshots.push(target); };
   const waitText = async (text, scope = page) => scope.getByText(text, { exact: true }).first().waitFor();
+  const darkContrast = async (label, locator) => {
+    if (theme !== "dark") return;
+    const colors = await locator.first().evaluate(element => {
+      const rgb = color => color.match(/[\d.]+/g).slice(0, 3).map(Number);
+      const style = getComputedStyle(element);
+      let backgroundElement = element;
+      while (backgroundElement.parentElement && getComputedStyle(backgroundElement).backgroundColor === "rgba(0, 0, 0, 0)") backgroundElement = backgroundElement.parentElement;
+      const foreground = rgb(style.color), background = rgb(getComputedStyle(backgroundElement).backgroundColor);
+      const luminance = values => values.map(value => { value /= 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4; }).reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
+      const a = luminance(foreground), b = luminance(background);
+      return { foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
+    });
+    report.contrast.push({ label, ...colors });
+    assert(colors.ratio >= 4.5, `${label} contrast must be 4.5:1: ${JSON.stringify(colors)}`);
+  };
   try {
     await page.goto(`${baseUrl}/research`); await waitText("Mit boligprojekt");
+    assert.equal(await page.locator("html").evaluate(element => element.classList.contains("dark")), theme === "dark");
     await page.getByRole("button", { name: "Projektprofil", exact: true }).click();
     assert.equal(await page.getByLabel("Samlet projektloft (kr.)", { exact: true }).inputValue(), "5000000");
     report.checks.push("Private project profile loads");
@@ -123,12 +141,18 @@ async function main() {
     await page.getByRole("button", { name: "Statistik", exact: true }).click();
     await waitText("Handler bag prisreferencen");
     assert((await page.getByRole("table").first().textContent()).includes("Referencevej 1"));
+    await page.getByRole("button", { name: "Vis kort og områdefilter", exact: true }).click();
+    await page.locator(`[data-map-theme="${theme}"][aria-busy="false"]`).waitFor();
+    await darkContrast("Dark research warning status", page.locator('.bg-warning-soft[role="status"]'));
     report.checks.push("Historical statistics render fixture transactions");
     await screenshot("research-statistics-desktop");
 
     await page.goto(`${baseUrl}/property/${propertyId}`);
     const workbench = page.locator("#research");
     await waitText("Afklar pris først", workbench);
+    await darkContrast("Dark research success status", workbench.locator('.bg-success-soft'));
+    await darkContrast("Dark research save action", workbench.getByRole("button", { name: "Gem projekt og undersøgelse", exact: true }));
+    if (theme === "dark") report.checks.push("Dark research warning/success statuses and save action have readable contrast; sales map loads the selected dark style");
     const priceReference = workbench.getByTestId("listing-price-reference");
     const priceMedian = priceReference.getByTestId("listing-price-median");
     const timeDefinition = priceReference.getByLabel("Tidsdefinition til prisreference", { exact: true });

@@ -25,5 +25,5 @@ export function Percent({ value }: { value: number | null }) { return <>{value =
 export function Status({ value }: { value: "met" | "failed" | "unknown" }) {
   const tx = useResearchText();
   const label = value === "met" ? tx("Opfyldt", "Met") : value === "failed" ? tx("Ikke opfyldt", "Not met") : tx("Ukendt", "Unknown");
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${value === "met" ? "bg-success-soft text-success" : value === "failed" ? "bg-danger-soft text-danger" : "bg-unknown-soft text-ink-soft"}`}>{label}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${value === "met" ? "bg-success-soft text-success-text" : value === "failed" ? "bg-danger-soft text-danger" : "bg-unknown-soft text-ink-soft"}`}>{label}</span>;
 }

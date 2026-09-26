@@ -105,7 +105,7 @@ export function AdminAdvisorConnectionsPage() {
               <div className="text-sm font-semibold text-ink">
                 {emailById.get(c.advisorId) ?? c.advisorId}
                 {professionalRole && (
-                  <span className="ml-1.5 rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand">
+                  <span className="ml-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand-text">
                     {t(professionalRole === "agent" ? "role.agent" : "role.advisor")}
                   </span>
                 )}
