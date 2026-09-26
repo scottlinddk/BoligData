@@ -8,7 +8,7 @@ The UI is fully bilingual (Danish default, English) and ships with light and dar
 
 Search now uses the supplied photo-led design reference: a white/navy/blue palette, compact filters, a split listing/map layout and a charcoal footer. Draw an area with clicks or taps to filter listings; boundaries persist in URLs and saved searches. Spatial matching runs before counts and pagination. Listings also offer historical price references based on comparable sales and documented time on market.
 
-**Apply migration 024 before deploying drawn-area search.** See [design, map interaction and verification](docs/design-system-and-map-search.md). No production migration is applied by the implementation task.
+**Apply migrations 024 and 025 in order before deploying drawn-area search.** See [design, map interaction and verification](docs/design-system-and-map-search.md). No production migration is applied by the implementation task.
 
 ## Property research before a viewing — 26 September 2026
 

@@ -5,7 +5,7 @@
 begin;
 do $$
 begin
-  if to_regclass('public.properties') is not null then
+  if to_regclass('public.properties') is not null or to_regclass('public.searches') is not null then
     raise exception 'Boundary verification requires an empty disposable database';
   end if;
 end;
@@ -19,6 +19,12 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role; end if;
 end;
 $$;
+
+create table public.searches (
+  id integer primary key,
+  filters jsonb not null default '{}'::jsonb
+);
+insert into public.searches (id) values (1);
 
 create table public.properties (
   id uuid primary key,
@@ -44,6 +50,33 @@ insert into public.properties (id, address, price, location, visible) values
   ('00000000-0000-0000-0000-000000000007', 'RLS hidden', 700, public.st_point(9.6, 57.25, 4326)::public.geography, false);
 
 \ir ../packages/supabase/migrations/024_drawn_search_boundary.sql
+\ir ../packages/supabase/migrations/025_property_search_boundary.sql
+
+-- The existing saved-search schema and the new property RPC must coexist.
+do $$
+begin
+  if not exists (select 1 from public.searches where id = 1 and boundary is null and filters = '{}'::jsonb) then
+    raise exception 'Boundary migration changed an existing saved search';
+  end if;
+  if to_regclass('public.searches_boundary_gix') is null or to_regclass('public.idx_properties_location_geometry') is null then
+    raise exception 'Both saved-search and property geometry indexes are required';
+  end if;
+  update public.searches
+    set boundary = public.st_geomfromtext('POLYGON((9 57,10 57,10 58,9 58,9 57))', 4326)::public.geography
+    where id = 1;
+  if not exists (select 1 from public.searches where id = 1 and public.st_isvalid(boundary::public.geometry)) then
+    raise exception 'Saved-search boundary did not retain a valid polygon';
+  end if;
+  begin
+    update public.searches
+      set boundary = public.st_geomfromtext('POLYGON((9 57,10 58,9 58,10 57,9 57))', 4326)::public.geography
+      where id = 1;
+    raise exception 'Saved-search boundary accepted a self-intersecting polygon';
+  exception when check_violation then
+    null;
+  end;
+end;
+$$;
 
 do $$
 declare
@@ -126,4 +159,4 @@ end;
 $$;
 reset role;
 rollback;
-\echo 'Drawn-boundary migration, geometry, input validation, RLS and pagination checks passed.'
+\echo 'Drawn-boundary migrations, saved-search storage, geometry, input validation, RLS and pagination checks passed.'
