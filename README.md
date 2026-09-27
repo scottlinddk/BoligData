@@ -4,6 +4,10 @@
 
 The UI is fully bilingual (Danish default, English) and ships with light and dark themes; both preferences persist in `localStorage`.
 
+## Price by time on market
+
+Listing details prominently show **Pris efter liggetid / Price by time on market**: a historical reference from the supplied workbook, today's asking price, the difference, time bracket and source freshness. The calculation uses 281 eligible historical villa sales in Aalborg/Hasseris, with a documented first asking price or a clearly labelled approximation from Boligsiden's rounded price-change percentage. Missing or conflicting evidence stays unavailable. See [workbook data and calculation](docs/liggetid-workbook.md) and [weekly runner setup](docs/weekly-boligsiden-refresh.md). No new database migration is required beyond the existing research schema.
+
 ## Listing design and map search
 
 Search now uses the supplied photo-led design reference: a white/navy/blue palette, compact filters, a split listing/map layout and a charcoal footer. Draw an area with clicks or taps to filter listings; boundaries persist in URLs and saved searches. Spatial matching runs before counts and pagination. Listings also offer historical price references based on comparable sales and documented time on market.
@@ -23,7 +27,7 @@ The private **Boligprojekt / Buying project** workspace adds project requirement
 - Theming: Tailwind `class` dark mode with a context provider (`apps/web/src/theme`); an inline bootstrap in `index.html` applies the stored theme before first paint to avoid flashes.
 - Backend: Vercel serverless functions (`apps/web/api`), Node.js.
 - Database: Supabase (PostgreSQL + PostGIS), Supabase Auth.
-- Ingest: GitHub Actions daily cron -> `/api/crawl`.
+- Ingest: GitHub Actions daily cron -> `/api/crawl`, plus a weekly live Boligsiden runner. See [weekly refresh setup and coverage](docs/weekly-boligsiden-refresh.md).
 
 ## Monorepo layout
 
@@ -31,7 +35,7 @@ The private **Boligprojekt / Buying project** workspace adds project requirement
 apps/web            # Vite frontend + Vercel /api functions
 packages/shared      # shared TS types + utils, consumed via Vite alias
 packages/supabase    # SQL migrations + seed data
-.github/workflows    # crawl.yml (daily ingest), deploy.yml
+.github/workflows    # crawl.yml (daily + weekly ingest), deploy.yml
 ```
 
 ## Getting started
@@ -52,7 +56,7 @@ Real Boliga and Boligsiden clients live in `apps/web/server/lib/crawl/{boliga,bo
 
 **Boliga is currently blocked from Vercel** (confirmed 2026-07-10): every request gets `HTTP 403` from datacenter IPs, and browser-like headers (UA, Referer/Origin, `sec-ch-*`) didn't change that, so it's an IP-range block rather than a fingerprint check. Boligsiden has no such block and ingests live data cleanly. Use `CRAWL_SOURCES` (comma-separated, e.g. `CRAWL_SOURCES=boligsiden`) to run only the working source(s) — unset, empty, or containing no recognized source name falls back to both. Re-enable Boliga once it's reachable again (a residential/rotating proxy in front of that one client, or a different execution host).
 
-**Postal code (postnummer) scope**: both clients only keep listings whose postal code falls within one of the intervals configured via `CRAWL_ZIP_RANGES` (`server/lib/crawl/map-utils.ts`, `getZipRanges`/`filterByZipRanges`), a comma-separated list of `min-max` pairs — e.g. `CRAWL_ZIP_RANGES=9000-9900,6000-6600` to crawl both North Jutland and Aarhus — defaulting to a single **9000-9900** range (North Jutland) when unset. (The legacy single-range `CRAWL_ZIP_MIN`/`CRAWL_ZIP_MAX` vars still work as a fallback.) The filter runs client-side after mapping — correct regardless of whether the upstream APIs' own zip params (best-effort) do anything — so widening or narrowing coverage later is just an env var change, no code change or redeploy of logic required. Boliga sends `zipcodeFrom`/`zipcodeTo` (a contiguous range, undocumented and unverified). Boligsiden tried the same range shape first; a live diagnostic (2026-08-22) proved it a total no-op (`totalHits` stayed at the full nationwide count, 43,885) and showed its case records carry zip as a discrete `address.zip.{name,slug,zipCode}` area object rather than a bare range-filterable field — so it now sends `zipCodes` as a repeated exact-match param instead, one per postal code in the configured ranges (`enumerateZipCodes`, capped to bound the request URL's size). Still unverified against a live response as of this writing. Without working narrowing, Boligsiden pages through the *entire* national listings feed sorted by freshness before the zip filter ever applies, so with Boliga currently disabled (see below), the crawl can spend its whole page budget on other regions and never reach older-but-still-active listings in the configured area. Out-of-range records are counted as `skippedOutOfArea`, kept **separate** from `skippedInvalid` (records the mapper rejected): with the default range covering North Jutland alone, most of a nationwide page is expected to be filtered out, and folding the two together made a healthy run report `skippedInvalid=899` — indistinguishable from the upstream shape having drifted. Only `skippedInvalid` moving is worth investigating.
+**Postal code (postnummer) scope**: both clients retain only listings within `CRAWL_ZIP_RANGES`, a comma-separated list of `min-max` pairs. The default is **9000–9900**; legacy `CRAWL_ZIP_MIN`/`CRAWL_ZIP_MAX` still work as a fallback. Boligsiden sends every postcode as a repeated `zipCodes` parameter for scopes containing at most 300 values. Larger scopes use the national feed with the full local postcode filter, avoiding the former silent truncation to the first 300 codes. Out-of-area records are counted as `skippedOutOfArea`, separately from malformed records in `skippedInvalid`. The weekly runner scans beyond the routine daily limits and fails when caps or source gaps prevent full coverage. See [weekly refresh coverage and operations](docs/weekly-boligsiden-refresh.md).
 
 The ingest orchestrator (`apps/web/server/lib/crawl/ingest.ts`, exposed as `/api/crawl`) isolates the two sources (`Promise.allSettled`), batch-upserts properties in chunks, and only re-enriches listings that are new or changed — each listing's payload is fingerprinted into `properties.content_hash` (migration 005). A source that hits a fetch error and comes back with zero listings is treated as failed too, so a blocked or drifted upstream API can't masquerade as "nothing new this run." The endpoint returns per-source reports and responds `502` on partial failure so the daily GitHub Action (`crawl.yml`) goes red with the report in its log; `crawl.yml` parses that JSON and prints, per source and in total, how many listings were found and how many were brand new.
 

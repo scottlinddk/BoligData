@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { ListingImage, SaleType, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
 import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
@@ -15,6 +16,7 @@ import {
   filterByZipRanges,
   getZipRanges,
   isDanishCoordinate,
+  isInZipRange,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
 import { mockModeEnabled } from "../enrichment-sources/types.js";
@@ -78,6 +80,16 @@ function get(obj: unknown, ...path: string[]): unknown {
     cur = (cur as Record<string, unknown>)[key];
   }
   return cur;
+}
+
+/** Only a valid, unambiguous postcode can establish that a record is out
+ * of scope. Missing/conflicting geography must remain a coverage warning. */
+function mapPostalCode(raw: unknown): string | null {
+  const supplied = [get(raw, "address", "zipCode"), get(raw, "address", "zip", "zipCode"), get(raw, "zipCode")]
+    .filter((value) => value !== undefined && value !== null);
+  const codes = supplied.map(asFiniteNumber);
+  if (codes.length === 0 || codes.some((code) => code === null || !Number.isInteger(code) || code < 1000 || code > 9999)) return null;
+  return new Set(codes).size === 1 ? String(codes[0]) : null;
 }
 
 function mapReportedTimeOnMarket(value: unknown): RawListing["reported_time_on_market"] {
@@ -227,17 +239,19 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   }
 
   const addressType = asNonEmptyString(r.addressType)?.toLowerCase() ?? "";
-  const zip = asPositiveInt(get(r, "address", "zipCode")) ?? asPositiveInt(get(r, "address", "zip", "zipCode")) ?? asPositiveInt(r.zipCode);
+  const postalCode = mapPostalCode(r);
   const images = (Array.isArray(r.images) ? r.images : [])
     .map(mapImage)
     .filter((img): img is ListingImage => img !== null);
   const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket);
+  const changePercent = typeof r.priceChangePercentage === "number" && Number.isFinite(r.priceChangePercentage)
+    && r.priceChangePercentage > -100 ? r.priceChangePercentage : null;
 
   return {
     data_mode: "real",
     address,
     municipality,
-    postal_code: zip !== null ? String(zip) : null,
+    postal_code: postalCode,
     price,
     sqm,
     // Null (rather than a "today" guess) when none of these parse — a
@@ -248,6 +262,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     listing_date:
       asIsoDate(r.timeOnMarket) ?? asIsoDate(get(r, "status", "createdDate")) ?? asIsoDate(r.createdDate),
     ...(reportedTimeOnMarket ? { reported_time_on_market: reportedTimeOnMarket } : {}),
+    ...(changePercent !== null ? { reported_price_change: { currentAsking: price, changePercent } } : {}),
     listing_source: "boligsiden",
     external_id: externalId,
     lat,
@@ -296,13 +311,19 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   }
 
   const pageSize = envInt("CRAWL_PAGE_SIZE", 100, 1, 500);
-  const maxPages = envInt("CRAWL_MAX_PAGES", 10, 1, 100);
+  const maxPages = envInt("CRAWL_MAX_PAGES", 10, 1, 1000);
   const maxListings = envInt("CRAWL_MAX_LISTINGS", 1000, 1, 50_000);
   const delayMs = envInt("CRAWL_DELAY_MS", 250, 0, 10_000);
 
   const listings: RawListing[] = [];
+  const seenIds = new Set<string>();
+  let duplicateRecords = 0;
+  // Never send a truncated scope: upstream would correctly exclude the
+  // omitted postcodes and a complete response would conceal that gap.
+  // Broad scopes use a nationwide feed plus the authoritative local filter.
+  const zipCodes = enumerateZipCodes(zipRanges, 301);
 
-  for (let page = 1; page <= maxPages && listings.length < maxListings; page++) {
+  for (let page = 1; page <= maxPages && stats.recordsSeen < maxListings; page++) {
     if (page > 1) await sleep(delayMs);
 
     const params = new URLSearchParams({
@@ -311,20 +332,10 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       sortBy: "timeOnMarket",
       sortAscending: "true", // newest listings first
     });
-    // Best-effort server-side narrowing (undocumented param, may be a
-    // no-op) so pagination isn't spent on nationwide results outside the
-    // configured area. A live diagnostic (2026-08-22) confirmed
-    // zipCodeFrom/zipCodeTo — a contiguous-range param modeled on Boliga's —
-    // did nothing: totalHits stayed at the full nationwide count. It also
-    // showed Boligsiden's own case shape carries zip as a discrete
-    // `address.zip.zipCode` area object rather than a bare range-filterable
-    // field, so this tries an exact-match list instead: repeated `zipCodes`
-    // params, one per configured postal code (capped — see
-    // enumerateZipCodes). filterByZipRanges() below is the source of truth
-    // either way, so a wrong guess still costs nothing but wasted pages,
-    // never correctness.
-    for (const zip of enumerateZipCodes(zipRanges)) {
-      params.append("zipCodes", String(zip));
+    // Best-effort server-side narrowing. Local filtering remains required
+    // because the frontend API is undocumented and can change independently.
+    if (zipCodes.length <= 300) {
+      for (const zip of zipCodes) params.append("zipCodes", String(zip));
     }
     const url = `${API_BASE}?${params}`;
 
@@ -346,14 +357,10 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     }
     const cases = body.cases;
     let processed = 0;
-    // TEMPORARY diagnostic (page 1 only), round 2: confirms whether the new
-    // `zipCodes` exact-match param actually narrows totalHits from the
-    // nationwide count (43,885 confirmed on 2026-08-22 with no zip param
-    // applying at all). Remove once confirmed working (or found to still be
-    // a no-op, in which case server-side narrowing gets abandoned in favor
-    // of raising CRAWL_MAX_PAGES/CRAWL_MAX_LISTINGS instead).
+    let newIdentities = 0;
+    const duplicatesBeforePage = duplicateRecords;
     if (page === 1) {
-      logEvent("crawl.boligsiden.debug_page1", {
+      logEvent("crawl.boligsiden.scope", {
         totalHits: body.totalHits,
         total: body.total,
         casesLength: cases.length,
@@ -361,8 +368,34 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       });
     }
     for (const record of cases) {
+      if (stats.recordsSeen >= maxListings) break;
       processed += 1;
       stats.recordsSeen += 1;
+      // Track pagination before scope/mapping exclusions. A repeated page of
+      // out-of-area plots must not inflate recordsSeen into apparent coverage.
+      const externalId = asNonEmptyString(get(record, "caseID")) ?? asNonEmptyString(get(record, "caseId"));
+      const identity = externalId !== null ? `id:${externalId}`
+        : `raw:${createHash("sha256").update(JSON.stringify(record) ?? "undefined").digest("hex")}`;
+      const duplicate = seenIds.has(identity);
+      if (duplicate) {
+        duplicateRecords += 1;
+      } else {
+        seenIds.add(identity);
+        newIdentities += 1;
+      }
+
+      const postalCode = mapPostalCode(record);
+      if (postalCode !== null && !isInZipRange(postalCode, zipRanges)) {
+        stats.recordsOutOfArea += 1;
+        continue;
+      }
+      if (postalCode === null) {
+        stats.recordsSkipped += 1;
+        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+          mappingWarnings.push(`page ${page}: skipped record with unknown or conflicting postcode`);
+        }
+        continue;
+      }
       const listing = mapBoligsidenCase(record);
       if (listing === null) {
         stats.recordsSkipped += 1;
@@ -371,19 +404,30 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
         }
         continue;
       }
-      listings.push(listing);
-      if (listings.length >= maxListings) break;
+      if (!duplicate) listings.push(listing);
     }
 
     const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
-    if ((total !== null && page * pageSize >= total) || (total === null && cases.length < pageSize)) {
-      stats.complete = processed === cases.length && stats.recordsSkipped === 0;
+    if (newIdentities === 0 && duplicateRecords > duplicatesBeforePage) {
+      stats.errors.push(`page ${page}: no new listing identities; pagination did not advance`);
+      break;
+    }
+    // Count returned records, not requested page size: providers may cap
+    // per_page. Without a total, only an empty page proves exhaustion.
+    if ((total !== null && stats.recordsSeen >= total) || cases.length === 0) {
+      const exhausted = total === null || stats.recordsSeen >= total;
+      stats.complete = exhausted && processed === cases.length && stats.recordsSkipped === 0 && duplicateRecords === 0;
+      if (!exhausted) stats.errors.push(`page ${page}: empty page before the reported feed total`);
       break;
     }
   }
 
+  if (duplicateRecords > 0 && mappingWarnings.length < MAX_ERRORS_REPORTED) {
+    mappingWarnings.push(`${duplicateRecords} duplicate listing identities; feed changed or pagination overlapped`);
+  }
+
   const { kept, excluded } = filterByZipRanges(listings, zipRanges);
-  stats.recordsOutOfArea = excluded;
+  stats.recordsOutOfArea += excluded;
 
   logEvent("crawl.boligsiden.fetched", { ...stats, listings: kept.length });
   return { listings: dedupeByExternalId(kept), stats };

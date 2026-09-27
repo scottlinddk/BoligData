@@ -42,6 +42,9 @@ export interface RawListing {
   /** Provider-reported durations, observed as-is. They do not document a
    * calendar start date or independently establish continuous active time. */
   reported_time_on_market?: { latestEpisodeDays: number | null; totalDays: number | null };
+  /** Rounded provider percentage, retained separately from a documented first
+   * asking price. It can support an explicitly approximate price scenario. */
+  reported_price_change?: { currentAsking: number; changePercent: number };
 }
 
 export interface SourceCrawlStats {
@@ -54,7 +57,8 @@ export interface SourceCrawlStats {
   /** Records that failed defensive mapping (missing/invalid required fields). */
   recordsSkipped: number;
   /**
-   * Records that mapped fine but fell outside the configured zip ranges.
+   * Records positively identified as outside the configured zip ranges.
+   * Boligsiden skips full mapping once a valid raw postcode proves exclusion.
    * Counted apart from `recordsSkipped` because the two mean opposite
    * things operationally: this one is the filter doing its job (the default
    * range is North Jutland alone, so most of a nationwide page is expected

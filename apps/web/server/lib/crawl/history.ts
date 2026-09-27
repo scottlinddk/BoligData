@@ -146,6 +146,14 @@ export function buildHistoryRows(
   }
 
   const transactions: HistoryRow[] = [];
+  if (listing.reported_price_change) {
+    observations.push({
+      ...common, ingest_key: key(snapshotKey, "asking_price_change", today),
+      field_name: "asking_price_change", value: listing.reported_price_change,
+      effective_date: today, date_precision: "day", method: "source_reported_price_change",
+      verification_status: "unverified", source_version: "crawl-v2",
+    });
+  }
   let quarantinedSales = 0;
   for (const sale of listing.sold_price_history ?? []) {
     const validDate = asIsoDate(sale.soldDate);

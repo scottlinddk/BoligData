@@ -9,6 +9,8 @@ import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ResearchWorkbench } from "@/components/research/workbench";
+import { WorkbookPriceReferenceCard } from "@/components/research/workbook-price-reference";
+import { useListingHistory } from "@/hooks/use-listing-history";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
@@ -92,6 +94,7 @@ export function PropertyDetailPage() {
   // An authenticated, separately rate-limited register read lets listing facts
   // render immediately and upgrade in place when each live source answers.
   const listing = detailQuery.data?.property;
+  const listingHistory = useListingHistory(listing?.id);
   const lookupQuery = useQuery({
     queryKey: ["property-lookup", listing?.id],
     queryFn: () =>
@@ -197,6 +200,7 @@ export function PropertyDetailPage() {
         <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />
       )}
 
+      <WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />
       <ResearchWorkbench property={property} facts={facts} />
 
       <div className="mt-4 flex flex-wrap gap-2">

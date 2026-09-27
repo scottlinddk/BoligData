@@ -13,6 +13,19 @@ const listing: RawListing = {
 const observedAt = "2026-09-26T10:00:00Z";
 
 describe("documented listing and sale history", () => {
+  it("dates rounded source price changes without manufacturing first-listing events", () => {
+    const input = { ...listing, reported_price_change: { currentAsking: listing.price, changePercent: -5.5 } };
+    const rows = buildHistoryRows(input, "property-1", observedAt);
+    const observation = (r: ReturnType<typeof buildHistoryRows>) => r.observations.find(o => o.field_name === "asking_price_change");
+    expect(observation(rows)).toMatchObject({ value: input.reported_price_change, effective_date: "2026-09-26",
+      method: "source_reported_price_change", verification_status: "unverified", data_mode: "real" });
+    expect(rows.events).toHaveLength(1);
+    expect(rows.episode.start_date).toBeNull();
+    expect(listingContentHash(input)).not.toBe(listingContentHash(listing));
+    expect(observation(buildHistoryRows(input, "property-1", "2026-09-26T15:00:00Z"))?.ingest_key).toBe(observation(rows)?.ingest_key);
+    expect(observation(buildHistoryRows(input, "property-1", "2026-09-27T15:00:00Z"))?.ingest_key).not.toBe(observation(rows)?.ingest_key);
+  });
+
   it("stores dated source-reported duration without inventing chronology or pricing evidence", () => {
     const withDuration = { ...listing, reported_time_on_market: { latestEpisodeDays: 464, totalDays: 700 } };
     const rows = buildHistoryRows(withDuration, "property-1", observedAt);

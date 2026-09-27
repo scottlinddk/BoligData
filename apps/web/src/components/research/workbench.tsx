@@ -5,7 +5,8 @@ import { createBuyingProject, estimateResearchPrice, summarizeResearchTransactio
 import type { Property } from "@shared/types/index";
 import type { ResearchAssessmentResponse, ResearchHistoryResponse } from "@shared/types/research-api";
 import { useAuth } from "@/hooks/use-auth";
-import { getResearchAssessment, getResearchHistory, getResearchMarketHistory, getResearchProject, saveResearchAssessment, saveResearchProject } from "@/lib/research-api";
+import { useListingHistory } from "@/hooks/use-listing-history";
+import { getResearchAssessment, getResearchMarketHistory, getResearchProject, saveResearchAssessment, saveResearchProject } from "@/lib/research-api";
 import { downloadSnapshot, newAssessment, researchDecision } from "@/lib/research-view";
 import { researchListingTime } from "@/lib/research-listing-time";
 import type { MergedPropertyFacts } from "@/lib/property-facts";
@@ -23,7 +24,7 @@ export function ResearchWorkbench({ property, facts }: { property: Property; fac
   const { user } = useAuth(); const tx = useResearchText();
   const project = useQuery({ queryKey: ["research-project", user?.id], queryFn: getResearchProject, enabled: !!user });
   const assessment = useQuery({ queryKey: ["research-assessment", user?.id, property.id], queryFn: () => getResearchAssessment(property.id), enabled: !!user });
-  const history = useQuery({ queryKey: ["research-history", user?.id, property.id], queryFn: () => getResearchHistory(property.id), enabled: !!user });
+  const history = useListingHistory(property.id);
   const market = useQuery({ queryKey: ["research-market", user?.id, property.id], queryFn: () => getResearchMarketHistory(property.id), enabled: !!user });
   if (project.isPending || assessment.isPending) return <div className="my-5 space-y-4"><ListingEvidenceOverview property={property} facts={facts} history={history.data} listing={researchListingTime(property, history.data)} /><section className="animate-pulse rounded-2xl bg-surface p-6">{tx("Henter privat boligundersøgelse…", "Loading private research…")}</section></div>;
   if (project.isError || assessment.isError) return <div className="my-5 space-y-4"><ListingEvidenceOverview property={property} facts={facts} history={history.data} listing={researchListingTime(property, history.data)} /><section className="rounded-2xl border border-warning bg-surface p-5"><h2 className="font-bold">{tx("Boligundersøgelsen kunne ikke hentes", "Research could not be loaded")}</h2><p className="my-2 text-sm">{String(project.error?.message ?? assessment.error?.message)}</p><button className={buttonClass} onClick={() => { void project.refetch(); void assessment.refetch(); }}>{tx("Prøv igen", "Retry")}</button></section></div>;

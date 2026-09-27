@@ -117,6 +117,7 @@ export function listingContentHash(l: RawListing): string {
         // Preserve provider-reported duration independently of asking price,
         // while leaving older hashes unchanged for sources without it.
         ...(l.reported_time_on_market ? [[l.reported_time_on_market.latestEpisodeDays, l.reported_time_on_market.totalDays]] : []),
+        ...(l.reported_price_change ? [["price_change", l.reported_price_change.currentAsking, l.reported_price_change.changePercent]] : []),
       ]),
     )
     .digest("hex");
