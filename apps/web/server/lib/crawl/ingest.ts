@@ -60,6 +60,8 @@ export interface IngestSourceReport {
   matrikelLookupFailed: number;
   dbErrors: number;
   errors: string[];
+  /** Individual invalid source records were excluded; valid records can proceed. */
+  mappingWarnings: string[];
   durationMs: number;
 }
 
@@ -152,6 +154,7 @@ async function ingestSource(
     matrikelLookupFailed: 0,
     dbErrors: 0,
     errors: [],
+    mappingWarnings: [],
     durationMs: 0,
   };
 
@@ -188,6 +191,7 @@ async function ingestSource(
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
   report.skippedOutOfArea = stats.recordsOutOfArea;
+  report.mappingWarnings = stats.mappingWarnings ?? [];
   for (const err of stats.errors) pushFetchError(err);
 
   // A page-fetch error (blocked, drifted API, network failure) makes the

@@ -67,6 +67,24 @@ beforeEach(() => {
 });
 
 describe("bounded ingest slices", () => {
+  it("advances valid batches while retaining invalid-record warnings and incomplete coverage", async () => {
+    const db = database();
+    const feed = result([base, { ...base, external_id: "case-2" }]);
+    feed.stats.complete = false;
+    feed.stats.recordsSkipped = 3;
+    feed.stats.mappingWarnings = ["page 3: skipped unmappable record"];
+    vi.mocked(fetchBoligsidenListings).mockResolvedValue(feed);
+    const batch = await runIngest(db.client, { offset: 0, batchSize: 1 });
+    expect(batch.ok).toBe(true);
+    expect(batch.batch?.nextOffset).toBe(1);
+    expect(batch.reports[0]).toMatchObject({ complete: false, skippedInvalid: 3, upserted: 1, mappingWarnings: feed.stats.mappingWarnings });
+    expect([...db.table("listing_events").values()].some(row => row.event_type === "removed")).toBe(false);
+    feed.stats.errors.push("page 7: source unavailable");
+    const failed = await runIngest(db.client, { offset: 1, batchSize: 1 });
+    expect(failed.ok).toBe(false);
+    expect(failed.batch?.nextOffset).toBe(1);
+  });
+
   it("deduplicates and sorts before heavy work, covering every identity across batches", async () => {
     const db = database();
     const records = ["c", "a", "b", "a", "e", "d"].map((external_id) => ({ ...base, external_id, address: external_id }));

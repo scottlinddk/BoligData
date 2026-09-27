@@ -39,6 +39,9 @@ export interface RawListing {
    * sources that don't carry it (Boliga) and for fixture data.
    */
   sold_price_history: SoldPriceEntry[];
+  /** Provider-reported durations, observed as-is. They do not document a
+   * calendar start date or independently establish continuous active time. */
+  reported_time_on_market?: { latestEpisodeDays: number | null; totalDays: number | null };
 }
 
 export interface SourceCrawlStats {
@@ -60,8 +63,11 @@ export interface SourceCrawlStats {
    * records" on a run that was in fact healthy.
    */
   recordsOutOfArea: number;
-  /** Non-fatal error summaries, bounded to the first few. */
+  /** Source/page failure summaries; these block successful batch progress. */
   errors: string[];
+  /** Individual invalid records were skipped; valid records can still be
+   * ingested. Distinct from source/page failures that block batch progress. */
+  mappingWarnings?: string[];
 }
 
 export interface SourceCrawlResult {

@@ -119,6 +119,7 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
  */
 export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
   const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
+  const mappingWarnings: string[] = [];
   const stats: SourceCrawlStats = {
     source: "boliga",
     complete: false,
@@ -128,6 +129,7 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     recordsSkipped: 0,
     recordsOutOfArea: 0,
     errors: [],
+    mappingWarnings,
   };
 
   const zipRanges = getZipRanges();
@@ -194,8 +196,8 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
       const listing = mapBoligaRecord(record);
       if (listing === null) {
         stats.recordsSkipped += 1;
-        if (stats.errors.length < MAX_ERRORS_REPORTED) {
-          stats.errors.push(`page ${page}: skipped unmappable record`);
+        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+          mappingWarnings.push(`page ${page}: skipped unmappable record`);
         }
         continue;
       }
