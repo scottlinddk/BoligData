@@ -25,7 +25,7 @@ it("verifies stored comparisons without calling unavailable live data an empty m
     }; return query;
   } }; } } as unknown as SupabaseClient;
   const result = await verifyCrawlData(client);
-  expect(result.targetMarket).toMatchObject({ sourceStatus: "unavailable", sourceFailure: "http_403", population: "stored_listing_sales", transactions: 2, eligibleSales: 2, baselinePrice: null });
+  expect(result.targetMarket).toMatchObject({ sourceStatus: "unavailable", sourceFailure: "http_403", population: "stored_listing_sales", transactions: 2, eligibleSales: 2, baselinePrice: 2_500_000 });
   const marketRead = requests.find(row => row.columns.includes("properties!inner"));
   expect(marketRead?.filters).toContainEqual(["owner_id", null]);
   expect(marketRead?.filters).toContainEqual(["data_mode", "real"]);

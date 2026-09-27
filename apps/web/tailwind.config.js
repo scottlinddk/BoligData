@@ -6,8 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Inter"', "system-ui", "sans-serif"],
-        // Legacy heading call sites share the same readable sans-serif face.
-        serif: ['"Inter"', "system-ui", "sans-serif"],
+        serif: ['"DM Serif Display"', "Georgia", "serif"],
         mono: ["ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
@@ -36,6 +35,11 @@ export default {
           hover: "var(--color-brand-hover)",
           soft: "var(--color-brand-soft)",
           text: "var(--color-brand-text)",
+        },
+        accent: {
+          DEFAULT: "var(--color-accent)",
+          hover: "var(--color-accent-hover)",
+          text: "var(--color-accent-text)",
         },
         success: {
           DEFAULT: "var(--color-success)",

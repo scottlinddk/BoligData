@@ -4,8 +4,8 @@ import { parseResearchDay } from "./history.js";
 import { historicalReferencePrice, researchPriceFall } from "./prices.js";
 import { RESEARCH_DAY_GROUPS, researchDays, researchDistribution, summarizeResearchTransactions } from "./statistics.js";
 
-export const RESEARCH_PRICE_METHOD_VERSION = "matched-sale-price-reference/1.0";
-export const RESEARCH_PRICE_MINIMUM_SALES = 5;
+export const RESEARCH_PRICE_METHOD_VERSION = "matched-sale-price-reference/2.0";
+export const RESEARCH_PRICE_MINIMUM_SALES = 1;
 
 export interface ResearchPriceSubject {
   propertyId: string;
@@ -237,11 +237,11 @@ export function estimateResearchPrice(input: ResearchPriceEstimateInput): Resear
       medianTotalFallPercent: pairSampleSufficient ? totalFall.median : null,
     };
     if (!documentedFirst) warnings.push(issue("missing_first_asking", "En dokumenteret første udbudspris i det aktuelle forløb mangler. Historisk samlet prisfald anvendes ikke på dagens udbud.", "A documented first asking price in the current campaign is missing. Historical total price falls are not applied to today's asking price."));
-    else if (!pairSampleSufficient) warnings.push(issue("insufficient_first_asking_pairs", `Kun ${pricePairRows.length} handler i tidsgruppen har dokumenterede første-/salgsprispar; mindst 5 kræves til den særskilte prisfaldsreference.`, `Only ${pricePairRows.length} time-matched sales have documented first-asking/sale-price pairs; at least 5 are needed for the separate price-fall reference.`));
+    else if (!pairSampleSufficient) warnings.push(issue("insufficient_first_asking_pairs", "Ingen handler i tidsgruppen har dokumenterede første-/salgsprispar til den særskilte prisfaldsreference.", "No time-matched sales have documented first-asking/sale-price pairs for the separate price-fall reference."));
     else if (pricePairRows.length < 10) warnings.push(issue("thin_first_asking_sample", `Prisfaldsreferencen bygger på et spinkelt grundlag på ${pricePairRows.length} handler.`, `The price-fall reference uses a thin sample of ${pricePairRows.length} sales.`));
-    if (timeGroup && primary.count < RESEARCH_PRICE_MINIMUM_SALES) noDataReasons.push(issue("insufficient_time_group_sales", `Kun ${primary.count} forskellige handler matcher boligen og tidsgruppen; mindst 5 kræves før en prisreference vises.`, `Only ${primary.count} unique transactions match the property and time group; at least 5 are required before publishing a price reference.`));
+    if (timeGroup && primary.count < RESEARCH_PRICE_MINIMUM_SALES) noDataReasons.push(issue("insufficient_time_group_sales", "Ingen brugbare handler matcher boligen og tidsgruppen. Se det særskilte grundlag uden tidsfilter.", "No usable sales match the property and time group. See the separate reference without time matching."));
     else if (primary.count >= RESEARCH_PRICE_MINIMUM_SALES && primary.count < 10) warnings.push(issue("thin_time_group_sample", `Tidsgruppens prisreference bygger på et spinkelt grundlag på ${primary.count} handler.`, `The time-matched price reference uses a thin sample of ${primary.count} sales.`));
-    if (baseline.count < RESEARCH_PRICE_MINIMUM_SALES) warnings.push(issue("insufficient_baseline_sales", `Udvalget uden tidsfilter har kun ${baseline.count} brugbare handler; en prisreference kræver mindst 5.`, `The selection without time matching has only ${baseline.count} usable sales; a price reference requires at least 5.`));
+    if (baseline.count < RESEARCH_PRICE_MINIMUM_SALES) warnings.push(issue("insufficient_baseline_sales", "Udvalget uden tidsfilter har ingen brugbare handler.", "The selection without time matching has no usable sales."));
     else if (baseline.count < 10) warnings.push(issue("thin_baseline_sample", `Sammenligningen uden tidsfilter bygger på et spinkelt grundlag på ${baseline.count} handler.`, `The reference without time matching uses a thin sample of ${baseline.count} sales.`));
     if (baseline.propertyCount < baseline.count || primary.propertyCount < primary.count) warnings.push(issue("repeated_property_sales", "Flere handler vedrører samme ejendom. Antallet af handler er derfor større end antallet af forskellige ejendomme.", "Some transactions concern the same property. The transaction count therefore exceeds the number of distinct properties."));
     if (excluded.some(entry => entry.code === "area_not_at_sale")) warnings.push(issue("historical_area_missing", "Handler uden dokumenteret boligareal på salgstidspunktet er udeladt fra begge prisreferencer.", "Sales without documented residential area at the time of sale are excluded from both price references."));

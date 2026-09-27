@@ -41,8 +41,9 @@ timestamp is used, so output is deterministic. The expected source SHA-256 is
 The reference prefers the **documented first asking price**, multiplied by one minus
 the median **total** price fall from first asking to eventual sale in the relevant
 latest-episode duration bracket. Each trade has equal weight. The result is
-rounded to the nearest DKK 50,000. Q3 of the historical discount produces the lower
-price; Q1 produces the upper price. Sales above asking retain negative discounts.
+rounded to the nearest DKK 10,000. The original workbook used DKK 50,000;
+that source setting is retained separately as `sourceRoundingDkk`. Q3 of the
+historical discount produces the lower price; Q1 produces the upper price. Sales above asking retain negative discounts.
 The gap is current asking minus the reference; its percentage uses current asking
 as denominator and can be negative.
 
@@ -57,23 +58,28 @@ conflicting latest source evidence, relisted campaigns and future observations
 prevent this fallback.
 
 The workbook example, 188 days with first asking DKK 5.5m and current asking DKK
-5.2m, falls in the 181–240 day group (22 trades). It gives DKK **4.8m**, an
-interquartile price range of **4.65–5.1m**, and a current-price gap of **400,000**
-(7.69%). The detailed 181–210 day group has only nine trades; the application uses
-the ten pooled groups instead.
+5.2m, falls in the 181–240 day group (22 trades). With the application's 10,000-kr
+rounding it gives DKK **4.81m**, an interquartile price range of **4.66–5.08m**,
+and a current-price gap of **390,000** (7.5%). The detailed 181–210 day group has
+only nine trades; the application uses the ten pooled groups instead.
 
 The calculator requires at least 15 trades and stays within the observed **2–797
 days**, even though the last bracket is labelled 366+. Day inputs must be whole
 numbers. Missing first asking, missing latest-episode days, insufficient samples,
-invalid models, unsupported property types and unsupported/unknown postcodes
-produce explicit unavailable results. It never substitutes today's asking price,
-cumulative active days, a technical first-seen date or an unknown property type.
+and invalid models produce explicit unavailable results. If the first asking
+price is missing but time is known, the observed discount and transaction count
+remain visible without a made-up price. All historical groups are available in
+the evidence disclosure for every listing. It never substitutes today's asking
+price, cumulative active days or a technical first-seen date for missing inputs.
 
 These are selected **villa** trades from the original **Aalborg/Hasseris map
-area**. The calculator restricts display to villas in postcode 9000 as a coarse
-scope check. The original polygon is unavailable, so postcode eligibility does
-not establish that a house was inside that selected area. This is not all Aalborg
-sales or a national model. It does not match on condition, floor area, plot or
+area**. Villas in postcode 9000 match this coarse sample scope; other or unknown
+types/postcodes receive an explicitly labelled **broad historical scenario**.
+There is no minimum number of local comparable sales for this workbook scenario.
+The original polygon is unavailable, so matching the postcode does not establish
+that a house was inside that selected area. This is not all Aalborg sales or a
+national model, and the sample never claims to be locally matched sales for other
+areas or property types. It does not match on condition, floor area, plot or
 precise location; 2026 is incomplete. First asking and latest episode can describe
 different listing periods. The interquartile range describes historical price
 falls, not uncertainty about this home's market value.

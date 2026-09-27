@@ -15,7 +15,8 @@
     "minimumSample": 15,
     "observedMinDays": 2,
     "observedMaxDays": 797,
-    "roundingDkk": 50000,
+    "roundingDkk": 10000,
+    "sourceRoundingDkk": 50000,
     "saleYears": {
       "from": 2024,
       "to": 2026
@@ -27,7 +28,7 @@
       "9000"
     ],
     "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
-    "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 50.000 kr.",
+    "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 10.000 kr.",
     "limitations": [
       "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
       "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",

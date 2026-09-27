@@ -40,8 +40,8 @@ function NumberField({
 export function FilterFields({
   filters,
   onChange,
-  fieldLabelClassName = "flex flex-col gap-1.5 text-xs font-bold text-ink-soft",
-  fieldInputClassName = "rounded-full border border-border bg-paper px-3 py-2 text-[13px] font-medium text-ink placeholder:text-ink-faint",
+  fieldLabelClassName = "flex min-w-0 flex-col gap-2 text-xs font-medium text-ink-soft",
+  fieldInputClassName = "w-full min-w-0 rounded-xl border border-border bg-surface px-3.5 py-3 text-sm font-normal text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft",
 }: FilterFieldsProps) {
   const { t } = useI18n();
   const label = fieldLabelClassName;
@@ -49,7 +49,7 @@ export function FilterFields({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="col-span-full grid grid-cols-2 gap-3">
         <label className={label}>
           {t("filters.location")}
           <input
@@ -73,16 +73,16 @@ export function FilterFields({
         </label>
       </div>
 
-      <fieldset className={label}>
-        <legend className="mb-1">{t("filters.propertyType")}</legend>
-        <div className="flex flex-wrap gap-1.5">
+      <fieldset className={`col-span-full ${label}`}>
+        <legend className="mb-3">{t("filters.propertyType")}</legend>
+        <div className="flex flex-wrap gap-2">
           {PROPERTY_TYPE_OPTIONS.map((type) => {
             const checked = filters.propertyTypes?.includes(type) ?? false;
             return (
               <label
                 key={type}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium normal-case tracking-normal ${
-                  checked ? "border-cta bg-cta text-cta-text" : "border-border bg-paper text-ink"
+                className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium normal-case tracking-normal transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand ${
+                  checked ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-ink hover:bg-surface-hover"
                 }`}
               >
                 <input
@@ -104,7 +104,7 @@ export function FilterFields({
         </div>
       </fieldset>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="col-span-full grid grid-cols-2 gap-x-3 gap-y-4">
         <NumberField
           label={t("filters.minPrice")}
           value={filters.minPrice}

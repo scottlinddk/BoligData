@@ -1,8 +1,7 @@
 export function BrandMark({ className = "h-7 w-7", cutoutColor = "var(--color-surface)" }: { className?: string; cutoutColor?: string }) {
   return <svg viewBox="0 0 32 32" className={className} fill="none" aria-hidden="true">
-    <path d="M3 16.5 16 4l13 12.5" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M7.5 15v13h6v-8h5v8h6V15L16 7Z" fill="currentColor" />
-    <path d="M22.5 5.5v6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    <path d="M14 14h4" stroke={cutoutColor} strokeWidth="2.5" strokeLinecap="round" />
+    <path d="m3 14 13-10 13 10M7.5 12v15h6v-8h5v8h6V12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M22.5 5.5v3M12.5 12.5h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="16" cy="12.5" r="1.6" fill={cutoutColor} stroke="currentColor" strokeWidth="1.5" />
   </svg>;
 }
