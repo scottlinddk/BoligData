@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertRunnerDatabaseConfiguration, configureRunner } from "./runner-config.js";
+import { assertRunnerDatabaseConfiguration, configureRunner, runnerOutcome } from "./runner-config.js";
+import type { IngestSourceReport } from "./ingest.js";
 
 afterEach(() => vi.unstubAllEnvs());
 describe("manual runner configuration", () => {
@@ -47,5 +48,46 @@ describe("manual runner configuration", () => {
     expect(JSON.stringify(configureRunner(false))).not.toContain("private-test-key");
     vi.stubEnv("SUPABASE_URL", undefined);
     expect(() => assertRunnerDatabaseConfiguration()).toThrow("VITE_SUPABASE_URL");
+  });
+});
+
+describe("weekly runner", () => {
+  it("selects live Boligsiden, removes mock modes, and keeps the configured region and pacing", () => {
+    for (const name of Object.keys(configureRunner(false).mockFlags)) vi.stubEnv(name, "true");
+    vi.stubEnv("CRAWL_SOURCES", "boliga");
+    vi.stubEnv("CRAWL_MAX_PAGES", "3");
+    vi.stubEnv("CRAWL_MAX_LISTINGS", "300");
+    vi.stubEnv("CRAWL_PAGE_SIZE", "100");
+    vi.stubEnv("CRAWL_DELAY_MS", "750");
+    vi.stubEnv("CRAWL_CONCURRENCY", "4");
+    vi.stubEnv("CRAWL_ZIP_RANGES", "9000-9900,6000-6100");
+    const result = configureRunner(false, true);
+    expect(process.env.CRAWL_SOURCES).toBe("boligsiden");
+    expect(result).toMatchObject({ weekly: true, fullScan: true, maximumRecordsPerSource: 50_000 });
+    expect(result.effectiveCaps).toMatchObject({ CRAWL_MAX_PAGES: 1000, CRAWL_MAX_LISTINGS: 50_000,
+      CRAWL_PAGE_SIZE: 100, CRAWL_DELAY_MS: 750, CRAWL_CONCURRENCY: 4 });
+    expect(Object.values(result.mockFlags).every((value) => value === false)).toBe(true);
+    expect(result.zipRanges).toEqual([{ min: 9000, max: 9900 }, { min: 6000, max: 6100 }]);
+  });
+
+  const sourceReport = (overrides: Partial<IngestSourceReport> = {}): IngestSourceReport => ({
+    source: "boligsiden", ok: true, complete: true, dataMode: "real", quarantinedSales: 0,
+    fetched: 100, upserted: 100, created: 0, skippedInvalid: 0, skippedOutOfArea: 0, enriched: 0,
+    enrichSkippedUnchanged: 100, cadastralLookupFailed: 0, matrikelLookupFailed: 0,
+    dbErrors: 0, errors: [], mappingWarnings: [], durationMs: 100, ...overrides,
+  });
+
+  it("fails a capped scan or excluded records even when saved observations are valid", () => {
+    const result = { ok: true, reports: [sourceReport({ complete: false })] };
+    expect(runnerOutcome(result, true)).toEqual({ ok: false, complete: false, incompleteSources: ["boligsiden"] });
+    // A deliberately bounded routine refresh remains allowed to process a subset.
+    expect(runnerOutcome(result, false).ok).toBe(true);
+  });
+
+  it("requires real, complete, successful data and never treats an empty report as success", () => {
+    expect(runnerOutcome({ ok: true, reports: [sourceReport()] }, true).ok).toBe(true);
+    expect(runnerOutcome({ ok: true, reports: [sourceReport({ dataMode: "mock" })] }, true).ok).toBe(false);
+    expect(runnerOutcome({ ok: false, reports: [sourceReport({ dbErrors: 1 })] }, true).ok).toBe(false);
+    expect(runnerOutcome({ ok: true, reports: [] }, true).ok).toBe(false);
   });
 });

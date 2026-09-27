@@ -1,0 +1,171 @@
+{
+  "metadata": {
+    "version": "workbook-liggetid/2026-09-27",
+    "sourceFilename": "02-Boligsalg_liggetidsintervaller_2026-09-27-1-.xlsx",
+    "sourceSha256": "b78c3020fe41bac9523cc3972e639c5231da73231c6748020834a8b2f892fab1",
+    "snapshotDate": "2026-09-27",
+    "collectedFrom": "2026-09-23",
+    "collectedTo": "2026-09-24",
+    "sourceSheets": {
+      "records": "Grunddata!A7:AB443",
+      "brackets": "Intervaller!B10:K19"
+    },
+    "rowCount": 437,
+    "eligibleCount": 281,
+    "minimumSample": 15,
+    "observedMinDays": 2,
+    "observedMaxDays": 797,
+    "roundingDkk": 50000,
+    "saleYears": {
+      "from": 2024,
+      "to": 2026
+    },
+    "propertyTypes": [
+      "villa"
+    ],
+    "postalCodes": [
+      "9000"
+    ],
+    "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
+    "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 50.000 kr.",
+    "limitations": [
+      "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
+      "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",
+      "Første udbud og seneste liggetid kan dække forskellige perioder; genudbud kan nulstille liggetiden.",
+      "Udvalget er ikke matchet på stand, areal, grund eller præcis beliggenhed. 2026 er ufuldstændigt.",
+      "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig."
+    ]
+  },
+  "brackets": [
+    {
+      "sourceRange": "Intervaller!B10:K10",
+      "label": "0–14",
+      "count": 54,
+      "medianDiscountFraction": 0.009191736396050958,
+      "meanDiscountFraction": 0.021340125723446162,
+      "q1DiscountFraction": 0,
+      "q3DiscountFraction": 0.03081874072291,
+      "sensitivityCount": 47,
+      "sensitivityMedianDiscountFraction": 0.006622516556291391,
+      "fromDays": 0,
+      "toDays": 14
+    },
+    {
+      "sourceRange": "Intervaller!B11:K11",
+      "label": "15–30",
+      "count": 25,
+      "medianDiscountFraction": 0.03822098679638638,
+      "meanDiscountFraction": 0.016435792957066053,
+      "q1DiscountFraction": 0.00645161290323,
+      "q3DiscountFraction": 0.05943238731219,
+      "sensitivityCount": 22,
+      "sensitivityMedianDiscountFraction": 0.03341627524294883,
+      "fromDays": 15,
+      "toDays": 30
+    },
+    {
+      "sourceRange": "Intervaller!B12:K12",
+      "label": "31–60",
+      "count": 36,
+      "medianDiscountFraction": 0.05054744525547446,
+      "meanDiscountFraction": 0.06500337650722106,
+      "q1DiscountFraction": 0.02902902902903,
+      "q3DiscountFraction": 0.0906559371452,
+      "sensitivityCount": 24,
+      "sensitivityMedianDiscountFraction": 0.031852302698316085,
+      "fromDays": 31,
+      "toDays": 60
+    },
+    {
+      "sourceRange": "Intervaller!B13:K13",
+      "label": "61–90",
+      "count": 41,
+      "medianDiscountFraction": 0.05277401894451962,
+      "meanDiscountFraction": 0.06976880266380005,
+      "q1DiscountFraction": 0.03722721437741,
+      "q3DiscountFraction": 0.09090909090909,
+      "sensitivityCount": 34,
+      "sensitivityMedianDiscountFraction": 0.05075746360720454,
+      "fromDays": 61,
+      "toDays": 90
+    },
+    {
+      "sourceRange": "Intervaller!B14:K14",
+      "label": "91–120",
+      "count": 22,
+      "medianDiscountFraction": 0.08521660598475367,
+      "meanDiscountFraction": 0.10354475194470301,
+      "q1DiscountFraction": 0.04919174877158,
+      "q3DiscountFraction": 0.14734759972123,
+      "sensitivityCount": 16,
+      "sensitivityMedianDiscountFraction": 0.05092351938026912,
+      "fromDays": 91,
+      "toDays": 120
+    },
+    {
+      "sourceRange": "Intervaller!B15:K15",
+      "label": "121–150",
+      "count": 24,
+      "medianDiscountFraction": 0.10880927884231073,
+      "meanDiscountFraction": 0.11721262778313875,
+      "q1DiscountFraction": 0.0577303795944,
+      "q3DiscountFraction": 0.14975607756324,
+      "sensitivityCount": 17,
+      "sensitivityMedianDiscountFraction": 0.09415971394517282,
+      "fromDays": 121,
+      "toDays": 150
+    },
+    {
+      "sourceRange": "Intervaller!B16:K16",
+      "label": "151–180",
+      "count": 19,
+      "medianDiscountFraction": 0.10693970420932879,
+      "meanDiscountFraction": 0.10243683620432535,
+      "q1DiscountFraction": 0.05494692949204,
+      "q3DiscountFraction": 0.14143863241976,
+      "sensitivityCount": 13,
+      "sensitivityMedianDiscountFraction": 0.0878754171301446,
+      "fromDays": 151,
+      "toDays": 180
+    },
+    {
+      "sourceRange": "Intervaller!B17:K17",
+      "label": "181–240",
+      "count": 22,
+      "medianDiscountFraction": 0.12498525112419209,
+      "meanDiscountFraction": 0.11226254150437259,
+      "q1DiscountFraction": 0.07626582122569,
+      "q3DiscountFraction": 0.15206508135169,
+      "sensitivityCount": 19,
+      "sensitivityMedianDiscountFraction": 0.10198845413726748,
+      "fromDays": 181,
+      "toDays": 240
+    },
+    {
+      "sourceRange": "Intervaller!B18:K18",
+      "label": "241–365",
+      "count": 22,
+      "medianDiscountFraction": 0.13248990398932742,
+      "meanDiscountFraction": 0.15204510313007577,
+      "q1DiscountFraction": 0.09322978417668,
+      "q3DiscountFraction": 0.18885434968689,
+      "sensitivityCount": 12,
+      "sensitivityMedianDiscountFraction": 0.1418138615773969,
+      "fromDays": 241,
+      "toDays": 365
+    },
+    {
+      "sourceRange": "Intervaller!B19:K19",
+      "label": "366+",
+      "count": 16,
+      "medianDiscountFraction": 0.10872597284181096,
+      "meanDiscountFraction": 0.13252488973911483,
+      "q1DiscountFraction": 0.08360537706373,
+      "q3DiscountFraction": 0.14074971316207,
+      "sensitivityCount": 11,
+      "sensitivityMedianDiscountFraction": 0.10344827586206896,
+      "fromDays": 366,
+      "toDays": 99999
+    }
+  ]
+}

@@ -1,16 +1,18 @@
-name: Daily property crawl
+name: Property refresh (daily and weekly)
 
 on:
   schedule:
     # 03:00 UTC daily — off-peak, well before the Danish business day starts.
     - cron: "0 3 * * *"
+    # Monday 04:17 UTC: refresh older listings across the entire postcode scope.
+    - cron: "17 4 * * 1"
   workflow_dispatch:
     inputs:
       mode:
-        description: "Batched API crawl, optional runner refresh, or read-only API verification"
+        description: "Daily API crawl, full weekly Boligsiden refresh, optional runner, or read-only verification"
         type: choice
         default: api
-        options: [api, runner, verify]
+        options: [api, weekly, runner, verify]
       start_offset:
         description: "API batch offset to resume (0 starts from the beginning)"
         type: number
@@ -22,7 +24,7 @@ on:
 
 jobs:
   crawl:
-    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'api' || inputs.mode == 'verify'
+    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'api' || inputs.mode == 'verify'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -39,9 +41,9 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
   runner:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'runner'
+    if: github.event.schedule == '17 4 * * 1' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'runner' || inputs.mode == 'weekly'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 180
     concurrency:
       group: boligdata-crawl-production
       cancel-in-progress: false
@@ -69,6 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           args=()
+          if [ "$RUN_WEEKLY" = "true" ]; then args+=(--weekly); fi
           if [ "$RUN_FULL_SCAN" = "true" ]; then args+=(--full-scan); fi
           # Vercel does not export protected production values. Optional runner
           # secrets take precedence over the downloaded placeholders.
@@ -78,6 +81,7 @@ jobs:
           node --env-file=.vercel/.env.production.local apps/web/.crawl-build/apps/web/server/lib/crawl/run-cli.js "${args[@]}"
         env:
           RUN_FULL_SCAN: ${{ inputs.full_scan }}
+          RUN_WEEKLY: ${{ github.event.schedule == '17 4 * * 1' || inputs.mode == 'weekly' }}
           RUNNER_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           RUNNER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RUNNER_DATAFORDELER_API_KEY: ${{ secrets.DATAFORDELER_API_KEY }}

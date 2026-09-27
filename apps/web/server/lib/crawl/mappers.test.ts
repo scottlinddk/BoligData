@@ -84,6 +84,16 @@ describe("mapBoligaRecord", () => {
 });
 
 describe("mapBoligsidenCase", () => {
+  it("retains signed rounded asking-price changes as source evidence, never a first price", () => {
+    for (const changePercent of [-9.26, 0, 3.13]) {
+      expect(mapBoligsidenCase({ ...boligsidenCase, priceChangePercentage: changePercent })?.reported_price_change)
+        .toEqual({ currentAsking: 3_200_000, changePercent });
+    }
+    for (const value of [null, undefined, "-5", NaN, Infinity, -100, -101]) {
+      expect(mapBoligsidenCase({ ...boligsidenCase, priceChangePercentage: value })).not.toHaveProperty("reported_price_change");
+    }
+  });
+
   it("retains live reported durations without deriving a listing date", () => {
     const mapped = mapBoligsidenCase({ ...boligsidenCase, status: "open", timeOnMarket: { current: { days: 464 }, total: { days: 700 } } });
     expect(mapped?.reported_time_on_market).toEqual({ latestEpisodeDays: 464, totalDays: 700 });
