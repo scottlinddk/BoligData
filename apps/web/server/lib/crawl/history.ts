@@ -14,6 +14,56 @@ export interface PreviousListingObservation {
 type HistoryRow = Record<string, unknown>;
 const key = (...parts: unknown[]) => createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 
+function conflictingSaleEvidence(existing: HistoryRow, incoming: HistoryRow): boolean {
+  for (const field of ["residential_area", "first_asking_price", "last_asking_price", "latest_episode_days", "documented_active_days", "calendar_days"]) {
+    if (existing[field] != null && incoming[field] != null && Number(existing[field]) !== Number(incoming[field])) return true;
+  }
+  if (existing.area_definition && incoming.area_definition && existing.area_definition !== "unknown" && incoming.area_definition !== "unknown" && existing.area_definition !== incoming.area_definition) return true;
+  return existing.area_as_of != null && incoming.area_as_of != null && existing.area_as_of !== incoming.area_as_of;
+}
+
+/** The database also deduplicates a documented trade by property/date/price/
+ * type, independently of registration ID. An upstream ID can change or first
+ * appear later. Keep every source observation, but reuse an exactly equivalent
+ * normalized trade rather than treating that secondary constraint as failure.
+ * A different property, scope, price/type or provenance is never equivalent. */
+async function persistSaleTransactions(client: SupabaseClient, transactions: HistoryRow[]): Promise<string[]> {
+  const write = (values: HistoryRow[]) => client.from("sale_transactions")
+    .upsert(values, { onConflict: "ingest_key", ignoreDuplicates: true });
+  const { error } = await write(transactions);
+  if (!error) return [];
+  if (error.code !== "23505") return [`sale_transactions: ${error.message}`];
+
+  // A failed INSERT statement is atomic. Retry each member so one alternate
+  // registration identity cannot prevent unrelated valid trades from saving.
+  const errors: string[] = [];
+  for (const transaction of transactions) {
+    const retry = await write([transaction]);
+    if (!retry.error) continue;
+    if (retry.error.code !== "23505") {
+      errors.push(`sale_transactions: ${retry.error.message}`);
+      continue;
+    }
+    let match = client.from("sale_transactions").select("id,residential_area,area_definition,area_as_of,first_asking_price,last_asking_price,latest_episode_days,documented_active_days,calendar_days")
+      .eq("property_id", transaction.property_id)
+      .eq("sold_date", transaction.sold_date)
+      .eq("date_precision", transaction.date_precision)
+      .eq("sale_price", transaction.sale_price)
+      .eq("sale_type", transaction.sale_type)
+      .eq("data_mode", transaction.data_mode);
+    match = transaction.owner_id == null ? match.is("owner_id", null) : match.eq("owner_id", transaction.owner_id);
+    const existing = await match.limit(1).maybeSingle();
+    if (existing.error || !existing.data) {
+      // Do not ignore arbitrary 23505 failures, and never let a mock/legacy or
+      // privately imported row stand in for newly observed public real data.
+      errors.push(`sale_transactions: ${existing.error?.message ?? retry.error.message}`);
+    } else if (conflictingSaleEvidence(existing.data, transaction)) {
+      errors.push("sale_transactions: conflicting area, asking price or duration evidence for an existing trade");
+    }
+  }
+  return errors;
+}
+
 /** A sale registration is independent of the current listing campaign. Do not
  * attach past sales to the current asking price, room count or description. */
 export function buildHistoryRows(
@@ -150,6 +200,10 @@ export async function persistHistoryRows(client: SupabaseClient, rows: ReturnTyp
     if (values.length === 0) continue;
     // Duplicate registrations in one payload must not trigger Postgres 21000.
     const unique = [...new Map(values.map((row) => [row.ingest_key, row])).values()];
+    if (table === "sale_transactions") {
+      errors.push(...await persistSaleTransactions(client, unique));
+      continue;
+    }
     const { error } = await client.from(table).upsert(unique, { onConflict: "ingest_key", ignoreDuplicates });
     if (error) errors.push(`${table}: ${error.message}`);
   }

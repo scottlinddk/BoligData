@@ -1,15 +1,17 @@
 import { estimateResearchPrice, type ResearchTimeDefinition } from "@shared/analysis";
 import type { Property } from "@shared/types/index";
+import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import type { researchListingTime } from "@/lib/research-listing-time";
 import { buttonClass, Field, inputClass, Money, Panel, Percent, useResearchText } from "./fields";
 
 type PriceReference = ReturnType<typeof estimateResearchPrice>;
 type ListingTime = ReturnType<typeof researchListingTime>;
 
-export function PriceReferencePanel({ result, property, listing, definition, onDefinition, onUsePrice, loading, failed }: {
+export function PriceReferencePanel({ result, property, listing, definition, onDefinition, onUsePrice, loading, failed, scope }: {
   result: PriceReference; property: Property; listing: ListingTime; definition: ResearchTimeDefinition;
   onDefinition: (value: ResearchTimeDefinition) => void; onUsePrice: (value: number) => void;
   loading: boolean; failed: boolean;
+  scope?: ResearchHistoryResponse["marketScope"];
 }) {
   const tx = useResearchText();
   const usingBaseline = result.primary.median === null && result.baseline.median !== null;
@@ -32,6 +34,7 @@ export function PriceReferencePanel({ result, property, listing, definition, onD
     {loading ? <p role="status" className="text-sm text-ink-soft">{tx("Henter handler og udbudsforløb…", "Loading sales and listing history…")}</p>
       : failed ? <p role="status" className="text-sm text-warning">{tx("Prisgrundlaget kunne ikke hentes. Genindlæs siden for at prøve igen.", "The price evidence could not be loaded. Reload the page to try again.")}</p>
       : <>
+        {scope?.population === "registered_postal_sales" && <p className="mb-4 text-sm text-ink-soft">{tx("Boligsidens registrerede salg i postnummer", "Boligsiden's registered sales in postal code")} {scope.postalCode}. {tx("Udvalget omfatter også boliger, som ikke er til salg nu. Det er et begrænset udsnit af nyligt registrerede handler.", "The selection includes homes that are no longer for sale. It is a bounded sample of recently registered sales.")}</p>}
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <p className="text-sm text-ink-soft">{usingBaseline ? tx("Prisreference uden match på liggetid", "Price reference without time matching") : tx("Vejledende pris for denne bolig", "Indicative price for this property")}</p>

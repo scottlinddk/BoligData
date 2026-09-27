@@ -31,7 +31,7 @@ request() {
 
 if [ "${RUN_MODE:-api}" = "verify" ]; then
   request '{"mode":"verify"}'
-  jq '{counts, targetFound, samples}' response.json
+  jq '{counts, targetFound, samples, targetMarket}' response.json
   exit 0
 fi
 
@@ -64,7 +64,7 @@ for ((batch=1; batch<=625; batch++)); do
   echo "Batch $batch completed; offset=$offset total=$total next=$next"
   if [ "$next" = "null" ]; then
     request '{"mode":"verify"}'
-    jq '{counts, targetFound, samples}' response.json
+    jq '{counts, targetFound, samples, targetMarket}' response.json
     exit 0
   fi
   if ! [[ "$next" =~ ^[0-9]+$ ]] || ((next <= offset || next > 50000)); then

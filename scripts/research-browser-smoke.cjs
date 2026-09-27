@@ -1,7 +1,7 @@
 /* Run against a local Vite server: node scripts/research-browser-smoke.cjs
  * Every API, Supabase, map and external request is mocked or blocked. No production login or write occurs.
  * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL, SMOKE_OUTPUT_DIR and SMOKE_THEME can override local defaults.
- * SMOKE_SCENARIO=sparse covers fresh accounts and missing/partial evidence.
+ * SMOKE_SCENARIO=sparse covers fresh accounts; saved-empty covers a saved project without assessable results.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -14,8 +14,9 @@ assert(["127.0.0.1", "localhost"].includes(new URL(baseUrl).hostname), "Only a l
 const theme = process.env.SMOKE_THEME || "light";
 assert(["light", "dark"].includes(theme), "SMOKE_THEME must be light or dark");
 const scenario = process.env.SMOKE_SCENARIO || "complete";
-assert(["complete", "sparse"].includes(scenario), "SMOKE_SCENARIO must be complete or sparse");
-const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${scenario === "sparse" ? "-sparse" : ""}${theme === "dark" ? "-dark" : ""}`);
+assert(["complete", "sparse", "saved-empty"].includes(scenario), "SMOKE_SCENARIO must be complete, sparse or saved-empty");
+const sparseEvidence = scenario !== "complete";
+const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${sparseEvidence ? `-${scenario}` : ""}${theme === "dark" ? "-dark" : ""}`);
 fs.mkdirSync(outputDir, { recursive: true });
 let playwright;
 try { playwright = require(process.env.PLAYWRIGHT_MODULE || "playwright"); }
@@ -51,6 +52,10 @@ let assessment = {
   budgetItems: [cost("fees", "Handel", 150_000, "transaction"), cost("work", "Arbejder", 650_000, "necessary_work"), cost("reserve", "Reserve", 200_000, "reserve")],
   selectedPurchasePrice: null, questions: [{ id: "q1", text: "Kan I sende den godkendte plantegning?", resolved: false }], notes: "Privat testnote — må ikke indgå i mæglerudkast", comparables: [], documents: [], brokerDraft: "", budgetScenario: "base",
 };
+if (scenario === "saved-empty") {
+  project = { ...project, name: "Mit gemte boligprojekt", totalBudget: 6_400_000 };
+  assessment = { ...assessment, legalBedrooms: null, bedroomEvidence: "unknown", bedroomSource: "", residentialArea: null, areaEvidence: "unknown", areaSource: "", budgetItems: assessment.budgetItems.map(item => ({ ...item, low: null, high: null })), notes: "Tidligere gemt note om taget", documents: [], comparables: [] };
+}
 const transactions = Array.from({ length: 6 }, (_, i) => ({
   id: `transaction-${i}`, transactionIdentity: `verified-transaction-${i}`, propertyId: `00000000-0000-4000-8000-${String(i + 10).padStart(12, "0")}`, unitId: null, address: `Referencevej ${i + 1}, Aalborg`,
   municipality: "Aalborg", postalCode: "9000", propertyType: "villa", saleType: "normal", saleDate: dayBefore(365), observedAt: now,
@@ -135,17 +140,17 @@ async function main() {
     if (resource === "research-assessments") return json(route, { assessments: scenario === "sparse" ? [] : [{ assessment, revision: 1, updatedAt: now, property }] });
     if (resource === "research-history") {
       const marketId = url.searchParams.get("marketForPropertyId");
-      if (scenario === "sparse") return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
+      if (sparseEvidence) return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
       return json(route, marketId ? { ...history, campaigns: [], episodes: [], events: [], observations: [], marketScope: { propertyId: marketId, municipality: property.municipality, propertyType: property.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 } } : history);
     }
     if (resource === "connections") return json(route, { connections: [] });
     if (resource === "conversations") return json(route, { conversations: [] });
     if (url.pathname === "/api/properties") {
       if (url.searchParams.get("comparables")) return json(route, { comparables: [], neighborhoodAvgPricePerSqm: null });
-      if (url.searchParams.get("id")) return json(route, { property: scenario === "sparse" ? sparseProperties.find(row => row.id === url.searchParams.get("id")) ?? activeSparseProperty : property, enrichment: null });
+      if (url.searchParams.get("id")) return json(route, { property: sparseEvidence ? sparseProperties.find(row => row.id === url.searchParams.get("id")) ?? activeSparseProperty : property, enrichment: null });
       return json(route, { authenticated: true, properties: [property], summaries: [], total: 1, limit: 8, offset: 0, page: 1, totalPages: 1 });
     }
-    if (url.pathname === "/api/property-lookup") return json(route, scenario === "sparse" ? sparseLookup(sparseProperties.find(row => row.address === url.searchParams.get("address")) ?? activeSparseProperty) : lookup);
+    if (url.pathname === "/api/property-lookup") return json(route, sparseEvidence ? sparseLookup(sparseProperties.find(row => row.address === url.searchParams.get("address")) ?? activeSparseProperty) : lookup);
     if (url.pathname === "/api/favorites") return json(route, { favorites: [], properties: [] });
     if (url.pathname === "/api/notifications") return json(route, { notifications: [] });
     if (url.pathname === "/api/recommendations") return json(route, { recommendations: [] });
@@ -174,6 +179,46 @@ async function main() {
     assert(colors.ratio >= 4.5, `${label} contrast must be 4.5:1: ${JSON.stringify(colors)}`);
   };
   try {
+    if (scenario === "saved-empty") {
+      await page.goto(`${baseUrl}/property/${propertyId}`);
+      const workbench = page.locator("#research");
+      const incomplete = workbench.getByTestId("research-project-incomplete");
+      await incomplete.waitFor();
+      assert.equal(await workbench.getByTestId("research-personal-result").count(), 0, "A saved project alone must not create a recommendation or three unknown result badges");
+      assert.equal(await workbench.getByTestId("research-project-setup").count(), 0, "A saved project must not be treated as a new account");
+      assert.equal(await workbench.getByRole("tablist").count(), 0, "An all-unknown saved assessment starts collapsed");
+      assert.equal(await incomplete.getByRole("button", { name: "Åbn din private undersøgelse", exact: true }).getAttribute("aria-expanded"), "false");
+      assert((await workbench.getByTestId("listing-evidence-overview").innerText()).includes("4.900.000"));
+      await screenshot("research-saved-empty-collapsed", workbench);
+      report.checks.push("A saved all-unknown assessment starts as a compact card while listing facts remain visible");
+      await incomplete.getByRole("button", { name: "Åbn din private undersøgelse", exact: true }).click();
+      const notes = workbench.getByRole("textbox", { name: /^Private noter/ });
+      await notes.waitFor();
+      assert.equal(await notes.inputValue(), "Tidligere gemt note om taget", "Existing private notes survive the collapsed state");
+      await notes.fill("Tidligere gemt note om taget — lokal kladde");
+      await incomplete.getByRole("button", { name: "Skjul privat undersøgelse", exact: true }).click();
+      assert.equal(await workbench.getByRole("tablist").count(), 0);
+      await incomplete.getByRole("button", { name: "Åbn din private undersøgelse", exact: true }).click();
+      assert.equal(await notes.inputValue(), "Tidligere gemt note om taget — lokal kladde", "Collapsing the editor must preserve unsaved changes");
+      await incomplete.getByRole("button", { name: "Rediger boligprojekt", exact: true }).click();
+      assert.equal(await workbench.getByLabel("Samlet projektloft (kr.)", { exact: true }).inputValue(), "6400000", "The saved project ceiling must survive instead of reverting to defaults");
+      assert.equal(report.apiWrites.length, 0, "Opening, editing and collapsing must not automatically save");
+      await workbench.getByRole("button", { name: "Gem projekt og undersøgelse", exact: true }).click();
+      await workbench.getByRole("status").filter({ hasText: "Gemt privat" }).waitFor();
+      const saved = report.apiWrites.find(write => write.resource === "research-assessment");
+      assert.equal(saved?.body.assessment.notes, "Tidligere gemt note om taget — lokal kladde");
+      assert.equal(report.apiWrites.find(write => write.resource === "research-project")?.body.project.totalBudget, 6_400_000);
+      assert.equal(await workbench.getByTestId("research-personal-result").count(), 0, "Saving unresolved fields must not manufacture an assessment result");
+      report.checks.push("Existing project values, saved notes and unsaved edits survive collapse; explicit save persists them");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await incomplete.getByRole("button", { name: "Skjul privat undersøgelse", exact: true }).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await screenshot("research-saved-empty-mobile", workbench);
+      assert.deepEqual(report.pageErrors, []);
+      assert.deepEqual(report.unmockedApiRequests, []);
+      report.checks.push("The compact saved-project card fits mobile without browser errors");
+      return;
+    }
     if (scenario === "sparse") {
       const openSparse = async index => {
         activeSparseProperty = sparseProperties[index];
