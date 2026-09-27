@@ -1,7 +1,7 @@
 import type { ResearchHistoryResponse } from "../../../../../packages/shared/src/types/research-api.js";
 import type { PropertyType } from "../../../../../packages/shared/src/types/index.js";
 import { mapRegistrations } from "../crawl/boligsiden.js";
-import { fetchJson } from "../crawl/http.js";
+import { fetchJson, HttpError } from "../crawl/http.js";
 import { isDanishCoordinate } from "../crawl/map-utils.js";
 import { haversineMeters } from "../row-mappers.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
@@ -66,13 +66,13 @@ export function mapMarketAddresses(raw: unknown[], subject: MarketSubject, saleF
   return [...new Map(rows.map(row => [row.id, row])).values()];
 }
 
-export interface MarketSourceResult { transactions: Transaction[]; truncated: boolean; status: "available" | "unavailable" }
+export interface MarketSourceResult { transactions: Transaction[]; truncated: boolean; status: "available" | "unavailable"; failure?: "subject_unavailable" | "invalid_response" | "network_or_timeout" | `http_${number}` }
 /** Short shared cache holds public evidence only. Failures are never cached as sales. */
 const cache = new Map<string, { expires: number; body: unknown[]; truncated: boolean; observedAt: string }>();
 export async function fetchMarketSales(subject: MarketSubject, saleFrom: string): Promise<MarketSourceResult> {
   const unavailable: MarketSourceResult = { transactions: [], truncated: false, status: "unavailable" };
   if (subject.data_mode !== "real" || !text(subject.address) || !/^\d{4}$/.test(subject.postal_code ?? "") || !subject.municipality ||
-      !isDanishCoordinate(subject.lat, subject.lon) || mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE")) return unavailable;
+      !isDanishCoordinate(subject.lat, subject.lon) || mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE")) return { ...unavailable, failure: "subject_unavailable" };
   const endpoint = process.env.BOLIGSIDEN_ADDRESS_API_BASE?.trim() || "https://api.boligsiden.dk/search/addresses";
   const key = `${endpoint}:${subject.postal_code}`;
   try {
@@ -80,11 +80,11 @@ export async function fetchMarketSales(subject: MarketSubject, saleFrom: string)
     if (!page || page.expires <= Date.now()) {
       const params = new URLSearchParams({ zipCodes: subject.postal_code, sortBy: "soldDate", sortAscending: "false", per_page: "500", page: "1" });
       const body = await fetchJson<{ addresses?: unknown; totalHits?: unknown }>(`${endpoint}?${params}`, { timeoutMs: 8_000, attempts: 1 });
-      if (!Array.isArray(body.addresses)) return unavailable;
+      if (!Array.isArray(body.addresses)) return { ...unavailable, failure: "invalid_response" };
       page = { body: body.addresses, truncated: body.addresses.length >= 500 || (typeof body.totalHits === "number" && body.totalHits > body.addresses.length), observedAt: new Date().toISOString(), expires: Date.now() + 5 * 60_000 };
       if (cache.size >= 50) cache.delete(cache.keys().next().value!);
       cache.set(key, page);
     }
     return { transactions: mapMarketAddresses(page.body, subject, saleFrom, page.observedAt), truncated: page.truncated, status: "available" };
-  } catch { return unavailable; }
+  } catch (error) { return { ...unavailable, failure: error instanceof HttpError ? `http_${error.status}` : "network_or_timeout" }; }
 }
