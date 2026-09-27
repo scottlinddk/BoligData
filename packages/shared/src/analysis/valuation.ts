@@ -19,6 +19,8 @@ export interface ResearchPriceSubject {
   /** True only for a documented first asking price in this listing campaign. */
   firstAskingDocumented: boolean;
   daysOnMarket: number | null;
+  /** Dated source observation used directly for the current listing duration. */
+  daysOnMarketSource?: { kind: "source_reported"; source: string; observedAt: string } | null;
   timeDefinition: ResearchTimeDefinition;
 }
 
@@ -135,6 +137,7 @@ export function estimateResearchPrice(input: ResearchPriceEstimateInput): Resear
     dataMode: input.subject.dataMode, firstAsking: input.subject.firstAsking,
     firstAskingDocumented: input.subject.firstAskingDocumented,
     daysOnMarket: input.subject.daysOnMarket, timeDefinition: input.subject.timeDefinition,
+    daysOnMarketSource: input.subject.daysOnMarketSource ? { ...input.subject.daysOnMarketSource } : null,
   };
   const warnings: ResearchPriceIssue[] = [
     issue("unmatched_condition", "Udvalget matcher boligtype, kommune og boligareal. Stand, grund, enhedstype og øvrige forhold er ikke fuldt matchet.", "The selection matches property type, municipality and residential area. Condition, land, unit type and other characteristics are not fully matched."),
@@ -161,7 +164,7 @@ export function estimateResearchPrice(input: ResearchPriceEstimateInput): Resear
   const foundGroup = validTime ? RESEARCH_DAY_GROUPS.find(group => subject.daysOnMarket! >= group.min && (group.max === null || subject.daysOnMarket! <= group.max)) : undefined;
   const timeGroup = foundGroup ? { ...foundGroup } : null;
   const baseSubjectComplete = noDataReasons.length === 0;
-  if (!timeGroup) noDataReasons.push(issue("subject_time_missing", "Dokumenteret liggetid med en kendt definition mangler. Et særskilt sammenligningsgrundlag uden tidsfilter kan stadig vises.", "Documented time on market with a known definition is missing. A separate comparable-sales reference without time matching may still be shown."));
+  if (!timeGroup) noDataReasons.push(issue("subject_time_missing", "Liggetid for den valgte tidsdefinition er ikke tilgængelig. Et særskilt sammenligningsgrundlag uden tidsfilter kan stadig vises.", "Time on market for the selected time definition is unavailable. A separate comparable-sales reference without time matching may still be shown."));
 
   const userExcluded = new Set(input.excludedTransactionIds ?? []);
   const subjectExcluded = new Set<string>();

@@ -1,7 +1,7 @@
 /* Run against a local Vite server: node scripts/research-browser-smoke.cjs
  * Every API, Supabase, map and external request is mocked or blocked. No production login or write occurs.
  * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL, SMOKE_OUTPUT_DIR and SMOKE_THEME can override local defaults.
- * SMOKE_SCENARIO=sparse covers fresh accounts; saved-empty covers saved projects; thin covers fewer than five usable sales.
+ * SMOKE_SCENARIO=sparse covers fresh accounts; saved-empty covers saved projects; thin covers small samples; source-time covers reported current duration.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -14,7 +14,7 @@ assert(["127.0.0.1", "localhost"].includes(new URL(baseUrl).hostname), "Only a l
 const theme = process.env.SMOKE_THEME || "light";
 assert(["light", "dark"].includes(theme), "SMOKE_THEME must be light or dark");
 const scenario = process.env.SMOKE_SCENARIO || "complete";
-assert(["complete", "sparse", "saved-empty", "thin"].includes(scenario), "SMOKE_SCENARIO must be complete, sparse, saved-empty or thin");
+assert(["complete", "sparse", "saved-empty", "thin", "source-time"].includes(scenario), "Unknown SMOKE_SCENARIO");
 const sparseEvidence = scenario !== "complete";
 const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${sparseEvidence ? `-${scenario}` : ""}${theme === "dark" ? "-dark" : ""}`);
 fs.mkdirSync(outputDir, { recursive: true });
@@ -28,6 +28,7 @@ assert(publicUrl, "The local frontend needs its public Supabase URL to determine
 const authStorageKey = `sb-${new URL(publicUrl).hostname.split(".")[0]}-auth-token`;
 const now = new Date().toISOString();
 const dayBefore = days => new Date(Date.parse(`${now.slice(0, 10)}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+const missingTimeWarning = /Dokumenteret liggetid med en kendt definition mangler|Liggetid for den valgte tidsdefinition er ikke tilgængelig/;
 const listingDate = dayBefore(240);
 const userId = "00000000-0000-4000-8000-000000000001";
 const propertyId = "00000000-0000-4000-8000-000000000002";
@@ -110,6 +111,10 @@ const thinHistory = subject => ({ ...emptyHistory(),
   ] : [],
   marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000, population: "stored_listing_sales", liveSourceUnavailable: true },
 });
+const sourceTimeHistory = subject => ({ ...scopedHistory(subject),
+  transactions: transactions.slice(0, 5).map(row => ({ ...row, latestEpisodeDays: 464, firstAsking: null, lastAsking: null })),
+  marketScope: { ...scopedHistory(subject).marketScope, population: "stored_listing_sales" },
+});
 let activeSparseProperty = sparseProperties[0];
 
 async function main() {
@@ -136,19 +141,19 @@ async function main() {
     if (request.method() !== "GET") report.apiWrites.push({ path: url.pathname, resource, method: request.method(), body: request.postDataJSON() });
     else report.apiReads.push({ path: url.pathname, ...Object.fromEntries(url.searchParams) });
     if (url.pathname === "/api/account" && resource === "research-project") {
-      if (scenario === "sparse" || scenario === "thin") return json(route, { project: null, updatedAt: null });
+      if (["sparse", "thin", "source-time"].includes(scenario)) return json(route, { project: null, updatedAt: null });
       if (request.method() === "PUT") project = request.postDataJSON().project;
       return json(route, { project, updatedAt: now });
     }
     if (url.pathname === "/api/account" && resource === "research-assessment") {
-      if (scenario === "sparse" || scenario === "thin") return json(route, { assessment: null, revision: 0, updatedAt: null, revisions: [] });
+      if (["sparse", "thin", "source-time"].includes(scenario)) return json(route, { assessment: null, revision: 0, updatedAt: null, revisions: [] });
       if (request.method() === "PUT") assessment = request.postDataJSON().assessment;
       return json(route, { assessment, revision: 1, updatedAt: now, revisions: [] });
     }
     if (resource === "research-assessments") return json(route, { assessments: scenario === "sparse" ? [] : [{ assessment, revision: 1, updatedAt: now, property }] });
     if (resource === "research-history") {
       const marketId = url.searchParams.get("marketForPropertyId");
-      if (sparseEvidence) return json(route, marketId ? (scenario === "thin" ? thinHistory : scopedHistory)(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
+      if (sparseEvidence) return json(route, marketId ? (scenario === "thin" ? thinHistory : scenario === "source-time" ? sourceTimeHistory : scopedHistory)(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
       return json(route, marketId ? { ...history, campaigns: [], episodes: [], events: [], observations: [], marketScope: { propertyId: marketId, municipality: property.municipality, propertyType: property.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 } } : history);
     }
     if (resource === "connections") return json(route, { connections: [] });
@@ -187,6 +192,51 @@ async function main() {
     assert(colors.ratio >= 4.5, `${label} contrast must be 4.5:1: ${JSON.stringify(colors)}`);
   };
   try {
+    if (scenario === "source-time") {
+      activeSparseProperty = sparseProperties[1];
+      await page.goto(`${baseUrl}/property/${activeSparseProperty.id}`);
+      const workbench = page.locator("#research");
+      const price = workbench.getByTestId("listing-price-reference");
+      const median = price.getByTestId("listing-price-median");
+      const definition = price.getByLabel("Tidsdefinition til prisreference", { exact: true });
+      await median.getByText(/3\.571\.429/).waitFor();
+      assert((await definition.locator('option[value="latest_episode_days"]').innerText()).includes("464 dage"), "The observed current-source duration must reach the price cohort");
+      assert((await definition.locator('option[value="active_days"]').innerText()).includes("ukendt"), "Source current days must not invent summed active time");
+      assert((await definition.locator('option[value="calendar_days"]').innerText()).includes("ukendt"), "Source current days must not invent total calendar time");
+      assert(!missingTimeWarning.test(await price.textContent()));
+      assert(!(await workbench.getByTestId("listing-evidence-overview").innerText()).includes(dayBefore(464)), "Using reported days must not manufacture a start date");
+      const sourceTime = await price.getByTestId("listing-price-reported-time").innerText();
+      for (const value of ["464", "boligsiden", now.slice(0, 10)]) assert(sourceTime.toLowerCase().includes(value), `The current duration must retain source metadata: ${value}`);
+      await screenshot("research-source-time-primary", price);
+      report.checks.push("464 dated source-current days select five matching sales and produce a DKK3,571,429 reference without reconstructing a listing date");
+      for (const alternative of ["active_days", "calendar_days"]) {
+        await definition.selectOption(alternative);
+        await price.getByTestId("listing-price-baseline").getByText(/3\.571\.429/).waitFor();
+        assert(!(await median.innerText()).includes("3.571.429"), "Unknown time definitions must suppress the primary estimate while retaining the separate baseline");
+        assert.equal(await price.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0);
+      }
+      await definition.selectOption("latest_episode_days");
+      await median.getByText(/3\.571\.429/).waitFor();
+      report.checks.push("Switching to unknown active/calendar time removes the matched estimate; switching back restores the source-current cohort");
+      await workbench.getByTestId("research-project-setup").getByRole("button", { name: "Tilpas dit boligprojekt", exact: true }).click();
+      await workbench.getByRole("tab", { name: "Sammenligninger", exact: true }).click();
+      for (const number of [1, 2]) {
+        const row = page.getByRole("tabpanel").getByRole("row").filter({ hasText: `Referencevej ${number},` });
+        await row.getByLabel("Begrundelse for udvalg", { exact: true }).fill("Ikke sammenlignelig i denne undersøgelse");
+        await row.getByRole("checkbox").uncheck();
+      }
+      await price.getByRole("heading", { name: "3 sammenlignelige handler fundet", exact: true }).waitFor();
+      assert.equal(await price.getByTestId("listing-price-baseline").count(), 0);
+      assert(!(await median.innerText()).includes("3.571.429"));
+      assert.equal(await price.getByRole("button", { name: /budgetscenario/ }).count(), 0);
+      assert(!missingTimeWarning.test(await price.textContent()), "A small sample must not be blamed on missing source time");
+      assert.equal(report.apiWrites.length, 0);
+      assert.deepEqual(report.pageErrors, []);
+      assert.deepEqual(report.unmockedApiRequests, []);
+      await screenshot("research-source-time-three-sales", price);
+      report.checks.push("Excluding two of five trades leaves three observed sales and no calculated reference, while the source-current duration remains known");
+      return;
+    }
     if (scenario === "thin") {
       activeSparseProperty = sparseProperties[1];
       await page.goto(`${baseUrl}/property/${activeSparseProperty.id}`);
@@ -201,6 +251,8 @@ async function main() {
       assert((await price.innerText()).includes("2 egnede handler blandt 4"));
       assert((await price.getByTestId("listing-price-source-unavailable").innerText()).includes("gemte salgsregistreringer"), "The user must know that the live feed failed and stored records form this evidence");
       assert((await price.getByTestId("listing-price-median").innerText()).includes("Ingen beregnelig prisreference endnu"));
+      assert(!missingTimeWarning.test(await price.textContent()), "Two comparable sales must not cause a false missing-duration warning when the source reports 464 days");
+      assert((await price.getByTestId("listing-price-reported-time").innerText()).includes("464"), "Thin price evidence must still show the known current duration");
       assert.equal(await price.getByTestId("listing-price-baseline").count(), 0);
       assert.equal(await price.getByTestId("listing-price-range").count(), 0);
       assert.equal(await price.getByRole("button", { name: /budgetscenario/ }).count(), 0, "Individual sale prices must not become an actionable valuation");
@@ -307,12 +359,13 @@ async function main() {
       await postalBaseline.getByText(/3\.571\.429/).waitFor();
       assert((await postalPrice.innerText()).includes("Boligsidens registrerede salg i postnummer 9000"), "The visible price must identify the separate registered postal-sale population");
       assert((await postalPrice.innerText()).includes("Prisreference uden match på liggetid"), "The sold-price baseline must clearly state that it has no duration matching");
-      assert((await postalPrice.getByLabel("Tidsdefinition til prisreference", { exact: true }).innerText()).includes("Seneste udbudsperiode · ukendt"), "Reported listing days must remain separate from documented valuation chronology");
-      assert(!(await postalPrice.getByTestId("listing-price-median").innerText()).includes("3.571.429"), "Registered sale prices must not fabricate a time-matched reference when chronology is absent");
-      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Source-reported days must not unlock the documented-time reference action");
+      assert((await postalPrice.getByLabel("Tidsdefinition til prisreference", { exact: true }).innerText()).includes("Seneste udbudsperiode · 464 dage"), "Reported current days must supply the latest-period value used for pricing");
+      assert(!missingTimeWarning.test(await postalPrice.textContent()));
+      assert(!(await postalPrice.getByTestId("listing-price-median").innerText()).includes("3.571.429"), "Missing sale durations must still prevent time matching even when subject duration is known");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Sales without durations must not unlock a time-matched reference action");
       await darkContrast("Registered-sales baseline price", postalBaseline);
       await screenshot("research-fresh-live-sales", page.locator("#research"));
-      report.checks.push("A different live listing shows 464 source-reported days and real own/nearby sales without inventing a start date or unlocking a time-matched reference");
+      report.checks.push("A live listing uses 464 source-current days consistently while sales without durations provide only the separate baseline");
       await page.setViewportSize({ width: 390, height: 844 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Sparse mobile detail must not overflow");
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));

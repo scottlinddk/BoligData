@@ -187,14 +187,18 @@ describe("data-based listing price reference", () => {
 
   it("exports an independent reproducible snapshot and never accepts asking/budget as a price method", () => {
     const request = input();
+    request.subject.daysOnMarketSource = { kind: "source_reported", source: "boligsiden", observedAt: "2026-09-26T10:00:00Z" };
     const result = estimateResearchPrice(request);
     request.subject.residentialArea = 900;
+    request.subject.daysOnMarketSource.source = "changed-source";
     request.transactions[0]!.soldPrice = 10;
     expect(result.snapshot.subject.residentialArea).toBe(140);
+    expect(result.snapshot.subject.daysOnMarketSource).toEqual({ kind: "source_reported", source: "boligsiden", observedAt: "2026-09-26T10:00:00Z" });
     expect(result.snapshot.sourceTransactions[0]!.soldPrice).toBe(3_080_000);
     const replay = estimateResearchPrice({ subject: result.snapshot.subject, transactions: result.snapshot.sourceTransactions, excludedTransactionIds: result.snapshot.excludedTransactionIds, dataVersion: result.snapshot.dataVersion, calculatedAt: result.snapshot.calculatedAt, partialDataset: result.snapshot.partialDataset });
     expect(replay.primary).toEqual(result.primary);
     expect(replay.firstAskingReference).toEqual(result.firstAskingReference);
+    expect(replay.snapshot.subject.daysOnMarketSource).toEqual(result.snapshot.subject.daysOnMarketSource);
     const extras = { ...input(), budget: 1, currentAsking: 9_000_000, subject: { ...subject, budget: 1, currentAsking: 9_000_000 } };
     const ignored = estimateResearchPrice(extras);
     expect(ignored.primary).toEqual(result.primary);

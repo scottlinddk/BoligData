@@ -60,6 +60,7 @@ function ResearchEditor({ property, facts, initialHasProject, initialHasAssessme
       dataMode: property.dataMode === "real" && property.status === "active" ? "live" : "unavailable",
       firstAsking: listing.firstAsking, firstAskingDocumented: listing.firstAsking !== null,
       daysOnMarket: priceTimeDefinition === "active_days" ? listing.time.activeDays : priceTimeDefinition === "calendar_days" ? listing.time.calendarDays : listing.time.latestEpisodeDays,
+      daysOnMarketSource: priceTimeDefinition === "latest_episode_days" ? listing.latestEpisodeSource : null,
       timeDefinition: priceTimeDefinition,
     },
     transactions: market?.transactions ?? [], excludedTransactionIds: assessment.comparables.filter(s => !s.included).map(s => s.transactionId),
