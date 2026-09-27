@@ -86,6 +86,15 @@ export function buildHistoryRows(
     method: "source_listing_v2", verification_status: "unverified", source_version: "crawl-v2",
   }));
 
+  if (listing.reported_time_on_market) {
+    observations.push({
+      ...common, ingest_key: key(snapshotKey, "reported_time_on_market", today),
+      field_name: "reported_time_on_market", value: listing.reported_time_on_market,
+      effective_date: today, date_precision: "day", method: "source_reported_duration",
+      verification_status: "unverified", source_version: "crawl-v2",
+    });
+  }
+
   const transactions: HistoryRow[] = [];
   let quarantinedSales = 0;
   for (const sale of listing.sold_price_history ?? []) {

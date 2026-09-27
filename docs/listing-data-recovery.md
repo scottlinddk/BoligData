@@ -4,7 +4,7 @@ The September 2026 research migration left existing listings with unknown proven
 
 ## Property page
 
-The overview shows each listing's available asking price, advertised area and rooms, price per advertised m², and listing time. A reported listing date can supply clearly labelled elapsed days even when pauses/relistings are unresolved; these days never become documented valuation evidence. Real registered transactions and nearby sales appear independently of BBR availability. Unknown historical area prevents a per-m² comparison, but no longer suppresses a genuine transaction amount/date.
+The overview shows each listing's available asking price, advertised area and rooms, price per advertised m², and listing time. Boligsiden's `timeOnMarket.current.days` is preserved as a dated source observation and shown as source-reported time when documented chronology is unavailable. The observation must match the current source listing and episode. It never becomes an invented start date, total active campaign time or valuation input. A reported listing date can also supply clearly labelled elapsed days even when pauses/relistings are unresolved. Real registered transactions and nearby sales appear independently of BBR availability. Unknown historical area prevents a per-m² comparison, but no longer suppresses a genuine transaction amount/date.
 
 Private budget and family decisions require a configured project. Unsaved starter values no longer produce the generic documentation verdict or a printable budget decision. The evidence overview also remains available when loading the private workspace fails.
 
@@ -17,6 +17,8 @@ Market history now filters real sales by the subject's municipality, property ty
 Only a new live observation establishes real provenance. An unchanged listing is re-enriched when source provenance is absent, sources failed, mock/live settings changed, or its enrichment is at least seven days old. Mock sources require an explicit mock flag. Unavailable credentials or an upstream failure stay unavailable.
 
 Normalized history writes use bounded concurrency. Enrichment writes persist in small batches, prioritizing missing/older records so an interrupted run retains progress. Partial crawls still never infer that an unseen listing was removed or sold.
+
+Malformed individual source records are excluded and counted as mapping warnings. These warnings do not block valid records or batch advancement. Failed page requests, invalid page shapes and database errors remain failures and keep the batch cursor unchanged. A feed containing excluded records still reports incomplete coverage.
 
 The **Daily property crawl** GitHub Actions workflow provides:
 

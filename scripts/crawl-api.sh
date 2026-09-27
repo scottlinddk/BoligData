@@ -55,7 +55,10 @@ for ((batch=1; batch<=625; batch++)); do
     echo "::error::The deployed API does not support this batch contract. Deploy the batching change before running it."
     exit 1
   fi
-  jq -r '.reports[] | "[\(.source)] fetched=\(.fetched) updated=\(.upserted) enriched=\(.enriched) unchanged=\(.enrichSkippedUnchanged) dbErrors=\(.dbErrors)"' response.json
+  jq -r '.reports[] | "[\(.source)] fetched=\(.fetched) updated=\(.upserted) enriched=\(.enriched) unchanged=\(.enrichSkippedUnchanged) skippedInvalid=\(.skippedInvalid) dbErrors=\(.dbErrors)"' response.json
+  if [ "$batch" = "1" ]; then
+    jq -r '.reports[] | .mappingWarnings[]? | "::warning::" + .' response.json
+  fi
   next=$(jq -r '.batch.nextOffset' response.json)
   total=$(jq -r '.batch.total' response.json)
   echo "Batch $batch completed; offset=$offset total=$total next=$next"

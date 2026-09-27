@@ -84,6 +84,22 @@ describe("mapBoligaRecord", () => {
 });
 
 describe("mapBoligsidenCase", () => {
+  it("retains live reported durations without deriving a listing date", () => {
+    const mapped = mapBoligsidenCase({ ...boligsidenCase, status: "open", timeOnMarket: { current: { days: 464 }, total: { days: 700 } } });
+    expect(mapped?.reported_time_on_market).toEqual({ latestEpisodeDays: 464, totalDays: 700 });
+    expect(mapped?.listing_date).toBeNull();
+  });
+
+  it("keeps zero days and an independently valid duration while rejecting malformed values", () => {
+    const mapped = (current: unknown, total: unknown) => mapBoligsidenCase({ ...boligsidenCase, timeOnMarket: { current: { days: current }, total: { days: total } } });
+    expect(mapped(0, 36_500)?.reported_time_on_market).toEqual({ latestEpisodeDays: 0, totalDays: 36_500 });
+    expect(mapped(null, 12)?.reported_time_on_market).toEqual({ latestEpisodeDays: null, totalDays: 12 });
+    for (const invalid of [-1, 1.5, 36_501, NaN, Infinity, "464", null, undefined]) {
+      expect(mapped(invalid, invalid)).not.toHaveProperty("reported_time_on_market");
+    }
+    expect(mapBoligsidenCase({ ...boligsidenCase, timeOnMarket: 464 })).not.toHaveProperty("reported_time_on_market");
+  });
+
   it("maps a valid case to a RawListing", () => {
     const listing = mapBoligsidenCase(boligsidenCase);
     expect(listing).toEqual({

@@ -13,6 +13,26 @@ const listing: RawListing = {
 const observedAt = "2026-09-26T10:00:00Z";
 
 describe("documented listing and sale history", () => {
+  it("stores dated source-reported duration without inventing chronology or pricing evidence", () => {
+    const withDuration = { ...listing, reported_time_on_market: { latestEpisodeDays: 464, totalDays: 700 } };
+    const rows = buildHistoryRows(withDuration, "property-1", observedAt);
+    expect(rows.observations.find((row) => row.field_name === "reported_time_on_market")).toMatchObject({
+      value: { latestEpisodeDays: 464, totalDays: 700 }, effective_date: "2026-09-26", date_precision: "day",
+      observed_at: observedAt, data_mode: "real", method: "source_reported_duration", verification_status: "unverified",
+    });
+    expect(rows.episode.start_date).toBeNull();
+    expect(rows.events.map((event) => event.event_type)).toEqual(["observation"]);
+    expect(rows.transactions).toEqual([]);
+    expect(listingContentHash(withDuration)).not.toBe(listingContentHash(listing));
+    expect(listingContentHash({ ...withDuration, reported_time_on_market: { latestEpisodeDays: 465, totalDays: 701 } })).not.toBe(listingContentHash(withDuration));
+    const repeated = buildHistoryRows(withDuration, "property-1", "2026-09-26T12:00:00Z");
+    const nextDay = buildHistoryRows(withDuration, "property-1", "2026-09-27T12:00:00Z");
+    const observation = (values: ReturnType<typeof buildHistoryRows>) => values.observations.find((row) => row.field_name === "reported_time_on_market");
+    expect(observation(repeated)?.ingest_key).toBe(observation(rows)?.ingest_key);
+    expect(observation(nextDay)?.ingest_key).not.toBe(observation(rows)?.ingest_key);
+    expect(observation(buildHistoryRows({ ...withDuration, data_mode: "mock" }, "property-1", observedAt))?.data_mode).toBe("mock");
+  });
+
   it("detects new sales despite unchanged asking price, preserving unknown area", () => {
     const withSale = { ...listing, sold_price_history: [{ soldDate: "2025-06-01", price: 4_000_000, pricePerSqm: null, saleType: "normal" as const }] };
     expect(listingContentHash(withSale)).not.toBe(listingContentHash(listing));

@@ -80,6 +80,14 @@ function get(obj: unknown, ...path: string[]): unknown {
   return cur;
 }
 
+function mapReportedTimeOnMarket(value: unknown): RawListing["reported_time_on_market"] {
+  const days = (candidate: unknown): number | null =>
+    typeof candidate === "number" && Number.isSafeInteger(candidate) && candidate >= 0 && candidate <= 36_500 ? candidate : null;
+  const latestEpisodeDays = days(get(value, "current", "days"));
+  const totalDays = days(get(value, "total", "days"));
+  return latestEpisodeDays !== null || totalDays !== null ? { latestEpisodeDays, totalDays } : undefined;
+}
+
 /**
  * Boligsiden images carry a `category` (photo/floorplan/...) and an
  * `imageSources` array of pre-sized variants ({url, width, height}) — we
@@ -223,6 +231,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   const images = (Array.isArray(r.images) ? r.images : [])
     .map(mapImage)
     .filter((img): img is ListingImage => img !== null);
+  const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket);
 
   return {
     data_mode: "real",
@@ -238,6 +247,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     // The crawler's first observation is stored separately.
     listing_date:
       asIsoDate(r.timeOnMarket) ?? asIsoDate(get(r, "status", "createdDate")) ?? asIsoDate(r.createdDate),
+    ...(reportedTimeOnMarket ? { reported_time_on_market: reportedTimeOnMarket } : {}),
     listing_source: "boligsiden",
     external_id: externalId,
     lat,
@@ -261,6 +271,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
  */
 export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
+  const mappingWarnings: string[] = [];
   const stats: SourceCrawlStats = {
     source: "boligsiden",
     complete: false,
@@ -270,6 +281,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     recordsSkipped: 0,
     recordsOutOfArea: 0,
     errors: [],
+    mappingWarnings,
   };
 
   const zipRanges = getZipRanges();
@@ -354,8 +366,8 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
       const listing = mapBoligsidenCase(record);
       if (listing === null) {
         stats.recordsSkipped += 1;
-        if (stats.errors.length < MAX_ERRORS_REPORTED) {
-          stats.errors.push(`page ${page}: skipped unmappable record`);
+        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+          mappingWarnings.push(`page ${page}: skipped unmappable record`);
         }
         continue;
       }

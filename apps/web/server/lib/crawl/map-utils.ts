@@ -114,6 +114,9 @@ export function listingContentHash(l: RawListing): string {
         [...(l.sold_price_history ?? [])].sort((a, b) =>
           `${a.soldDate}|${a.price}|${a.saleType}`.localeCompare(`${b.soldDate}|${b.price}|${b.saleType}`)),
         l.data_mode ?? "unknown",
+        // Preserve provider-reported duration independently of asking price,
+        // while leaving older hashes unchanged for sources without it.
+        ...(l.reported_time_on_market ? [[l.reported_time_on_market.latestEpisodeDays, l.reported_time_on_market.totalDays]] : []),
       ]),
     )
     .digest("hex");

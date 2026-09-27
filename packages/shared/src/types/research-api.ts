@@ -20,6 +20,8 @@ export interface ResearchEvent {
 }
 export interface ResearchObservation {
   id: string; propertyId: string; fieldName: string; value: unknown; source: string; sourceUrl: string | null;
+  /** Explicit listing-period association when the source observation belongs to an episode. */
+  episodeId?: string | null;
   effectiveDate: string | null; datePrecision: DatePrecision; observedAt: string; method: string;
   verificationStatus: "unverified" | "verified" | "conflict" | "not_found" | "unavailable";
   dataMode: SourceDataMode; sourceFile: string | null; sourceSheet: string | null; sourceRow: number | null;

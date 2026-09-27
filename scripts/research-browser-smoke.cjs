@@ -72,10 +72,16 @@ const lookup = {
 const emptyHistory = () => ({ campaigns: [], episodes: [], events: [], transactions: [], observations: [], conditionEvidence: [], dataVersion: "browser-sparse-fixture", retrievedAt: now, truncated: false });
 const sparseProperties = [
   { ...property, address: "Legacyvej 14, 9000 Aalborg", externalId: "legacy-case", dataMode: "unknown", listingDate: null, firstSeenAt: `${dayBefore(20)}T12:00:00Z` },
-  { ...property, id: "00000000-0000-4000-8000-000000000003", address: "Kildevej 8, 9000 Aalborg", externalId: "live-case", price: 3_650_000, sqm: 125, rooms: 5, listingDate: dayBefore(60) },
+  { ...property, id: "00000000-0000-4000-8000-000000000003", address: "Kildevej 8, 9000 Aalborg", externalId: "live-case", price: 3_650_000, sqm: 125, rooms: 5, listingDate: null },
   { ...property, id: "00000000-0000-4000-8000-000000000004", address: "Tidsløsvej 6, 9000 Aalborg", externalId: "baseline-case", listingDate: null },
   { ...property, id: "00000000-0000-4000-8000-000000000005", address: "Demovej 9, 9000 Aalborg", externalId: "mock-case", dataMode: "mock" },
 ];
+const sparseHistory = subject => subject.id !== sparseProperties[1].id ? emptyHistory() : {
+  ...emptyHistory(),
+  campaigns: [{ id: "reported-campaign", propertyId: subject.id, linkReason: "Exact source listing identity", source: subject.listingSource, sourceUrl: null, observedAt: now }],
+  episodes: [{ id: "reported-episode", propertyId: subject.id, campaignId: "reported-campaign", source: subject.listingSource, sourceListingId: subject.externalId, sourceUrl: null, startDate: null, endDate: null, datePrecision: "unknown", status: "active", agentName: subject.agentName, observedAt: now, dataMode: "real" }],
+  observations: [{ id: "reported-duration", propertyId: subject.id, episodeId: "reported-episode", fieldName: "reported_time_on_market", value: { latestEpisodeDays: 464, totalDays: 464 }, source: subject.listingSource, sourceUrl: null, effectiveDate: now.slice(0, 10), datePrecision: "day", observedAt: now, method: "source_reported_duration", verificationStatus: "unverified", dataMode: "real", conflictGroup: null }],
+};
 const sparseLookup = subject => {
   const result = { ...lookup, address: subject.address, resolved: { ...lookup.resolved, formattedAddress: subject.address }, sources: lookup.sources.map(source => ({ ...source })) };
   if (subject.id === sparseProperties[1].id) {
@@ -88,7 +94,7 @@ const sparseLookup = subject => {
   return result;
 };
 const scopedHistory = subject => ({ ...emptyHistory(),
-  transactions: [sparseProperties[2].id, sparseProperties[3].id].includes(subject.id) ? transactions.slice(0, 5).map(row => ({ ...row })) : [],
+  transactions: subject.id === sparseProperties[1].id ? transactions.slice(0, 5).map(row => ({ ...row, latestEpisodeDays: 464, activeDays: 464 })) : [sparseProperties[2].id, sparseProperties[3].id].includes(subject.id) ? transactions.slice(0, 5).map(row => ({ ...row })) : [],
   marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 },
 });
 let activeSparseProperty = sparseProperties[0];
@@ -129,7 +135,7 @@ async function main() {
     if (resource === "research-assessments") return json(route, { assessments: scenario === "sparse" ? [] : [{ assessment, revision: 1, updatedAt: now, property }] });
     if (resource === "research-history") {
       const marketId = url.searchParams.get("marketForPropertyId");
-      if (scenario === "sparse") return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : emptyHistory());
+      if (scenario === "sparse") return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
       return json(route, marketId ? { ...history, campaigns: [], episodes: [], events: [], observations: [], marketScope: { propertyId: marketId, municipality: property.municipality, propertyType: property.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 } } : history);
     }
     if (resource === "connections") return json(route, { connections: [] });
@@ -200,13 +206,16 @@ async function main() {
 
       const live = await openSparse(1);
       await live.getByText(/3\.050\.000/).waitFor();
+      await live.getByText("Liggetid oplyst af kilden", { exact: true }).waitFor();
       const liveText = await live.innerText();
       for (const value of ["3.650.000", "125", "29.200", "2.750.000", "3.050.000", "Nabovej 12"]) assert(liveText.includes(value), `Live listing evidence ${value} must remain visible`);
       assert(!liveText.includes("4.900.000"), "Navigating to another listing must replace the previous asking price");
-      assert(/60\s*(?:kalender)?dage/i.test(liveText), "The source-reported listing date must provide this listing's known elapsed time");
-      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Two observed sales must not bypass the five-sale reference threshold");
+      assert(/464\s*dage/i.test(liveText), "A dated source duration must remain visible without a listing start date");
+      assert(!liveText.includes("Siden oplyst annoncedato") && !liveText.includes("Aktuelt udbudsforløb") && !liveText.includes(dayBefore(464)), "Reported days must not fabricate a start date or documented period");
+      assert(!(await page.getByTestId("listing-price-median").innerText()).includes("3.571.429"), "Five sales with the same reported duration must not become a time-matched reference without documented subject chronology");
+      assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Source-reported days must not unlock the documented-time reference action");
       await screenshot("research-fresh-live-sales", page.locator("#research"));
-      report.checks.push("A different live listing shows distinct asking/area/time and real own/nearby sales even when other register groups are unavailable");
+      report.checks.push("A different live listing shows 464 source-reported days and real own/nearby sales without inventing a start date or unlocking a time-matched reference");
       await page.setViewportSize({ width: 390, height: 844 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, "Sparse mobile detail must not overflow");
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));

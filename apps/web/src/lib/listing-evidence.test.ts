@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Enrichment, Property, SoldPriceEntry } from "@shared/types/index";
-import { listingEvidence } from "./listing-evidence";
+import { listingEvidence, reportedListingDuration } from "./listing-evidence";
+import type { ResearchEpisode, ResearchHistoryResponse, ResearchObservation } from "@shared/types/research-api";
 import { mergePropertyFacts, type MergedPropertyFacts } from "./property-facts";
 import { researchListingTime } from "./research-listing-time";
 
@@ -95,5 +96,91 @@ describe("registered evidence stays distinct from listing and market estimates",
     const listing = { ...researchListingTime({ ...property, dataMode: "real" }), firstAsking: 4_100_000 };
     expect(listingEvidence(property, listing, storedFacts([ownSale], "real"), AS_OF).priceChange).toBe(-250_000);
     expect(listingEvidence({ ...property, price: 4_250_000 }, listing, undefined, AS_OF).priceChange).toBe(150_000);
+  });
+});
+
+describe("explicit source-reported listing duration", () => {
+  const liveProperty = { ...property, dataMode: "real" as const, listingDate: null };
+  const observedAt = `${AS_OF}T08:00:00Z`;
+  const episode: ResearchEpisode = { id: "current-episode", propertyId: property.id, campaignId: "campaign", source: "boligsiden", sourceListingId: "case-1",
+    sourceUrl: null, startDate: null, endDate: null, datePrecision: "unknown", status: "active", agentName: null, observedAt, dataMode: "real" };
+  const observation = (overrides: Partial<ResearchObservation> = {}): ResearchObservation => ({ id: "duration", propertyId: property.id, episodeId: episode.id,
+    fieldName: "reported_time_on_market", value: { latestEpisodeDays: 137, totalDays: 450 }, source: "boligsiden", sourceUrl: null,
+    effectiveDate: AS_OF, datePrecision: "day", observedAt, method: "source_reported_duration", verificationStatus: "unverified", dataMode: "real",
+    sourceFile: null, sourceSheet: null, sourceRow: null, sourceVersion: "crawl-v2", conflictGroup: null, ...overrides });
+  const history = (observations = [observation()], episodes = [episode]): ResearchHistoryResponse => ({ campaigns: [], episodes, events: [], transactions: [], observations,
+    conditionEvidence: [], dataVersion: "fixture/1", retrievedAt: `${AS_OF}T12:00:00Z`, truncated: false });
+
+  it("returns a dated source count without changing documented chronology or deriving a start date", () => {
+    const data = history();
+    const listing = researchListingTime(liveProperty, data);
+    const before = structuredClone({ property: liveProperty, listing, data });
+    expect(reportedListingDuration(liveProperty, data)).toEqual({ days: 137, observedAt });
+    const result = listingEvidence(liveProperty, listing, undefined, AS_OF, data);
+    expect(result.reportedTime).toEqual({ days: 137, observedAt });
+    expect(result.days).toBeNull(); expect(result.documentedDays).toBe(false);
+    expect(listing.time.latestEpisodeDays).toBeNull(); expect(listing.time.activeDays).toBeNull();
+    expect({ property: liveProperty, listing, data }).toEqual(before);
+  });
+
+  it("uses the newest valid observation from the exact current case, not total days or other episodes", () => {
+    const older = observation({ id: "old", observedAt: "2026-09-25T08:00:00Z", effectiveDate: "2026-09-25", value: { latestEpisodeDays: 136, totalDays: 900 } });
+    const unrelated = observation({ id: "other", episodeId: "former-episode", observedAt: `${AS_OF}T09:00:00Z`, value: { latestEpisodeDays: 900 } });
+    expect(reportedListingDuration(liveProperty, history([unrelated, older, observation()]))).toEqual({ days: 137, observedAt });
+    expect(reportedListingDuration(liveProperty, history([observation({ value: { latestEpisodeDays: null, totalDays: 450 } })]))).toBeNull();
+    expect(reportedListingDuration(liveProperty, history([observation({ value: { latestEpisodeDays: 0, totalDays: 450 } })]))?.days).toBe(0);
+  });
+
+  it.each([-1, 1.5, 36_501, "137", Number.NaN, Number.POSITIVE_INFINITY, null, undefined])("rejects invalid source counts %j", days => {
+    expect(reportedListingDuration(liveProperty, history([observation({ value: { latestEpisodeDays: days, totalDays: 450 } })]))).toBeNull();
+  });
+
+  it("does not trust foreign properties, sources, episode links, methods or conflicts", () => {
+    for (const change of [{ propertyId: "other" }, { source: "boliga" }, { episodeId: null }, { episodeId: "old" },
+      { fieldName: "advertised_rooms" }, { method: "computed_from_listing_date" }, { dataMode: "mock" }, { dataMode: "unknown" },
+      { verificationStatus: "conflict" }, { verificationStatus: "unavailable" }, { conflictGroup: "conflict" }, { datePrecision: "month" }] as Partial<ResearchObservation>[]) {
+      expect(reportedListingDuration(liveProperty, history([observation(change)]))).toBeNull();
+    }
+  });
+
+  it("requires one current live active episode for the property's exact source case", () => {
+    for (const episodes of [[], [episode, { ...episode, id: "ambiguous" }], [{ ...episode, sourceListingId: "older-case" }],
+      [{ ...episode, propertyId: "foreign" }], [{ ...episode, source: "boliga" }], [{ ...episode, dataMode: "mock" as const }],
+      [{ ...episode, status: "removed" as const }], [{ ...episode, endDate: AS_OF }]]) {
+      expect(reportedListingDuration(liveProperty, history([observation()], episodes))).toBeNull();
+    }
+    for (const dataMode of ["unknown", "mock", "demo"] as const) expect(reportedListingDuration({ ...liveProperty, dataMode }, history())).toBeNull();
+    expect(reportedListingDuration({ ...liveProperty, status: "sold" }, history())).toBeNull();
+  });
+
+  it("requires explicit non-empty property, source, case and episode identities", () => {
+    for (const change of [{ id: "" }, { listingSource: " " }, { externalId: "" }] as Partial<Property>[]) {
+      const target = { ...liveProperty, ...change };
+      const data = history([observation({ propertyId: target.id, source: target.listingSource })], [{ ...episode, propertyId: target.id, source: target.listingSource, sourceListingId: target.externalId }]);
+      expect(reportedListingDuration(target, data)).toBeNull();
+    }
+    expect(reportedListingDuration(liveProperty, history([observation({ episodeId: "" })], [{ ...episode, id: "" }]))).toBeNull();
+  });
+
+  it("allows clipped older observations but withholds claims when the episode list may be clipped", () => {
+    expect(reportedListingDuration(liveProperty, { ...history(), truncated: true })).toEqual({ days: 137, observedAt });
+    const episodes = [episode, ...Array.from({ length: 499 }, (_, index) => ({ ...episode, id: `older-${index}`, status: "removed" as const }))];
+    expect(reportedListingDuration(liveProperty, { ...history([observation()], episodes), truncated: true })).toBeNull();
+  });
+
+  it("rejects invalid/future observation and retrieval times, including future times later today", () => {
+    for (const time of ["not a date", "2026-02-30T08:00:00Z", "2026-09-27T08:00:00Z", `${AS_OF}T20:00:00Z`]) {
+      expect(reportedListingDuration(liveProperty, history([observation({ observedAt: time, effectiveDate: time.slice(0, 10) })]), AS_OF)).toBeNull();
+      expect(reportedListingDuration(liveProperty, { ...history(), retrievedAt: time }, AS_OF)).toBeNull();
+    }
+    expect(reportedListingDuration(liveProperty, history([observation({ effectiveDate: "2026-09-25" })]))).toBeNull();
+    expect(reportedListingDuration(liveProperty, history(), "invalid")).toBeNull();
+    expect(reportedListingDuration(liveProperty, undefined)).toBeNull();
+  });
+
+  it("withholds tied conflicting latest counts and ignores newer unusable values", () => {
+    expect(reportedListingDuration(liveProperty, history([observation(), observation({ id: "conflicting", value: { latestEpisodeDays: 138 } })]))).toBeNull();
+    expect(reportedListingDuration(liveProperty, history([observation(), observation({ id: "duplicate" })]))).toEqual({ days: 137, observedAt });
+    expect(reportedListingDuration(liveProperty, history([observation(), observation({ id: "empty-newer", observedAt: `${AS_OF}T09:00:00Z`, value: { latestEpisodeDays: null, totalDays: 500 } })]))).toEqual({ days: 137, observedAt });
   });
 });
