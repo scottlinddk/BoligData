@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Property } from "@shared/types/index";
-import type { ResearchCampaign, ResearchEpisode, ResearchEvent, ResearchHistoryResponse } from "@shared/types/research-api";
+import type { ResearchCampaign, ResearchEpisode, ResearchEvent, ResearchHistoryResponse, ResearchObservation } from "@shared/types/research-api";
 import { researchListingTime } from "./research-listing-time";
+import { listingEvidence } from "./listing-evidence";
 
 const NOW = "2026-09-26T12:00:00.000Z";
 const ago = (days: number) => new Date(Date.parse(NOW) - days * 86_400_000).toISOString().slice(0, 10);
@@ -131,5 +132,86 @@ describe("current listing chronology adapter", () => {
     const before = JSON.stringify(payload);
     expect(researchListingTime(property, payload).events.map((entry) => entry.id)).toEqual(["early", "late"]);
     expect(JSON.stringify(payload)).toBe(before);
+  });
+});
+
+describe("dated source count as latest-listing duration", () => {
+  const noStartProperty = { ...property, listingDate: null };
+  const current = episode({ startDate: null, datePrecision: "unknown" });
+  const observed: ResearchObservation = {
+    id: "duration", propertyId: property.id, episodeId: current.id, fieldName: "reported_time_on_market",
+    value: { latestEpisodeDays: 464, totalDays: 600 }, source: property.listingSource, sourceUrl: null,
+    effectiveDate: NOW.slice(0, 10), datePrecision: "day", observedAt: NOW, method: "source_reported_duration",
+    verificationStatus: "unverified", dataMode: "real", sourceFile: null, sourceSheet: null, sourceRow: null,
+    sourceVersion: "source-fixture/1", conflictGroup: null,
+  };
+  const sourceHistory = (overrides: Partial<ResearchHistoryResponse> = {}) => history({ episodes: [current], events: [], observations: [observed], ...overrides });
+
+  it("uses 464 source days with provenance while leaving other time definitions and starts unknown", () => {
+    const data = sourceHistory(); const before = structuredClone(data);
+    const result = researchListingTime(noStartProperty, data);
+    expect(result.time.latestEpisodeDays).toBe(464);
+    expect(result.latestEpisodeSource).toEqual({ kind: "source_reported", source: "boligsiden", observedAt: NOW });
+    expect(result.time.latestEpisodeDefinition).toContain("boligsiden");
+    expect(result.time.latestEpisodeDefinition).toContain("2026-09-26");
+    expect(result.time.activeDays).toBeNull(); expect(result.time.calendarDays).toBeNull();
+    expect(result.time.firstDocumentedListing).toBeNull(); expect(result.firstAsking).toBeNull();
+    expect(data).toEqual(before); expect(noStartProperty.listingDate).toBeNull();
+    expect(data.episodes[0]!.startDate).toBeNull(); expect(data.transactions).toEqual([]);
+    expect(listingEvidence(noStartProperty, result, undefined, NOW.slice(0, 10), data)).toMatchObject({ days: 464, documentedDays: false, reportedTime: { days: 464, observedAt: NOW } });
+    expect(result.warnings.some(warning => warning.includes("Starten på den aktuelle"))).toBe(false);
+  });
+  it("does not advance an older observed count or replace precise chronology with it", () => {
+    const older = { ...observed, observedAt: `${ago(2)}T12:00:00.000Z`, effectiveDate: ago(2) };
+    expect(researchListingTime(noStartProperty, sourceHistory({ observations: [older] })).time.latestEpisodeDays).toBe(464);
+    const precise = researchListingTime(property, history({ observations: [observed] }));
+    expect(precise.time.latestEpisodeDays).toBe(91); expect(precise.latestEpisodeSource).toBeNull();
+    expect(precise.time.activeDays).toBe(91); expect(precise.time.calendarDays).toBe(91);
+  });
+  it("allows a dated current count from truncated observation history without claiming campaign totals", () => {
+    const result = researchListingTime(noStartProperty, sourceHistory({ truncated: true }));
+    expect(result.time.latestEpisodeDays).toBe(464); expect(result.time.activeDays).toBeNull(); expect(result.time.calendarDays).toBeNull();
+  });
+  it("never reinterprets the source's total duration as current duration", () => {
+    const result = researchListingTime(noStartProperty, sourceHistory({ observations: [{ ...observed, value: { latestEpisodeDays: null, totalDays: 464 } }] }));
+    expect(result.time.latestEpisodeDays).toBeNull(); expect(result.latestEpisodeSource).toBeNull();
+  });
+  it("preserves zero as an observed current count", () => {
+    expect(researchListingTime(noStartProperty, sourceHistory({ observations: [{ ...observed, value: { latestEpisodeDays: 0, totalDays: 464 } }] })).time.latestEpisodeDays).toBe(0);
+  });
+  it("cannot bypass episode/campaign identity ambiguity or an impossible current episode", () => {
+    const alternatives: Partial<ResearchHistoryResponse>[] = [
+      { episodes: [current, { ...current, id: "duplicate" }] }, { episodes: [{ ...current, sourceListingId: "other-case" }] },
+      { episodes: [{ ...current, endDate: ago(1) }] }, { episodes: [{ ...current, observedAt: "2026-09-27T12:00:00Z" }] },
+      { campaigns: [] }, { campaigns: [{ ...campaign(), observedAt: "2027-01-01T00:00:00Z" }] },
+      { episodes: [current, episode({ id: "parallel", source: "boliga", sourceListingId: "parallel", campaignId: "another" })] },
+    ];
+    for (const change of alternatives) {
+      const result = researchListingTime(noStartProperty, sourceHistory(change));
+      expect(result.time.latestEpisodeDays).toBeNull(); expect(result.latestEpisodeSource).toBeNull();
+    }
+  });
+  it.each(["paused", "removed", "sold", "relisted"] as const)("cannot override a conflicting %s event on the current episode", eventType => {
+    const result = researchListingTime(noStartProperty, sourceHistory({ events: [event({ eventType, eventDate: ago(10), price: null })] }));
+    expect(result.time.latestEpisodeDays).toBeNull(); expect(result.latestEpisodeSource).toBeNull();
+  });
+  it("cannot override a contradictory known listing date, month-precise start or current first-listing event", () => {
+    expect(researchListingTime(property, sourceHistory()).time.latestEpisodeDays).toBeNull();
+    expect(researchListingTime(noStartProperty, sourceHistory({ episodes: [{ ...current, startDate: ago(30), datePrecision: "month" }] })).time.latestEpisodeDays).toBeNull();
+    expect(researchListingTime(noStartProperty, sourceHistory({ events: [event({ eventDate: ago(20) })] })).time.latestEpisodeDays).toBeNull();
+    expect(researchListingTime({ ...property, listingDate: "2026-02-30" }, sourceHistory()).time.latestEpisodeDays).toBeNull();
+  });
+  it("can corroborate a known start without inferring another start from the count", () => {
+    const result = researchListingTime({ ...property, listingDate: ago(464) }, sourceHistory());
+    expect(result.time.latestEpisodeDays).toBe(464); expect(result.latestEpisodeSource?.kind).toBe("source_reported");
+    expect(result.time.activeDays).toBeNull(); expect(result.time.calendarDays).toBeNull();
+  });
+  it("does not turn mock/future/unrelated/conflicting counts into current valuation duration", () => {
+    for (const change of [{ dataMode: "mock" }, { episodeId: "another" }, { verificationStatus: "conflict" },
+      { observedAt: "2026-09-26T18:00:00Z" }, { observedAt: "2026-09-27T08:00:00Z", effectiveDate: "2026-09-27" }] as Partial<ResearchObservation>[]) {
+      expect(researchListingTime(noStartProperty, sourceHistory({ observations: [{ ...observed, ...change }] })).time.latestEpisodeDays).toBeNull();
+    }
+    expect(researchListingTime({ ...noStartProperty, dataMode: "mock" }, sourceHistory()).time.latestEpisodeDays).toBeNull();
+    expect(researchListingTime(noStartProperty, sourceHistory({ observations: [observed, { ...observed, id: "conflict", value: { latestEpisodeDays: 465 } }] })).time.latestEpisodeDays).toBeNull();
   });
 });

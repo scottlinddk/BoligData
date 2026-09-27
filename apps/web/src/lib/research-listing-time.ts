@@ -4,6 +4,7 @@ import {
 } from "@shared/analysis";
 import type { Property } from "@shared/types/index";
 import type { ResearchEpisode, ResearchEvent, ResearchHistoryResponse } from "@shared/types/research-api";
+import { reportedListingDuration } from "./reported-listing-duration";
 
 const DAY = 86_400_000;
 
@@ -14,6 +15,9 @@ export interface ResearchListingTimeResult {
   events: ResearchEvent[];
   campaignId: string | null;
   warnings: string[];
+  /** Present only when the latest duration is a dated source count rather
+   * than elapsed days calculated from a documented start. */
+  latestEpisodeSource?: { kind: "source_reported"; source: string; observedAt: string } | null;
 }
 
 function dayOf(value: string | null | undefined): string | null {
@@ -55,6 +59,30 @@ function hasContradictoryLifecycle(episode: ResearchEpisode, events: ResearchEve
   });
 }
 
+/** A known start can corroborate a reported count, but cannot be silently
+ * contradicted by it. Check at observation time; never increment the count
+ * or manufacture a start date from it. */
+function reportedCountAgreesWithStarts(property: Property, episode: ResearchEpisode, events: ResearchEvent[], days: number, observedAt: string): boolean {
+  const observed = parseResearchDay(observedAt.slice(0, 10));
+  if (observed === null) return false;
+  const starts: Array<ResearchDate | null> = [];
+  if (property.listingDate != null) starts.push({ value: property.listingDate, precision: "day" });
+  if (episode.startDate !== null) starts.push(episode.datePrecision === "day" || episode.datePrecision === "month"
+    ? { value: episode.datePrecision === "month" ? episode.startDate.slice(0, 7) : episode.startDate, precision: episode.datePrecision }
+    : null);
+  for (const event of events.filter(event => event.episodeId === episode.id)) {
+    if (["paused", "removed", "sold", "relisted"].includes(event.eventType)) return false;
+    if (event.eventType === "first_listing" && event.eventDate !== null) starts.push(eventDate(event));
+  }
+  return starts.every(start => {
+    const bounds = start ? researchDateBounds(start) : null;
+    if (!bounds) return false;
+    const earliest = parseResearchDay(bounds.earliest)!;
+    const latest = parseResearchDay(bounds.latest)!;
+    return earliest <= observed && days >= Math.max(0, (observed - latest) / DAY) && days <= (observed - earliest) / DAY;
+  });
+}
+
 /** Resolve chronology by explicit source/listing identity, never by whichever
  * observation is newest. Source-reported elapsed listing time is not active
  * campaign time, calendar time, or the crawler's first observation. */
@@ -71,13 +99,14 @@ export function researchListingTime(property: Property, history?: ResearchHistor
   const finish = (input: {
     latest?: number | null; definition?: string | null; intervals?: ResearchActiveInterval[];
     first?: ResearchDate | null; firstAsking?: number | null; campaignId?: string | null;
+    latestSource?: ResearchListingTimeResult["latestEpisodeSource"];
   } = {}): ResearchListingTimeResult => {
     const time = calculateResearchTimeMetrics({ intervals: input.intervals ?? [], asOf,
       latestEpisodeDays: input.latest ?? null, latestEpisodeDefinition: input.definition ?? null,
       firstDocumentedListing: input.first ?? null, firstSeenAt });
     const combined = [...new Set([...warnings, ...time.warnings])];
     return { time: { ...time, warnings: combined }, firstAsking: input.firstAsking ?? null,
-      events, campaignId: input.campaignId ?? null, warnings: combined };
+      events, campaignId: input.campaignId ?? null, warnings: combined, latestEpisodeSource: input.latestSource ?? null };
   };
 
   if (property.dataMode !== "real" || property.status !== "active") {
@@ -140,15 +169,26 @@ export function researchListingTime(property: Property, history?: ResearchHistor
     warnings.push("Annoncens startdato eller status strider mod det dokumenterede periodeforløb. Afklar kilden før beregning.");
     return finish({ campaignId });
   }
-  const latestDays = latestInterval ? (parseResearchDay(asOf)! - parseResearchDay(latestInterval.start.value)!) / DAY : null;
-  const definition = latestDays !== null
+  let latestDays = latestInterval ? (parseResearchDay(asOf)! - parseResearchDay(latestInterval.start.value)!) / DAY : null;
+  let definition = latestDays !== null
     ? `Forløbne kalenderdage fra præcist dokumenteret start på den aktuelle aktive udbudsperiode (${latest.source}); ikke samlet aktiv tid eller kalendertid for hele salgsforløbet.`
     : null;
+  let latestSource: ResearchListingTimeResult["latestEpisodeSource"] = null;
+  if (latestDays === null) {
+    const reported = reportedListingDuration(property, history);
+    const campaignObserved = Date.parse(campaign[0]!.observedAt);
+    if (reported && Number.isFinite(campaignObserved) && campaignObserved <= Date.parse(history!.retrievedAt) &&
+        reportedCountAgreesWithStarts(property, latest, campaignEvents, reported.days, reported.observedAt)) {
+      latestDays = reported.days;
+      latestSource = { kind: "source_reported", source: latest.source, observedAt: reported.observedAt };
+      definition = `Kildens oplyste liggetid for den aktuelle annonce (${latest.source}), observeret ${reported.observedAt.slice(0, 10)}. Dagetallet bruges uændret; ingen startdato, samlet aktiv tid eller kalendertid udledes.`;
+    }
+  }
   if (latestDays === null) warnings.push("Starten på den aktuelle udbudsperiode mangler dagpræcision eller gyldig dokumentation; en tidligere annoncedato genbruges ikke.");
-  if (history!.truncated) return finish({ latest: latestDays, definition, campaignId });
+  if (history!.truncated) return finish({ latest: latestDays, definition, campaignId, latestSource });
   if (relevant.some((episode) => episode.status === "sold") || campaignEvents.some((event) => event.eventType === "sold")) {
     warnings.push("Det samme salgsforløb indeholder en afsluttet handel og et nyt aktivt udbud. Første pris og samlet tid kræver særskilt sammenkædning af det nye forløb.");
-    return finish({ latest: latestDays, definition, campaignId });
+    return finish({ latest: latestDays, definition, campaignId, latestSource });
   }
 
   const mappedIntervals = relevant.map((episode) => preciseEpisode(episode, asOf));
@@ -183,5 +223,5 @@ export function researchListingTime(property: Property, history?: ResearchHistor
       firstAsking = null;
     }
   }
-  return finish({ latest: latestDays, definition, intervals, first, firstAsking, campaignId });
+  return finish({ latest: latestDays, definition, intervals, first, firstAsking, campaignId, latestSource });
 }
