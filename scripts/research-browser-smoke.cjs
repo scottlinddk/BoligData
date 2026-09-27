@@ -1,7 +1,7 @@
 /* Run against a local Vite server: node scripts/research-browser-smoke.cjs
  * Every API, Supabase, map and external request is mocked or blocked. No production login or write occurs.
  * PLAYWRIGHT_MODULE, BROWSER_EXECUTABLE, SMOKE_BASE_URL, SMOKE_OUTPUT_DIR and SMOKE_THEME can override local defaults.
- * SMOKE_SCENARIO=sparse covers fresh accounts; saved-empty covers a saved project without assessable results.
+ * SMOKE_SCENARIO=sparse covers fresh accounts; saved-empty covers saved projects; thin covers fewer than five usable sales.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -14,7 +14,7 @@ assert(["127.0.0.1", "localhost"].includes(new URL(baseUrl).hostname), "Only a l
 const theme = process.env.SMOKE_THEME || "light";
 assert(["light", "dark"].includes(theme), "SMOKE_THEME must be light or dark");
 const scenario = process.env.SMOKE_SCENARIO || "complete";
-assert(["complete", "sparse", "saved-empty"].includes(scenario), "SMOKE_SCENARIO must be complete, sparse or saved-empty");
+assert(["complete", "sparse", "saved-empty", "thin"].includes(scenario), "SMOKE_SCENARIO must be complete, sparse, saved-empty or thin");
 const sparseEvidence = scenario !== "complete";
 const outputDir = process.env.SMOKE_OUTPUT_DIR || path.join(root, `node_modules/.cache/research-smoke${sparseEvidence ? `-${scenario}` : ""}${theme === "dark" ? "-dark" : ""}`);
 fs.mkdirSync(outputDir, { recursive: true });
@@ -99,8 +99,16 @@ const sparseLookup = subject => {
   return result;
 };
 const scopedHistory = subject => ({ ...emptyHistory(),
-  transactions: subject.id === sparseProperties[1].id ? transactions.slice(0, 5).map(row => ({ ...row, latestEpisodeDays: 464, activeDays: 464 })) : [sparseProperties[2].id, sparseProperties[3].id].includes(subject.id) ? transactions.slice(0, 5).map(row => ({ ...row })) : [],
-  marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 },
+  transactions: subject.id === sparseProperties[1].id ? transactions.slice(0, 5).map(row => ({ ...row, propertyId: `boligsiden-address:${row.propertyId}`, unitId: row.propertyId, source: "boligsiden", sourceUrl: null, areaEvidence: "reported", firstAsking: null, lastAsking: null, latestEpisodeDays: null, activeDays: null })) : [sparseProperties[2].id, sparseProperties[3].id].includes(subject.id) ? transactions.slice(0, 5).map(row => ({ ...row })) : [],
+  marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000, ...(subject.id === sparseProperties[1].id ? { population: "registered_postal_sales", postalCode: "9000" } : {}) },
+});
+const thinHistory = subject => ({ ...emptyHistory(),
+  transactions: subject.id === sparseProperties[1].id ? [
+    ...transactions.slice(0, 2).map(row => ({ ...row, source: "boligsiden", firstAsking: null, lastAsking: null, latestEpisodeDays: null, activeDays: null })),
+    { ...transactions[2], address: "Udelukket familievej 3, Aalborg", saleType: "family" },
+    { ...transactions[3], address: "Udelukket arealvej 4, Aalborg", areaAtSale: false },
+  ] : [],
+  marketScope: { propertyId: subject.id, municipality: subject.municipality, propertyType: subject.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000, population: "stored_listing_sales", liveSourceUnavailable: true },
 });
 let activeSparseProperty = sparseProperties[0];
 
@@ -128,19 +136,19 @@ async function main() {
     if (request.method() !== "GET") report.apiWrites.push({ path: url.pathname, resource, method: request.method(), body: request.postDataJSON() });
     else report.apiReads.push({ path: url.pathname, ...Object.fromEntries(url.searchParams) });
     if (url.pathname === "/api/account" && resource === "research-project") {
-      if (scenario === "sparse") return json(route, { project: null, updatedAt: null });
+      if (scenario === "sparse" || scenario === "thin") return json(route, { project: null, updatedAt: null });
       if (request.method() === "PUT") project = request.postDataJSON().project;
       return json(route, { project, updatedAt: now });
     }
     if (url.pathname === "/api/account" && resource === "research-assessment") {
-      if (scenario === "sparse") return json(route, { assessment: null, revision: 0, updatedAt: null, revisions: [] });
+      if (scenario === "sparse" || scenario === "thin") return json(route, { assessment: null, revision: 0, updatedAt: null, revisions: [] });
       if (request.method() === "PUT") assessment = request.postDataJSON().assessment;
       return json(route, { assessment, revision: 1, updatedAt: now, revisions: [] });
     }
     if (resource === "research-assessments") return json(route, { assessments: scenario === "sparse" ? [] : [{ assessment, revision: 1, updatedAt: now, property }] });
     if (resource === "research-history") {
       const marketId = url.searchParams.get("marketForPropertyId");
-      if (sparseEvidence) return json(route, marketId ? scopedHistory(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
+      if (sparseEvidence) return json(route, marketId ? (scenario === "thin" ? thinHistory : scopedHistory)(sparseProperties.find(row => row.id === marketId) ?? activeSparseProperty) : sparseHistory(sparseProperties.find(row => row.id === url.searchParams.get("propertyId")) ?? activeSparseProperty));
       return json(route, marketId ? { ...history, campaigns: [], episodes: [], events: [], observations: [], marketScope: { propertyId: marketId, municipality: property.municipality, propertyType: property.propertyType, saleFrom: dayBefore(730), saleTo: now.slice(0, 10), limit: 2000 } } : history);
     }
     if (resource === "connections") return json(route, { connections: [] });
@@ -179,6 +187,43 @@ async function main() {
     assert(colors.ratio >= 4.5, `${label} contrast must be 4.5:1: ${JSON.stringify(colors)}`);
   };
   try {
+    if (scenario === "thin") {
+      activeSparseProperty = sparseProperties[1];
+      await page.goto(`${baseUrl}/property/${activeSparseProperty.id}`);
+      const price = page.getByTestId("listing-price-reference");
+      const sales = price.getByTestId("listing-price-observed-sales");
+      await sales.waitFor();
+      await price.getByRole("heading", { name: "2 sammenlignelige handler fundet", exact: true }).waitFor();
+      const text = await sales.innerText();
+      for (const value of ["Referencevej 1", "Referencevej 2", "3.800.000", "3.900.000", dayBefore(365), "140 m²"]) assert(text.includes(value), `Observed eligible sale fact ${value} must be visible`);
+      assert.equal(await sales.getByRole("listitem").count(), 2, "Only the two eligible trades should be shown as matching sales");
+      assert(!text.includes("Udelukket"), "Family transfers and undocumented sale areas must not be promoted into eligible examples");
+      assert((await price.innerText()).includes("2 egnede handler blandt 4"));
+      assert((await price.getByTestId("listing-price-source-unavailable").innerText()).includes("gemte salgsregistreringer"), "The user must know that the live feed failed and stored records form this evidence");
+      assert((await price.getByTestId("listing-price-median").innerText()).includes("Ingen beregnelig prisreference endnu"));
+      assert.equal(await price.getByTestId("listing-price-baseline").count(), 0);
+      assert.equal(await price.getByTestId("listing-price-range").count(), 0);
+      assert.equal(await price.getByRole("button", { name: /budgetscenario/ }).count(), 0, "Individual sale prices must not become an actionable valuation");
+      await darkContrast("Thin evidence source status", price.getByTestId("listing-price-source-unavailable"));
+      await screenshot("research-thin-observed-sales", price);
+      report.checks.push("Two eligible stored sales show their actual prices, addresses, dates and areas; rejected records stay excluded and no valuation is invented");
+      await page.setViewportSize({ width: 390, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await screenshot("research-thin-mobile", price);
+      activeSparseProperty = sparseProperties[2];
+      await page.goto(`${baseUrl}/property/${activeSparseProperty.id}`);
+      await price.getByTestId("listing-price-source-unavailable").waitFor();
+      assert.equal(await price.getByTestId("listing-price-observed-sales").count(), 0, "Zero usable trades must not retain the previous home's sale examples");
+      assert.equal(await price.getByTestId("listing-price-baseline").count(), 0);
+      assert(!(await price.innerText()).includes("3.800.000") && !(await price.innerText()).includes("3.900.000"));
+      assert.equal(await price.getByRole("button", { name: /budgetscenario/ }).count(), 0);
+      assert.equal(report.apiWrites.length, 0);
+      assert.deepEqual(report.pageErrors, []);
+      assert.deepEqual(report.unmockedApiRequests, []);
+      await screenshot("research-thin-zero-sales", price);
+      report.checks.push("Zero-sale fallback clears prior examples, explains the unavailable source, and exposes no price or budget action");
+      return;
+    }
     if (scenario === "saved-empty") {
       await page.goto(`${baseUrl}/property/${propertyId}`);
       const workbench = page.locator("#research");
@@ -257,8 +302,15 @@ async function main() {
       assert(!liveText.includes("4.900.000"), "Navigating to another listing must replace the previous asking price");
       assert(/464\s*dage/i.test(liveText), "A dated source duration must remain visible without a listing start date");
       assert(!liveText.includes("Siden oplyst annoncedato") && !liveText.includes("Aktuelt udbudsforløb") && !liveText.includes(dayBefore(464)), "Reported days must not fabricate a start date or documented period");
-      assert(!(await page.getByTestId("listing-price-median").innerText()).includes("3.571.429"), "Five sales with the same reported duration must not become a time-matched reference without documented subject chronology");
+      const postalPrice = page.getByTestId("listing-price-reference");
+      const postalBaseline = postalPrice.getByTestId("listing-price-baseline");
+      await postalBaseline.getByText(/3\.571\.429/).waitFor();
+      assert((await postalPrice.innerText()).includes("Boligsidens registrerede salg i postnummer 9000"), "The visible price must identify the separate registered postal-sale population");
+      assert((await postalPrice.innerText()).includes("Prisreference uden match på liggetid"), "The sold-price baseline must clearly state that it has no duration matching");
+      assert((await postalPrice.getByLabel("Tidsdefinition til prisreference", { exact: true }).innerText()).includes("Seneste udbudsperiode · ukendt"), "Reported listing days must remain separate from documented valuation chronology");
+      assert(!(await postalPrice.getByTestId("listing-price-median").innerText()).includes("3.571.429"), "Registered sale prices must not fabricate a time-matched reference when chronology is absent");
       assert.equal(await page.getByRole("button", { name: "Brug som budgetscenario", exact: true }).count(), 0, "Source-reported days must not unlock the documented-time reference action");
+      await darkContrast("Registered-sales baseline price", postalBaseline);
       await screenshot("research-fresh-live-sales", page.locator("#research"));
       report.checks.push("A different live listing shows 464 source-reported days and real own/nearby sales without inventing a start date or unlocking a time-matched reference");
       await page.setViewportSize({ width: 390, height: 844 });
@@ -267,6 +319,15 @@ async function main() {
       await screenshot("research-fresh-mobile", null, false);
       report.checks.push("Fresh-account evidence and setup fit a 390px viewport");
       await page.setViewportSize({ width: 1365, height: 900 });
+      await page.getByTestId("research-project-setup").getByRole("button", { name: "Tilpas dit boligprojekt", exact: true }).click();
+      await page.locator("#research").getByRole("tab", { name: "Sammenligninger", exact: true }).click();
+      const externalSales = page.getByRole("tabpanel").getByRole("table");
+      await externalSales.getByText("Referencevej 1, Aalborg", { exact: true }).waitFor();
+      assert.equal(await externalSales.getByRole("link", { name: /Referencevej/ }).count(), 0, "External registered addresses must not link to nonexistent local property pages");
+      assert.equal(await page.locator('a[href*="/property/boligsiden-address:"]').count(), 0);
+      assert.equal(await externalSales.getByRole("row").count(), 6, "All five source sales remain inspectable behind the baseline price");
+      await screenshot("research-postal-sale-comparisons", page.getByRole("tabpanel"));
+      report.checks.push("Five registered postal sales produce a labelled DKK3,571,429 baseline and inspectable external rows without invented local links or listing durations");
 
       await openSparse(2);
       const baseline = page.getByTestId("listing-price-baseline");
