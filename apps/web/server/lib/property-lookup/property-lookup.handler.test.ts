@@ -27,18 +27,22 @@ const parcelRecord = { bfenummer: 2340871 };
 
 const bbrBody = {
   data: {
-    DAR_Husnummer: {
+    BBR_Bygning: {
+      pageInfo: { hasNextPage: false },
       nodes: [
         {
-          husnummerGiverAdgangTilBygning: [
-            {
-              byg021BygningensAnvendelse: 120,
-              byg026Opfoerelsesaar: 1962,
-              byg038SamletBygningsareal: 168,
-              byg039BygningensSamledeBoligAreal: 142,
-              byg056Varmeinstallation: 1,
-            },
-          ],
+          id_lokalId: "a49ca297-725b-4510-ae12-000000000001",
+          husnummer: dawaRecord.id,
+          status: "6",
+          registreringFra: "2020-01-01T00:00:00Z",
+          registreringTil: null,
+          virkningFra: "1962-01-01T00:00:00Z",
+          virkningTil: null,
+          byg021BygningensAnvendelse: 120,
+          byg026Opfoerelsesaar: 1962,
+          byg038SamletBygningsareal: 168,
+          byg039BygningensSamledeBoligAreal: 142,
+          byg056Varmeinstallation: 1,
         },
       ],
     },
@@ -57,6 +61,7 @@ function introspectionBody(fields: string[]) {
 }
 
 const BYGNING_FIELDS = [
+  "id_lokalId", "husnummer", "status", "registreringFra", "registreringTil", "virkningFra", "virkningTil",
   "byg007Bygningsnummer",
   "byg021BygningensAnvendelse",
   "byg026Opfoerelsesaar",
@@ -89,7 +94,7 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
       ? [dawaRecord]
       : href.includes("/jordstykker/")
         ? parcelRecord
-        : href.includes("/DAR/")
+        : href.includes("/BBR/")
           ? introspecting
             ? introspectionBody(BYGNING_FIELDS)
             : (overrides.bbr ?? bbrBody)
@@ -127,7 +132,7 @@ describe("lookupProperty (live)", () => {
     expect(result.resolved.ejerlav).toBe("Gl. Hasseris By, Hasseris");
     expect(result.resolved.bfeNummer).toBe("2340871");
     expect(result.bbrData?.yearBuilt).toBe(1962);
-    expect(result.bbrData?.areaSqm).toBe(142);
+    expect(result.bbrData?.areaSqm).toBeNull(); // Entrance/building identity does not identify the housing unit.
     expect(result.bbrData?.heatingInstallation).toBe("fjernvarme");
     expect(result.publicValuation?.assessedPropertyValueDkk).toBe(3_150_000);
     expect(result.scoringInputs.noiseZoneEstimate).toBe(57);

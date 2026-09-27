@@ -43,6 +43,9 @@ export interface ResearchHistoryResponse {
   marketScope?: {
     propertyId: string; municipality: string | null; propertyType: PropertyType | null;
     saleFrom: string; saleTo: string; limit: number;
+    population?: "registered_postal_sales" | "stored_listing_sales";
+    postalCode?: string;
+    liveSourceUnavailable?: boolean;
     unavailableReason?: "missing_subject_location_or_type";
   };
 }

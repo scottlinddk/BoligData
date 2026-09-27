@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { ResearchHistoryResponse } from "../../../../../packages/shared/src/types/research-api.js";
 import { handleResearch, RESEARCH_MARKET_LIMIT } from "./handlers.js";
+import { stubFetch } from "../test-support/stub-fetch.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 type Row = Record<string, any>;
@@ -42,9 +43,27 @@ async function run(client: ReturnType<typeof fakeClient>, query: Record<string, 
   return { response, result: response.json.mock.calls[0]?.[0] as ResearchHistoryResponse };
 }
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-26T12:00:00Z")); });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe("property-scoped market history", () => {
+  it("returns a separate registered-sales population including homes not currently advertised", async () => {
+    vi.stubEnv("BOLIGSIDEN_ADDRESS_API_BASE", "https://source.example/handler-market");
+    stubFetch([{ body: { addresses: [{ addressID: "00000000-0000-4000-8000-000000000001", addressType: "villa", zipCode: 9000, municipality: { name: "Aalborg" }, coordinates: { lat: 57.055, lon: 9.92 }, road: { name: "Soldvej" }, houseNumber: "7", registrations: [{ amount: 2_000_000, livingArea: 130, date: "2026-08-01", type: "normal" }] }], totalHits: 1 } }]);
+    const client = fakeClient({ properties: [{ ...subject, address: "Subjectvej 1", data_mode: "real", postal_code: "9000", lat: 57.05, lon: 9.90 }], sale_transactions: [sale("listing-only")] });
+    const { result } = await run(client);
+    expect(result.transactions).toHaveLength(1);
+    expect(result.transactions[0]?.address).toBe("Soldvej 7, 9000 Aalborg");
+    expect(result.marketScope).toMatchObject({ population: "registered_postal_sales", postalCode: "9000" });
+    expect(client.calls.every(call => call.table === "properties")).toBe(true);
+  });
+
+  it("retains stored sales with explicit source failure metadata", async () => {
+    vi.stubEnv("BOLIGSIDEN_ADDRESS_API_BASE", "https://source.example/handler-failure");
+    stubFetch([{ status: 403, body: {} }]);
+    const { result } = await run(fakeClient({ properties: [{ ...subject, address: "Subjectvej 1", data_mode: "real", postal_code: "9000", lat: 57.05, lon: 9.90 }], sale_transactions: [sale("stored")] }));
+    expect(result.transactions[0]?.id).toBe("stored");
+    expect(result.marketScope).toMatchObject({ population: "stored_listing_sales", liveSourceUnavailable: true });
+  });
   it("selects local comparable candidates before the cap and preserves conflicting transfer/area sources", async () => {
     const unrelated = Array.from({ length: 600 }, (_, i) => sale(`unrelated-${i}`, { properties: { municipality: "København", property_type: "villa" }, observed_at: "2026-09-26T00:00:00Z" }));
     const local = Array.from({ length: 6 }, (_, i) => sale(`local-${i}`));

@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchMarketSales, type MarketSubject } from "../research/market-source.js";
+import { estimateResearchPrice } from "../../../../../packages/shared/src/analysis/valuation.js";
 
 const TARGET_ID = "9dfbb273-37da-4e21-b8c7-f482d2aae19d";
-const PUBLIC_COLUMNS = "id,address,listing_source,external_id,data_mode,listing_date,listing_date_definition,price,sqm,status,last_seen_at";
+const PUBLIC_COLUMNS = "id,address,municipality,postal_code,property_type,lat,lon,listing_source,external_id,data_mode,listing_date,listing_date_definition,price,sqm,status,last_seen_at";
 const GROUPS = ["sales", "bbr", "valuation", "soil_type", "soil_contamination", "noise"];
 
 /** Whitelist source metadata, never raw payloads, errors, credentials or owner IDs. */
@@ -55,5 +57,13 @@ export async function verifyCrawlData(client: SupabaseClient) {
     const reportedTimeOnMarket = duration ? { observedAt: duration.observed_at, latestEpisodeDays: days(duration.value?.latestEpisodeDays), totalDays: days(duration.value?.totalDays) } : null;
     samples.push({ ...property, ownRealTransactionCount: sales.count, enrichedAt: enrichment.data?.enriched_at ?? null, reportedTimeOnMarket, sourceGroups: verificationSourceGroups(enrichment.data?.source_status) });
   }
-  return { counts, targetFound: Boolean(target.data), samples };
+  let targetMarket = null;
+  if (target.data?.data_mode === "real") {
+    const now = new Date().toISOString();
+    const from = `${Number(now.slice(0, 4)) - 2}${now.slice(4, 10)}`;
+    const live = await fetchMarketSales(target.data as MarketSubject, from);
+    const reference = estimateResearchPrice({ subject: { propertyId: target.data.id, propertyType: target.data.property_type, municipality: target.data.municipality, residentialArea: target.data.sqm, areaEvidence: "reported", dataMode: "live", firstAsking: null, firstAskingDocumented: false, daysOnMarket: null, timeDefinition: "latest_episode_days" }, transactions: live.transactions, dataVersion: "verification", calculatedAt: now, partialDataset: live.truncated });
+    targetMarket = { sourceStatus: live.status, transactions: live.transactions.length, eligibleSales: reference.baseline.count, baselinePrice: reference.baseline.median, truncated: live.truncated };
+  }
+  return { counts, targetFound: Boolean(target.data), samples, targetMarket };
 }
