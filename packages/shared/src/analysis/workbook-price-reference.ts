@@ -17,6 +17,8 @@ export interface WorkbookPriceReferenceBracket {
 export type WorkbookPriceReferenceMetadata = typeof snapshot.metadata;
 export interface WorkbookPriceReferenceModel {
   metadata: WorkbookPriceReferenceMetadata;
+  /** Statistics over every eligible raw sale, not an average of bracket statistics. */
+  aggregate: WorkbookPriceReferenceBracket;
   brackets: readonly WorkbookPriceReferenceBracket[];
 }
 
@@ -25,7 +27,7 @@ export const WORKBOOK_PRICE_REFERENCE_MODEL: WorkbookPriceReferenceModel = snaps
 export const WORKBOOK_PRICE_REFERENCE_METADATA = WORKBOOK_PRICE_REFERENCE_MODEL.metadata;
 
 export interface WorkbookPriceReferenceInput {
-  /** First asking price of the relevant journey, never a fallback to today's price.
+  /** First asking price of the relevant journey, never a caller fallback to today's price.
    * Callers must label any source-percentage reconstruction as an approximate scenario. */
   firstAsking: number | null;
   currentAsking: number | null;
@@ -37,6 +39,7 @@ export interface WorkbookPriceReferenceInput {
 
 export type WorkbookPriceReferenceStatus =
   | "available"
+  | "missing_price"
   | "missing_first_asking"
   | "missing_days"
   | "outside_observed_range"
@@ -46,6 +49,12 @@ export type WorkbookPriceReferenceStatus =
 
 export interface WorkbookPriceReferenceResult {
   status: WorkbookPriceReferenceStatus;
+  priceBasis: "first_asking" | "current_asking" | null;
+  timeBasis: "matched_bracket" | "nearest_bracket" | "all_sales";
+  /** The actual price multiplied by historical discounts; never added to chronology. */
+  baselinePrice: number | null;
+  /** Actual whole nonnegative input days; unknown/invalid values remain null. */
+  latestEpisodeDays: number | null;
   /** Scope is disclosed, never confused with locally matched comparable sales. */
   applicability: "sample_scope" | "broad_scenario";
   reason: string | null;
@@ -78,31 +87,43 @@ export function calculateWorkbookPriceReference(
   model: WorkbookPriceReferenceModel = WORKBOOK_PRICE_REFERENCE_MODEL,
 ): WorkbookPriceReferenceResult {
   const metadata = model.metadata;
+  const priceBasis = validPrice(input.firstAsking) ? "first_asking" : validPrice(input.currentAsking) ? "current_asking" : null;
+  const baselinePrice = priceBasis === "first_asking" ? input.firstAsking : priceBasis === "current_asking" ? input.currentAsking : null;
+  const latestEpisodeDays = input.latestEpisodeDays !== null && Number.isInteger(input.latestEpisodeDays) && input.latestEpisodeDays >= 0
+    ? input.latestEpisodeDays : null;
+  const timeBasis = latestEpisodeDays === null ? "all_sales"
+    : latestEpisodeDays < metadata.observedMinDays || latestEpisodeDays > metadata.observedMaxDays ? "nearest_bracket" : "matched_bracket";
   const withinSampleScope = metadata.propertyTypes.includes(input.propertyType?.trim().toLowerCase() ?? "")
     && metadata.postalCodes.includes(input.postalCode?.trim() ?? "");
   const empty: WorkbookPriceReferenceResult = {
     status: "available", applicability: withinSampleScope ? "sample_scope" : "broad_scenario", reason: null, referencePrice: null, lowerPrice: null,
     upperPrice: null, gapAmount: null, gapPercent: null, medianDiscountPercent: null,
-    bracket: null, metadata,
+    bracket: null, metadata, priceBasis, timeBasis, baselinePrice, latestEpisodeDays,
   };
   const unavailable = (status: WorkbookPriceReferenceStatus, reason: string,
     bracket: WorkbookPriceReferenceBracket | null = null): WorkbookPriceReferenceResult =>
     ({ ...empty, status, reason, bracket });
 
-  if (input.latestEpisodeDays === null || !Number.isInteger(input.latestEpisodeDays) || input.latestEpisodeDays < 0) {
-    return unavailable("missing_days", "Der mangler et dokumenteret antal dage i seneste udbudsperiode.");
+  if (!Number.isInteger(metadata.observedMinDays) || metadata.observedMinDays < 0
+      || !Number.isInteger(metadata.observedMaxDays) || metadata.observedMaxDays < metadata.observedMinDays) {
+    return unavailable("invalid_model", "Datagrundlagets observerede liggetid er ugyldig.");
   }
-  if (input.latestEpisodeDays < metadata.observedMinDays || input.latestEpisodeDays > metadata.observedMaxDays) {
-    return unavailable("outside_observed_range", `Liggetiden ligger uden for grundlagets ${metadata.observedMinDays}–${metadata.observedMaxDays} observerede dage.`);
-  }
-  const matches = model.brackets.filter((row) =>
-    input.latestEpisodeDays! >= row.fromDays && input.latestEpisodeDays! <= row.toDays);
+  // Only the lookup is bounded. Preserve the listing's actual duration and label
+  // boundary reuse explicitly instead of fabricating a day or extrapolated trend.
+  const lookupDays = latestEpisodeDays === null ? null : Math.max(metadata.observedMinDays, Math.min(metadata.observedMaxDays, latestEpisodeDays));
+  const matches = lookupDays === null ? [model.aggregate] : model.brackets.filter((row) =>
+    lookupDays >= row.fromDays && lookupDays <= row.toDays);
   if (matches.length !== 1) {
     return unavailable("invalid_model", "Der findes ikke én entydig liggetidsgruppe i datagrundlaget.");
   }
   const bracket = matches[0]!;
-  if (!Number.isInteger(bracket.count) || bracket.count < metadata.minimumSample) {
-    return unavailable("insufficient_sample", `Gruppen har færre end ${metadata.minimumSample} handler. Der vises ingen prisreference.`, bracket);
+  if (!bracket || !Number.isInteger(bracket.count) || bracket.count < 0
+      || !Number.isInteger(bracket.fromDays) || !Number.isInteger(bracket.toDays)
+      || bracket.fromDays < 0 || bracket.toDays < bracket.fromDays) {
+    return unavailable("invalid_model", "Datagrundlagets tidsgruppe eller antal handler er ugyldigt.");
+  }
+  if (bracket.count === 0) {
+    return unavailable("insufficient_sample", "Gruppen har ingen observerede handler.", bracket);
   }
   const discounts = [bracket.q1DiscountFraction, bracket.medianDiscountFraction, bracket.q3DiscountFraction];
   if (!Number.isFinite(metadata.roundingDkk) || metadata.roundingDkk <= 0
@@ -111,17 +132,26 @@ export function calculateWorkbookPriceReference(
       || bracket.medianDiscountFraction > bracket.q3DiscountFraction) {
     return unavailable("invalid_model", "Datagrundlagets prisfald eller afrunding er ugyldige.", bracket);
   }
-  if (!validPrice(input.firstAsking)) {
+  if (!validPrice(baselinePrice)) {
     return {
-      ...unavailable("missing_first_asking", "En dokumenteret første udbudspris mangler. Dagens pris kan ikke erstatte den.", bracket),
+      ...unavailable("missing_price", "Der mangler en positiv første eller aktuel udbudspris som scenariobasis.", bracket),
       medianDiscountPercent: bracket.medianDiscountFraction * 100,
     };
   }
   const round = (value: number) => Math.round(value / metadata.roundingDkk) * metadata.roundingDkk;
-  const referencePrice = round(input.firstAsking * (1 - bracket.medianDiscountFraction));
-  const lowerPrice = round(input.firstAsking * (1 - bracket.q3DiscountFraction));
-  const upperPrice = round(input.firstAsking * (1 - bracket.q1DiscountFraction));
-  if (![referencePrice, lowerPrice, upperPrice].every((value) => Number.isFinite(value) && value > 0)) {
+  const unrounded = [
+    baselinePrice * (1 - bracket.medianDiscountFraction),
+    baselinePrice * (1 - bracket.q3DiscountFraction),
+    baselinePrice * (1 - bracket.q1DiscountFraction),
+  ] as const;
+  if (!unrounded.every((value) => Number.isFinite(value) && value > 0)) {
+    return unavailable("invalid_model", "Prisreferencen kan ikke beregnes med de angivne beløb.", bracket);
+  }
+  const referencePrice = round(unrounded[0]);
+  const lowerPrice = round(unrounded[1]);
+  const upperPrice = round(unrounded[2]);
+  // A valid positive scenario can round to zero at the chosen display precision.
+  if (![referencePrice, lowerPrice, upperPrice].every((value) => Number.isFinite(value) && value >= 0)) {
     return unavailable("invalid_model", "Prisreferencen kan ikke beregnes med de angivne beløb.", bracket);
   }
   const gapAmount = validPrice(input.currentAsking) ? input.currentAsking - referencePrice : null;

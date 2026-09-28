@@ -4,9 +4,9 @@ import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import { researchListingTime } from "./research-listing-time";
 import { reportedAskingPrice } from "./reported-asking-price";
 
-/** Keep source chronology rules identical to the research workbench. In
- * particular, today's asking price and firstSeenAt are never model inputs
- * standing in for the first asking price and listing start. */
+/** Preserve documented chronology. The calculator may use today's asking price
+ * as an explicitly labelled scenario baseline, but never writes it into the
+ * first-asking history or invents a listing start from firstSeenAt. */
 export function workbookListingReference(property: Property, history?: ResearchHistoryResponse) {
   const listing = researchListingTime(property, history);
   const currentEpisodes = (history?.episodes ?? []).filter(episode =>
@@ -38,7 +38,7 @@ export function workbookListingReference(property: Property, history?: ResearchH
     propertyType: property.propertyType,
     postalCode: property.postalCode,
   });
-  const candidate = currentEpisodes.length === 1 ? currentEpisodes[0]!.observedAt : null;
+  const candidate = property.dataMode === "real" && property.status === "active" && currentEpisodes.length === 1 ? currentEpisodes[0]!.observedAt : null;
   const stamp = candidate ? timestamp(candidate) : NaN;
   const lastSourceCheck = !invalidSourceTiming && candidate && Number.isFinite(stamp) && stamp <= cutoff ? candidate : null;
   return {

@@ -128,10 +128,28 @@ def extract(source):
         brackets.append(bracket)
 
     observed_days = [record["latestEpisodeDays"] for record in eligible]
+    # Pool the actual eligible observations, never the medians of unequal bins.
+    all_discounts = [record["calculatedDiscountFraction"] for record in eligible]
+    all_sensitive = [record["calculatedDiscountFraction"] for record in eligible
+                     if record["previousEpisodeFlag"] == 0]
+    aggregate = {
+        "sourceRange": "Grunddata!A7:AB443",
+        "label": "Alle liggetider",
+        "count": len(all_discounts),
+        "medianDiscountFraction": statistics.median(all_discounts),
+        "meanDiscountFraction": statistics.mean(all_discounts),
+        "q1DiscountFraction": quartile(all_discounts, .25),
+        "q3DiscountFraction": quartile(all_discounts, .75),
+        "sensitivityCount": len(all_sensitive),
+        "sensitivityMedianDiscountFraction": statistics.median(all_sensitive),
+        "fromDays": min(observed_days),
+        "toDays": max(observed_days),
+    }
     same_number(calculator["J5"].value, min(observed_days), "Prisberegner!J5")
     same_number(calculator["J6"].value, max(observed_days), "Prisberegner!J6")
     metadata = {
         "version": "workbook-liggetid/2026-09-27",
+        "calculationVersion": "workbook-price-scenario/2.0",
         "sourceFilename": source.name,
         "sourceSha256": digest,
         "snapshotDate": "2026-09-27",
@@ -150,13 +168,15 @@ def extract(source):
         "propertyTypes": ["villa"],
         "postalCodes": ["9000"],
         "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
-        "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 10.000 kr.",
+        "methodDescription": "Første udbudspris, ellers dagens udbudspris som scenariobasis, × (1 − median historisk prisfald). Kendt liggetid bruger den matchende eller nærmeste observerede tidsgruppe; ukendt liggetid bruger alle 281 handler. Afrundet til 10.000 kr.",
         "limitations": [
             "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
             "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",
             "Første udbud og seneste liggetid kan dække forskellige perioder; genudbud kan nulstille liggetiden.",
             "Udvalget er ikke matchet på stand, areal, grund eller præcis beliggenhed. 2026 er ufuldstændigt.",
             "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig.",
+            "Dagens udbudspris som basis er en antagelse, ikke dokumentation for første udbud; allerede skete prisfald kan blive talt med igen.",
+            "Uden for observeret liggetid genbruges nærmeste gruppe uden fremskrivning; ved ukendt liggetid er scenariet ikke tidsmatchet.",
         ],
     }
     audit = {
@@ -166,7 +186,7 @@ def extract(source):
         "selectionCounts": dict(sorted(Counter(record["selectionStatus"] for record in records).items())),
         "records": records,
     }
-    model = {"metadata": metadata, "brackets": brackets}
+    model = {"metadata": metadata, "aggregate": aggregate, "brackets": brackets}
     workbook.close()
     require(hashlib.sha256(source.read_bytes()).hexdigest() == digest, "Source workbook changed during import")
     return audit, model
@@ -190,7 +210,7 @@ def main():
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(encoded, encoding="utf-8", newline="\n")
-    print("Verified 437 source rows, 281 eligible trades, 10 pooled groups and all quartiles; source unchanged.")
+    print("Verified 437 source rows, 281 eligible trades, 10 pooled groups, all-sale aggregate and all quartiles; source unchanged.")
 
 
 if __name__ == "__main__":
