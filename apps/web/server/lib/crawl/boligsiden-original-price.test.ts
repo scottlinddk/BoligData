@@ -290,6 +290,16 @@ describe("bounded source original-price retrieval", () => {
     expect(fetchJson).toHaveBeenNthCalledWith(2, `https://api.boligsiden.dk/addresses/${ADDRESS_ID}/timeline`, { attempts: 1, timeoutMs: 6_000 });
   });
 
+  it.each([null, []])("does not request a timeline after a verified off-market address with cases %j", async cases => {
+    vi.mocked(fetchJson).mockResolvedValueOnce({ ...address(), isOnMarket: false, cases })
+      .mockRejectedValueOnce(new HttpError(403, `https://api.boligsiden.dk/addresses/${ADDRESS_ID}/timeline`));
+    expect(await (await resolver())(input)).toMatchObject({
+      status: "not_current", reason: "source_address_off_market", identityConfirmed: false, listingStatus: "unknown", price: null,
+    });
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+    expect(fetchJson).toHaveBeenCalledWith(`https://api.boligsiden.dk/addresses/${ADDRESS_ID}`, { attempts: 1, timeoutMs: 6_000 });
+  });
+
   it("discovers the source address by exact case ID, not the first matching price", async () => {
     vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 2, cases: [
       { caseID: OTHER_ID, address: { addressID: OTHER_ID } },

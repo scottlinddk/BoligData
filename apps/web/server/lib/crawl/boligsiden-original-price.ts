@@ -333,8 +333,11 @@ export async function fetchBoligsidenOriginalAsking(input: BoligsidenOriginalAsk
     result.sourceAddressId = addressId;
     result.timelineUrl = `${API_ORIGIN}/addresses/${addressId}/timeline`;
     const addressPayload = await request(`${API_ORIGIN}/addresses/${addressId}`, deadline);
+    const classificationInput = { ...input, addressId, observedAt: result.observedAt };
+    const addressOnly = classifyBoligsidenOriginalAsking(classificationInput, addressPayload, undefined);
+    if (addressOnly.status === "not_current" && addressOnly.reason === "source_address_off_market") return addressOnly;
     const timelinePayload = await request(`${API_ORIGIN}/addresses/${addressId}/timeline`, deadline);
-    return classifyBoligsidenOriginalAsking({ ...input, addressId, observedAt: result.observedAt }, addressPayload, timelinePayload);
+    return classifyBoligsidenOriginalAsking(classificationInput, addressPayload, timelinePayload);
   } catch (error) {
     return fail("unavailable", error instanceof HttpError ? `http_${error.status}` : error instanceof Error ? error.message : "source_request_failed");
   }
