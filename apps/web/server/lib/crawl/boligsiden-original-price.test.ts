@@ -125,6 +125,51 @@ describe("Boligsiden exact original asking from address timeline", () => {
     expect(classifyBoligsidenOriginalAsking(input, source, timeline())).toMatchObject({ status: "not_current", identityConfirmed: true, listingStatus: "closed", price: null });
   });
 
+  it.each([null, []])("recognizes an explicitly off-market address with cases %j without asserting case identity", cases => {
+    const source = { ...address(), isOnMarket: false, cases };
+    expect(classifyBoligsidenOriginalAsking(input, source, undefined)).toMatchObject({
+      status: "not_current", reason: "source_address_off_market", identityConfirmed: false, listingStatus: "unknown",
+      sourceListingId: CASE_ID, sourceAddressId: ADDRESS_ID, price: null, originalDate: null, currentPrice: null,
+    });
+  });
+
+  it.each([undefined, {}, "missing"])("does not interpret malformed or absent cases %j as off-market evidence", cases => {
+    expect(classifyBoligsidenOriginalAsking(input, { ...address(), isOnMarket: false, cases }, timeline())).toMatchObject({
+      status: "unavailable", reason: "missing_address_cases", identityConfirmed: false, price: null,
+    });
+  });
+
+  it.each([null, []])("keeps contradictory current-market flags unresolved when cases are %j", cases => {
+    expect(classifyBoligsidenOriginalAsking(input, { ...address(), cases }, timeline())).toMatchObject({
+      status: "conflict", reason: "inconsistent_address_market_state", identityConfirmed: false, price: null,
+    });
+    expect(classifyBoligsidenOriginalAsking(input, { ...address(), isOnMarket: false, hasMultipleCases: true, cases }, timeline())).toMatchObject({
+      status: "conflict", reason: "inconsistent_address_market_state", identityConfirmed: false, price: null,
+    });
+  });
+
+  it.each([undefined, null, "false"])("requires an explicit boolean off-market flag rather than %j", isOnMarket => {
+    expect(classifyBoligsidenOriginalAsking(input, { ...address(), isOnMarket, cases: null }, timeline())).toMatchObject({
+      status: "unavailable", reason: "missing_address_market_state", identityConfirmed: false, price: null,
+    });
+  });
+
+  it("rejects malformed multiple-case flags on an otherwise off-market response", () => {
+    expect(classifyBoligsidenOriginalAsking(input, { ...address(), isOnMarket: false, hasMultipleCases: "false", cases: null }, timeline())).toMatchObject({
+      status: "unavailable", reason: "invalid_address_market_state", identityConfirmed: false, price: null,
+    });
+  });
+
+  it.each([null, []])("validates the expected address before classifying empty cases %j", cases => {
+    const source = { ...address(), isOnMarket: false, cases };
+    expect(classifyBoligsidenOriginalAsking({ ...input, addressId: OTHER_ID }, source, timeline())).toMatchObject({
+      status: "conflict", reason: "address_identity_mismatch", identityConfirmed: false, price: null,
+    });
+    expect(classifyBoligsidenOriginalAsking(input, { ...source, addressID: "invalid" }, timeline())).toMatchObject({
+      status: "conflict", reason: "address_identity_mismatch", identityConfirmed: false, price: null,
+    });
+  });
+
   it("rejects a closure after the latest opening even if the address snapshot is active", () => {
     const history = [...timeline(), { at: "2026-09-28T00:00:00Z", price: 3_850_000, type: "closed" }];
     expect(classifyBoligsidenOriginalAsking(input, address(), history)).toMatchObject({ status: "not_current", reason: "timeline_closed_after_latest_open", price: null });
@@ -243,6 +288,16 @@ describe("bounded source original-price retrieval", () => {
     expect(result).toMatchObject({ status: "exact", price: 4_495_000 });
     expect(fetchJson).toHaveBeenNthCalledWith(1, `https://api.boligsiden.dk/addresses/${ADDRESS_ID}`, { attempts: 1, timeoutMs: 6_000 });
     expect(fetchJson).toHaveBeenNthCalledWith(2, `https://api.boligsiden.dk/addresses/${ADDRESS_ID}/timeline`, { attempts: 1, timeoutMs: 6_000 });
+  });
+
+  it.each([null, []])("does not request a timeline after a verified off-market address with cases %j", async cases => {
+    vi.mocked(fetchJson).mockResolvedValueOnce({ ...address(), isOnMarket: false, cases })
+      .mockRejectedValueOnce(new HttpError(403, `https://api.boligsiden.dk/addresses/${ADDRESS_ID}/timeline`));
+    expect(await (await resolver())(input)).toMatchObject({
+      status: "not_current", reason: "source_address_off_market", identityConfirmed: false, listingStatus: "unknown", price: null,
+    });
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+    expect(fetchJson).toHaveBeenCalledWith(`https://api.boligsiden.dk/addresses/${ADDRESS_ID}`, { attempts: 1, timeoutMs: 6_000 });
   });
 
   it("discovers the source address by exact case ID, not the first matching price", async () => {
