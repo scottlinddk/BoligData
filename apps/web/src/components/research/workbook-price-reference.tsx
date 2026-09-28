@@ -46,33 +46,37 @@ export function WorkbookPriceReferenceCard({ property, history, loading, failed,
         <h2 id="workbook-price-title" className="text-xl font-semibold tracking-tight text-ink">{tx("Pris efter liggetid", "Price by time on market")}</h2>
         <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-soft">{tx("Historisk scenario", "Historical scenario")}</span>
       </div>
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
+          <dt className="text-sm font-medium text-ink-soft">{tx("Aktuel udbudspris", "Current asking price")}</dt>
+          <dd data-testid="workbook-current-asking" className="mt-2 break-words text-3xl font-semibold tracking-tight text-ink"><Money value={currentAsking} /></dd>
+        </div>
+        <div className="min-w-0 rounded-xl border border-border-strong bg-surface p-4 sm:p-5">
+          <dt className="text-sm font-medium text-ink-soft">{tx("Burde koste", "Should cost")}</dt>
+          <dd data-testid={ready ? "workbook-target-price" : undefined} className="mt-2 break-words text-3xl font-semibold tracking-tight text-ink">
+            <Money value={ready ? reference.referencePrice : null} />
+            {!ready && <p className="mt-2 text-xs font-normal tracking-normal text-ink-soft">{reference.status === "missing_first_asking" ? tx("Afventer oprindelig udbudspris", "Awaiting original asking price") : tx("Datagrundlag ikke tilgængeligt", "Historical data unavailable")}</p>}
+          </dd>
+        </div>
+      </dl>
       {ready ? <>
-        <div className="mt-5 grid gap-5 sm:grid-cols-[1.2fr_1fr]">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-ink-soft">{tx("Bør-pris", "Should-be price")}</p>
-            <p data-testid="workbook-target-price" className="mt-1 break-words text-3xl font-semibold tracking-tight text-ink sm:text-4xl"><Money value={reference.referencePrice} /></p>
+        {gap !== null ? <div data-testid="workbook-price-gap" data-comparison={gap > 0 ? "above" : gap < 0 ? "below" : "equal"} className="mt-3 rounded-xl border border-border-strong p-4">
+          <p className="text-sm font-medium text-ink">{gap > 0 ? tx("Udbudsprisen er over ‘Burde koste’", "Asking price is above ‘Should cost’") : gap < 0 ? tx("Udbudsprisen er under ‘Burde koste’", "Asking price is below ‘Should cost’") : tx("Udbudsprisen er på niveau med ‘Burde koste’", "Asking price is in line with ‘Should cost’")}</p>
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-semibold tracking-tight text-ink"><Money value={Math.abs(gap)} />{reference.gapPercent !== null && <span className="text-base font-medium text-ink-soft">{percent(Math.abs(reference.gapPercent))} {tx("af udbudsprisen", "of asking price")}</span>}</p>
+          <p className="mt-1 text-xs text-ink-soft">{tx("Forskel mellem aktuel udbudspris og det historiske prispejlemærke.", "Difference between the current asking price and the historical price reference.")}</p>
+        </div> : <p data-testid="workbook-comparison-unavailable" className="mt-3 text-sm text-ink-soft">{tx("Sammenligningen afventer en gyldig aktuel udbudspris.", "A valid current asking price is needed for the comparison.")}</p>}
+        <div className="mt-3">
             {reference.referencePrice === 0 && <p className="mt-2 text-xs text-ink-soft">{tx(`Beløbet afrundes til 0 kr. ved afrunding til nærmeste ${metadata.roundingDkk.toLocaleString("da-DK")} kr.`, `The amount rounds to DKK 0 when rounded to the nearest DKK ${metadata.roundingDkk.toLocaleString("en-GB")}.`)}</p>}
             <p className="mt-2 text-xs text-ink-soft">{tx("Historisk spænd", "Historical spread")}: <Money value={reference.lowerPrice} /> – <Money value={reference.upperPrice} /></p>
             <p data-testid="workbook-original-price-basis" className="mt-2 text-xs text-ink-soft">{estimatedFirst ? tx("Beregnet oprindelig udbudspris", "Estimated original asking price") : tx("Oprindelig udbudspris", "Original asking price")}: <strong className="font-medium text-ink"><Money value={estimatedFirst && reference.baselinePrice !== null ? Math.round(reference.baselinePrice / metadata.roundingDkk) * metadata.roundingDkk : reference.baselinePrice} /></strong></p>
-          </div>
-          <div className="min-w-0 rounded-xl bg-surface p-4">
-            <p className="text-xs text-ink-soft">{tx("Dagens udbudspris", "Current asking price")}</p>
-            <p className="mt-1 text-xl font-semibold"><Money value={currentAsking} /></p>
-            {gap !== null && <p data-testid="workbook-price-gap" className="mt-2 text-xs text-ink-soft">
-              {gap === 0 ? tx("På niveau med bør-prisen", "In line with the should-be price") : <>
-                <strong className="font-medium text-ink"><Money value={Math.abs(gap)} /></strong>{reference.gapPercent !== null && <> ({percent(Math.abs(reference.gapPercent))})</>} {gap > 0 ? tx("over prisreferencen", "above the price reference") : tx("under prisreferencen", "below the price reference")}
-              </>}
-            </p>}
-          </div>
         </div>
         {estimatedFirst && <p className="mt-2 text-xs text-ink-soft">{tx("Omtrentligt scenario: første udbud er beregnet fra kildens afrundede prisændring.", "Approximate scenario: first asking is estimated from the source's rounded price change.")}</p>}
-      </> : <div className="mt-5">
-        <p className="text-xs font-medium text-ink-soft">{tx("Bør-pris", "Should-be price")}</p>
+      </> : <div className="mt-3">
         <p role="status" className="mt-2 text-sm text-ink-soft">{reference.status === "missing_first_asking"
-          ? tx("Den oprindelige udbudspris mangler. Bør-prisen beregnes, når den kan dokumenteres eller beregnes fra kildens prisændring. Dagens pris bruges kun til sammenligning.", "The original asking price is missing. The should-be price is calculated once it can be documented or reconstructed from the source's price change. Current asking is used only for comparison.")
+          ? tx("Den oprindelige udbudspris mangler. ‘Burde koste’ beregnes, når den kan dokumenteres eller beregnes fra kildens prisændring. Dagens pris bruges kun til sammenligning.", "The original asking price is missing. ‘Should cost’ is calculated once it can be documented or reconstructed from the source's price change. Current asking is used only for comparison.")
           : tx("Det historiske datagrundlag kunne ikke valideres.", "The historical dataset could not be validated.")}</p>
       </div>}
-      {originalPriceConflict && <p role="status" className="mt-3 text-sm text-warning-text">{tx("Kilderne angiver forskellige oprindelige udbudspriser. Bør-prisen afventer afklaring af prisgrundlaget.", "The sources report conflicting original asking prices. The should-be price requires this conflict to be resolved.")}</p>}
+      {originalPriceConflict && <p role="status" className="mt-3 text-sm text-warning-text">{tx("Kilderne angiver forskellige oprindelige udbudspriser. ‘Burde koste’ afventer afklaring af prisgrundlaget.", "The sources report conflicting original asking prices. ‘Should cost’ requires this conflict to be resolved.")}</p>}
       {historicalDataAvailable && <>
         <p data-testid="workbook-time-basis" className="mt-4 text-xs text-ink-soft">
           {allSales ? tx("Liggetid ukendt · samlet historisk grundlag", "Time on market unknown · full historical sample") : <>{reference.latestEpisodeDays} {tx("dage på markedet", "days on market")} · {tx("Tidsgruppe", "Time group")}: {bracket!.label} {tx("dage", "days")}</>}
@@ -80,7 +84,7 @@ export function WorkbookPriceReferenceCard({ property, history, loading, failed,
         </p>
         {nearestBracket && <p data-testid="workbook-nearest-bracket" className="mt-2 text-xs text-ink-soft">{tx(`Liggetiden er uden for de observerede ${metadata.observedMinDays}–${metadata.observedMaxDays} dage. Den nærmeste historiske tidsgruppe anvendes.`, `Time on market is outside the observed ${metadata.observedMinDays}–${metadata.observedMaxDays} days. The nearest historical time group is used.`)}</p>}
         {allSales && <p className="mt-2 text-xs text-ink-soft">{tx("Alle handler i datagrundlaget anvendes, indtil en pålidelig liggetid er tilgængelig.", "All sales in the dataset are used until a reliable time on market is available.")}</p>}
-        {bracket!.count < metadata.minimumSample && <p className="mt-2 text-xs text-warning-text">{tx("Tidsgruppen har få handler. Bør-prisen bygger på et begrænset grundlag.", "This time group has few sales. The should-be price uses limited evidence.")}</p>}
+        {bracket!.count < metadata.minimumSample && <p className="mt-2 text-xs text-warning-text">{tx("Tidsgruppen har få handler. ‘Burde koste’ bygger på et begrænset grundlag.", "This time group has few sales. ‘Should cost’ uses limited evidence.")}</p>}
       </>}
       {historyStatus && <div role="status" className="mt-3 text-xs text-ink-soft"><p>{historyStatus}</p>{failed && <button type="button" className={`${buttonClass} mt-2`} onClick={onRetry}>{tx("Prøv igen", "Retry")}</button>}</div>}
       {broadScenario && historicalDataAvailable && <p data-testid="workbook-broad-scenario" className="mt-3 rounded-xl bg-warning-soft p-3 text-sm text-warning-text">{tx("Bredt historisk scenario: Boligen er uden for udvalgets boligtype eller område. Scenariet anvender historiske villasalg i Aalborg/Hasseris og er ikke baseret på lokale, sammenlignelige handler for denne bolig.", "Broad historical scenario: This home is outside the sample's property type or area. The scenario uses historical villa sales in Aalborg/Hasseris, not locally matched comparable sales for this home.")}</p>}

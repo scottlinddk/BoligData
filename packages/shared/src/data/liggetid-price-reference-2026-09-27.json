@@ -36,7 +36,7 @@
       "Første udbud og seneste liggetid kan dække forskellige perioder; genudbud kan nulstille liggetiden.",
       "Udvalget er ikke matchet på stand, areal, grund eller præcis beliggenhed. 2026 er ufuldstændigt.",
       "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig.",
-      "Bør-pris kræver oprindelig udbudspris; dagens eller en allerede nedsat pris bruges aldrig som erstatning. En kildebaseret rekonstruktion af oprindelig pris markeres som omtrentlig.",
+      "Burde koste kræver oprindelig udbudspris; dagens eller en allerede nedsat pris bruges aldrig som erstatning. En kildebaseret rekonstruktion af oprindelig pris markeres som omtrentlig.",
       "Uden for observeret liggetid genbruges nærmeste gruppe uden fremskrivning; ved ukendt liggetid er scenariet ikke tidsmatchet."
     ]
   },
