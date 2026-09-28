@@ -1,0 +1,694 @@
+[
+  {
+    "name": "Hasserisvej 124B",
+    "sourceListingId": "faf207e0-8542-45c7-b6ae-73dbf7df455d",
+    "address": {
+      "addressID": "2c576194-1bc0-446d-b123-3ab2ac63b917",
+      "slugAddress": "hasserisvej-124b-1-mf-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "faf207e0-8542-45c7-b6ae-73dbf7df455d",
+          "status": "open",
+          "priceCash": 2399000,
+          "priceChangePercentage": -7.55,
+          "timeOnMarket": {
+            "current": {
+              "days": 144
+            },
+            "total": {
+              "days": 221,
+              "realtors": [
+                {
+                  "days": 27,
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
+                  "realtorName": "Thorkild Kristensen Hasseris"
+                },
+                {
+                  "days": 50,
+                  "realtorId": "4bf16ab2-d24b-4806-a6d3-ab4a5af837f0",
+                  "realtorName": "EDC Poul Erik Bech"
+                },
+                {
+                  "days": 144,
+                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf",
+                  "realtorName": "home Aalborg - Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "a8a92591-01a1-4e8a-972c-a25fce0a92cf"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-09-10T11:23:20.779718Z",
+        "price": 2399000,
+        "type": "open"
+      },
+      {
+        "at": "2026-09-07T19:24:31.854036Z",
+        "price": 2475000,
+        "type": "closed"
+      },
+      {
+        "at": "2026-08-11T07:34:30.199452Z",
+        "aux": {
+          "difference": -120000,
+          "differencePercentage": -4.62
+        },
+        "price": 2475000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-05-07T08:54:37.459411Z",
+        "price": 2595000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Nældevej 57",
+    "sourceListingId": "2032732e-f428-4d11-97d2-4e8372c1f426",
+    "address": {
+      "addressID": "0a3f50ca-7465-32b8-e044-0003ba298018",
+      "slugAddress": "naeldevej-57-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "2032732e-f428-4d11-97d2-4e8372c1f426",
+          "status": "open",
+          "priceCash": 2695000,
+          "priceChangePercentage": -6.91,
+          "timeOnMarket": {
+            "current": {
+              "days": 511
+            },
+            "total": {
+              "days": 691,
+              "realtors": [
+                {
+                  "days": 180,
+                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905",
+                  "realtorName": "Nybolig Hasseris"
+                },
+                {
+                  "days": 511,
+                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf",
+                  "realtorName": "home Aalborg - Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "a8a92591-01a1-4e8a-972c-a25fce0a92cf"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2025-04-23T09:03:20.372382Z",
+        "price": 2895000,
+        "type": "closed"
+      },
+      {
+        "at": "2024-10-25T13:28:08.534977Z",
+        "price": 2895000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Estlandsgade 1",
+    "sourceListingId": "881d1b4b-a0cc-4393-9098-58e817258279",
+    "address": {
+      "addressID": "0a3f50c9-f041-32b8-e044-0003ba298018",
+      "slugAddress": "estlandsgade-1-2-mf-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "881d1b4b-a0cc-4393-9098-58e817258279",
+          "status": "open",
+          "priceCash": 1398000,
+          "priceChangePercentage": -12.35,
+          "timeOnMarket": {
+            "current": {
+              "days": 392
+            },
+            "total": {
+              "days": 392,
+              "realtors": [
+                {
+                  "days": 392,
+                  "realtorId": "bf93749d-6889-4bb8-82e0-1fc7af21556e",
+                  "realtorName": "EDC Danebo"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "bf93749d-6889-4bb8-82e0-1fc7af21556e"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-07-15T11:48:03.764402Z",
+        "aux": {
+          "difference": -97000,
+          "differencePercentage": -6.49
+        },
+        "price": 1398000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-03-28T14:40:18.2837Z",
+        "price": 1495000,
+        "type": "open"
+      },
+      {
+        "at": "2026-02-25T09:21:01.9182Z",
+        "price": 1595000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-09-01T13:00:31.141901Z",
+        "price": 1595000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Peder Skrams Gade 35",
+    "sourceListingId": "463bab68-a4a6-4827-8d74-9115cf18f244",
+    "address": {
+      "addressID": "0a3f50ca-7edd-32b8-e044-0003ba298018",
+      "slugAddress": "peder-skrams-gade-35-0-tv-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "463bab68-a4a6-4827-8d74-9115cf18f244",
+          "status": "open",
+          "priceCash": 1525000,
+          "priceChangePercentage": -10.03,
+          "timeOnMarket": {
+            "current": {
+              "days": 494
+            },
+            "total": {
+              "days": 494,
+              "realtors": [
+                {
+                  "days": 494,
+                  "realtorId": "29262ec1-e604-4bb6-80e1-76807839fc8d",
+                  "realtorName": "Estate Aalborg"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "29262ec1-e604-4bb6-80e1-76807839fc8d"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-09-08T09:08:38.349862Z",
+        "aux": {
+          "difference": -70000,
+          "differencePercentage": -4.39
+        },
+        "price": 1525000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-03T11:52:13.833931Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -5.9
+        },
+        "price": 1595000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-03T11:52:13.833931Z",
+        "price": 1595000,
+        "type": "open"
+      },
+      {
+        "at": "2025-12-03T13:19:15.304555Z",
+        "price": 1695000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-05-22T13:39:33.309972Z",
+        "price": 1695000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Samsøgade 19",
+    "sourceListingId": "39c09c7d-e62b-4483-8746-654e367f7062",
+    "address": {
+      "addressID": "0a3f50ca-a186-32b8-e044-0003ba298018",
+      "slugAddress": "samsoegade-19-1-tv-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "39c09c7d-e62b-4483-8746-654e367f7062",
+          "status": "open",
+          "priceCash": 1045000,
+          "priceChangePercentage": -4.57,
+          "timeOnMarket": {
+            "current": {
+              "days": 252
+            },
+            "total": {
+              "days": 428,
+              "realtors": [
+                {
+                  "days": 176,
+                  "realtorId": "068f1962-5d71-4d59-be14-dca2882ad69a",
+                  "realtorName": "RealMæglerne Brian Harbo"
+                },
+                {
+                  "days": 252,
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
+                  "realtorName": "Nybolig Aalborg Lejligheder"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-04-08T14:04:21.845396Z",
+        "aux": {
+          "difference": -50000,
+          "differencePercentage": -4.57
+        },
+        "price": 1045000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-01-20T15:03:33.694248Z",
+        "price": 1095000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-19T12:47:03.073083Z",
+        "price": 1095000,
+        "type": "closed"
+      },
+      {
+        "at": "2026-01-19T11:47:53.003224Z",
+        "price": 1095000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-13T13:39:24.053176Z",
+        "price": 1145000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-11-03T13:07:14.346819Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -8.03
+        },
+        "price": 1145000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-09-02T12:50:34.405077Z",
+        "aux": {
+          "difference": -50000,
+          "differencePercentage": -3.86
+        },
+        "price": 1245000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-07-21T06:41:57.56518Z",
+        "price": 1295000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Hasserishøj 2",
+    "sourceListingId": "501bfaee-fa31-4873-b19e-5ef6ccec2649",
+    "address": {
+      "addressID": "0a3f50ca-14d8-32b8-e044-0003ba298018",
+      "slugAddress": "hasserishoej-2-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "501bfaee-fa31-4873-b19e-5ef6ccec2649",
+          "status": "open",
+          "priceCash": 18895000,
+          "priceChangePercentage": -5.53,
+          "timeOnMarket": {
+            "current": {
+              "days": 731
+            },
+            "total": {
+              "days": 731,
+              "realtors": [
+                {
+                  "days": 731,
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
+                  "realtorName": "Thorkild Kristensen Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "0573c09d-bcd0-430d-add5-2ab3ae2155b9"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-02-03T17:32:11.12061Z",
+        "price": 18895000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-29T10:40:13.167493Z",
+        "price": 20000000,
+        "type": "closed"
+      },
+      {
+        "at": "2024-09-27T13:01:37.036693Z",
+        "price": 20000000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Elme Alle 12",
+    "sourceListingId": "fcc257fe-d903-4544-b2a1-4f2922ce76eb",
+    "address": {
+      "addressID": "0a3f50c9-ebd6-32b8-e044-0003ba298018",
+      "slugAddress": "elme-alle-12-0--9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "fcc257fe-d903-4544-b2a1-4f2922ce76eb",
+          "status": "open",
+          "priceCash": 5598000,
+          "priceChangePercentage": 0,
+          "timeOnMarket": {
+            "current": {
+              "days": 28
+            },
+            "total": {
+              "days": 405,
+              "realtors": [
+                {
+                  "days": 28,
+                  "realtorId": "a4428013-b7c3-4a62-a42c-a0deaa16ec5d",
+                  "realtorName": "Aalborg Mægleren ApS"
+                },
+                {
+                  "days": 378,
+                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905",
+                  "realtorName": "Nybolig Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "a4428013-b7c3-4a62-a42c-a0deaa16ec5d"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T11:27:01.867941Z",
+        "price": 5745000,
+        "type": "closed"
+      },
+      {
+        "at": "2026-08-31T13:16:33.961839Z",
+        "price": 5598000,
+        "type": "open"
+      },
+      {
+        "at": "2026-05-22T16:06:46.033948Z",
+        "aux": {
+          "difference": -250000,
+          "differencePercentage": -4.17
+        },
+        "price": 5745000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-08-19T07:30:18.923684Z",
+        "price": 5995000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Hadsundvej 26B",
+    "sourceListingId": "8c606520-48ae-427d-aa00-a6b1a15778a7",
+    "address": {
+      "addressID": "40eb1f85-a3c3-4581-e044-0003ba298018",
+      "slugAddress": "hadsundvej-26b-0-tv-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "8c606520-48ae-427d-aa00-a6b1a15778a7",
+          "status": "open",
+          "priceCash": 1695000,
+          "priceChangePercentage": -7.12,
+          "timeOnMarket": {
+            "current": {
+              "days": 787
+            },
+            "total": {
+              "days": 787,
+              "realtors": [
+                {
+                  "days": 787,
+                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e",
+                  "realtorName": "Estaldo ApS"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-07-03T11:35:02.875909Z",
+        "price": 1695000,
+        "type": "open"
+      },
+      {
+        "at": "2026-06-11T08:03:54.197207Z",
+        "price": 1775000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-02-27T14:17:39.590241Z",
+        "aux": {
+          "difference": -50000,
+          "differencePercentage": -2.74
+        },
+        "price": 1775000,
+        "type": "price_change"
+      },
+      {
+        "at": "2024-08-02T13:42:05.419944Z",
+        "price": 1825000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Vesterbro 19A",
+    "sourceListingId": "4596745b-da31-46a5-b2ff-d7c711234f4c",
+    "address": {
+      "addressID": "0a3f50ca-f3a1-32b8-e044-0003ba298018",
+      "slugAddress": "vesterbro-19a-0-th-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "4596745b-da31-46a5-b2ff-d7c711234f4c",
+          "status": "open",
+          "priceCash": 974900,
+          "priceChangePercentage": -2.02,
+          "timeOnMarket": {
+            "current": {
+              "days": 531
+            },
+            "total": {
+              "days": 761,
+              "realtors": [
+                {
+                  "days": 531,
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
+                  "realtorName": "Nybolig Aalborg Lejligheder"
+                },
+                {
+                  "days": 230,
+                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e",
+                  "realtorName": "Estaldo ApS"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-06-04T15:50:01.498239Z",
+        "aux": {
+          "difference": -20100,
+          "differencePercentage": -2.02
+        },
+        "price": 974900,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-04T15:50:01.498239Z",
+        "price": 974900,
+        "type": "open"
+      },
+      {
+        "at": "2026-02-26T16:06:46.410982Z",
+        "price": 995000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-04-15T08:30:47.792856Z",
+        "price": 995000,
+        "type": "open"
+      },
+      {
+        "at": "2024-05-15T13:41:16.271829Z",
+        "price": 995000,
+        "type": "closed"
+      },
+      {
+        "at": "2024-03-05T10:42:49.976372Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -9.13
+        },
+        "price": 995000,
+        "type": "price_change"
+      }
+    ]
+  },
+  {
+    "name": "Kong Christians Alle 21",
+    "sourceListingId": "57466f56-af9a-4d1f-8ba0-21e7467033e9",
+    "address": {
+      "addressID": "f94d60ea-6c16-408b-b22d-ceee517b8dde",
+      "slugAddress": "kong-christians-alle-21-0--9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "57466f56-af9a-4d1f-8ba0-21e7467033e9",
+          "status": "open",
+          "priceCash": 3495000,
+          "priceChangePercentage": -5.41,
+          "timeOnMarket": {
+            "current": {
+              "days": 404
+            },
+            "total": {
+              "days": 404,
+              "realtors": [
+                {
+                  "days": 404,
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
+                  "realtorName": "Nybolig Aalborg Lejligheder"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "type": "family",
+          "date": "2025-10-08",
+          "amount": 1102000
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-08-17T16:34:24.693459Z",
+        "aux": {
+          "difference": -200000,
+          "differencePercentage": -5.41
+        },
+        "price": 3495000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-10-08T00:00:00Z",
+        "aux": {
+          "type": "family"
+        },
+        "price": 1102000,
+        "type": "sold"
+      },
+      {
+        "at": "2025-08-20T14:12:20.304571Z",
+        "price": 3695000,
+        "type": "open"
+      }
+    ]
+  }
+]
