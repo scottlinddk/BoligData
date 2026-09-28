@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import type { MouseEvent } from "react";
-import type { Property } from "@shared/types/index";
+import { useState, type MouseEvent } from "react";
+import type { ListingImage, Property } from "@shared/types/index";
 import { overallRisk } from "@shared/utils/risk-status";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
@@ -9,6 +9,7 @@ import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
 import { BrandMark } from "./brand-mark";
 import { fallbackToOriginalImage } from "@/lib/image-fallback";
+import { Skeleton, Spinner } from "@/components/ui/loading";
 
 const CARD_IMAGE_WIDTHS = [400, 600, 800, 1200, 1600];
 const CARD_IMAGE_ASPECT = 8 / 5;
@@ -26,15 +27,35 @@ interface PropertyCardProps {
   onToggleSelect?: (id: string) => void;
 }
 
+function NoPhoto() {
+  const { t } = useI18n();
+  return <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-ink-faint"><BrandMark className="h-10 w-10 opacity-40" /><span className="text-xs">{t("property.noPhoto")}</span></div>;
+}
+
+function CardPhoto({ photo, alt }: { photo: ListingImage; alt: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+  if (state === "error") return <NoPhoto />;
+  return <>
+    {state === "loading" && <Skeleton className="absolute inset-0 h-full w-full rounded-none" />}
+    <img src={getImageUrl(photo, 800, 500)} srcSet={getImageSrcSet(photo, CARD_IMAGE_WIDTHS, CARD_IMAGE_ASPECT)} sizes="(min-width: 1200px) 360px, (min-width: 640px) 45vw, 100vw" alt={alt} loading="lazy"
+      onLoad={() => setState("loaded")}
+      onError={event => {
+        const element = event.currentTarget;
+        if (!element.srcset && element.getAttribute("src") === photo.url) setState("error");
+        else fallbackToOriginalImage(element, photo.url);
+      }}
+      className={`h-full w-full object-cover transition-[opacity,transform] duration-300 motion-safe:group-hover:scale-[1.025] ${state === "loaded" ? "opacity-100" : "opacity-0"}`} />
+  </>;
+}
+
 export function PropertyCard({ property, selectable, selected, onToggleSelect }: PropertyCardProps) {
   const { t, language } = useI18n();
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
+  const [saving, setSaving] = useState(false);
   const daysOnMarket = property.listingDate ? daysBetween(property.listingDate) : null;
   const photos = getPhotos(property.images);
   const photo = photos[0] ?? null;
-  const photoUrl = photo ? getImageUrl(photo, 800, 500) : null;
-  const photoSrcSet = photo ? getImageSrcSet(photo, CARD_IMAGE_WIDTHS, CARD_IMAGE_ASPECT) : undefined;
   const saved = isSaved(property.id);
   const risk = overallRisk(property.riskFlags);
   const locality = [property.postalCode, property.municipality].filter(Boolean).join(" ");
@@ -45,17 +66,20 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
   async function handleSave(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    const nowSaved = await toggle(property.id);
-    showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"), nowSaved ? "success" : "info");
+    if (saving) return;
+    setSaving(true);
+    try {
+      const nowSaved = await toggle(property.id);
+      showToast(nowSaved ? t("property.toastSaved") : t("property.toastUnsaved"), nowSaved ? "success" : "info");
+    } catch {
+      showToast(language === "da" ? "Boligen kunne ikke gemmes. Prøv igen." : "Could not save this home. Please try again.", "error");
+    } finally { setSaving(false); }
   }
 
   return <article className="group relative min-w-0" data-testid="property-card">
     <Link to={`/property/${property.id}`} className="block rounded-2xl text-ink">
       <div className="relative aspect-[8/5] overflow-hidden rounded-2xl bg-surface-alt">
-        {photoUrl ? <img src={photoUrl} srcSet={photoSrcSet} sizes="(min-width: 1200px) 360px, (min-width: 640px) 45vw, 100vw" alt={property.address} loading="lazy"
-          onError={event => { if (photo) fallbackToOriginalImage(event.currentTarget, photo.url); }}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.025]" />
-          : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-ink-faint"><BrandMark className="h-10 w-10 opacity-40" /><span className="text-xs">{t("property.noPhoto")}</span></div>}
+        {photo ? <CardPhoto key={photo.url} photo={photo} alt={property.address} /> : <NoPhoto />}
         <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">{property.listingSource}</span>
         <span title={t(RISK_CHIP_KEY[risk])} className={`absolute bottom-3 left-3 rounded-full px-2.5 py-1.5 text-[10px] font-medium leading-none ${RISK_CHIP_STYLES[risk]}`}>{t(RISK_CHIP_KEY[risk])}</span>
         {photos.length > 1 && <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1.5 text-[10px] leading-none text-white backdrop-blur-sm"><svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2" /><circle cx="8" cy="8" r="2.5" /></svg>{photos.length}</span>}
@@ -74,8 +98,8 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
         <p className="mt-2 text-[10px] font-medium leading-4 text-ink-faint">{property.agentName || property.listingSource}</p>
       </div>
     </Link>
-    <button type="button" onClick={handleSave} aria-label={saved ? t("property.saved") : t("property.save")} aria-pressed={saved} className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow-card transition-colors ${saved ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-surface text-ink-soft hover:bg-surface-hover"}`}>
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>
+    <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} aria-pressed={saved} className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow-card transition-colors disabled:opacity-60 ${saved ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-surface text-ink-soft hover:bg-surface-hover"}`}>
+      {saving ? <Spinner /> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>}
     </button>
     {selectable && <button type="button" onClick={() => onToggleSelect?.(property.id)} aria-label={t("recommend.selectListing")} title={t("recommend.selectListing")} aria-pressed={selected} className={`absolute left-3 top-12 flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-bold transition-colors ${selected ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-transparent hover:border-cta"}`}>✓</button>}
   </article>;

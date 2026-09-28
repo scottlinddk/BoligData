@@ -21,6 +21,9 @@ export function useReceivedRecommendations(refetchInterval?: number) {
     recommendations: query.data?.recommendations ?? [],
     properties: query.data?.properties ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
     respond: respondMutation.mutateAsync,
     isResponding: respondMutation.isPending,
   };
@@ -33,6 +36,9 @@ export function useSentRecommendations() {
     recommendations: query.data?.recommendations ?? [],
     properties: query.data?.properties ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
   };
 }
 

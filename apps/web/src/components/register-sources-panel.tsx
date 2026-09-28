@@ -28,7 +28,7 @@ const MODE_CLASS: Record<SourceSummaryEntry["mode"], string> = {
  * than mapped to a friendly string — it is the thing an operator needs.
  */
 export function RegisterSourcesPanel({ sources, isLoading, isError, onRetry }: RegisterSourcesPanelProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const title = <h3 className="text-[15px] font-extrabold text-ink">{t("register.title")}</h3>;
 
@@ -46,11 +46,11 @@ export function RegisterSourcesPanel({ sources, isLoading, isError, onRetry }: R
     );
   }
 
-  if (isLoading || sources.length === 0) {
+  if (isLoading) {
     return (
       <div className="rounded-[20px] border border-dashed border-border-strong p-4">
         {title}
-        <p className="mt-2 text-[12.5px] text-ink-faint">{t("register.loading")}</p>
+        <p role="status" className="mt-2 flex items-center gap-2 text-[12.5px] text-ink-faint"><span className="ui-spinner" aria-hidden="true" />{t("register.loading")}</p>
       </div>
     );
   }
@@ -58,6 +58,7 @@ export function RegisterSourcesPanel({ sources, isLoading, isError, onRetry }: R
   return (
     <div className="rounded-[20px] border border-border bg-surface p-4 shadow-card">
       {title}
+      {sources.length === 0 && <p className="mt-2 text-sm text-ink-soft">{language === "da" ? "Ingen registerkilder er tilgængelige for denne bolig." : "No register sources are available for this property."}</p>}
       <ul className="mt-3 flex flex-col gap-2">
         {sources.map((source) => (
           <li key={source.key} className="flex flex-col gap-0.5">
