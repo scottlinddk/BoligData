@@ -45,6 +45,32 @@ describe("school district lookup", () => {
   });
 
   it.each([
+    { address: "Hobrovej 1000", postalCode: "9200" },
+    { address: "Hobrovej 1000, 9200 Aalborg SV", postalCode: "9200" },
+    { address: "Hobrovej 1000, 2. tv, 9200 Aalborg SV", postalCode: null },
+  ])("keeps four-digit house numbers separate from postcodes: $address", async changes => {
+    upstream({ ...fixture, address: { ...fixture.address, fullAddress: "Hobrovej 1000, 9200 Aalborg SV" } });
+    expect(await lookupSchoolDistrict({ ...input, ...changes })).toMatchObject({ status: "available", address: "Hobrovej 1000, 9200 Aalborg SV" });
+  });
+
+  it("resolves four-digit house numbers through autocomplete without confusing its label postcode", async () => {
+    const fullAddress = "Hobrovej 1000, 9200 Aalborg SV";
+    const fetch = upstream([{ ...suggestion, label: fullAddress, streetName: "Hobrovej", houseNumber: "1000", postalCode: "9200" }],
+      { ...fixture, address: { ...fixture.address, fullAddress } });
+    expect(await lookupSchoolDistrict({ ...input, address: "Hobrovej 1000", postalCode: "9200", idLokalid: null })).toMatchObject({ status: "available", address: fullAddress });
+    expect(new URL(fetch.mock.calls[0]?.[0]).searchParams.get("q")).toBe("Hobrovej 1000, 9200");
+  });
+
+  it("does not invent a postcode from a four-digit house number or ignore a real postcode conflict", async () => {
+    const fetch = upstream();
+    expect(await lookupSchoolDistrict({ ...input, address: "Hobrovej 1000", postalCode: null })).toMatchObject({ status: "unavailable", reason: "address_missing" });
+    expect(await lookupSchoolDistrict({ ...input, address: "Hobrovej 1000, 9200 Aalborg SV" })).toMatchObject({ status: "unavailable", reason: "address_mismatch" });
+    expect(fetch).not.toHaveBeenCalled();
+    upstream({ ...fixture, address: { ...fixture.address, fullAddress: "Hobrovej 1000, 9000 Aalborg" } });
+    expect(await lookupSchoolDistrict({ ...input, address: "Hobrovej 1000", postalCode: "9200" })).toMatchObject({ status: "unavailable", reason: "address_mismatch" });
+  });
+
+  it.each([
     { candidates: [{ ...suggestion, kind: "vejnavn" }], reason: "address_missing" },
     { candidates: [{ ...suggestion, houseNumber: "180" }], reason: "address_missing" },
     { candidates: [{ ...suggestion, label: "Slåenvej 19, 9000 Aalborg" }], reason: "address_missing" },
