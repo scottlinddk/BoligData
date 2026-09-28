@@ -3,6 +3,7 @@ import type { Property } from "@shared/types/index";
 import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import { researchListingTime } from "./research-listing-time";
 import { reportedAskingPrice } from "./reported-asking-price";
+import { originalAskingPrice } from "./original-asking-price";
 
 /** The reference is anchored to the original asking price. A complete source
  * price/percentage pair may reconstruct it, but today's asking price is only
@@ -25,12 +26,24 @@ export function workbookListingReference(property: Property, history?: ResearchH
   // checks instants so a later observation on the same day cannot leak in.
   const invalidSourceTiming = !!history && (!Number.isFinite(retrieved) || retrieved > Date.now() ||
     sourceTimes.some(value => !Number.isFinite(timestamp(value)) || timestamp(value) > cutoff));
+  const exactResolution = originalAskingPrice(property, history);
+  const exactOriginal = exactResolution.evidence;
+  // A campaign can span several listings. Its earlier first asking is a
+  // different scope from the source's original for the current episode.
+  const comparableOriginalEvents = exactOriginal ? listing.events.filter(event => event.eventType === "first_listing"
+    && event.episodeId === exactOriginal.episodeId && Number.isFinite(timestamp(event.observedAt))
+    && timestamp(event.observedAt) <= cutoff && event.price !== null && Number.isFinite(event.price) && event.price > 0
+    && (event.eventDate === null ? event.datePrecision === "unknown" : event.datePrecision === "day"
+      && parseResearchDay(event.eventDate) !== null && event.eventDate <= event.observedAt.slice(0, 10))
+    && (exactOriginal.originalDate === null || event.eventDate === null || event.eventDate === exactOriginal.originalDate)) : [];
+  const exactConflict = exactResolution.status === "conflict" || comparableOriginalEvents.some(event => event.price !== exactOriginal!.price);
+  const exactBlocked = exactConflict || ["invalid", "incomplete"].includes(exactResolution.status);
   // A source percentage can supply an approximate baseline only when there is
   // no conflicting documented first-price evidence in the current campaign.
   const hasFirstPriceEvidence = firstEvents.some(event => event.price !== null);
-  const estimatedFirst = !invalidSourceTiming && listing.firstAsking === null && listing.campaignId !== null && !history?.truncated && !hasFirstPriceEvidence
+  const estimatedFirst = !exactOriginal && !exactBlocked && !invalidSourceTiming && listing.firstAsking === null && listing.campaignId !== null && !history?.truncated && !hasFirstPriceEvidence
     ? reportedAskingPrice(property, history) : null;
-  const firstAsking = invalidSourceTiming ? null : listing.firstAsking ?? estimatedFirst?.firstAsking ?? null;
+  const firstAsking = exactBlocked ? null : exactOriginal?.price ?? (invalidSourceTiming ? null : listing.firstAsking ?? estimatedFirst?.firstAsking ?? null);
   const reference = calculateWorkbookPriceReference({
     firstAsking,
     currentAsking: property.price,
@@ -42,7 +55,8 @@ export function workbookListingReference(property: Property, history?: ResearchH
   const stamp = candidate ? timestamp(candidate) : NaN;
   const lastSourceCheck = !invalidSourceTiming && candidate && Number.isFinite(stamp) && stamp <= cutoff ? candidate : null;
   return {
-    listing, reference, firstAsking, estimatedFirst, lastSourceCheck, invalidSourceTiming,
+    listing, reference, firstAsking, estimatedFirst, exactOriginal: exactBlocked ? null : exactOriginal,
+    originalPriceConflict: exactConflict, originalPriceEvidenceStatus: exactResolution.status, lastSourceCheck, invalidSourceTiming,
     stale: lastSourceCheck !== null && Date.now() - Date.parse(lastSourceCheck) > 8 * 86_400_000,
   };
 }

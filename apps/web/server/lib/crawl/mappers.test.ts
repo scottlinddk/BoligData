@@ -84,6 +84,16 @@ describe("mapBoligaRecord", () => {
 });
 
 describe("mapBoligsidenCase", () => {
+  it("preserves the provider's address identity and verified public address-page slug", () => {
+    const sourceAddressId = "0a3f50c9-be71-32b8-e044-0003ba298018";
+    const mapped = mapBoligsidenCase({ ...boligsidenCase, slugAddress: "bejsebakkevej-30-9000-aalborg",
+      address: { ...boligsidenCase.address, addressID: sourceAddressId } });
+    expect(mapped?.source_address_id).toBe(sourceAddressId);
+    expect(mapped?.listing_url).toBe("https://www.boligsiden.dk/adresse/bejsebakkevej-30-9000-aalborg");
+    expect(mapBoligsidenCase({ ...boligsidenCase, address: { ...boligsidenCase.address, addressID: "not-an-id" } }))
+      .not.toHaveProperty("source_address_id");
+  });
+
   it("retains signed rounded asking-price changes as source evidence, never a first price", () => {
     for (const changePercent of [-9.26, 0, 3.13]) {
       expect(mapBoligsidenCase({ ...boligsidenCase, priceChangePercentage: changePercent })?.reported_price_change)

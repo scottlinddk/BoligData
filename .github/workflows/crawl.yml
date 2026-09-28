@@ -9,10 +9,18 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Daily API crawl, full weekly Boligsiden refresh, optional runner, or read-only verification"
+        description: "API crawl, weekly refresh, runner, verification, or original asking-price backfill"
         type: choice
         default: api
-        options: [api, weekly, runner, verify]
+        options: [api, weekly, runner, verify, original-prices]
+      dry_run:
+        description: "Original prices only: inspect source evidence without writing"
+        type: boolean
+        default: true
+      start_after_id:
+        description: "Original prices only: resume after this property UUID; empty starts from the beginning"
+        type: string
+        default: ""
       start_offset:
         description: "API batch offset to resume (0 starts from the beginning)"
         type: number
@@ -24,9 +32,9 @@ on:
 
 jobs:
   crawl:
-    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'api' || inputs.mode == 'verify'))
+    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'api' || inputs.mode == 'verify' || inputs.mode == 'original-prices'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.mode == 'original-prices' && 180 || 45 }}
     concurrency:
       group: boligdata-crawl-${{ inputs.mode == 'verify' && 'verification' || 'production' }}
       cancel-in-progress: false
@@ -37,6 +45,8 @@ jobs:
         env:
           RUN_MODE: ${{ inputs.mode }}
           RUN_START_OFFSET: ${{ inputs.start_offset }}
+          RUN_DRY_RUN: ${{ inputs.dry_run }}
+          RUN_START_AFTER_ID: ${{ inputs.start_after_id }}
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -88,3 +98,22 @@ jobs:
       - name: Remove downloaded environment
         if: always()
         run: rm -f .vercel/.env.production.local
+  original-price-refresh:
+    name: Refresh original asking-price evidence
+    needs: [crawl, runner]
+    if: always() && github.event_name == 'schedule' && (needs.crawl.result == 'success' || needs.runner.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: boligdata-crawl-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backfill original asking prices after the listing refresh
+        run: bash scripts/crawl-api.sh
+        env:
+          RUN_MODE: original-prices
+          RUN_DRY_RUN: "false"
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

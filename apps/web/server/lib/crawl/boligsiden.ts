@@ -20,6 +20,7 @@ import {
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
 import { mockModeEnabled } from "../enrichment-sources/types.js";
+import { isUuid } from "../http-helpers.js";
 
 const MAX_ERRORS_REPORTED = 10;
 
@@ -140,18 +141,15 @@ function mapImage(img: unknown): ListingImage | null {
 const SITE_ORIGIN = "https://www.boligsiden.dk";
 
 /**
- * The listing's URL on boligsiden.dk. Unlike Boliga there's no id-based route
- * to fall back on — boligsiden.dk addresses listings by slug — so this only
- * ever returns a link the record actually carried, and null otherwise. The
- * candidate field names are unverified against the live API (this repo has
- * never had network access to it), which is exactly why they're tried in
- * order and why a miss is a null rather than a constructed guess: the detail
- * page hides the button, instead of shipping a 404 to every listing.
+ * Prefer the address-page slug verified against the live feed and public site.
+ * Only source-provided identity is used; no address text is converted to a slug.
  */
 function mapListingUrl(r: Record<string, unknown>): string | null {
+  const addressSlug = asNonEmptyString(r.slugAddress) ?? asNonEmptyString(get(r, "address", "slugAddress"));
   return (
     asHttpUrl(r.url) ??
     asHttpUrl(get(r, "case", "url")) ??
+    (addressSlug && /^[a-z0-9æøå_-]+$/i.test(addressSlug) ? absoluteUrl(SITE_ORIGIN, `/adresse/${addressSlug}`) : null) ??
     absoluteUrl(SITE_ORIGIN, asNonEmptyString(r.slug)) ??
     absoluteUrl(SITE_ORIGIN, asNonEmptyString(get(r, "address", "slug")))
   );
@@ -246,6 +244,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket);
   const changePercent = typeof r.priceChangePercentage === "number" && Number.isFinite(r.priceChangePercentage)
     && r.priceChangePercentage > -100 ? r.priceChangePercentage : null;
+  const sourceAddressId = get(r, "address", "addressID");
 
   return {
     data_mode: "real",
@@ -265,6 +264,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     ...(changePercent !== null ? { reported_price_change: { currentAsking: price, changePercent } } : {}),
     listing_source: "boligsiden",
     external_id: externalId,
+    ...(isUuid(sourceAddressId) ? { source_address_id: sourceAddressId.toLowerCase() } : {}),
     lat,
     lon,
     status: "active",

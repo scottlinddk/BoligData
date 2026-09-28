@@ -1,0 +1,254 @@
+import { fetchJson, HttpError } from "./http.js";
+
+const API_ORIGIN = "https://api.boligsiden.dk";
+const PUBLIC_ORIGIN = "https://www.boligsiden.dk";
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const DAY = 86_400_000;
+
+type JsonObject = Record<string, unknown>;
+const object = (value: unknown): JsonObject | null => typeof value === "object" && value !== null && !Array.isArray(value) ? value as JsonObject : null;
+const positive = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
+const text = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+const uuid = (value: unknown): string | null => typeof value === "string" && UUID.test(value) ? value.toLowerCase() : null;
+
+export interface BoligsidenOriginalAskingInput {
+  sourceListingId: string;
+  /** Boligsiden's address.addressID, never an access-address/BBR identifier. */
+  addressId?: string | null;
+  listingUrl?: string | null;
+  postalCode?: string | null;
+  /** Only narrows source discovery; never supplies the original price. */
+  currentAsking?: number | null;
+  status?: string;
+  observedAt?: string;
+}
+
+export interface BoligsidenOriginalAskingResult {
+  status: "exact" | "missing" | "unavailable" | "conflict" | "not_current";
+  price: number | null;
+  originalDate: string | null;
+  originalAt: string | null;
+  sourceUrl: string;
+  timelineUrl: string | null;
+  sourceListingId: string;
+  sourceAddressId: string | null;
+  scope: "listing";
+  reason: string | null;
+  observedAt: string;
+  identityConfirmed: boolean;
+  listingStatus: "active" | "closed" | "unknown";
+  currentPrice: number | null;
+  latestEpisodeDays: number | null;
+  previousOpenCount: number;
+}
+
+function publicUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.origin === PUBLIC_ORIGIN && /^\/adresse\/[^/]+\/?$/.test(url.pathname) ? `${url.origin}${url.pathname}` : null;
+  } catch { return null; }
+}
+
+function empty(input: BoligsidenOriginalAskingInput, addressId: string | null = null): BoligsidenOriginalAskingResult {
+  return {
+    status: "missing", price: null, originalDate: null, originalAt: null,
+    sourceUrl: publicUrl(input.listingUrl) ?? `${API_ORIGIN}/search/cases`,
+    timelineUrl: addressId ? `${API_ORIGIN}/addresses/${addressId}/timeline` : null,
+    sourceListingId: input.sourceListingId, sourceAddressId: addressId, scope: "listing",
+    reason: null, observedAt: input.observedAt ?? new Date().toISOString(),
+    identityConfirmed: false, listingStatus: "unknown", currentPrice: null,
+    latestEpisodeDays: null, previousOpenCount: 0,
+  };
+}
+
+function timestamp(value: unknown): number | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const stamp = Date.parse(value);
+  const day = value.slice(0, 10);
+  return Number.isFinite(stamp) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day ? stamp : null;
+}
+
+/** The public address timeline has no case IDs. Join through the address's
+ * unique active case, then corroborate a unique opening with its source
+ * duration and complete price-change path. A pause may retain that duration,
+ * but a reopening must preserve the exact closing price with no intervening sale. */
+export function classifyBoligsidenOriginalAsking(
+  input: BoligsidenOriginalAskingInput,
+  addressPayload: unknown,
+  timelinePayload: unknown,
+): BoligsidenOriginalAskingResult {
+  const address = object(addressPayload);
+  const sourceAddressId = uuid(address?.addressID);
+  const result = empty(input, sourceAddressId);
+  const fail = (status: BoligsidenOriginalAskingResult["status"], reason: string) => ({ ...result, status, reason });
+  const expectedCase = uuid(input.sourceListingId);
+  if (!expectedCase || !sourceAddressId || (input.addressId && uuid(input.addressId) !== sourceAddressId)) return fail("conflict", "address_identity_mismatch");
+  const slug = text(address?.slugAddress);
+  if (slug && /^[a-z0-9-]+$/i.test(slug)) result.sourceUrl = `${PUBLIC_ORIGIN}/adresse/${slug}`;
+  if (!Array.isArray(address?.cases)) return fail("unavailable", "missing_address_cases");
+  const cases = address.cases.map(object).filter((row): row is JsonObject => row !== null);
+  const activeCases = cases.filter(row => row.status === "open");
+  const matching = cases.filter(row => uuid(row.caseID) === expectedCase);
+  if (matching.length !== 1) return fail(matching.length === 0 ? "not_current" : "conflict", "source_case_not_unique_at_address");
+  const current = matching[0]!;
+  result.identityConfirmed = true;
+  result.listingStatus = current.status === "open" ? "active" : "closed";
+  if (current.status !== "open" || address.isOnMarket === false) return fail("not_current", "source_case_closed");
+  if (activeCases.length !== 1 || address.hasMultipleCases === true) return fail("conflict", "multiple_active_cases_at_address");
+  const nestedAddress = object(current.address);
+  if (nestedAddress?.addressID !== undefined && uuid(nestedAddress.addressID) !== sourceAddressId) return fail("conflict", "case_address_mismatch");
+  result.currentPrice = positive(current.priceCash) ? current.priceCash : null;
+  const duration = object(object(current.timeOnMarket)?.current)?.days;
+  result.latestEpisodeDays = typeof duration === "number" && Number.isSafeInteger(duration) && duration >= 0 ? duration : null;
+  const observedStamp = timestamp(result.observedAt);
+  if (observedStamp === null || observedStamp > Date.now()) return fail("conflict", "invalid_observation_time");
+  if (!Array.isArray(timelinePayload)) return fail("unavailable", "invalid_timeline_shape");
+  const events: { at: string; stamp: number; price: number | null; type: string; difference: number | null }[] = [];
+  for (const raw of timelinePayload) {
+    const event = object(raw);
+    const type = text(event?.type);
+    if (!type || !["open", "closed", "sold", "price_change"].includes(type)) continue;
+    const stamp = timestamp(event?.at);
+    if (stamp === null || stamp > observedStamp) return fail("conflict", "invalid_or_future_timeline_event");
+    const difference = object(event?.aux)?.difference;
+    events.push({ at: event!.at as string, stamp, price: positive(event?.price) ? event.price : null,
+      type, difference: typeof difference === "number" && Number.isFinite(difference) ? difference : null });
+  }
+  events.sort((a, b) => a.stamp - b.stamp);
+  const unique = events.filter((event, index) => index === 0 || JSON.stringify(event) !== JSON.stringify(events[index - 1]));
+  const openings = unique.flatMap((event, index) => event.type === "open" ? [index] : []);
+  if (openings.length === 0) return fail("missing", "no_original_open_event");
+  if (result.latestEpisodeDays === null) return fail("conflict", "current_episode_duration_missing");
+  // Source day counts and event timestamps can straddle midnight/refresh cycles.
+  const matchingOpenings = openings.filter(index => {
+    const calendarDays = Math.floor((Date.parse(result.observedAt.slice(0, 10)) - Date.parse(unique[index]!.at.slice(0, 10))) / DAY);
+    return Math.abs(calendarDays - result.latestEpisodeDays!) <= 1;
+  });
+  if (matchingOpenings.length === 0) return fail("conflict", "opening_does_not_match_current_episode");
+  if (matchingOpenings.length !== 1) return fail("conflict", "multiple_openings_match_current_episode");
+  const opening = matchingOpenings[0]!;
+  for (let index = Math.max(1, opening); index < unique.length; index++) {
+    if (unique[index]!.stamp === unique[index - 1]!.stamp) return fail("conflict", "ambiguous_simultaneous_timeline_events");
+  }
+  const original = unique[opening]!;
+  result.previousOpenCount = unique.slice(0, opening).filter(event => event.type === "open").length;
+  if (original.price === null) return fail("missing", "original_open_price_missing");
+  const journey = unique.slice(opening + 1);
+  let latestPrice = original.price;
+  let active = true;
+  for (const event of journey) {
+    if (event.type === "sold") return fail("conflict", "sale_after_current_episode_opening");
+    if (event.type === "closed") {
+      if (!active || event.price !== latestPrice) return fail("conflict", "inconsistent_pause_price");
+      active = false;
+      continue;
+    }
+    if (event.type === "open") {
+      if (active || event.price !== latestPrice) return fail("conflict", "inconsistent_reopening_price");
+      active = true;
+      continue;
+    }
+    if (event.type !== "price_change") continue;
+    if (!active) return fail("conflict", "price_change_while_closed");
+    if (event.price === null) return fail("conflict", "price_change_amount_missing");
+    if (event.difference !== null && Math.abs(latestPrice + event.difference - event.price) > 1) return fail("conflict", "inconsistent_price_change_path");
+    latestPrice = event.price;
+  }
+  if (!active) return fail("not_current", "timeline_closed_after_latest_open");
+  if (result.currentPrice === null || latestPrice !== result.currentPrice) return fail("conflict", "timeline_current_price_mismatch");
+  return { ...result, status: "exact", price: original.price, originalDate: original.at.slice(0, 10), originalAt: original.at };
+}
+
+interface PostcodeDiscovery { addresses: Map<string, string>; complete: boolean; reason: string | null }
+const postcodeCache = new Map<string, { expires: number; value: Promise<PostcodeDiscovery> }>();
+
+async function request(url: string, deadline: number): Promise<unknown> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new Error("source_deadline_exceeded");
+  return fetchJson(url, { attempts: 1, timeoutMs: Math.min(6_000, remaining) });
+}
+
+function caseAddresses(payload: unknown): { addresses: Map<string, string>; count: number; total: number | null } {
+  const page = object(payload);
+  if (!Array.isArray(page?.cases)) throw new Error("invalid_case_search_shape");
+  const addresses = new Map<string, string>();
+  for (const raw of page.cases) {
+    const row = object(raw);
+    const caseId = uuid(row?.caseID);
+    const addressId = uuid(object(row?.address)?.addressID);
+    if (caseId && addressId) {
+      if (addresses.has(caseId) && addresses.get(caseId) !== addressId) throw new Error("conflicting_source_case_addresses");
+      addresses.set(caseId, addressId);
+    }
+  }
+  const total = typeof page.totalHits === "number" && Number.isInteger(page.totalHits) && page.totalHits >= 0 ? page.totalHits : null;
+  return { addresses, count: page.cases.length, total };
+}
+
+function postcodeAddresses(postalCode: string, deadline: number): Promise<PostcodeDiscovery> {
+  const cached = postcodeCache.get(postalCode);
+  if (cached && cached.expires > Date.now()) return cached.value;
+  const value = (async (): Promise<PostcodeDiscovery> => {
+    const addresses = new Map<string, string>();
+    try {
+      for (let page = 1; page <= 5; page++) {
+        const query = new URLSearchParams({ zipCodes: postalCode, per_page: "100", page: String(page), sortBy: "timeOnMarket", sortAscending: "true" });
+        const result = caseAddresses(await request(`${API_ORIGIN}/search/cases?${query}`, deadline));
+        const before = addresses.size;
+        for (const [caseId, addressId] of result.addresses) {
+          if (addresses.has(caseId) && addresses.get(caseId) !== addressId) return { addresses: new Map(), complete: false, reason: "conflicting_source_case_addresses" };
+          addresses.set(caseId, addressId);
+        }
+        if (result.count === 0) {
+          const complete = result.total !== null && addresses.size >= result.total;
+          return { addresses, complete, reason: complete ? null : "incomplete_source_pagination" };
+        }
+        // Only unique, valid case/address pairs establish coverage. Repeated or
+        // malformed rows cannot prove that an absent case is no longer current.
+        if (addresses.size - before !== result.count) return { addresses, complete: false, reason: "nonadvancing_source_pagination" };
+        if (result.total !== null && addresses.size >= result.total) return { addresses, complete: true, reason: null };
+        if (addresses.size === before) return { addresses, complete: false, reason: "nonadvancing_source_pagination" };
+      }
+      return { addresses, complete: false, reason: "bounded_search" };
+    } catch (error) {
+      return { addresses, complete: false, reason: error instanceof Error ? error.message : "source_search_failed" };
+    }
+  })();
+  postcodeCache.set(postalCode, { expires: Date.now() + 60_000, value });
+  if (postcodeCache.size > 100) postcodeCache.delete(postcodeCache.keys().next().value!);
+  return value;
+}
+
+/** At most 12 seconds per resolver; no retries or browser-challenge bypass.
+ * Current price is only a discovery optimization. A cached bounded postcode
+ * search can find a source case after its asking price changed. */
+export async function fetchBoligsidenOriginalAsking(input: BoligsidenOriginalAskingInput): Promise<BoligsidenOriginalAskingResult> {
+  const started = Date.now();
+  const deadline = started + 12_000;
+  const result = empty({ ...input, observedAt: input.observedAt ?? new Date(started).toISOString() });
+  const fail = (status: BoligsidenOriginalAskingResult["status"], reason: string) => ({ ...result, status, reason });
+  const caseId = uuid(input.sourceListingId);
+  if (!caseId) return fail("missing", "invalid_source_case_id");
+  let addressId = uuid(input.addressId);
+  try {
+    if (!addressId) {
+      if (!input.postalCode || !/^\d{4}$/.test(input.postalCode)) return fail("unavailable", "source_address_identity_missing");
+      if (positive(input.currentAsking)) {
+        const query = new URLSearchParams({ zipCodes: input.postalCode, priceMin: String(input.currentAsking), priceMax: String(input.currentAsking), per_page: "100", page: "1" });
+        const result = caseAddresses(await request(`${API_ORIGIN}/search/cases?${query}`, deadline));
+        addressId = result.addresses.get(caseId) ?? null;
+      }
+      if (!addressId) {
+        const discovery = await postcodeAddresses(input.postalCode, deadline);
+        addressId = discovery.addresses.get(caseId) ?? null;
+        if (!addressId) return fail(discovery.complete ? "not_current" : "unavailable", discovery.reason ?? "source_case_absent_from_current_postcode_feed");
+      }
+    }
+    const addressPayload = await request(`${API_ORIGIN}/addresses/${addressId}`, deadline);
+    const timelinePayload = await request(`${API_ORIGIN}/addresses/${addressId}/timeline`, deadline);
+    return classifyBoligsidenOriginalAsking({ ...input, addressId, observedAt: result.observedAt }, addressPayload, timelinePayload);
+  } catch (error) {
+    return fail("unavailable", error instanceof HttpError ? `http_${error.status}` : error instanceof Error ? error.message : "source_request_failed");
+  }
+}

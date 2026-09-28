@@ -13,6 +13,18 @@ const listing: RawListing = {
 const observedAt = "2026-09-26T10:00:00Z";
 
 describe("documented listing and sale history", () => {
+  it("retains exact source address identity separately from listing chronology", () => {
+    const input = { ...listing, source_address_id: "0a3f50c9-be71-32b8-e044-0003ba298018" };
+    const first = buildHistoryRows(input, "property-1", observedAt);
+    const repeated = buildHistoryRows(input, "property-1", "2026-09-27T10:00:00Z");
+    const identity = (rows: ReturnType<typeof buildHistoryRows>) => rows.observations.find(row => row.field_name === "source_address_id");
+    expect(identity(first)).toMatchObject({ value: { addressId: input.source_address_id, sourceListingId: listing.external_id },
+      source: "boligsiden", method: "source_listing_identity", data_mode: "real" });
+    expect(identity(repeated)?.ingest_key).toBe(identity(first)?.ingest_key);
+    expect(first.episode.start_date).toBeNull();
+    expect(first.events.some(row => row.event_type === "first_listing")).toBe(false);
+  });
+
   it("dates rounded source price changes without manufacturing first-listing events", () => {
     const input = { ...listing, reported_price_change: { currentAsking: listing.price, changePercent: -5.5 } };
     const rows = buildHistoryRows(input, "property-1", observedAt);

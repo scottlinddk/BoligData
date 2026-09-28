@@ -142,21 +142,31 @@ async function handleHistory(req: VercelRequest, res: VercelResponse, client: Su
   }
   const propertyId = propertyIdFromQuery(req, true);
   const tables = ["listing_campaigns", "listing_episodes", "listing_events", "sale_transactions", "source_observations", "condition_evidence"];
-  const results = await Promise.all(tables.map((table) => {
+  const [results, originalResult] = await Promise.all([Promise.all(tables.map((table) => {
     let query = client.from(table).select(table === "sale_transactions" ? "*,properties(address,municipality,postal_code,property_type,lat,lon)" : "*");
     if (propertyId) query = query.eq("property_id", propertyId);
     return query.order("observed_at", { ascending: false }).order("id", { ascending: true }).limit(500);
-  }));
+  })), propertyId ? client.from("source_observations").select("*").eq("property_id", propertyId)
+    .eq("field_name", "original_asking_price").order("observed_at", { ascending: false }).order("id", { ascending: true }).limit(501)
+    : Promise.resolve(null)]);
   for (const result of results) if (result.error) throw result.error;
+  if (originalResult?.error) throw originalResult.error;
   const rows = results.map((r) => (r.data ?? []) as Row[]);
   const [campaigns = [], episodes = [], events = [], transactions = [], observations = [], conditionEvidence = []] = rows;
-  const dataVersion = `research/1:${createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 24)}`;
+  const originalRows = (originalResult?.data ?? []) as Row[];
+  const dataVersion = `research/2:${createHash("sha256").update(JSON.stringify([rows, originalRows])).digest("hex").slice(0, 24)}`;
   const result: ResearchHistoryResponse = {
     campaigns: campaigns.map(camelRow) as ResearchHistoryResponse["campaigns"], episodes: episodes.map(camelRow) as ResearchHistoryResponse["episodes"],
     events: events.map((r) => ({ ...camelRow(r), price: numberOrNull(r.price) })) as ResearchHistoryResponse["events"],
     transactions: transactions.map((r) => transactionFromRow(r, conditionEvidence)),
     observations: observations.map(camelRow) as ResearchHistoryResponse["observations"], conditionEvidence: conditionEvidence.map(camelRow) as ResearchHistoryResponse["conditionEvidence"],
     dataVersion, retrievedAt: new Date().toISOString(), truncated: rows.some((r) => r.length >= 500),
+    ...(propertyId ? { originalAskingEvidence: {
+      propertyId, observations: originalRows.slice(0, 500).map(camelRow) as ResearchHistoryResponse["observations"],
+      // A full exact-price slice is not enough if current episode identity
+      // itself may have been cut off. Routine observations do not gate it.
+      complete: originalRows.length <= 500 && episodes.length < 500,
+    } } : {}),
   };
   res.status(200).json(result);
 }

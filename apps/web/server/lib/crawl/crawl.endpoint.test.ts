@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const { getClient, ingest, verify, logError, cors } = vi.hoisted(() => ({ getClient: vi.fn(), ingest: vi.fn(), verify: vi.fn(), logError: vi.fn(), cors: vi.fn() }));
+const { getClient, ingest, verify, originalPrices, logError, cors } = vi.hoisted(() => ({ getClient: vi.fn(), ingest: vi.fn(), verify: vi.fn(), originalPrices: vi.fn(), logError: vi.fn(), cors: vi.fn() }));
 vi.mock("../../middleware/cors.js", () => ({ applyCors: cors }));
 vi.mock("../supabase.js", () => ({ getServiceRoleClient: getClient }));
 vi.mock("./ingest.js", () => ({ runIngest: ingest }));
 vi.mock("./runner-verification.js", () => ({ verifyCrawlData: verify }));
+vi.mock("./original-price-backfill.js", () => ({ runOriginalPriceBackfill: originalPrices }));
 vi.mock("./log.js", () => ({ logError }));
 import handler from "../../../api/crawl.js";
 
@@ -22,6 +23,7 @@ beforeEach(() => {
   cors.mockReturnValue(false); getClient.mockReturnValue(CLIENT);
   ingest.mockResolvedValue({ ok: true, reports: [] });
   verify.mockResolvedValue({ counts: { realProperties: 10 }, targetFound: true, samples: [] });
+  originalPrices.mockResolvedValue({ ok: true, mode: "original-prices", dryRun: true, results: [], counters: {} });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -65,6 +67,25 @@ describe("authenticated crawl API", () => {
     expect(res.json).toHaveBeenCalledWith(result);
   });
 
+  it.each([true, false])("runs only the original-price backfill with explicit dryRun=%s", async dryRun => {
+    const afterId = "AAAAAAAA-1111-4111-8111-111111111111";
+    const result = { ok: true, mode: "original-prices", dryRun, results: [], counters: {}, batch: { afterId: afterId.toLowerCase(), batchSize: 8, total: 20, nextAfterId: null } };
+    originalPrices.mockResolvedValue(result);
+    const res = await call({ mode: "original-prices", dryRun, afterId, batchSize: 8 });
+    expect(originalPrices).toHaveBeenCalledExactlyOnceWith(CLIENT, { dryRun, afterId: afterId.toLowerCase(), batchSize: 8 });
+    expect(ingest).not.toHaveBeenCalled(); expect(verify).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(result);
+  });
+
+  it("starts original-price enumeration without a cursor and keeps failed writes retryable", async () => {
+    const result = { ok: false, results: [{ outcome: "write_failed" }], counters: { write_failed: 1 }, batch: { afterId: null, nextAfterId: null } };
+    originalPrices.mockResolvedValue(result);
+    const res = await call({ mode: "original-prices", dryRun: false, batchSize: 1 });
+    expect(originalPrices).toHaveBeenCalledExactlyOnceWith(CLIENT, { dryRun: false, batchSize: 1, afterId: null });
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res.json).toHaveBeenCalledWith(result);
+  });
+
   it.each([
     [], true, 8, "not json", '{"mode":"verify"}',
     { mode: "unknown" }, { mode: "ingest" }, { mode: "verify", offset: 0, batchSize: 8 }, { mode: "verify", extra: true },
@@ -73,11 +94,18 @@ describe("authenticated crawl API", () => {
     { offset: Number.NaN, batchSize: 8 }, { offset: Number.POSITIVE_INFINITY, batchSize: 8 },
     { offset: 0, batchSize: 0 }, { offset: 0, batchSize: 51 }, { offset: 0, batchSize: 1.5 }, { offset: 0, batchSize: "8" },
     { offset: 0, batchSize: null }, { offset: 0, batchSize: Number.NaN },
+    { mode: "original-prices", batchSize: 8 }, { mode: "original-prices", dryRun: "false", batchSize: 8 },
+    { mode: "original-prices", dryRun: true, batchSize: 9 }, { mode: "original-prices", dryRun: false, batchSize: 0 },
+    { mode: "original-prices", dryRun: true, batchSize: 1.5 }, { mode: "original-prices", dryRun: true, batchSize: "8" },
+    { mode: "original-prices", dryRun: true, batchSize: 8, afterId: "not-a-uuid" },
+    { mode: "original-prices", dryRun: true, batchSize: 8, afterId: 8 },
+    { mode: "original-prices", dryRun: true, batchSize: 8, offset: 0 },
   ])("rejects invalid or mismatched fields before connecting (%j)", async body => {
     const res = await call(body);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(getClient).not.toHaveBeenCalled();
     expect(verify).not.toHaveBeenCalled(); expect(ingest).not.toHaveBeenCalled();
+    expect(originalPrices).not.toHaveBeenCalled();
   });
 
   it("preserves source failure reports and the existing 502 status", async () => {
@@ -97,5 +125,14 @@ describe("authenticated crawl API", () => {
     expect(JSON.stringify(res.json.mock.calls)).not.toContain(SECRET);
     expect(JSON.stringify(res.json.mock.calls)).not.toContain("private database");
     expect(logError).toHaveBeenCalledOnce();
+  });
+
+  it("does not expose upstream backfill failure details in the response or log", async () => {
+    originalPrices.mockRejectedValue(new Error(`private database details / ${SECRET}`));
+    const res = await call({ mode: "original-prices", dryRun: true, batchSize: 8 });
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Original-price backfill failed" });
+    expect(JSON.stringify(res.json.mock.calls)).not.toContain(SECRET);
+    expect((logError.mock.calls[0]?.[1] as Error).message).toBe("Original-price backfill failed");
   });
 });

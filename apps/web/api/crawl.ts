@@ -4,8 +4,11 @@ import { getServiceRoleClient } from "../server/lib/supabase.js";
 import { runIngest } from "../server/lib/crawl/ingest.js";
 import { logError } from "../server/lib/crawl/log.js";
 import { verifyCrawlData } from "../server/lib/crawl/runner-verification.js";
+import { runOriginalPriceBackfill, type OriginalPriceBackfillOptions } from "../server/lib/crawl/original-price-backfill.js";
+import { isUuid } from "../server/lib/http-helpers.js";
 
-type CrawlRequest = { mode: "verify" } | { mode: "ingest"; batch?: { offset: number; batchSize: number } };
+type CrawlRequest = { mode: "verify" } | { mode: "ingest"; batch?: { offset: number; batchSize: number } }
+  | { mode: "original-prices"; options: OriginalPriceBackfillOptions };
 
 function parseRequest(body: unknown): CrawlRequest | null {
   if (body === undefined || body === null || body === "") return { mode: "ingest" };
@@ -14,6 +17,14 @@ function parseRequest(body: unknown): CrawlRequest | null {
   const keys = Object.keys(value);
   if (keys.length === 0) return { mode: "ingest" };
   if (value.mode === "verify" && keys.length === 1) return { mode: "verify" };
+  if (value.mode === "original-prices") {
+    if (keys.some(key => !["mode", "dryRun", "afterId", "batchSize"].includes(key)) ||
+        typeof value.dryRun !== "boolean" || typeof value.batchSize !== "number" ||
+        !Number.isInteger(value.batchSize) || value.batchSize < 1 || value.batchSize > 8 ||
+        (value.afterId !== undefined && value.afterId !== null && !isUuid(value.afterId))) return null;
+    return { mode: "original-prices", options: { dryRun: value.dryRun, batchSize: value.batchSize,
+      afterId: typeof value.afterId === "string" ? value.afterId.toLowerCase() : null } };
+  }
   if (keys.length !== 2 || !keys.includes("offset") || !keys.includes("batchSize")) return null;
   const { offset, batchSize } = value;
   if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0 || offset > 50_000 ||
@@ -30,6 +41,8 @@ function parseRequest(body: unknown): CrawlRequest | null {
  *
  * Response contract used by the scheduled workflow:
  * - POST { mode: "verify" } runs SELECT-only, shared-data verification
+ * - POST { mode: "original-prices", dryRun, afterId?, batchSize } audits or
+ *   adds original-price source evidence for at most eight stored listings
  * - POST { offset, batchSize } ingests a bounded listing slice (batchSize 1–50)
  * - POST with no body preserves the existing full ingest behavior
  * - 200 { ok: true, reports }  — every source fetched and ingested cleanly
@@ -56,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
   const request = parseRequest(req.body);
   if (!request) {
-    res.status(400).json({ error: "Use no body, { mode: 'verify' }, or integer offset 0–50000 and batchSize 1–50 together" });
+    res.status(400).json({ error: "Use no body, { mode: 'verify' }, offset 0–50000 with batchSize 1–50, or { mode: 'original-prices', dryRun: boolean, afterId?: UUID, batchSize: 1–8 }" });
     return;
   }
 
@@ -67,10 +80,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(200).json({ ok: true, ...verification });
       return;
     }
+    if (request.mode === "original-prices") {
+      const result = await runOriginalPriceBackfill(client, request.options);
+      res.status(result.ok ? 200 : 502).json(result);
+      return;
+    }
     const result = request.batch ? await runIngest(client, request.batch) : await runIngest(client);
     res.status(result.ok ? 200 : 502).json(result);
   } catch (err) {
-    logError(request.mode === "verify" ? "crawl.verification_failed" : "crawl.crashed", err);
-    res.status(500).json({ error: request.mode === "verify" ? "Crawl verification failed" : "Crawl failed" });
+    // Backfill upstream or database messages must never leak credentials into logs.
+    logError(request.mode === "verify" ? "crawl.verification_failed" : "crawl.crashed",
+      request.mode === "original-prices" ? new Error("Original-price backfill failed") : err);
+    res.status(500).json({ error: request.mode === "verify" ? "Crawl verification failed" : request.mode === "original-prices" ? "Original-price backfill failed" : "Crawl failed" });
   }
 }
