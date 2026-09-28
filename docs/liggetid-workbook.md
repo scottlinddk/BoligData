@@ -41,7 +41,7 @@ timestamp is used, so output is deterministic. The expected source SHA-256 is
 
 ## Interpretation
 
-The card calculates **Bør-pris from the original asking price only**. The current
+The card calculates **Burde koste from the original asking price only**. The current
 asking price, including an already reduced price, is never the calculation basis. The displayed amount is always rounded to the
 nearest DKK 10,000. The original workbook used DKK 50,000; that source setting is
 retained separately as `sourceRoundingDkk`. `calculationVersion` identifies the
@@ -70,8 +70,12 @@ the original price is available; both fields are null otherwise. The inputs and
 listing chronology are never changed.
 
 `currentAsking` is used **only** for the gap comparison. With the same original
-asking price and duration, changing today's price cannot change Bør-pris or its
+asking price and duration, changing today's price cannot change Burde koste or its
 historical range. A missing current price removes the gap, not the calculation.
+The card shows current asking and **Burde koste** side by side, with an explicit
+above/below/equal comparison in DKK and percent of current asking. Current asking
+remains visible when the original-price evidence is missing; no estimate or gap
+is invented in that state.
 
 Time matching follows three explicit paths:
 
@@ -97,7 +101,7 @@ its percentage uses current asking as denominator and can be negative.
 At 188 days, first asking DKK 5.5m and current asking DKK 5.2m, the 181–240 day
 group (22 trades) gives DKK **4.81m**, a middle-half range of **4.66–5.08m**, and a
 current-price gap of **390,000** (7.5%). Reducing current asking to DKK 4.5m leaves
-Bør-pris at **4.81m** and changes only the gap to **−310,000**. With unknown
+Burde koste at **4.81m** and changes only the gap to **−310,000**. With unknown
 duration and original asking DKK 5.5m, the all-sales median discount of
 approximately **5.9894%** gives **5.17m**, with **4.80–5.35m** as the middle-half
 historical range. If the original asking price is missing, these historical

@@ -312,11 +312,11 @@ describe("prominent price by time on market card", () => {
     const html = render();
     expect(html).toContain('data-state="available"');
     expect(html).toContain("Pris efter liggetid");
-    expect(html).toContain("Bør-pris");
+    expect(html).toContain("Burde koste");
     expect(html).toContain("4.810.000");
     expect(html).toContain("5.200.000");
     expect(html).toContain("390.000");
-    expect(html).toContain("over prisreferencen");
+    expect(html).toContain("over ‘Burde koste’");
     expect(html).toContain("281 historiske villasalg");
     expect(html).toContain("2026-09-27");
     expect(html).toContain("ikke en markedsvurdering");
@@ -327,13 +327,77 @@ describe("prominent price by time on market card", () => {
     expect(html.indexOf('data-testid="workbook-target-price"')).toBeLessThan(html.indexOf("<details"));
   });
 
+  it("shows current asking and Burde koste together ahead of the evidence details", () => {
+    const overview = render().split("<details")[0]!;
+    expect(overview).toContain("Aktuel udbudspris");
+    expect(overview).toContain("Burde koste");
+    expect(overview).toContain('data-testid="workbook-current-asking"');
+    expect(overview).toContain('data-testid="workbook-target-price"');
+    expect(overview).toContain("5.200.000");
+    expect(overview).toContain("4.810.000");
+    expect(overview).toContain('data-comparison="above"');
+    expect(overview).toContain("390.000");
+    expect(overview).toContain("7,5 % af udbudsprisen");
+    expect(overview).not.toContain("Bør-pris");
+  });
+
+  it.each([
+    { price: 4_700_000, state: "below", amount: "110.000", percent: "2,3 %", label: "under ‘Burde koste’" },
+    { price: 4_810_000, state: "equal", amount: "0 kr.", percent: "0 %", label: "på niveau med ‘Burde koste’" },
+  ])("shows the $state amount and percentage without changing the original-based estimate", ({ price, state, amount, percent, label }) => {
+    const html = render({ property: { ...property, price } });
+    const comparison = html.split('data-testid="workbook-price-gap"')[1]!.split("</div>")[0]!.replace(/\s+/g, " ");
+    expect(comparison).toContain(`data-comparison="${state}"`);
+    expect(comparison).toContain(amount);
+    expect(comparison).toContain(`${percent} af udbudsprisen`);
+    expect(comparison).toContain(label);
+    expect(comparison).not.toContain("-110.000");
+    expect(html).toContain("4.810.000");
+    expect(html).toContain("5.500.000");
+  });
+
+  it("keeps current asking visible with an explicit pending estimate when original evidence is missing", () => {
+    const overview = render({ history: history({ events: [] }) }).split("<details")[0]!;
+    expect(overview).toContain('data-testid="workbook-current-asking"');
+    expect(overview).toContain("5.200.000");
+    expect(overview).toContain("Burde koste");
+    expect(overview).toContain("Afventer oprindelig udbudspris");
+    expect(overview).not.toContain('data-testid="workbook-target-price"');
+    expect(overview).not.toContain('data-testid="workbook-price-gap"');
+  });
+
+  it("retains the estimate with an explicit missing-current-price comparison state", () => {
+    const overview = render({ property: { ...property, price: NaN } }).split("<details")[0]!;
+    expect(overview).toContain('data-testid="workbook-current-asking"');
+    expect(overview).toContain("Ukendt");
+    expect(overview).toContain("4.810.000");
+    expect(overview).toContain("Sammenligningen afventer en gyldig aktuel udbudspris");
+    expect(overview).not.toContain('data-testid="workbook-price-gap"');
+    expect(overview).not.toContain("NaN");
+  });
+
+  it.each([
+    { price: 5_200_000, label: "above ‘Should cost’", amount: "390,000", percent: "7.5 %" },
+    { price: 4_700_000, label: "below ‘Should cost’", amount: "110,000", percent: "2.3 %" },
+    { price: 4_810_000, label: "in line with ‘Should cost’", amount: "DKK 0", percent: "0 %" },
+  ])("translates the $label comparison and its denominator", ({ price, label, amount, percent }) => {
+    i18n.language = "en";
+    const overview = render({ property: { ...property, price } }).split("<details")[0]!.replace(/\s+/g, " ");
+    expect(overview).toContain("Current asking price");
+    expect(overview).toContain("Should cost");
+    expect(overview).toContain(label);
+    expect(overview).toContain(amount);
+    expect(overview).toContain(`${percent} of asking price`);
+    expect(overview).not.toContain("Should-be price");
+  });
+
   it("translates the should-be price and missing original explanation into English", () => {
     i18n.language = "en";
     const html = render();
     expect(html).toContain("Price by time on market");
-    expect(html).toContain("Should-be price");
+    expect(html).toContain("Should cost");
     expect(html).toContain("4,810,000");
-    expect(html).toContain("above the price reference");
+    expect(html).toContain("above ‘Should cost’");
     expect(html).toContain("not a market valuation");
     const missing = render({ history: history({ events: [] }) });
     expect(missing).toContain("The original asking price is missing");
@@ -344,13 +408,13 @@ describe("prominent price by time on market card", () => {
   it("makes estimated first asking prices explicit in both languages", () => {
     const data = history({ events: [{ ...first, price: null }], observations: [askingChange] });
     const da = render({ history: data });
-    expect(da).toContain("Bør-pris");
+    expect(da).toContain("Burde koste");
     expect(da).toContain("beregnet fra Boligsidens afrundede prisændring");
     expect(da).toContain("omtrentligt scenario");
     expect(da).toContain("4.810.000");
     i18n.language = "en";
     const en = render({ history: data });
-    expect(en).toContain("Should-be price");
+    expect(en).toContain("Should cost");
     expect(en).toContain("approximate scenario");
     expect(en).toContain("4,810,000");
   });
@@ -499,7 +563,7 @@ describe("prominent price by time on market card", () => {
   it("shows below-reference prices as below, without suggesting a negative reduction", () => {
     const html = render({ property: { ...property, price: 4_700_000 } });
     expect(html).toContain("110.000");
-    expect(html).toContain("under prisreferencen");
+    expect(html).toContain("under ‘Burde koste’");
     expect(html).not.toContain("-110.000");
   });
 });
