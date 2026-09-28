@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../property-map.css";
 import type { ResearchAnalysisFilters, ResearchTransaction } from "@shared/analysis";
-import { mapStyleUrl } from "@/lib/map-theme";
+import { mapStyleUrl, readableMapStyle } from "@/lib/map-theme";
 import { useMapStyleTheme } from "@/lib/use-map-style-theme";
 import { useTheme } from "@/theme/theme";
 import { buttonClass, useResearchText } from "./fields";
@@ -25,7 +25,8 @@ export function SalesMap({ rows, onFilter, onFocus }: { rows: ResearchTransactio
   useEffect(() => {
     if (!container.current) return;
     try {
-      const instance = new maplibregl.Map({ container: container.current, style: mapStyleUrl(theme), center: [9.9, 57.04], zoom: 11 });
+      const instance = new maplibregl.Map({ container: container.current, center: [9.9, 57.04], zoom: 11 });
+      instance.setStyle(mapStyleUrl(theme), { transformStyle: (_previous, next) => readableMapStyle(next, theme) });
       map.current = instance; instance.addControl(new maplibregl.NavigationControl(), "top-right");
       instance.on("load", () => setReady(true));
       instance.on("click", e => { if (drawing.current) { const point: [number, number] = [e.lngLat.lng, e.lngLat.lat]; polygon.current.push(point); const element = document.createElement("span"); element.className = "research-map-vertex"; element.setAttribute("aria-hidden", "true"); vertices.current.push(new maplibregl.Marker({ element }).setLngLat(point).addTo(instance)); setCount(polygon.current.length); } });
