@@ -50,6 +50,7 @@ if [ "${RUN_MODE:-api}" = "original-prices" ]; then
   after_id=${after_id,,}
   totals='{}'
   batch_size=8
+  retryable_unavailable_pattern='^(source_request_failed|source_deadline_exceeded|source_search_failed|http_[0-9]+)$'
   for ((batch=1; batch<=10000; batch++)); do
     echo "Original-price batch $batch: dryRun=$dry_run afterId=${after_id:-start}"
     body=$(jq -cn --arg cursor "$after_id" --argjson dry "$dry_run" --argjson size "$batch_size" \
@@ -61,16 +62,26 @@ if [ "${RUN_MODE:-api}" = "original-prices" ]; then
       exit 1
     fi
     jq -c '{batch,counters,results}' response.json
-    totals=$(jq -cn --argjson previous "$totals" --argjson current "$(jq '.counters' response.json)" \
+    # A rerun only helps the "unavailable" rows caused by a transient failure
+    # to reach the source (network/timeout/HTTP error). Rows the source
+    # actually answered but could not confirm (bounded search coverage,
+    # an unexpected response shape, an unlinked identity) reproduce
+    # identically on every retry and must not fail the job every run.
+    current=$(jq --arg pattern "$retryable_unavailable_pattern" \
+      '.counters + {unavailable_retryable: ([.results[] | select(.outcome == "unavailable" and ((.reason // "") | test($pattern)))] | length)}' response.json)
+    totals=$(jq -cn --argjson previous "$totals" --argjson current "$current" \
       '$previous as $p | reduce ($current | to_entries[]) as $e ($p; .[$e.key] = ((.[$e.key] // 0) + $e.value))')
     next=$(jq -r '.batch.nextAfterId' response.json)
     if [ "$next" = "null" ]; then
       jq -cn --argjson dry "$dry_run" --argjson counters "$totals" \
         '{event:"original-prices.completed",dryRun:$dry,counters:$counters}'
       echo "Stored listing enumeration completed. Review every outcome; missing source evidence is not a recovered original price."
-      if jq -e '.unavailable // 0 | . > 0' <<< "$totals" > /dev/null; then
-        echo "::error::Some source requests were unavailable. All stored rows were classified; rerun to retry those lookups. Saved evidence is retained."
+      if jq -e '.unavailable_retryable // 0 | . > 0' <<< "$totals" > /dev/null; then
+        echo "::error::Some source requests failed transiently (network/timeout/HTTP error). All stored rows were classified; rerun to retry those lookups. Saved evidence is retained."
         exit 1
+      fi
+      if jq -e '.unavailable // 0 | . > 0' <<< "$totals" > /dev/null; then
+        echo "::warning::Some source lookups reached the source but could not confirm original-price evidence (e.g. bounded search coverage or an unexpected response shape). Rerunning will not change these; review the reason codes in the batch output above. Saved evidence is retained."
       fi
       exit 0
     fi
