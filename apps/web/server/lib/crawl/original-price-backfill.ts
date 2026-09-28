@@ -20,6 +20,8 @@ type Outcome = "unsupported_source" | "nonlive_data" | "invalid_source_identity"
   | "ambiguous_episode" | "would_persist" | "persisted" | "already_present" | "read_failed" | "write_failed";
 export interface OriginalPriceBackfillRow {
   id: string; source: string; status: string; dataMode: string; outcome: Outcome;
+  sourceListingId: string; address: string; postalCode: string | null; listingUrl: string | null; currentAsking: number | null;
+  sourceAddressId?: string | null; sourceUrl?: string | null; timelineUrl?: string | null;
   originalPrice?: number; originalDate?: string | null; reason?: string;
 }
 
@@ -44,17 +46,43 @@ export async function runOriginalPriceBackfill(client: SupabaseClient, options: 
   const selected = rows.slice(0, options.batchSize);
   const observedAt = new Date().toISOString();
   const results = await mapConcurrent(selected, 4, async (property): Promise<OriginalPriceBackfillRow> => {
+    let sourceDetails: Partial<OriginalPriceBackfillRow> = {};
     const result = (outcome: Outcome, details: Partial<OriginalPriceBackfillRow> = {}): OriginalPriceBackfillRow =>
-      ({ id: property.id, source: property.listing_source, status: property.status, dataMode: property.data_mode, outcome, ...details });
+      ({ id: property.id, source: property.listing_source, status: property.status, dataMode: property.data_mode, outcome,
+        sourceListingId: property.external_id, address: property.address, postalCode: property.postal_code, listingUrl: property.listing_url,
+        currentAsking: Number.isFinite(Number(property.price)) ? Number(property.price) : null, ...sourceDetails, ...details });
     if (property.listing_source !== "boligsiden") return result("unsupported_source");
     if (["mock", "demo"].includes(property.data_mode)) return result("nonlive_data");
     if (!isUuid(property.external_id)) return result("invalid_source_identity");
 
+    // These identities came from the source case feed, not DAR/access-address
+    // identifiers. They only shortcut discovery; the live source must still
+    // corroborate the case and opening before any original can be persisted.
+    let addressId: string | undefined;
+    try {
+      const identities = await client.from("source_observations").select("value,conflict_group", { count: "exact" })
+        .eq("property_id", property.id).eq("source", "boligsiden").eq("field_name", "source_address_id")
+        .eq("method", "source_listing_identity").eq("data_mode", "real").eq("verification_status", "verified")
+        .is("owner_id", null).limit(101);
+      if (identities.error || typeof identities.count !== "number") return result("read_failed", { reason: "source_identity_read_failed" });
+      if (identities.count <= 100) {
+        const matching = (identities.data ?? []).filter(row => typeof row.value?.sourceListingId === "string" &&
+          row.value.sourceListingId.toLowerCase() === property.external_id.toLowerCase());
+        if (matching.length > 0 && matching.every(row => !row.conflict_group && isUuid(row.value?.addressId))) {
+          const addresses = new Set<string>(matching.map(row => row.value.addressId.toLowerCase()));
+          if (addresses.size === 1) addressId = addresses.values().next().value;
+        }
+      }
+    } catch { return result("read_failed", { reason: "source_identity_read_failed" }); }
+
+    if (addressId) sourceDetails = { sourceAddressId: addressId };
     let source: Awaited<ReturnType<typeof fetchBoligsidenOriginalAsking>>;
     try {
       source = await fetchBoligsidenOriginalAsking({ sourceListingId: property.external_id, listingUrl: property.listing_url,
-        postalCode: property.postal_code, status: property.status, currentAsking: Number(property.price), observedAt });
+        postalCode: property.postal_code, status: property.status, currentAsking: Number(property.price), observedAt,
+        ...(addressId ? { addressId } : {}) });
     } catch { return result("unavailable", { reason: "source_request_failed" }); }
+    sourceDetails = { sourceAddressId: source.sourceAddressId ?? addressId ?? null, sourceUrl: source.sourceUrl ?? null, timelineUrl: source.timelineUrl ?? null };
     const reason = typeof source.reason === "string" && /^[a-z][a-z0-9_]{0,79}$/.test(source.reason) ? source.reason : undefined;
     if (source.status !== "exact") return result(source.status, reason ? { reason } : {});
     if (!source.identityConfirmed || source.listingStatus !== "active" || source.sourceListingId.toLowerCase() !== property.external_id.toLowerCase() || source.scope !== "listing" ||

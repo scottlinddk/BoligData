@@ -4,6 +4,7 @@ const API_ORIGIN = "https://api.boligsiden.dk";
 const PUBLIC_ORIGIN = "https://www.boligsiden.dk";
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const DAY = 86_400_000;
+const MAX_POSTCODE_PAGES = 20;
 
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown): JsonObject | null => typeof value === "object" && value !== null && !Array.isArray(value) ? value as JsonObject : null;
@@ -171,6 +172,10 @@ async function request(url: string, deadline: number): Promise<unknown> {
 
 function caseAddresses(payload: unknown): { addresses: Map<string, string>; count: number; total: number | null } {
   const page = object(payload);
+  const total = typeof page?.totalHits === "number" && Number.isInteger(page.totalHits) && page.totalHits >= 0 ? page.totalHits : null;
+  // The live search API returns `cases: null` when no records match. Only an
+  // explicit zero total makes that a complete empty result, not a malformed feed.
+  if (page?.cases == null && total === 0) return { addresses: new Map(), count: 0, total };
   if (!Array.isArray(page?.cases)) throw new Error("invalid_case_search_shape");
   const addresses = new Map<string, string>();
   for (const raw of page.cases) {
@@ -182,7 +187,6 @@ function caseAddresses(payload: unknown): { addresses: Map<string, string>; coun
       addresses.set(caseId, addressId);
     }
   }
-  const total = typeof page.totalHits === "number" && Number.isInteger(page.totalHits) && page.totalHits >= 0 ? page.totalHits : null;
   return { addresses, count: page.cases.length, total };
 }
 
@@ -192,7 +196,7 @@ function postcodeAddresses(postalCode: string, deadline: number): Promise<Postco
   const value = (async (): Promise<PostcodeDiscovery> => {
     const addresses = new Map<string, string>();
     try {
-      for (let page = 1; page <= 5; page++) {
+      for (let page = 1; page <= MAX_POSTCODE_PAGES; page++) {
         const query = new URLSearchParams({ zipCodes: postalCode, per_page: "100", page: String(page), sortBy: "timeOnMarket", sortAscending: "true" });
         const result = caseAddresses(await request(`${API_ORIGIN}/search/cases?${query}`, deadline));
         const before = addresses.size;
@@ -245,6 +249,8 @@ export async function fetchBoligsidenOriginalAsking(input: BoligsidenOriginalAsk
         if (!addressId) return fail(discovery.complete ? "not_current" : "unavailable", discovery.reason ?? "source_case_absent_from_current_postcode_feed");
       }
     }
+    result.sourceAddressId = addressId;
+    result.timelineUrl = `${API_ORIGIN}/addresses/${addressId}/timeline`;
     const addressPayload = await request(`${API_ORIGIN}/addresses/${addressId}`, deadline);
     const timelinePayload = await request(`${API_ORIGIN}/addresses/${addressId}/timeline`, deadline);
     return classifyBoligsidenOriginalAsking({ ...input, addressId, observedAt: result.observedAt }, addressPayload, timelinePayload);

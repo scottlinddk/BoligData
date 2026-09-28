@@ -15,6 +15,7 @@ const property = (n = 1, extra: Row = {}) => ({ id: id(n), listing_source: "boli
 const episode = (extra: Row = {}) => ({ id: "episode-1", property_id: id(1), campaign_id: "campaign-1", source: "boligsiden", source_listing_id: caseId, owner_id: null, status: "active", data_mode: "real", ingest_key: key("episode", "boligsiden", caseId, "real", null), ...extra });
 const exact = (extra: Row = {}) => ({ status: "exact", price: 4_495_000, originalDate: "2025-06-20", sourceUrl: "https://www.boligsiden.dk/adresse/example", sourceListingId: caseId, scope: "listing", observedAt: "2026-09-28T00:00:00Z", identityConfirmed: true, listingStatus: "active", ...extra });
 const evidence = (extra: Row = {}) => ({ id: "evidence-1", property_id: id(1), episode_id: "episode-1", owner_id: null, source: "boligsiden", field_name: "original_asking_price", method: "source_reported_original_asking", data_mode: "real", verification_status: "verified", observed_at: "2025-06-21T12:00:00Z", effective_date: "2025-06-20", date_precision: "day", value: { price: 4_495_000, sourceListingId: caseId, scope: "listing", originalDate: "2025-06-20" }, ...extra });
+const sourceIdentity = (extra: Row = {}) => evidence({ field_name: "source_address_id", method: "source_listing_identity", value: { addressId: id(90), sourceListingId: caseId }, ...extra });
 type Call = { table: string; action: string; value?: Row; filters: Array<[string, string, unknown]>; limit?: number; columns?: string; selectOptions?: Row; writeOptions?: Row; order?: [string, Row] };
 function database(properties: Row[], episodes: Row[] = [], observations: Row[] = [], fail?: (call: Call) => boolean) {
   const calls: Call[] = [];
@@ -215,5 +216,65 @@ describe("original asking-price backfill", () => {
     const result = await runOriginalPriceBackfill(db.client, options());
     expect(result.results[0]!.reason).toBe("duration_mismatch");
     expect(result.results[1]).not.toHaveProperty("reason");
+  });
+
+  it("includes public identity details for unresolved, unsupported and exact rows", async () => {
+    const db = database([property(1), property(2, { listing_source: "boliga", price: Number.NaN }), property(3)]);
+    fetchOriginal.mockResolvedValueOnce(exact({ status: "conflict", reason: "duration_mismatch", sourceAddressId: id(90), timelineUrl: `https://api.boligsiden.dk/addresses/${id(90)}/timeline` }));
+    const result = await runOriginalPriceBackfill(db.client, options());
+    expect(result.results[0]).toMatchObject({ outcome: "conflict", sourceListingId: caseId, address: "Example 1", postalCode: "2000", listingUrl: "https://www.boligsiden.dk/adresse/example", currentAsking: 4_195_000, sourceAddressId: id(90), sourceUrl: "https://www.boligsiden.dk/adresse/example", timelineUrl: `https://api.boligsiden.dk/addresses/${id(90)}/timeline`, reason: "duration_mismatch" });
+    expect(result.results[1]).toMatchObject({ outcome: "unsupported_source", address: "Example 1", sourceListingId: caseId, currentAsking: null });
+    expect(result.results[2]).toMatchObject({ outcome: "would_persist", address: "Example 1", sourceListingId: caseId, originalPrice: 4_495_000 });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("uses a unique verified source address for this property/case and never its DAR identifier", async () => {
+    const db = database([property(1, { data_mode: "unknown", id_lokalid: id(91) })], [], [sourceIdentity(), sourceIdentity({ id: "duplicate", value: { addressId: id(90).toUpperCase(), sourceListingId: caseId.toUpperCase() } }), sourceIdentity({ property_id: id(2), value: { addressId: id(99), sourceListingId: caseId } })]);
+    await runOriginalPriceBackfill(db.client, options());
+    expect(fetchOriginal).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ sourceListingId: caseId, addressId: id(90) }));
+    expect(db.writes()).toEqual([]);
+  });
+
+  it.each([
+    { source: "boliga" }, { data_mode: "unknown" }, { data_mode: "demo" }, { verification_status: "unverified" },
+    { owner_id: id(7) }, { method: "source_listing_v2" }, { field_name: "id_lokalid" },
+    { value: { addressId: id(90), sourceListingId: id(2) } }, { value: { addressId: "not-an-address-id", sourceListingId: caseId } },
+    { conflict_group: "address_identity_conflict" },
+  ])("does not use an untrusted or mismatched address identity %j", async overrides => {
+    const db = database([property()], [], [sourceIdentity(overrides)]);
+    await runOriginalPriceBackfill(db.client, options());
+    expect(fetchOriginal).toHaveBeenCalledOnce();
+    expect(fetchOriginal.mock.calls[0]![0]).not.toHaveProperty("addressId");
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("falls back to source discovery for ambiguous or incomplete stored address identities", async () => {
+    const ambiguous = database([property()], [], [sourceIdentity(), sourceIdentity({ value: { addressId: id(91), sourceListingId: caseId } })]);
+    await runOriginalPriceBackfill(ambiguous.client, options());
+    expect(fetchOriginal.mock.calls[0]![0]).not.toHaveProperty("addressId");
+    fetchOriginal.mockClear();
+    const incomplete = database([property()], [], Array.from({ length: 101 }, (_, n) => sourceIdentity({ id: `identity-${n}` })));
+    await runOriginalPriceBackfill(incomplete.client, options());
+    expect(fetchOriginal.mock.calls[0]![0]).not.toHaveProperty("addressId");
+    expect(incomplete.calls.find(call => call.filters.some(([, field, value]) => field === "field_name" && value === "source_address_id"))?.limit).toBe(101);
+  });
+
+  it("retains a verified address diagnostic if the live source request throws", async () => {
+    const db = database([property()], [], [sourceIdentity()]);
+    fetchOriginal.mockRejectedValue(new Error("private network failure"));
+    const result = await runOriginalPriceBackfill(db.client, options());
+    expect(result.results[0]).toMatchObject({ outcome: "unavailable", reason: "source_request_failed", sourceAddressId: id(90), sourceListingId: caseId });
+    expect(JSON.stringify(result)).not.toContain("private network failure");
+  });
+
+  it("fails a stored identity read without advancing the cursor or making live requests", async () => {
+    const db = database([property(), property(2, { listing_source: "boliga" })], [], [], call => call.filters.some(([, field, value]) => field === "field_name" && value === "source_address_id"));
+    const result = await runOriginalPriceBackfill(db.client, options({ afterId: id(0) }));
+    expect(result.ok).toBe(false);
+    expect(result.batch.nextAfterId).toBe(id(0));
+    expect(result.results[0]).toMatchObject({ outcome: "read_failed", reason: "source_identity_read_failed", sourceListingId: caseId, address: "Example 1" });
+    expect(result.results[1]!.outcome).toBe("unsupported_source");
+    expect(fetchOriginal).not.toHaveBeenCalled();
+    expect(db.writes()).toEqual([]);
   });
 });
