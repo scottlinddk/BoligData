@@ -22,7 +22,7 @@ Deploy the change to the production API before dispatching this workflow. The ex
    gh workflow run crawl.yml --ref main -f mode=original-prices -f dry_run=false
    ```
 
-4. Run another audit to verify `already_present` for saved originals and inspect unresolved rows. Unavailable source requests make the workflow fail after all rows have been classified, so a successful enumeration cannot hide retryable source failures. Re-run from the beginning to retry them; source-backed evidence already saved is retained.
+4. Run another audit to verify `already_present` for saved originals and inspect unresolved rows. A transient failure to reach the source (network error, timeout, or an HTTP error status; reason `source_request_failed`, `source_deadline_exceeded`, `source_search_failed`, or `http_<status>`) makes the workflow fail after all rows have been classified, so a successful enumeration cannot hide a retryable source failure. Re-run from the beginning to retry those; source-backed evidence already saved is retained. Other `unavailable` reasons (for example `bounded_search` or `invalid_case_search_shape`) mean the source answered but the case could not be confirmed; re-running the same data will not change that outcome, so the workflow reports them as a warning instead of failing the job. Review those reason codes directly.
 
 The job uses batches of eight properties with at most four concurrent source lookups. The API permits batch sizes from one to eight, with an explicit boolean `dryRun` and optional UUID `afterId`:
 
