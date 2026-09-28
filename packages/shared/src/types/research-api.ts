@@ -39,6 +39,14 @@ export interface ResearchHistoryResponse {
   dataVersion: string; retrievedAt: string;
   /** Pagination is explicit; a bounded response must never look like all market data. */
   truncated: boolean;
+  /** Independently fetched exact listing-price evidence. Routine observation
+   * pagination must not hide an original price. complete also certifies that
+   * the response contains every episode needed to resolve listing identity. */
+  originalAskingEvidence?: {
+    propertyId: string;
+    observations: ResearchObservation[];
+    complete: boolean;
+  };
   /** A property-specific sale population selected before the response limit. */
   marketScope?: {
     propertyId: string; municipality: string | null; propertyType: PropertyType | null;

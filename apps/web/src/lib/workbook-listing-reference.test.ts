@@ -35,12 +35,106 @@ const askingChange: ResearchObservation = {
   verificationStatus: "unverified", dataMode: "real", sourceFile: null, sourceSheet: null, sourceRow: null,
   sourceVersion: null, conflictGroup: null,
 };
+const exactOriginal: ResearchObservation = {
+  ...askingChange, id: "exact-original", fieldName: "original_asking_price", method: "source_reported_original_asking",
+  effectiveDate: null, datePrecision: "unknown",
+  value: { price: 5_500_000, sourceListingId: property.externalId, scope: "listing", originalDate: null },
+};
 const render = (overrides: Partial<Parameters<typeof WorkbookPriceReferenceCard>[0]> = {}) => renderToStaticMarkup(createElement(WorkbookPriceReferenceCard, {
   property, history: history(), loading: false, failed: false, onRetry: () => {}, ...overrides,
 }));
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(NOW)); i18n.language = "da"; });
 afterEach(() => vi.useRealTimers());
+
+describe("source-reported original asking integration", () => {
+  it("uses exact original evidence before approximate percentage recovery, without making a first-listing date", () => {
+    const data = history({ events: [], observations: [askingChange, exactOriginal] });
+    const result = workbookListingReference(property, data);
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000, baselinePrice: 5_500_000 });
+    expect(result.exactOriginal).toMatchObject({ price: 5_500_000, originalDate: null });
+    expect(result.estimatedFirst).toBeNull();
+    expect(result.listing.firstAsking).toBeNull();
+    expect(result.listing.time.firstDocumentedListing).toBeNull();
+  });
+
+  it("keeps a complete exact price usable when routine history reaches its response cap", () => {
+    const data = history({ truncated: true, events: [], observations: [], originalAskingEvidence: {
+      propertyId: property.id, complete: true, observations: [exactOriginal],
+    } });
+    const result = workbookListingReference(property, data);
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000 });
+    expect(result.estimatedFirst).toBeNull();
+    const html = render({ history: data });
+    expect(html).toContain("4.810.000");
+    expect(html).toContain("hentet som særskilt kildeoplysning");
+    expect(html).toContain('data-testid="workbook-exact-original-source"');
+    expect(html).not.toContain("Den oprindelige udbudspris kan ikke fastslås");
+  });
+
+  it("does not upgrade unknown listing provenance or invent duration from exact price evidence", () => {
+    const input = { ...property, dataMode: "unknown" as const, listingDate: null };
+    const data = history({ events: [], observations: [exactOriginal] });
+    const result = workbookListingReference(input, data);
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 5_170_000, timeBasis: "all_sales" });
+    expect(result.listing.time.latestEpisodeDays).toBeNull();
+    const html = render({ property: input, history: data });
+    expect(html).toContain("5.170.000");
+    expect(html).toContain("Øvrige annonceoplysninger er endnu ikke bekræftet");
+  });
+
+  it("retains conflicts between exact source amounts and documented originals", () => {
+    for (const events of [[{ ...first, price: 6_000_000 }], [first, { ...first, id: "conflicting", price: 6_000_000 }]]) {
+      const result = workbookListingReference(property, history({ events, observations: [exactOriginal, askingChange] }));
+      expect(result.reference.status).toBe("missing_first_asking");
+      expect(result.originalPriceConflict).toBe(true);
+      expect(result.estimatedFirst).toBeNull();
+      expect(result.exactOriginal).toBeNull();
+    }
+  });
+
+  it("does not compare a prior episode's campaign original with the current listing's exact original", () => {
+    const data = history({ events: [{ ...first, episodeId: "previous-episode", eventDate: "2025-01-01", price: 6_000_000 }],
+      observations: [exactOriginal] });
+    data.episodes.push({ ...data.episodes[0]!, id: "previous-episode", sourceListingId: "previous-case", startDate: "2025-01-01",
+      endDate: "2025-06-01", status: "removed" });
+    const result = workbookListingReference(property, data);
+    expect(result.listing.firstAsking).toBe(6_000_000);
+    expect(result.firstAsking).toBe(5_500_000);
+    expect(result.originalPriceConflict).toBe(false);
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000 });
+  });
+
+  it("compares precise originals only on the same date, while preserving an explicitly undated same-episode conflict", () => {
+    const dated = { ...exactOriginal, effectiveDate: startDate, datePrecision: "day" as const,
+      value: { ...exactOriginal.value as Record<string, unknown>, originalDate: startDate } };
+    const differentDate = history({ events: [{ ...first, eventDate: "2025-01-01", price: 6_000_000 }], observations: [dated] });
+    expect(workbookListingReference(property, differentDate).firstAsking).toBe(5_500_000);
+    for (const event of [{ ...first, price: 6_000_000 }, { ...first, eventDate: null, datePrecision: "unknown" as const, price: 6_000_000 }]) {
+      const result = workbookListingReference(property, history({ events: [event], observations: [dated] }));
+      expect(result.originalPriceConflict).toBe(true);
+      expect(result.firstAsking).toBeNull();
+    }
+  });
+
+  it("does not use a percentage behind invalid or conflicting newest exact evidence", () => {
+    for (const observation of [{ ...exactOriginal, verificationStatus: "conflict" as const }, { ...exactOriginal, method: "unknown" }]) {
+      const result = workbookListingReference(property, history({ events: [], observations: [askingChange, observation] }));
+      expect(result.reference.status).toBe("missing_first_asking");
+      expect(result.estimatedFirst).toBeNull();
+    }
+  });
+
+  it("shows exact provenance and an unknown original date in both languages", () => {
+    const data = history({ events: [], observations: [exactOriginal] });
+    expect(render({ history: data })).toContain("Den oprindelige udbudsdato er ikke oplyst");
+    i18n.language = "en";
+    const html = render({ history: data });
+    expect(html).toContain("Source-reported original asking price");
+    expect(html).toContain("The original listing date is not provided");
+    expect(html).not.toContain("Estimated original asking price");
+  });
+});
 
 describe("listing workbook reference integration", () => {
   it("uses the documented first asking price, not another discount on the current asking price", () => {

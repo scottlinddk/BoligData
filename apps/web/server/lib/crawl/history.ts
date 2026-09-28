@@ -136,6 +136,15 @@ export function buildHistoryRows(
     method: "source_listing_v2", verification_status: "unverified", source_version: "crawl-v2",
   }));
 
+  if (listing.source_address_id) {
+    observations.push({
+      ...common, ingest_key: key("source_address_id", ...identity, listing.source_address_id),
+      field_name: "source_address_id", value: { addressId: listing.source_address_id, sourceListingId: listing.external_id },
+      effective_date: null, date_precision: "unknown", method: "source_listing_identity",
+      verification_status: "verified", source_version: "crawl-v2",
+    });
+  }
+
   if (listing.reported_time_on_market) {
     observations.push({
       ...common, ingest_key: key(snapshotKey, "reported_time_on_market", today),

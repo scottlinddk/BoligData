@@ -18,6 +18,8 @@ export interface RawListing {
   listing_date: string | null;
   listing_source: ListingSource;
   external_id: string;
+  /** Provider's unit/address identity, distinct from the DAR access-address ID. */
+  source_address_id?: string;
   lat: number;
   lon: number;
   status: "active" | "sold" | "withdrawn";
