@@ -41,32 +41,37 @@ timestamp is used, so output is deterministic. The expected source SHA-256 is
 
 ## Interpretation
 
-The card shows a historical price scenario whenever a positive, finite first or
-current asking price is available. The displayed amount is always rounded to the
+The card calculates **Bør-pris from the original asking price only**. The current
+asking price, including an already reduced price, is never the calculation basis. The displayed amount is always rounded to the
 nearest DKK 10,000. The original workbook used DKK 50,000; that source setting is
 retained separately as `sourceRoundingDkk`. `calculationVersion` identifies the
 application's scenario rules independently of the dated source snapshot. A small
 positive scenario may round to zero; the UI labels this as below the rounding
 threshold, rather than a free property. A zero asking-price input is still invalid.
 
-The price basis follows this order:
+The original-price evidence follows this order:
 
-1. A documented first asking price is preferred. A first price reconstructed from
-   Boligsiden's rounded asking-price change remains an explicitly approximate
-   scenario: `currentAsking / (1 + changePercent / 100)`.
-2. If neither is available, the calculator uses the current asking price as an
-   explicitly labelled **current-price scenario**. It does not treat this amount
-   as the original asking price, insert it in listing chronology, or claim that
-   any resulting reduction is still available from the seller. Prior reductions
-   may effectively be counted again, so the scenario is an assumption.
-3. Without either positive price, there is no invented krone amount. The
-   historical data remain accessible.
+1. A documented original asking price is preferred. A first price reconstructed
+   from a reliable Boligsiden asking-price change remains explicitly approximate:
+   `askingAtObservation / (1 + changePercent / 100)`. The price and percentage
+   must come from the same source observation for the current listing episode.
+   That pair can recover the original even if today's asking price has since
+   changed; a newer unknown or conflicting observation is never skipped. This
+   reverses the source-reported change to recover the original basis; it does not
+   apply the historic discount to the reduced/current amount itself.
+2. If the original price cannot be established, no krone amount is invented.
+   The calculator returns `missing_first_asking` and still exposes the historical
+   discounts and sale count for the selected time group or all-sales aggregate.
 
-The adapter remains responsible for rejecting conflicting, future, incomplete or
-otherwise unreliable first-price evidence. Rejecting that evidence does not
-prevent a separately labelled scenario based on the listing's current price.
-The calculator reports `priceBasis` (`first_asking` or `current_asking`) and the
-actual `baselinePrice` used, without changing the input evidence.
+The adapter rejects conflicting, future, incomplete or otherwise unreliable
+original-price evidence. That evidence must not be replaced by today's asking
+price. The calculator reports `priceBasis: first_asking` and `baselinePrice` when
+the original price is available; both fields are null otherwise. The inputs and
+listing chronology are never changed.
+
+`currentAsking` is used **only** for the gap comparison. With the same original
+asking price and duration, changing today's price cannot change Bør-pris or its
+historical range. A missing current price removes the gap, not the calculation.
 
 Time matching follows three explicit paths:
 
@@ -91,11 +96,12 @@ its percentage uses current asking as denominator and can be negative.
 
 At 188 days, first asking DKK 5.5m and current asking DKK 5.2m, the 181–240 day
 group (22 trades) gives DKK **4.81m**, a middle-half range of **4.66–5.08m**, and a
-current-price gap of **390,000** (7.5%). If the first asking price is missing, the
-same group applied to current asking gives an explicitly hypothetical **4.55m**
-scenario. With unknown duration and current asking DKK 5.2m, the all-sales median
-discount of approximately **5.9894%** gives **4.89m**, with **4.53–5.06m** as the
-middle-half historical range.
+current-price gap of **390,000** (7.5%). Reducing current asking to DKK 4.5m leaves
+Bør-pris at **4.81m** and changes only the gap to **−310,000**. With unknown
+duration and original asking DKK 5.5m, the all-sales median discount of
+approximately **5.9894%** gives **5.17m**, with **4.80–5.35m** as the middle-half
+historical range. If the original asking price is missing, these historical
+statistics remain available without substituting today's price.
 
 The workbook's ten groups were originally pooled to at least 15 trades. This is
 source metadata, not a display requirement. Any nonempty, valid sample can produce

@@ -56,19 +56,19 @@ describe("listing workbook reference integration", () => {
   it("does not derive the first asking price from the crawler's first observation", () => {
     const result = workbookListingReference(property, history({ events: [{ ...first, eventType: "observation", price: property.price, eventDate: null, datePrecision: "unknown" }] }));
     expect(result.firstAsking).toBeNull();
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_550_000, priceBasis: "current_asking" });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null, baselinePrice: null, bracket: { count: 22 } });
   });
 
-  it("uses the current-price scenario without resolving conflicting first asking prices", () => {
+  it("does not choose among conflicting originals or substitute today's price", () => {
     const result = workbookListingReference(property, history({ events: [first, { ...first, id: "conflict", price: 6_000_000 }], observations: [askingChange] }));
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_550_000, priceBasis: "current_asking" });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null, baselinePrice: null });
     expect(result.firstAsking).toBeNull();
     expect(result.estimatedFirst).toBeNull();
   });
 
-  it("uses the listing's date and current price while history is unavailable", () => {
+  it("retains the time group without backdating today's price when history is unavailable", () => {
     const result = workbookListingReference(property);
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_550_000, gapAmount: 650_000, priceBasis: "current_asking" });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null, gapAmount: null, baselinePrice: null });
     expect(result.reference.bracket?.count).toBe(22);
     expect(result.listing.time.latestEpisodeDays).toBe(188);
     expect(result.firstAsking).toBeNull();
@@ -104,13 +104,43 @@ describe("listing workbook reference integration", () => {
     expect(result.estimatedFirst).toBeNull();
   });
 
-  it("rejects a percentage attached to another episode or a different current asking price", () => {
-    for (const observation of [{ ...askingChange, episodeId: "old-episode" }, { ...askingChange, value: { currentAsking: 5_000_000, changePercent: -5.45 } }]) {
+  it("rejects a percentage attached to another episode or a different listing source", () => {
+    for (const observation of [{ ...askingChange, episodeId: "old-episode" }, { ...askingChange, source: "boliga" }]) {
       const result = workbookListingReference(property, history({ events: [], observations: [observation] }));
-      expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_550_000, priceBasis: "current_asking" });
+      expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null, baselinePrice: null });
       expect(result.firstAsking).toBeNull();
       expect(result.estimatedFirst).toBeNull();
     }
+  });
+
+  it("keeps the documented original and should-be price unchanged when today's price is reduced", () => {
+    for (const price of [5_200_000, 4_900_000, 4_700_000]) {
+      const result = workbookListingReference({ ...property, price }, history());
+      expect(result.firstAsking).toBe(5_500_000);
+      expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000, baselinePrice: 5_500_000, gapAmount: price - 4_810_000 });
+    }
+  });
+
+  it("keeps the source-reconstructed original independent of subsequent current-price reductions", () => {
+    const data = history({ events: [], observations: [askingChange] });
+    for (const price of [5_200_000, 4_900_000, 4_700_000]) {
+      const result = workbookListingReference({ ...property, price }, data);
+      expect(result.firstAsking).toBeCloseTo(5_200_000 / .9455);
+      expect(result.estimatedFirst).toMatchObject({ askingAtObservation: 5_200_000, changePercent: -5.45, observedAt: NOW });
+      expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000, priceBasis: "first_asking", gapAmount: price - 4_810_000 });
+      expect(result.listing.firstAsking).toBeNull();
+    }
+  });
+
+  it.each([{ verificationStatus: "conflict" }, { value: { currentAsking: 4_900_000, changePercent: "unknown" } }])("does not revive an older source tuple when the newest evidence is invalid: %j", overrides => {
+    const data = history({ events: [], observations: [
+      { ...askingChange, id: "older", observedAt: "2026-09-26T12:00:00.000Z", effectiveDate: "2026-09-26" },
+      { ...askingChange, ...overrides } as ResearchObservation,
+    ] });
+    const result = workbookListingReference({ ...property, price: 4_900_000 }, data);
+    expect(result.firstAsking).toBeNull();
+    expect(result.estimatedFirst).toBeNull();
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null });
   });
 
   it("does not substitute firstSeenAt when both the listing date and episode start are unknown", () => {
@@ -121,32 +151,32 @@ describe("listing workbook reference integration", () => {
     expect(result.listing.time.latestEpisodeDays).toBeNull();
   });
 
-  it("uses all historical sales and today's price when both first asking and listing time are unknown", () => {
+  it("retains all-sales statistics without a monetary price when original and listing time are unknown", () => {
     const result = workbookListingReference({ ...property, listingDate: null });
-    expect(result.reference).toMatchObject({ status: "available", priceBasis: "current_asking", timeBasis: "all_sales", referencePrice: 4_890_000, bracket: { count: 281 } });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", baselinePrice: null, timeBasis: "all_sales", referencePrice: null, bracket: { count: 281 } });
     expect(result.firstAsking).toBeNull();
     expect(result.listing.time.latestEpisodeDays).toBeNull();
     expect(result.listing.time.firstDocumentedListing).toBeNull();
   });
 
-  it("retains the known latest listing time but uses today's price with truncated history", () => {
+  it("retains known latest listing time without substituting today's price for truncated original evidence", () => {
     const result = workbookListingReference(property, history({ truncated: true }));
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_550_000, priceBasis: "current_asking" });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null, baselinePrice: null });
     expect(result.listing.time.latestEpisodeDays).toBe(188);
     expect(result.firstAsking).toBeNull();
   });
 
-  it.each(["demo", "mock", "unknown"] as const)("offers a scenario for %s data without claiming documented listing evidence", dataMode => {
+  it.each(["demo", "mock", "unknown"] as const)("retains historical statistics for %s data without claiming an original asking price", dataMode => {
     const result = workbookListingReference({ ...property, dataMode }, history());
-    expect(result.reference).toMatchObject({ status: "available", priceBasis: "current_asking", timeBasis: "all_sales", referencePrice: 4_890_000 });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", baselinePrice: null, timeBasis: "all_sales", referencePrice: null });
     expect(result.firstAsking).toBeNull();
     expect(result.listing.time.latestEpisodeDays).toBeNull();
     expect(result.lastSourceCheck).toBeNull();
   });
 
-  it.each(["sold", "withdrawn"] as const)("offers a scenario for %s listings without implying they are currently on the market", status => {
+  it.each(["sold", "withdrawn"] as const)("does not use current-price fallback for %s listings", status => {
     const result = workbookListingReference({ ...property, status }, history());
-    expect(result.reference).toMatchObject({ status: "available", priceBasis: "current_asking", timeBasis: "all_sales", referencePrice: 4_890_000 });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", baselinePrice: null, timeBasis: "all_sales", referencePrice: null });
     expect(result.firstAsking).toBeNull();
     expect(result.listing.time.latestEpisodeDays).toBeNull();
     expect(result.lastSourceCheck).toBeNull();
@@ -167,7 +197,7 @@ describe("listing workbook reference integration", () => {
     expect(workbookListingReference(property, data).lastSourceCheck).toBeNull();
   });
 
-  it.each(["episode", "first_price", "retrieval", "campaign"])("excludes a same-day future %s observation while retaining the pooled scenario", target => {
+  it.each(["episode", "first_price", "retrieval", "campaign"])("excludes a same-day future %s observation while retaining pooled statistics", target => {
     const future = "2026-09-27T23:00:00.000Z";
     const data = history();
     if (target === "episode") data.episodes[0] = { ...data.episodes[0]!, observedAt: future };
@@ -176,7 +206,7 @@ describe("listing workbook reference integration", () => {
     if (target === "campaign") data.campaigns[0] = { ...data.campaigns[0]!, observedAt: future };
     const result = workbookListingReference(property, data);
     expect(result.invalidSourceTiming).toBe(true);
-    expect(result.reference).toMatchObject({ status: "available", priceBasis: "current_asking", timeBasis: "all_sales", referencePrice: 4_890_000 });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", baselinePrice: null, timeBasis: "all_sales", referencePrice: null });
     expect(result.firstAsking).toBeNull();
     expect(result.estimatedFirst).toBeNull();
     expect(result.lastSourceCheck).toBeNull();
@@ -196,10 +226,14 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain("281 historiske villasalg");
     expect(html).toContain("2026-09-27");
     expect(html).toContain("ikke en markedsvurdering");
+    expect(html).toContain('data-testid="workbook-original-price-basis"');
+    expect(html).toContain("Oprindelig udbudspris");
+    expect(html).toContain("5.500.000");
+    expect(html).not.toContain('data-testid="workbook-current-price-basis"');
     expect(html.indexOf('data-testid="workbook-target-price"')).toBeLessThan(html.indexOf("<details"));
   });
 
-  it("translates the should-be price and current asking fallback into English", () => {
+  it("translates the should-be price and missing original explanation into English", () => {
     i18n.language = "en";
     const html = render();
     expect(html).toContain("Price by time on market");
@@ -207,10 +241,10 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain("4,810,000");
     expect(html).toContain("above the price reference");
     expect(html).toContain("not a market valuation");
-    const fallback = render({ history: history({ events: [] }) });
-    expect(fallback).toContain("Calculated from the current asking price");
-    expect(fallback).toContain("4,550,000");
-    expect(fallback).toContain('data-testid="workbook-target-price"');
+    const missing = render({ history: history({ events: [] }) });
+    expect(missing).toContain("The original asking price is missing");
+    expect(missing).toContain('data-testid="workbook-time-basis"');
+    expect(missing).not.toContain('data-testid="workbook-target-price"');
   });
 
   it("makes estimated first asking prices explicit in both languages", () => {
@@ -227,6 +261,27 @@ describe("prominent price by time on market card", () => {
     expect(en).toContain("4,810,000");
   });
 
+  it("shows the original baseline beside the same should-be price after current asking is reduced", () => {
+    for (const price of [5_200_000, 4_900_000]) {
+      const html = render({ property: { ...property, price }, history: history({ events: [], observations: [askingChange] }) });
+      expect(html).toContain('data-testid="workbook-target-price"');
+      expect(html).toContain("4.810.000");
+      expect(html).toContain('data-testid="workbook-original-price-basis"');
+      expect(html).toContain("5.500.000");
+      expect(html).toContain("5.200.000");
+      expect(html).not.toContain('data-testid="workbook-current-price-basis"');
+    }
+  });
+
+  it.each([0, NaN])("keeps the original-based target but omits the gap when today's asking is %s", price => {
+    const html = render({ property: { ...property, price }, history: history({ events: [], observations: [askingChange] }) });
+    expect(html).toContain('data-testid="workbook-target-price"');
+    expect(html).toContain("4.810.000");
+    expect(html).toContain("Ukendt");
+    expect(html).not.toContain('data-testid="workbook-price-gap"');
+    expect(html).not.toContain("NaN");
+  });
+
   it("keeps a cached should-be price visible when refreshing history fails, with a retry and freshness warning", () => {
     const data = history();
     data.episodes[0] = { ...data.episodes[0]!, observedAt: "2026-09-16T09:00:00.000Z" };
@@ -239,12 +294,12 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain('data-testid="workbook-target-price"');
   });
 
-  it("uses today's price and the listing date while history loads", () => {
+  it("shows historical statistics while waiting for uncached original-price evidence", () => {
     const loading = render({ history: undefined, loading: true });
     expect(loading).toContain('aria-busy="true"');
-    expect(loading).toContain('data-testid="workbook-target-price"');
-    expect(loading).toContain("4.550.000");
-    expect(loading).toContain("Beregnet fra dagens udbudspris");
+    expect(loading).not.toContain('data-testid="workbook-target-price"');
+    expect(loading).toContain("Den oprindelige udbudspris mangler");
+    expect(loading).toContain('data-testid="workbook-time-basis"');
     expect(loading).toContain("Opdaterer udbudshistorik");
   });
 
@@ -255,21 +310,21 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain("4.810.000");
   });
 
-  it("shows a current-price fallback and retry when no history could be loaded", () => {
+  it("shows missing original evidence and retry when no history could be loaded", () => {
     const html = render({ history: undefined, failed: true });
-    expect(html).toContain('data-testid="workbook-target-price"');
-    expect(html).toContain("4.550.000");
-    expect(html).toContain("Beregnet fra dagens udbudspris");
+    expect(html).not.toContain('data-testid="workbook-target-price"');
+    expect(html).toContain("Den oprindelige udbudspris mangler");
+    expect(html).toContain('data-testid="workbook-time-basis"');
     expect(html).toContain("Udbudshistorikken kunne ikke hentes");
     expect(html).toContain("Prøv igen");
   });
 
-  it("uses known listing time and today's price while explaining truncated history", () => {
+  it("retains known listing time while explaining truncated original-price evidence", () => {
     const truncated = render({ history: history({ truncated: true }) });
     expect(truncated).toContain("Udbudshistorikken er ufuldstændig");
-    expect(truncated).toContain('data-testid="workbook-target-price"');
-    expect(truncated).toContain("4.550.000");
-    expect(truncated).toContain("Beregnet fra dagens udbudspris");
+    expect(truncated).not.toContain('data-testid="workbook-target-price"');
+    expect(truncated).toContain("Den oprindelige udbudspris mangler");
+    expect(truncated).toContain('data-testid="workbook-time-basis"');
     expect(truncated).toContain("188 dage på markedet");
     expect(truncated).not.toContain("Dokumenteret første udbud:");
   });
@@ -281,24 +336,23 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain('data-testid="workbook-target-price"');
   });
 
-  it("shows the should-be price without a first asking price or any comparable sales", () => {
+  it("keeps historical data visible without inventing an original or requiring comparable sales", () => {
     const html = render({ history: history({ events: [], transactions: [] }) });
-    expect(html).toContain("Beregnet fra dagens udbudspris");
-    expect(html).toContain("4.550.000");
+    expect(html).toContain("Den oprindelige udbudspris mangler");
     expect(html).toContain("12,5 %");
     expect(html).toContain("22 historiske handler");
     expect(html).toContain('data-testid="workbook-historical-groups"');
-    expect(html).toContain('data-testid="workbook-target-price"');
+    expect(html).not.toContain('data-testid="workbook-target-price"');
   });
 
   it("keeps the broad sample scope visible beside a discount when first asking is missing", () => {
     const html = render({ property: { ...property, postalCode: "8000" }, history: history({ events: [] }) });
-    expect(html).toContain("4.550.000");
-    expect(html).toContain("Beregnet fra dagens udbudspris");
+    expect(html).toContain("Den oprindelige udbudspris mangler");
+    expect(html).toContain('data-testid="workbook-time-basis"');
     expect(html).toContain('data-testid="workbook-broad-scenario"');
     expect(html).toContain("ikke baseret på lokale, sammenlignelige handler");
     expect(html.indexOf('data-testid="workbook-broad-scenario"')).toBeLessThan(html.indexOf("<details"));
-    expect(html).toContain('data-testid="workbook-target-price"');
+    expect(html).not.toContain('data-testid="workbook-target-price"');
   });
 
   it("explains 10,000-kr rounding and retains all historical groups when listing time is missing", () => {
@@ -312,29 +366,28 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain("Liggetid ukendt");
   });
 
-  it("shows the all-sales scenario when first asking price and listing time are both missing", () => {
+  it("shows all-sales statistics without a monetary target when original and listing time are both missing", () => {
     const input = { property: { ...property, listingDate: null }, history: undefined, failed: true };
     const da = render(input);
-    expect(da).toContain('data-testid="workbook-target-price"');
-    expect(da).toContain("4.890.000");
-    expect(da).toContain("Beregnet fra dagens udbudspris");
+    expect(da).not.toContain('data-testid="workbook-target-price"');
+    expect(da).toContain("Den oprindelige udbudspris mangler");
     expect(da).toContain("Liggetid ukendt");
     expect(da).toContain("281 historiske handler");
     expect(da).not.toContain("Dokumenteret første udbud:");
     i18n.language = "en";
     const en = render(input);
-    expect(en).toContain("4,890,000");
-    expect(en).toContain("Calculated from the current asking price");
+    expect(en).not.toContain('data-testid="workbook-target-price"');
+    expect(en).toContain("The original asking price is missing");
     expect(en).toContain("Time on market unknown");
     expect(en).toContain("Retry");
   });
 
-  it("excludes future evidence but still shows a labelled current-price and all-sales scenario", () => {
+  it("excludes future original-price evidence but still shows all-sales statistics", () => {
     const html = render({ history: history({ retrievedAt: "2026-09-27T23:00:00.000Z" }) });
-    expect(html).toContain('data-testid="workbook-target-price"');
-    expect(html).toContain("4.890.000");
+    expect(html).not.toContain('data-testid="workbook-target-price"');
+    expect(html).toContain("Den oprindelige udbudspris mangler");
     expect(html).toContain("Liggetid ukendt");
-    expect(html).toContain("Beregnet fra dagens udbudspris");
+    expect(html).toContain('data-testid="workbook-time-basis"');
     expect(html).not.toContain("Dokumenteret første udbud:");
     expect(html).not.toContain("188 dage på markedet");
   });
@@ -342,7 +395,7 @@ describe("prominent price by time on market card", () => {
   it("does not invent a monetary price when neither current nor first asking price is valid", () => {
     const input = { ...property, price: 0, listingDate: null };
     const result = workbookListingReference(input);
-    expect(result.reference).toMatchObject({ status: "missing_price", referencePrice: null });
+    expect(result.reference).toMatchObject({ status: "missing_first_asking", referencePrice: null });
     const html = render({ property: input, history: undefined });
     expect(html).not.toContain('data-testid="workbook-target-price"');
     expect(html).toContain('data-testid="workbook-historical-groups"');

@@ -30,10 +30,10 @@ describe("reported asking-price scenario baseline", () => {
     expect(reportedAskingPrice(property, h)?.firstAsking).toBe(property.price);
     expect(h.events).toEqual([]);
   });
-  it("rejects incomplete history, mismatched current prices, inactive/demo listings, or ambiguous current episodes", () => {
+  it("rejects incomplete history, inactive/demo listings, or ambiguous current episodes", () => {
     expect(reportedAskingPrice(property)).toBeNull();
     expect(reportedAskingPrice(property, { ...history(), truncated: true })).toBeNull();
-    for (const overrides of [{ price: 16_000_000 }, { status: "sold" }, { dataMode: "mock" }, { listingSource: "boliga" }]) {
+    for (const overrides of [{ status: "sold" }, { dataMode: "mock" }, { listingSource: "boliga" }]) {
       expect(reportedAskingPrice({ ...property, ...overrides } as Property, history())).toBeNull();
     }
     const h = history(); h.episodes.push({ ...h.episodes[0]!, id: "another" });
@@ -49,9 +49,24 @@ describe("reported asking-price scenario baseline", () => {
     const h = history(); h.observations.push(observation({ id: "conflicting", value: { currentAsking: property.price, changePercent: 4 } }));
     expect(reportedAskingPrice(property, h)).toBeNull();
   });
-  it("does not use an older matching-price observation after the latest price moved", () => {
+  it("uses the newest complete source pair independently of today's asking price", () => {
     const h = history(); h.observations = [observation({ observedAt: "2026-09-26T12:00:00Z", effectiveDate: "2026-09-26" }),
       observation({ value: { currentAsking: 16_000_000, changePercent: 0 } })];
+    expect(reportedAskingPrice(property, h)).toMatchObject({ firstAsking: 16_000_000, askingAtObservation: 16_000_000, changePercent: 0 });
+  });
+  it("keeps the recovered original unchanged when today's asking price falls or is unavailable", () => {
+    const h = history();
+    h.observations = [observation({ value: { currentAsking: 5_200_000, changePercent: -5.45 } })];
+    for (const price of [5_200_000, 4_900_000, 0]) {
+      const result = reportedAskingPrice({ ...property, price }, h);
+      expect(result?.firstAsking).toBeCloseTo(5_200_000 / .9455);
+      expect(result).toMatchObject({ askingAtObservation: 5_200_000, changePercent: -5.45, observedAt: NOW });
+    }
+  });
+  it("rejects a price pair observed before the current episode began", () => {
+    const h = history();
+    h.episodes[0] = { ...h.episodes[0]!, startDate: "2026-09-27", datePrecision: "day" };
+    h.observations = [observation({ observedAt: "2026-09-26T12:00:00Z", effectiveDate: "2026-09-26" })];
     expect(reportedAskingPrice(property, h)).toBeNull();
   });
   it.each([

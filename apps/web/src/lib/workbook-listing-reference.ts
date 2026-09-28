@@ -4,9 +4,9 @@ import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import { researchListingTime } from "./research-listing-time";
 import { reportedAskingPrice } from "./reported-asking-price";
 
-/** Preserve documented chronology. The calculator may use today's asking price
- * as an explicitly labelled scenario baseline, but never writes it into the
- * first-asking history or invents a listing start from firstSeenAt. */
+/** The reference is anchored to the original asking price. A complete source
+ * price/percentage pair may reconstruct it, but today's asking price is only
+ * used to show the gap and never substitutes for missing original evidence. */
 export function workbookListingReference(property: Property, history?: ResearchHistoryResponse) {
   const listing = researchListingTime(property, history);
   const currentEpisodes = (history?.episodes ?? []).filter(episode =>

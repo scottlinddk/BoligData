@@ -30,6 +30,7 @@ export interface WorkbookPriceReferenceInput {
   /** First asking price of the relevant journey, never a caller fallback to today's price.
    * Callers must label any source-percentage reconstruction as an approximate scenario. */
   firstAsking: number | null;
+  /** Comparison input only; never a replacement for the original asking price. */
   currentAsking: number | null;
   /** Latest listing episode only. Do not substitute cumulative active days or technical first_seen. */
   latestEpisodeDays: number | null;
@@ -49,7 +50,7 @@ export type WorkbookPriceReferenceStatus =
 
 export interface WorkbookPriceReferenceResult {
   status: WorkbookPriceReferenceStatus;
-  priceBasis: "first_asking" | "current_asking" | null;
+  priceBasis: "first_asking" | null;
   timeBasis: "matched_bracket" | "nearest_bracket" | "all_sales";
   /** The actual price multiplied by historical discounts; never added to chronology. */
   baselinePrice: number | null;
@@ -87,8 +88,8 @@ export function calculateWorkbookPriceReference(
   model: WorkbookPriceReferenceModel = WORKBOOK_PRICE_REFERENCE_MODEL,
 ): WorkbookPriceReferenceResult {
   const metadata = model.metadata;
-  const priceBasis = validPrice(input.firstAsking) ? "first_asking" : validPrice(input.currentAsking) ? "current_asking" : null;
-  const baselinePrice = priceBasis === "first_asking" ? input.firstAsking : priceBasis === "current_asking" ? input.currentAsking : null;
+  const baselinePrice = validPrice(input.firstAsking) ? input.firstAsking : null;
+  const priceBasis = baselinePrice !== null ? "first_asking" : null;
   const latestEpisodeDays = input.latestEpisodeDays !== null && Number.isInteger(input.latestEpisodeDays) && input.latestEpisodeDays >= 0
     ? input.latestEpisodeDays : null;
   const timeBasis = latestEpisodeDays === null ? "all_sales"
@@ -134,7 +135,7 @@ export function calculateWorkbookPriceReference(
   }
   if (!validPrice(baselinePrice)) {
     return {
-      ...unavailable("missing_price", "Der mangler en positiv første eller aktuel udbudspris som scenariobasis.", bracket),
+      ...unavailable("missing_first_asking", "Den oprindelige udbudspris mangler. Dagens udbudspris bruges kun til sammenligning, ikke som beregningsgrundlag.", bracket),
       medianDiscountPercent: bracket.medianDiscountFraction * 100,
     };
   }
