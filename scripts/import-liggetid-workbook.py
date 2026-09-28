@@ -149,7 +149,7 @@ def extract(source):
     same_number(calculator["J6"].value, max(observed_days), "Prisberegner!J6")
     metadata = {
         "version": "workbook-liggetid/2026-09-27",
-        "calculationVersion": "workbook-price-scenario/2.0",
+        "calculationVersion": "workbook-price-scenario/3.0",
         "sourceFilename": source.name,
         "sourceSha256": digest,
         "snapshotDate": "2026-09-27",
@@ -168,14 +168,14 @@ def extract(source):
         "propertyTypes": ["villa"],
         "postalCodes": ["9000"],
         "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
-        "methodDescription": "Første udbudspris, ellers dagens udbudspris som scenariobasis, × (1 − median historisk prisfald). Kendt liggetid bruger den matchende eller nærmeste observerede tidsgruppe; ukendt liggetid bruger alle 281 handler. Afrundet til 10.000 kr.",
+        "methodDescription": "Oprindelig udbudspris × (1 − median historisk prisfald). Dagens udbudspris bruges kun til sammenligning. Kendt liggetid bruger den matchende eller nærmeste observerede tidsgruppe; ukendt liggetid bruger alle 281 handler. Afrundet til 10.000 kr.",
         "limitations": [
             "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
             "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",
             "Første udbud og seneste liggetid kan dække forskellige perioder; genudbud kan nulstille liggetiden.",
             "Udvalget er ikke matchet på stand, areal, grund eller præcis beliggenhed. 2026 er ufuldstændigt.",
             "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig.",
-            "Dagens udbudspris som basis er en antagelse, ikke dokumentation for første udbud; allerede skete prisfald kan blive talt med igen.",
+            "Bør-pris kræver oprindelig udbudspris; dagens eller en allerede nedsat pris bruges aldrig som erstatning. En kildebaseret rekonstruktion af oprindelig pris markeres som omtrentlig.",
             "Uden for observeret liggetid genbruges nærmeste gruppe uden fremskrivning; ved ukendt liggetid er scenariet ikke tidsmatchet.",
         ],
     }

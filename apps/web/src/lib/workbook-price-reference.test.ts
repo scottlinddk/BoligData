@@ -85,10 +85,11 @@ describe("workbook liggetid reference", () => {
     });
   });
 
-  it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("uses an explicit current-price scenario when first asking is %s", (firstAsking) => {
+  it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("does not substitute the current price when original asking is %s", (firstAsking) => {
     expect(calculateWorkbookPriceReference({ ...example, firstAsking })).toMatchObject({
-      status: "available", priceBasis: "current_asking", baselinePrice: 5_200_000,
-      timeBasis: "matched_bracket", referencePrice: 4_550_000, lowerPrice: 4_410_000, upperPrice: 4_800_000,
+      status: "missing_first_asking", priceBasis: null, baselinePrice: null,
+      timeBasis: "matched_bracket", referencePrice: null, lowerPrice: null, upperPrice: null,
+      gapAmount: null, gapPercent: null, bracket: { count: 22, label: "181–240" },
     });
   });
 
@@ -96,9 +97,9 @@ describe("workbook liggetid reference", () => {
     const input = { ...example, firstAsking: null, latestEpisodeDays: null };
     const unchanged = structuredClone(input);
     expect(calculateWorkbookPriceReference(input)).toMatchObject({
-      status: "available", priceBasis: "current_asking", baselinePrice: 5_200_000,
+      status: "missing_first_asking", priceBasis: null, baselinePrice: null,
       timeBasis: "all_sales", latestEpisodeDays: null,
-      referencePrice: 4_890_000, lowerPrice: 4_530_000, upperPrice: 5_060_000,
+      referencePrice: null, lowerPrice: null, upperPrice: null,
       bracket: { count: 281 },
     });
     expect(input).toEqual(unchanged);
@@ -106,7 +107,7 @@ describe("workbook liggetid reference", () => {
 
   it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("does not invent a price when neither asking input is usable (%s)", value => {
     expect(calculateWorkbookPriceReference({ ...example, firstAsking: value, currentAsking: value })).toMatchObject({
-      status: "missing_price", priceBasis: null, baselinePrice: null, referencePrice: null,
+      status: "missing_first_asking", priceBasis: null, baselinePrice: null, referencePrice: null,
     });
   });
 
@@ -116,16 +117,42 @@ describe("workbook liggetid reference", () => {
     });
   });
 
+  it.each([188, null, 0, 1_000])("keeps the original-price scenario unchanged by current asking at %s days", latestEpisodeDays => {
+    const original = calculateWorkbookPriceReference({ ...example, latestEpisodeDays });
+    for (const currentAsking of [1, 3_000_000, 5_200_000, 6_000_000, null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const result = calculateWorkbookPriceReference({ ...example, latestEpisodeDays, currentAsking });
+      expect(result).toMatchObject({
+        status: "available", priceBasis: "first_asking", baselinePrice: 5_500_000,
+        referencePrice: original.referencePrice, lowerPrice: original.lowerPrice, upperPrice: original.upperPrice,
+        timeBasis: original.timeBasis, bracket: original.bracket,
+      });
+      if (currentAsking !== null && Number.isFinite(currentAsking) && currentAsking > 0) {
+        expect(result.gapAmount).toBe(currentAsking - original.referencePrice!);
+        expect(result.gapPercent).toBeCloseTo((currentAsking - original.referencePrice!) / currentAsking * 100);
+      } else {
+        expect(result.gapAmount).toBeNull();
+        expect(result.gapPercent).toBeNull();
+      }
+    }
+  });
+
   it.each([{ propertyType: "ejerlejlighed" }, { postalCode: "8000" }, { propertyType: null }, { postalCode: null }])("labels other or unknown property scope as a broad scenario %j", (scope) => {
     expect(calculateWorkbookPriceReference({ ...example, ...scope })).toMatchObject({
       status: "available", applicability: "broad_scenario", referencePrice: 4_810_000,
     });
   });
 
-  it("keeps the observed discounts and count visible for the current-price fallback", () => {
-    const result = calculateWorkbookPriceReference({ ...example, firstAsking: null });
-    expect(result).toMatchObject({ status: "available", priceBasis: "current_asking", referencePrice: 4_550_000, bracket: { count: 22, label: "181–240" } });
-    expect(result.medianDiscountPercent).toBeCloseTo(12.4985251124);
+  it.each([
+    [188, "matched_bracket", 22], [null, "all_sales", 281],
+    [0, "nearest_bracket", 54], [1_000_000, "nearest_bracket", 16],
+  ] as const)("keeps historical statistics at %s days without replacing the missing original price", (latestEpisodeDays, timeBasis, count) => {
+    const result = calculateWorkbookPriceReference({ ...example, firstAsking: null, latestEpisodeDays });
+    expect(result).toMatchObject({
+      status: "missing_first_asking", priceBasis: null, baselinePrice: null,
+      referencePrice: null, lowerPrice: null, upperPrice: null, gapAmount: null, gapPercent: null,
+      timeBasis, bracket: { count },
+    });
+    expect(result.medianDiscountPercent).not.toBeNull();
   });
 
   it("rounds all scenario bounds to the nearest 10,000, including halfway amounts", () => {
@@ -136,15 +163,12 @@ describe("workbook liggetid reference", () => {
   });
 
   it("shows valid positive amounts that round to zero without accepting zero price inputs", () => {
-    for (const firstAsking of [5_000, null]) {
-      expect(calculateWorkbookPriceReference({ ...example, firstAsking, currentAsking: 5_000 })).toMatchObject({
-        status: "available", baselinePrice: 5_000,
-        priceBasis: firstAsking === null ? "current_asking" : "first_asking",
-        referencePrice: 0, lowerPrice: 0, upperPrice: 0,
-      });
-    }
+    expect(calculateWorkbookPriceReference({ ...example, firstAsking: 5_000, currentAsking: 5_000 })).toMatchObject({
+      status: "available", baselinePrice: 5_000, priceBasis: "first_asking",
+      referencePrice: 0, lowerPrice: 0, upperPrice: 0,
+    });
     expect(calculateWorkbookPriceReference({ ...example, firstAsking: 0, currentAsking: 0 })).toMatchObject({
-      status: "missing_price", baselinePrice: null, referencePrice: null,
+      status: "missing_first_asking", baselinePrice: null, referencePrice: null,
     });
   });
 
