@@ -7,12 +7,12 @@ function img(url: string, sources: ListingImage["sources"] = []): ListingImage {
 }
 
 describe("getImageUrl", () => {
-  it("rewrites the size segment of a Boligsiden CDN URL when no sources exist", () => {
+  it("recovers a supported CDN preset for existing thumbnail-only rows", () => {
     const image = img(
       "https://images.boligsiden.dk/images/case/113ce067/100x80/393ea4e7.webp",
     );
-    expect(getImageUrl(image, 600, 400)).toBe(
-      "https://images.boligsiden.dk/images/case/113ce067/600x400/393ea4e7.webp",
+    expect(getImageUrl(image, 800, 500)).toBe(
+      "https://images.boligsiden.dk/images/case/113ce067/1440x960/393ea4e7.webp",
     );
   });
 
@@ -54,22 +54,43 @@ describe("getImageUrl", () => {
     expect(getImageUrl(image, 600, 400)).toBe("https://example.com/medium.jpg");
   });
 
-  it("rewrites the CDN URL when every source is smaller than the target", () => {
+  it("uses the largest provided source rather than inventing unsupported CDN sizes", () => {
     const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp", [
-      { url: "https://images.boligsiden.dk/images/case/x/400x300/y.webp", width: 400, height: 300 },
+      { url: "https://images.boligsiden.dk/images/case/x/1440x960/y.webp", width: 1440, height: 960 },
     ]);
-    expect(getImageUrl(image, 1200, 800)).toBe(
-      "https://images.boligsiden.dk/images/case/x/1200x800/y.webp",
+    expect(getImageUrl(image, 2000, 1333)).toBe(
+      "https://images.boligsiden.dk/images/case/x/1440x960/y.webp",
     );
+  });
+
+  it("caps legacy fullscreen images at the largest verified preset", () => {
+    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp");
+    expect(getImageUrl(image, 2000, 1333)).toBe("https://images.boligsiden.dk/images/case/x/1440x960/y.webp");
+  });
+
+  it.each([
+    "https://images.boligsiden.dk.example.com/images/case/x/100x80/y.webp",
+    "https://example.com/images/case/x/100x80/y.webp?host=images.boligsiden.dk",
+    "https://images.boligsiden.dk/other/x/100x80/y.webp",
+    "https://images.boligsiden.dk:8443/images/case/x/100x80/y.webp",
+    "https://images.boligsiden.dk/images/case/x/100x80/y.jpg",
+    "not a URL",
+  ])("does not resize URLs outside the verified CDN path: %s", url => {
+    expect(getImageUrl(img(url), 800, 500)).toBe(url);
+  });
+
+  it("preserves URL query parameters when recovering legacy presets", () => {
+    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp?v=2");
+    expect(getImageUrl(image, 600, 400)).toBe("https://images.boligsiden.dk/images/case/x/600x400/y.webp?v=2");
   });
 });
 
 describe("getImageSrcSet", () => {
-  it("emits one candidate per requested width for rewritable CDN URLs", () => {
+  it("deduplicates supported presets and reports their actual pixel widths", () => {
     const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp");
-    expect(getImageSrcSet(image, [400, 800], 2)).toBe(
-      "https://images.boligsiden.dk/images/case/x/400x200/y.webp 400w, " +
-        "https://images.boligsiden.dk/images/case/x/800x400/y.webp 800w",
+    expect(getImageSrcSet(image, [400, 600, 800, 1200, 1600], 8 / 5)).toBe(
+      "https://images.boligsiden.dk/images/case/x/600x400/y.webp 600w, " +
+        "https://images.boligsiden.dk/images/case/x/1440x960/y.webp 1440w",
     );
   });
 

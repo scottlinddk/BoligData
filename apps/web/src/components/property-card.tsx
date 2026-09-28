@@ -8,6 +8,7 @@ import { useI18n } from "@/i18n/i18n";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
 import { BrandMark } from "./brand-mark";
+import { fallbackToOriginalImage } from "@/lib/image-fallback";
 
 const CARD_IMAGE_WIDTHS = [400, 600, 800, 1200, 1600];
 const CARD_IMAGE_ASPECT = 8 / 5;
@@ -52,7 +53,7 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
     <Link to={`/property/${property.id}`} className="block rounded-2xl text-ink">
       <div className="relative aspect-[8/5] overflow-hidden rounded-2xl bg-surface-alt">
         {photoUrl ? <img src={photoUrl} srcSet={photoSrcSet} sizes="(min-width: 1200px) 360px, (min-width: 640px) 45vw, 100vw" alt={property.address} loading="lazy"
-          onError={event => { if (photo && event.currentTarget.src !== photo.url) { event.currentTarget.srcset = ""; event.currentTarget.src = photo.url; } }}
+          onError={event => { if (photo) fallbackToOriginalImage(event.currentTarget, photo.url); }}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.025]" />
           : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-ink-faint"><BrandMark className="h-10 w-10 opacity-40" /><span className="text-xs">{t("property.noPhoto")}</span></div>}
         <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">{property.listingSource}</span>

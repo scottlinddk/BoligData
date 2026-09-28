@@ -103,7 +103,7 @@ function mapReportedTimeOnMarket(value: unknown): RawListing["reported_time_on_m
 
 /**
  * Boligsiden images carry a `category` (photo/floorplan/...) and an
- * `imageSources` array of pre-sized variants ({url, width, height}) — we
+ * `imageSources` array of pre-sized variants ({url, size: {width, height}}) — we
  * keep the whole set so the UI can pick the size it needs instead of only
  * ever seeing one fixed URL.
  */
@@ -114,8 +114,10 @@ function mapImage(img: unknown): ListingImage | null {
   const sources = sourceItems
     .map((s) => {
       const url = asNonEmptyString(get(s, "url"));
-      const width = asPositiveInt(get(s, "width"));
-      const height = asPositiveInt(get(s, "height"));
+      // The live feed nests dimensions under `size`; retain support for
+      // older flat payloads. Dropping these left only the 100x80 thumbnail.
+      const width = asPositiveInt(get(s, "size", "width")) ?? asPositiveInt(get(s, "width"));
+      const height = asPositiveInt(get(s, "size", "height")) ?? asPositiveInt(get(s, "height"));
       return url !== null && width !== null && height !== null ? { url, width, height } : null;
     })
     .filter((s): s is { url: string; width: number; height: number } => s !== null);
