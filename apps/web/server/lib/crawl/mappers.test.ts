@@ -84,6 +84,13 @@ describe("mapBoligaRecord", () => {
 });
 
 describe("mapBoligsidenCase", () => {
+  it("retains the broker body and construction year from the live feed fields", () => {
+    expect(mapBoligsidenCase({ ...boligsidenCase, descriptionTitle: "Lejlighed med altan", descriptionBody: "En lys bolig.\nTo værelser og altan.", yearBuilt: 1937 }))
+      .toMatchObject({ description: "En lys bolig.\nTo værelser og altan.", building_year: 1937 });
+    expect(mapBoligsidenCase({ ...boligsidenCase, descriptionTitle: "Lejlighed med altan", descriptionBody: "  " })?.description)
+      .toBe("Lejlighed med altan");
+  });
+
   it("preserves the provider's address identity and verified public address-page slug", () => {
     const sourceAddressId = "0a3f50c9-be71-32b8-e044-0003ba298018";
     const mapped = mapBoligsidenCase({ ...boligsidenCase, slugAddress: "bejsebakkevej-30-9000-aalborg",

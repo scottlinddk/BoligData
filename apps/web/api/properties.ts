@@ -16,6 +16,7 @@ import { getComparables } from "../server/lib/comparables.js";
 import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
 import { handleLimfjordNoise } from "../server/lib/limfjord-noise-handler.js";
 import { handleMiljoegisNoise } from "../server/lib/miljoegis-noise/handler.js";
+import { fetchBoligsidenDetails } from "../server/lib/boligsiden-listing-details.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
@@ -132,11 +133,25 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
       return;
     }
 
+    // Supplement old, heading-only rows on read without changing the stored
+    // listing or labelling source-reported facts as an official register read.
+    const row = propertyResult.data;
+    // Legacy rows may have unknown provenance; the fresh response establishes
+    // its own source identity. Explicit demo/mock rows never use live data.
+    const listingDetails = row.listing_source === "boligsiden" && row.data_mode !== "mock" && row.data_mode !== "demo"
+      ? await fetchBoligsidenDetails(row.external_id, {
+        postalCode: row.postal_code,
+        lat: Number(row.lat),
+        lon: Number(row.lon),
+      }).catch(() => null)
+      : null;
+
     // Per-user auth response — never let a CDN share it across callers.
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
       property: rowToProperty(propertyResult.data),
       enrichment: enrichmentResult.data ? rowToEnrichment(enrichmentResult.data) : null,
+      listingDetails,
     });
   } catch (err) {
     sendError(res, 500, wantsComparables ? "Failed to load comparables" : "Failed to load property", err);

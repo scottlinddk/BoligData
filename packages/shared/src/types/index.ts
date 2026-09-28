@@ -192,6 +192,40 @@ export interface PublicValuation {
   valuationYear: number | null;
 }
 
+/** Facts reported by a listing provider. These are separate from a direct
+ * BBR/VUR lookup and must retain the listing source label in the UI. */
+export interface ListingSourceFacts {
+  yearBuilt: number | null;
+  renovationYear: number | null;
+  energyLabel: string | null;
+  areaSqm: number | null;
+  buildingType: string | null;
+  /** Building storeys, only from an unambiguous residential building. The
+   * listing's interior floor count and the apartment floor are distinct. */
+  floors: number | null;
+  roofMaterial: string | null;
+  wallMaterial: string | null;
+  heatingInstallation: string | null;
+  /** Only listing-level basement area; a building total is not a unit area. */
+  basementSqm: number | null;
+  toiletCount: number | null;
+  bathroomCount: number | null;
+  /** Provider's lot area, not an independently verified Matriklen value. */
+  landAreaSqm: number | null;
+  /** Provider-reported assessment; unavailable year/land value stay null. */
+  publicValuation: PublicValuation | null;
+}
+
+/** A fresh, identity-matched read of the provider's property listing. */
+export interface ListingDetails {
+  source: "boligsiden";
+  sourceUrl: string;
+  title: string | null;
+  description: string | null;
+  facts: ListingSourceFacts;
+  fetchedAt: string;
+}
+
 export interface Enrichment {
   id: string;
   propertyId: string;

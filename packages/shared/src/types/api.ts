@@ -55,6 +55,8 @@ export interface SearchPropertiesResponse {
 export interface PropertyDetailResponse {
   property: Property;
   enrichment: import("./index.js").Enrichment | null;
+  /** Live source listing details; separate from independently retrieved register facts. */
+  listingDetails?: import("./index.js").ListingDetails | null;
 }
 
 export interface ComparableEntry {
