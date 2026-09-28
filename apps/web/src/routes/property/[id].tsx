@@ -8,6 +8,7 @@ import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { researchListingTime } from "@/lib/research-listing-time";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
+import { CadastralPanel } from "@/components/cadastral-panel";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ResearchWorkbench } from "@/components/research/workbench";
@@ -139,6 +140,7 @@ export function PropertyDetailPage() {
             </dl>
             <BbrFactsPanel bbrData={facts.bbrData} plotSqm={property.registeredAreaSqm} source={facts.bbrSource} matrikelnr={facts.matrikelnr} ejerlav={facts.ejerlav} bfeNummer={facts.bfeNummer} />
           </DetailSection>
+          <CadastralPanel key={property.id} propertyId={property.id} />
           {floorplan && <DetailSection title={t("detail.floorplan")} subtitle={tx("Se boligens indretning", "Explore the layout")}>
             <img src={getImageUrl(floorplan, 1800, 1200)} alt={t("detail.floorplan")} loading="lazy" className="max-h-[720px] w-full rounded-xl bg-white object-contain"
               onError={event => { if (event.currentTarget.src !== floorplan.url) event.currentTarget.src = floorplan.url; }} />

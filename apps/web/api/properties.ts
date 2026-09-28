@@ -1,3 +1,4 @@
+import { handleCadastral } from "../server/lib/cadastral/handler.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   SearchPropertiesQuery,
@@ -92,6 +93,12 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
 
   const client = getAnonClient(user.jwt);
   const wantsComparables = str(req.query.comparables) === "true";
+
+  if (str(req.query.resource) === "cadastral") {
+    try { await handleCadastral(client, id, res); }
+    catch (error) { sendError(res, 500, "Failed to load cadastral records", error); }
+    return;
+  }
 
   try {
     if (str(req.query.resource) === "school-district") {
