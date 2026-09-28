@@ -88,6 +88,14 @@ export function classifyBoligsidenOriginalAsking(
   if (!expectedCase || !sourceAddressId || (input.addressId && uuid(input.addressId) !== sourceAddressId)) return fail("conflict", "address_identity_mismatch");
   const slug = text(address?.slugAddress);
   if (slug && /^[a-z0-9-]+$/i.test(slug)) result.sourceUrl = `${PUBLIC_ORIGIN}/adresse/${slug}`;
+  if (address?.cases === null || (Array.isArray(address?.cases) && address.cases.length === 0)) {
+    // Off-market address responses legitimately contain no cases. This proves
+    // no current listing at the verified address, not the absent case's identity.
+    if (address.hasMultipleCases !== undefined && typeof address.hasMultipleCases !== "boolean") return fail("unavailable", "invalid_address_market_state");
+    if (address.isOnMarket === false && address.hasMultipleCases !== true) return fail("not_current", "source_address_off_market");
+    if (address.isOnMarket === true || address.hasMultipleCases === true) return fail("conflict", "inconsistent_address_market_state");
+    return fail("unavailable", "missing_address_market_state");
+  }
   if (!Array.isArray(address?.cases)) return fail("unavailable", "missing_address_cases");
   const cases = address.cases.map(object).filter((row): row is JsonObject => row !== null);
   const activeCases = cases.filter(row => row.status === "open");
