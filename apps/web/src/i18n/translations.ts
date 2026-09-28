@@ -143,7 +143,7 @@ const da = {
   "detail.galleryNext": "Næste",
 
   "bbrFacts.title": "Bygningsoplysninger (BBR)",
-  "bbrFacts.noData": "Ingen berigelsesdata endnu.",
+  "bbrFacts.noData": "BBR-oplysninger er ikke tilgængelige for denne bolig. Se de tilgængelige oplysninger fra annoncen ovenfor.",
   "bbrFacts.heating": "Varmeinstallation",
   "bbrFacts.wallMaterial": "Ydervæg",
   "bbrFacts.roofMaterial": "Tagmateriale",
@@ -576,7 +576,7 @@ const en: Translations = {
   "detail.galleryNext": "Next",
 
   "bbrFacts.title": "Building facts (BBR)",
-  "bbrFacts.noData": "No enrichment data yet.",
+  "bbrFacts.noData": "BBR records are unavailable for this home. See the available listing details above.",
   "bbrFacts.heating": "Heating",
   "bbrFacts.wallMaterial": "Exterior wall",
   "bbrFacts.roofMaterial": "Roof material",

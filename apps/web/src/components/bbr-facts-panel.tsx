@@ -15,6 +15,9 @@ interface BbrFactsPanelProps {
   matrikelnr?: string | null;
   ejerlav?: string | null;
   bfeNummer?: string | null;
+  loading?: boolean;
+  failed?: boolean;
+  onRetry?: () => void;
 }
 
 /**
@@ -31,10 +34,15 @@ export function BbrFactsPanel({
   matrikelnr = null,
   ejerlav = null,
   bfeNummer = null,
+  loading = false,
+  failed = false,
+  onRetry,
 }: BbrFactsPanelProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const rows = [
+    { label: t("detail.built"), value: bbrData?.yearBuilt != null ? String(bbrData.yearBuilt) : null },
+    { label: t("detail.renovated"), value: bbrData?.renovationYear != null ? String(bbrData.renovationYear) : null },
     { label: t("bbrFacts.heating"), value: bbrData?.heatingInstallation ?? null },
     { label: t("bbrFacts.wallMaterial"), value: bbrData?.wallMaterial ?? null },
     { label: t("bbrFacts.roofMaterial"), value: bbrData?.roofMaterial ?? null },
@@ -42,7 +50,7 @@ export function BbrFactsPanel({
     { label: t("bbrFacts.plotSqm"), value: plotSqm != null ? t("property.sqm", { sqm: plotSqm }) : null },
     {
       label: t("bbrFacts.basementSqm"),
-      value: bbrData?.basementSqm ? t("property.sqm", { sqm: bbrData.basementSqm }) : null,
+      value: bbrData?.basementSqm != null ? t("property.sqm", { sqm: bbrData.basementSqm }) : null,
     },
     { label: t("bbrFacts.toiletCount"), value: bbrData?.toiletCount != null ? String(bbrData.toiletCount) : null },
     {
@@ -70,11 +78,14 @@ export function BbrFactsPanel({
     </div>
   );
 
-  if (!bbrData || rows.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="rounded-[20px] border border-dashed border-border-strong p-4">
         {title}
-        <p className="mt-2 text-[12.5px] text-ink-faint">{t("bbrFacts.noData")}</p>
+        <p role="status" className="mt-2 text-[12.5px] text-ink-soft">{loading
+          ? (language === "da" ? "Henter BBR-oplysninger…" : "Loading BBR records…")
+          : t("bbrFacts.noData")}</p>
+        {failed && !loading && onRetry && <button type="button" onClick={onRetry} className="mt-2 rounded text-sm font-semibold underline underline-offset-4">{t("common.retry")}</button>}
       </div>
     );
   }

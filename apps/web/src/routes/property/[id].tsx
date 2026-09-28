@@ -8,6 +8,7 @@ import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { researchListingTime } from "@/lib/research-listing-time";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
+import { ListingFactsPanel, PropertyDescription } from "@/components/listing-details";
 import { CadastralPanel } from "@/components/cadastral-panel";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
@@ -55,6 +56,11 @@ export function PropertyDetailPage() {
   const detailQuery = useQuery({ queryKey: ["property", id], queryFn: () => getProperty(id!), enabled: !!id });
   const comparablesQuery = useQuery({ queryKey: ["comparables", id], queryFn: () => getComparables(id!), enabled: !!id });
   const listing = detailQuery.data?.property;
+  useEffect(() => {
+    const appName = t("app.name");
+    document.title = listing?.address ? `${listing.address} | ${appName}` : appName;
+    return () => { document.title = appName; };
+  }, [listing?.address, t]);
   const listingHistory = useListingHistory(listing?.id);
   const lookupQuery = useQuery({
     queryKey: ["property-lookup", listing?.id],
@@ -78,7 +84,7 @@ export function PropertyDetailPage() {
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) return <p className="p-6 text-danger">{t("search.signInForDetails")} <Link to="/auth/signin" className="underline">{t("nav.signIn")}</Link></p>;
   if (detailQuery.isError || !detailQuery.data) return <div role="alert" className="mx-auto max-w-[1240px] p-6 text-danger"><p>{t("detail.notFound")}</p><button type="button" disabled={detailQuery.isFetching} onClick={() => { void detailQuery.refetch(); }} className="mt-3 inline-flex items-center gap-2 rounded font-semibold underline disabled:opacity-50">{detailQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>;
 
-  const { property, enrichment } = detailQuery.data;
+  const { property, enrichment, listingDetails = null } = detailQuery.data;
   const empty = t("detail.empty");
   const facts = mergePropertyFacts(property, enrichment, lookupQuery.data ?? null);
   const registerSources = summarizeLookupSources(lookupQuery.data ?? null);
@@ -127,33 +133,26 @@ export function PropertyDetailPage() {
             <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 border-y border-border py-5 sm:grid-cols-4">
               <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
               <Stat label={t("detail.rooms")} value={property.rooms ? String(property.rooms) : empty} />
-              <Stat label={t("detail.built")} value={facts.buildingYear ? String(facts.buildingYear) : empty} />
-              <Stat label={t("detail.energyLabel")} value={facts.bbrData?.energyLabel ?? empty} />
+              <Stat label={t("detail.built")} value={facts.buildingYear || listingDetails?.facts.yearBuilt ? String(facts.buildingYear ?? listingDetails?.facts.yearBuilt) : empty} />
+              <Stat label={t("detail.energyLabel")} value={listingDetails?.facts.energyLabel ?? facts.bbrData?.energyLabel ?? empty} />
             </dl>
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
           <div ref={priceReference} id="price-reference" tabIndex={-1} aria-labelledby="workbook-price-title" className="section-anchor rounded-2xl [&>section]:mt-0">
             <WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />
           </div>
-          {property.description && <section className="rounded-2xl bg-surface-alt p-5 sm:p-7">
-            <h2 className="text-xl font-medium tracking-tight">{tx("Om boligen", "About this home")}</h2>
-            {property.description.length > 500 ? <>
-              <p className="mt-4 line-clamp-4 whitespace-pre-line text-sm leading-7 text-ink-soft">{property.description}</p>
-              <details className="mt-3"><summary className="w-fit cursor-pointer text-sm font-semibold">{tx("Læs hele beskrivelsen", "Read the full description")}</summary><p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-soft">{property.description}</p></details>
-            </> : <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-soft">{property.description}</p>}
-          </section>}
+          <PropertyDescription key={property.id} property={property} details={listingDetails} />
           <DetailSection title={tx("Fakta og bygningsoplysninger", "Facts and building details")} subtitle={tx("BBR, grund, materialer og offentlig vurdering", "Building records, plot, materials and public valuation")}>
-            <dl className="mb-5 grid grid-cols-2 gap-5 sm:grid-cols-3">
-              <Stat label={t("detail.renovated")} value={facts.renovationYear ? String(facts.renovationYear) : empty} />
-              <Stat label={t("detail.floors")} value={facts.bbrData?.floors ? String(facts.bbrData.floors) : empty} />
-              <Stat label={t("detail.roofMaterial")} value={facts.bbrData?.roofMaterial ?? empty} />
-              <Stat label={t("detail.wallMaterial")} value={facts.bbrData?.wallMaterial ?? empty} />
-              <Stat label={t("detail.zone")} value={facts.zone ? t(`zone.${facts.zone}` as TranslationKey) : empty} />
-              <Stat label={t("detail.parcelArea")} value={property.registeredAreaSqm ? t("property.sqm", { sqm: property.registeredAreaSqm }) : empty} />
-              <Stat label={t("detail.publicValuation")} value={facts.publicValuation?.assessedPropertyValueDkk ? `${formatDkk(facts.publicValuation.assessedPropertyValueDkk)}${facts.publicValuation.valuationYear ? ` (${facts.publicValuation.valuationYear})` : ""}` : empty} />
-              <Stat label={t("detail.landValue")} value={facts.publicValuation?.assessedLandValueDkk ? formatDkk(facts.publicValuation.assessedLandValueDkk) : empty} />
-            </dl>
-            <BbrFactsPanel bbrData={facts.bbrData} plotSqm={property.registeredAreaSqm} source={facts.bbrSource} matrikelnr={facts.matrikelnr} ejerlav={facts.ejerlav} bfeNummer={facts.bfeNummer} />
+            <ListingFactsPanel property={property} details={listingDetails} />
+            {(facts.zone || facts.publicValuation) && <div className="mb-5">
+              <h3 className="text-[15px] font-semibold">{tx("Offentlige registeroplysninger", "Public register records")}</h3>
+              <dl className="mt-3 grid grid-cols-2 gap-5 sm:grid-cols-3">
+                {facts.zone && <Stat label={t("detail.zone")} value={t(`zone.${facts.zone}` as TranslationKey)} />}
+                {facts.publicValuation?.assessedPropertyValueDkk != null && <Stat label={t("detail.publicValuation")} value={`${formatDkk(facts.publicValuation.assessedPropertyValueDkk)}${facts.publicValuation.valuationYear ? ` (${facts.publicValuation.valuationYear})` : ""}`} />}
+                {facts.publicValuation?.assessedLandValueDkk != null && <Stat label={t("detail.landValue")} value={formatDkk(facts.publicValuation.assessedLandValueDkk)} />}
+              </dl>
+            </div>}
+            <BbrFactsPanel bbrData={facts.bbrData} plotSqm={property.registeredAreaSqm} source={facts.bbrSource} matrikelnr={facts.matrikelnr} ejerlav={facts.ejerlav} bfeNummer={facts.bfeNummer} loading={lookupQuery.isLoading} failed={lookupQuery.isError} onRetry={() => { void lookupQuery.refetch(); }} />
           </DetailSection>
           <CadastralPanel key={property.id} propertyId={property.id} />
           {floorplan && <DetailSection title={t("detail.floorplan")} subtitle={tx("Se boligens indretning", "Explore the layout")}>
