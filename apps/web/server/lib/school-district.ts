@@ -25,8 +25,20 @@ const normalize = (value: string) => value.normalize("NFC").toLocaleLowerCase("d
 const grade = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 10 ? value : null;
 const slug = (value: unknown) => typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null;
 
-function sameAddress(expected: NonNullable<ReturnType<typeof parseStructuredAddress>>, address: string) {
-  const actual = parseStructuredAddress(address, null);
+/** A house/street number in the first segment must never become a postcode. */
+function embeddedPostcode(address: string): string | null {
+  const segments = address.split(",");
+  if (segments.length < 2) return null;
+  return /^\s*(\d{4})(?:\s+\p{L}.*)?\s*$/u.exec(segments.at(-1)!)?.[1] ?? null;
+}
+
+function parseSchoolAddress(address: string, postalCodeHint: string | null) {
+  const structured = parseStructuredAddress(address, postalCodeHint);
+  return structured ? { ...structured, postalCode: postalCodeHint ?? embeddedPostcode(address) } : null;
+}
+
+function sameAddress(expected: NonNullable<ReturnType<typeof parseSchoolAddress>>, address: string) {
+  const actual = parseSchoolAddress(address, null);
   return actual !== null && actual.postalCode === expected.postalCode &&
     normalize(actual.streetName) === normalize(expected.streetName) &&
     normalize(actual.houseNumber) === normalize(expected.houseNumber);
@@ -44,11 +56,11 @@ export async function lookupSchoolDistrict(input: SchoolDistrictInput): Promise<
   };
   const unavailable = (reason: SchoolDistrictResult["reason"]): SchoolDistrictResult => ({ ...result, reason });
   if (input.dataMode === "mock" || input.dataMode === "demo") return unavailable("nonlive_data");
-  const expected = parseStructuredAddress(input.address, input.postalCode);
+  const expected = parseSchoolAddress(input.address, input.postalCode);
   if (!expected?.postalCode || !/^\d{4}$/.test(expected.postalCode)) return unavailable("address_missing");
   // Reject conflicting explicit postcodes rather than overriding one with a hint.
-  const embeddedPostcode = parseStructuredAddress(input.address, null)?.postalCode;
-  if (embeddedPostcode && embeddedPostcode !== expected.postalCode) return unavailable("address_mismatch");
+  const suppliedPostcode = embeddedPostcode(input.address);
+  if (suppliedPostcode && suppliedPostcode !== expected.postalCode) return unavailable("address_mismatch");
 
   try {
     let addressId = isUuid(input.idLokalid) ? input.idLokalid.toLowerCase() : null;

@@ -1,3 +1,4 @@
+import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   SearchPropertiesQuery,
@@ -12,7 +13,6 @@ import { isUuid, sendError, setPublicCache } from "../server/lib/http-helpers.js
 import { rowToEnrichment, rowToProperty } from "../server/lib/row-mappers.js";
 import { InvalidSearchBoundaryError, searchProperties } from "../server/lib/search.js";
 import { getComparables } from "../server/lib/comparables.js";
-import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
@@ -94,14 +94,15 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
   const wantsComparables = str(req.query.comparables) === "true";
 
   try {
-    if (str(req.query.resource) === "school-district") {
-      await handleSchoolDistrict(client, res, id);
-      return;
-    }
     if (wantsComparables) {
       const result = await getComparables(client, id);
       res.setHeader("Cache-Control", "private, no-store");
       res.status(200).json(result);
+      return;
+    }
+
+    if (str(req.query.resource) === "school-district") {
+      await handleSchoolDistrict(client, res, id);
       return;
     }
 

@@ -52,4 +52,4 @@ contract, so mapping is defensive and schema changes become unavailable data.
 Regression tests cover exact/ambiguous/wrong identity, all school matches and
 grade ranges, missing coverage, malformed responses and network failures,
 authenticated endpoint isolation, and Danish/English rendering. Full web suite:
-1,008 passing tests. Frontend/API/shared type checks and production build pass.
+1,013 passing tests. Frontend/API/shared type checks and production build pass.
