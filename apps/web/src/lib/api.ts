@@ -34,6 +34,7 @@ import type {
 import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
 import type { PropertyLookupResult } from "@shared/types/property-lookup";
 import type { SchoolDistrictResult } from "@shared/types/school-district";
+import type { LimfjordLanguage, LimfjordNoiseResult } from "@shared/types/limfjord-noise";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -84,6 +85,11 @@ export function getProperty(id: string): Promise<PropertyDetailResponse> {
 
 export function getSchoolDistrict(id: string): Promise<SchoolDistrictResult> {
   return request(`/properties?id=${encodeURIComponent(id)}&resource=school-district`);
+}
+
+export function getLimfjordNoise(id: string, language: LimfjordLanguage, signal?: AbortSignal): Promise<LimfjordNoiseResult> {
+  const query = new URLSearchParams({ id, resource: "limfjord-noise", lang: language });
+  return request(`/properties?${query}`, { signal });
 }
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
