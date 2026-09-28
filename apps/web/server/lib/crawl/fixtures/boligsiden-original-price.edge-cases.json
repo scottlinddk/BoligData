@@ -22,18 +22,15 @@
               "realtors": [
                 {
                   "days": 27,
-                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
-                  "realtorName": "Thorkild Kristensen Hasseris"
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9"
                 },
                 {
                   "days": 50,
-                  "realtorId": "4bf16ab2-d24b-4806-a6d3-ab4a5af837f0",
-                  "realtorName": "EDC Poul Erik Bech"
+                  "realtorId": "4bf16ab2-d24b-4806-a6d3-ab4a5af837f0"
                 },
                 {
                   "days": 144,
-                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf",
-                  "realtorName": "home Aalborg - Hasseris"
+                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf"
                 }
               ]
             }
@@ -95,13 +92,11 @@
               "realtors": [
                 {
                   "days": 180,
-                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905",
-                  "realtorName": "Nybolig Hasseris"
+                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905"
                 },
                 {
                   "days": 511,
-                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf",
-                  "realtorName": "home Aalborg - Hasseris"
+                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf"
                 }
               ]
             }
@@ -149,8 +144,7 @@
               "realtors": [
                 {
                   "days": 392,
-                  "realtorId": "bf93749d-6889-4bb8-82e0-1fc7af21556e",
-                  "realtorName": "EDC Danebo"
+                  "realtorId": "bf93749d-6889-4bb8-82e0-1fc7af21556e"
                 }
               ]
             }
@@ -212,8 +206,7 @@
               "realtors": [
                 {
                   "days": 494,
-                  "realtorId": "29262ec1-e604-4bb6-80e1-76807839fc8d",
-                  "realtorName": "Estate Aalborg"
+                  "realtorId": "29262ec1-e604-4bb6-80e1-76807839fc8d"
                 }
               ]
             }
@@ -284,13 +277,11 @@
               "realtors": [
                 {
                   "days": 176,
-                  "realtorId": "068f1962-5d71-4d59-be14-dca2882ad69a",
-                  "realtorName": "RealMæglerne Brian Harbo"
+                  "realtorId": "068f1962-5d71-4d59-be14-dca2882ad69a"
                 },
                 {
                   "days": 252,
-                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
-                  "realtorName": "Nybolig Aalborg Lejligheder"
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
                 }
               ]
             }
@@ -380,8 +371,7 @@
               "realtors": [
                 {
                   "days": 731,
-                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
-                  "realtorName": "Thorkild Kristensen Hasseris"
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9"
                 }
               ]
             }
@@ -434,13 +424,11 @@
               "realtors": [
                 {
                   "days": 28,
-                  "realtorId": "a4428013-b7c3-4a62-a42c-a0deaa16ec5d",
-                  "realtorName": "Aalborg Mægleren ApS"
+                  "realtorId": "a4428013-b7c3-4a62-a42c-a0deaa16ec5d"
                 },
                 {
                   "days": 378,
-                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905",
-                  "realtorName": "Nybolig Hasseris"
+                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905"
                 }
               ]
             }
@@ -502,8 +490,7 @@
               "realtors": [
                 {
                   "days": 787,
-                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e",
-                  "realtorName": "Estaldo ApS"
+                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e"
                 }
               ]
             }
@@ -565,13 +552,11 @@
               "realtors": [
                 {
                   "days": 531,
-                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
-                  "realtorName": "Nybolig Aalborg Lejligheder"
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
                 },
                 {
                   "days": 230,
-                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e",
-                  "realtorName": "Estaldo ApS"
+                  "realtorId": "d55ef01e-4348-4d44-9be6-c4f2eb81b97e"
                 }
               ]
             }
@@ -647,8 +632,7 @@
               "realtors": [
                 {
                   "days": 404,
-                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
-                  "realtorName": "Nybolig Aalborg Lejligheder"
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
                 }
               ]
             }
