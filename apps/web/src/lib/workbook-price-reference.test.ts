@@ -16,6 +16,7 @@ describe("workbook liggetid reference", () => {
     expect(reference).toMatchObject({
       status: "available", referencePrice: 4_810_000, lowerPrice: 4_660_000,
       upperPrice: 5_080_000, gapAmount: 390_000,
+      priceBasis: "first_asking", timeBasis: "matched_bracket", baselinePrice: 5_500_000, latestEpisodeDays: 188,
       bracket: { fromDays: 181, toDays: 240, count: 22 },
       metadata: { eligibleCount: 281, rowCount: 437, snapshotDate: "2026-09-27", roundingDkk: 10_000, sourceRoundingDkk: 50_000 },
     });
@@ -39,7 +40,7 @@ describe("workbook liggetid reference", () => {
     const brackets = WORKBOOK_PRICE_REFERENCE_MODEL.brackets;
     expect(brackets).toHaveLength(10);
     expect(brackets.reduce((sum, bracket) => sum + bracket.count, 0)).toBe(281);
-    for (const bracket of brackets) {
+    for (const bracket of [...brackets, WORKBOOK_PRICE_REFERENCE_MODEL.aggregate]) {
       const values = eligible.filter((record) => record.latestEpisodeDays! >= bracket.fromDays
         && record.latestEpisodeDays! <= bracket.toDays)
         .map((record) => record.calculatedDiscountFraction!).sort((a, b) => a - b);
@@ -52,7 +53,9 @@ describe("workbook liggetid reference", () => {
       expect(bracket.medianDiscountFraction).toBeCloseTo(percentile(.5), 12);
       expect(bracket.q1DiscountFraction).toBeCloseTo(percentile(.25), 10);
       expect(bracket.q3DiscountFraction).toBeCloseTo(percentile(.75), 10);
+      expect(bracket.meanDiscountFraction).toBeCloseTo(values.reduce((sum, value) => sum + value, 0) / values.length, 12);
     }
+    expect(WORKBOOK_PRICE_REFERENCE_MODEL.aggregate).toMatchObject({ count: 281, fromDays: 2, toDays: 797 });
   });
 
   it("assigns both inclusive endpoints without leakage between neighboring brackets", () => {
@@ -61,23 +64,49 @@ describe("workbook liggetid reference", () => {
         const result = calculateWorkbookPriceReference({ ...example, latestEpisodeDays: days });
         expect(result.status).toBe("available");
         expect(result.bracket?.label).toBe(bracket.label);
+        expect(result.timeBasis).toBe("matched_bracket");
       }
     }
   });
 
-  it.each([0, 1, 798, 99999])("does not extrapolate to %i days", (latestEpisodeDays) => {
+  it.each([0, 1, 798, 99999, 1_000_000])("uses the nearest observed group and retains the actual %i days", (latestEpisodeDays) => {
     expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays })).toMatchObject({
-      status: "outside_observed_range", referencePrice: null,
+      status: "available", timeBasis: "nearest_bracket", latestEpisodeDays,
+      referencePrice: latestEpisodeDays < 2 ? 5_450_000 : 4_900_000,
+      bracket: { label: latestEpisodeDays < 2 ? "0–14" : "366+" },
     });
   });
 
-  it.each([null, -1, 14.5, Number.NaN, Number.POSITIVE_INFINITY])("rejects missing/invalid latest-period days %s", (latestEpisodeDays) => {
-    expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays }).status).toBe("missing_days");
+  it.each([null, -1, 14.5, Number.NaN, Number.POSITIVE_INFINITY])("uses all raw sales without inventing a day for %s", (latestEpisodeDays) => {
+    expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays })).toMatchObject({
+      status: "available", timeBasis: "all_sales", latestEpisodeDays: null,
+      referencePrice: 5_170_000, lowerPrice: 4_800_000, upperPrice: 5_350_000,
+      bracket: { count: 281, label: "Alle liggetider" },
+    });
   });
 
-  it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("requires documented first asking %s", (firstAsking) => {
+  it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("uses an explicit current-price scenario when first asking is %s", (firstAsking) => {
     expect(calculateWorkbookPriceReference({ ...example, firstAsking })).toMatchObject({
-      status: "missing_first_asking", referencePrice: null,
+      status: "available", priceBasis: "current_asking", baselinePrice: 5_200_000,
+      timeBasis: "matched_bracket", referencePrice: 4_550_000, lowerPrice: 4_410_000, upperPrice: 4_800_000,
+    });
+  });
+
+  it("combines missing first price and unknown duration without altering the supplied listing inputs", () => {
+    const input = { ...example, firstAsking: null, latestEpisodeDays: null };
+    const unchanged = structuredClone(input);
+    expect(calculateWorkbookPriceReference(input)).toMatchObject({
+      status: "available", priceBasis: "current_asking", baselinePrice: 5_200_000,
+      timeBasis: "all_sales", latestEpisodeDays: null,
+      referencePrice: 4_890_000, lowerPrice: 4_530_000, upperPrice: 5_060_000,
+      bracket: { count: 281 },
+    });
+    expect(input).toEqual(unchanged);
+  });
+
+  it.each([null, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])("does not invent a price when neither asking input is usable (%s)", value => {
+    expect(calculateWorkbookPriceReference({ ...example, firstAsking: value, currentAsking: value })).toMatchObject({
+      status: "missing_price", priceBasis: null, baselinePrice: null, referencePrice: null,
     });
   });
 
@@ -93,9 +122,9 @@ describe("workbook liggetid reference", () => {
     });
   });
 
-  it("keeps historical discounts visible when the listing's first asking price is missing", () => {
+  it("keeps the observed discounts and count visible for the current-price fallback", () => {
     const result = calculateWorkbookPriceReference({ ...example, firstAsking: null });
-    expect(result).toMatchObject({ status: "missing_first_asking", referencePrice: null, bracket: { count: 22, label: "181–240" } });
+    expect(result).toMatchObject({ status: "available", priceBasis: "current_asking", referencePrice: 4_550_000, bracket: { count: 22, label: "181–240" } });
     expect(result.medianDiscountPercent).toBeCloseTo(12.4985251124);
   });
 
@@ -106,9 +135,30 @@ describe("workbook liggetid reference", () => {
     expect(calculateWorkbookPriceReference({ ...example, firstAsking: 4_804_999 }, model).referencePrice).toBe(4_800_000);
   });
 
-  it("does not display a price below the workbook's minimum sample size", () => {
+  it("shows valid positive amounts that round to zero without accepting zero price inputs", () => {
+    for (const firstAsking of [5_000, null]) {
+      expect(calculateWorkbookPriceReference({ ...example, firstAsking, currentAsking: 5_000 })).toMatchObject({
+        status: "available", baselinePrice: 5_000,
+        priceBasis: firstAsking === null ? "current_asking" : "first_asking",
+        referencePrice: 0, lowerPrice: 0, upperPrice: 0,
+      });
+    }
+    expect(calculateWorkbookPriceReference({ ...example, firstAsking: 0, currentAsking: 0 })).toMatchObject({
+      status: "missing_price", baselinePrice: null, referencePrice: null,
+    });
+  });
+
+  it.each([1, 4, 14])("shows a scenario from %i observations rather than imposing a minimum sample", count => {
     const model = structuredClone(WORKBOOK_PRICE_REFERENCE_MODEL);
-    model.brackets = model.brackets.map((bracket) => ({ ...bracket, count: 14 }));
+    model.brackets = model.brackets.map((bracket) => ({ ...bracket, count }));
+    expect(calculateWorkbookPriceReference(example, model)).toMatchObject({
+      status: "available", referencePrice: 4_810_000, bracket: { count },
+    });
+  });
+
+  it("does not invent an observation when the selected group is empty", () => {
+    const model = structuredClone(WORKBOOK_PRICE_REFERENCE_MODEL);
+    model.brackets = model.brackets.map((bracket) => ({ ...bracket, count: 0 }));
     expect(calculateWorkbookPriceReference(example, model)).toMatchObject({
       status: "insufficient_sample", referencePrice: null,
     });
@@ -132,5 +182,26 @@ describe("workbook liggetid reference", () => {
     expect(calculateWorkbookPriceReference(example, model).status).toBe("invalid_model");
     model.brackets = WORKBOOK_PRICE_REFERENCE_MODEL.brackets.map((bracket) => ({ ...bracket, q3DiscountFraction: 1 }));
     expect(calculateWorkbookPriceReference(example, model).status).toBe("invalid_model");
+  });
+
+  it("validates the pooled fallback instead of bypassing model checks for unknown days", () => {
+    const model = structuredClone(WORKBOOK_PRICE_REFERENCE_MODEL);
+    model.aggregate = { ...model.aggregate, q3DiscountFraction: 1 };
+    expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays: null }, model).status).toBe("invalid_model");
+    model.aggregate = { ...WORKBOOK_PRICE_REFERENCE_MODEL.aggregate, count: -1 };
+    expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays: null }, model).status).toBe("invalid_model");
+    model.aggregate = { ...WORKBOOK_PRICE_REFERENCE_MODEL.aggregate, count: 0 };
+    expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays: null }, model).status).toBe("insufficient_sample");
+  });
+
+  it("rejects invalid rounding and observed bounds for both matched and pooled calculations", () => {
+    for (const latestEpisodeDays of [188, null]) {
+      const model = structuredClone(WORKBOOK_PRICE_REFERENCE_MODEL);
+      model.metadata.roundingDkk = 0;
+      expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays }, model).status).toBe("invalid_model");
+      model.metadata.roundingDkk = 10_000;
+      model.metadata.observedMaxDays = -1;
+      expect(calculateWorkbookPriceReference({ ...example, latestEpisodeDays }, model).status).toBe("invalid_model");
+    }
   });
 });

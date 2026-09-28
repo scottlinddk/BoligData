@@ -1,6 +1,7 @@
 {
   "metadata": {
     "version": "workbook-liggetid/2026-09-27",
+    "calculationVersion": "workbook-price-scenario/2.0",
     "sourceFilename": "02-Boligsalg_liggetidsintervaller_2026-09-27-1-.xlsx",
     "sourceSha256": "b78c3020fe41bac9523cc3972e639c5231da73231c6748020834a8b2f892fab1",
     "snapshotDate": "2026-09-27",
@@ -28,14 +29,29 @@
       "9000"
     ],
     "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
-    "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 10.000 kr.",
+    "methodDescription": "Første udbudspris, ellers dagens udbudspris som scenariobasis, × (1 − median historisk prisfald). Kendt liggetid bruger den matchende eller nærmeste observerede tidsgruppe; ukendt liggetid bruger alle 281 handler. Afrundet til 10.000 kr.",
     "limitations": [
       "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
       "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",
       "Første udbud og seneste liggetid kan dække forskellige perioder; genudbud kan nulstille liggetiden.",
       "Udvalget er ikke matchet på stand, areal, grund eller præcis beliggenhed. 2026 er ufuldstændigt.",
-      "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig."
+      "Postnummer 9000 og villa er en grov områdeafgrænsning; kildearkets præcise kortpolygon er ikke tilgængelig.",
+      "Dagens udbudspris som basis er en antagelse, ikke dokumentation for første udbud; allerede skete prisfald kan blive talt med igen.",
+      "Uden for observeret liggetid genbruges nærmeste gruppe uden fremskrivning; ved ukendt liggetid er scenariet ikke tidsmatchet."
     ]
+  },
+  "aggregate": {
+    "sourceRange": "Grunddata!A7:AB443",
+    "label": "Alle liggetider",
+    "count": 281,
+    "medianDiscountFraction": 0.05989385898407885,
+    "meanDiscountFraction": 0.07735394303100777,
+    "q1DiscountFraction": 0.02666666666666667,
+    "q3DiscountFraction": 0.1280148423005566,
+    "sensitivityCount": 215,
+    "sensitivityMedianDiscountFraction": 0.04904904904904905,
+    "fromDays": 2,
+    "toDays": 797
   },
   "brackets": [
     {
