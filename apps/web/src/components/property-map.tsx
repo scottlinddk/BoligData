@@ -11,7 +11,7 @@ import { boundaryMapData, mapPriceLabel, propertyMapData, validMapProperty, view
 import { useI18n, type TranslateFn } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import { useTheme, type Theme } from "@/theme/theme";
-import { mapStyleUrl } from "@/lib/map-theme";
+import { mapStyleUrl, readableMapStyle } from "@/lib/map-theme";
 import { useMapStyleTheme } from "@/lib/use-map-style-theme";
 
 interface PropertyMapProps {
@@ -126,10 +126,11 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
     const initialBoundary = searchBoundaryBbox(polygon);
     try {
       map = new maplibregl.Map({
-        container: containerRef.current, style: mapStyleUrl(theme), renderWorldCopies: false,
+        container: containerRef.current, renderWorldCopies: false,
         bounds: initialBoundary ? [[initialBoundary[0], initialBoundary[1]], [initialBoundary[2], initialBoundary[3]]] : DENMARK_BOUNDS,
         fitBoundsOptions: { padding: 48 },
       });
+      map.setStyle(mapStyleUrl(theme), { transformStyle: (_previous, next) => readableMapStyle(next, theme) });
     } catch { setMapError(true); return; }
     mapRef.current = map;
     cameraSetRef.current = Boolean(initialBoundary);
