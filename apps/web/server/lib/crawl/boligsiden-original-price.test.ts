@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { classifyBoligsidenOriginalAsking } from "./boligsiden-original-price.js";
 import type { BoligsidenOriginalAskingInput } from "./boligsiden-original-price.js";
 import { fetchJson, HttpError } from "./http.js";
+import edgeCases from "./fixtures/boligsiden-original-price.edge-cases.json";
 
 vi.mock("./http.js", async importOriginal => ({ ...await importOriginal<typeof import("./http.js")>(), fetchJson: vi.fn() }));
 
@@ -86,8 +87,27 @@ describe("Boligsiden exact original asking from address timeline", () => {
   it("does not choose arbitrarily when multiple openings match the source duration", () => {
     const { source, history } = pausedJourney();
     history.push({ at: "2026-06-09T09:00:00Z", price: 1_750_000, type: "closed" });
-    history.push({ at: "2026-06-10T09:00:00Z", price: 1_750_000, type: "open" });
+    history.push({ at: "2026-06-09T10:00:00Z", price: 1_750_000, type: "open" });
     expect(classifyBoligsidenOriginalAsking(input, source, history)).toMatchObject({ status: "conflict", reason: "multiple_openings_match_current_episode", price: null });
+  });
+
+  it("requires independent price corroboration when adjacent-day openings differ in price", () => {
+    const { source, history } = pausedJourney();
+    history.push({ at: "2026-06-08T08:00:00Z", price: 1_800_000, type: "open" });
+    history.push({ at: "2026-06-08T16:00:00Z", price: 1_800_000, type: "closed" });
+    expect(classifyBoligsidenOriginalAsking(input, source, history)).toMatchObject({ status: "conflict", reason: "adjacent_opening_price_conflict", price: null });
+    const corroborated = { ...source, cases: [{ ...source.cases[0]!, priceChangePercentage: -3.14 }] };
+    expect(classifyBoligsidenOriginalAsking(input, corroborated, history)).toMatchObject({ status: "exact", price: 1_750_000, originalDate: "2026-06-09" });
+    corroborated.cases[0]!.priceChangePercentage = -5.83;
+    expect(classifyBoligsidenOriginalAsking(input, corroborated, history)).toMatchObject({ status: "conflict", reason: "adjacent_opening_price_conflict", price: null });
+  });
+
+  it("does not resolve distinct adjacent opening prices that the rounded source percentage cannot distinguish", () => {
+    const { source, history } = pausedJourney();
+    history.push({ at: "2026-06-08T08:00:00Z", price: 1_750_001, type: "open" });
+    history.push({ at: "2026-06-08T16:00:00Z", price: 1_750_001, type: "closed" });
+    const corroborated = { ...source, cases: [{ ...source.cases[0]!, priceChangePercentage: -3.14 }] };
+    expect(classifyBoligsidenOriginalAsking(input, corroborated, history)).toMatchObject({ status: "conflict", reason: "adjacent_opening_price_conflict", price: null });
   });
 
   it("does not join an access-address identifier or another case", () => {
@@ -137,6 +157,78 @@ describe("Boligsiden exact original asking from address timeline", () => {
 
   it("rejects a guessed timeline wrapper instead of silently accepting another schema", () => {
     expect(classifyBoligsidenOriginalAsking(input, address(), { timeline: timeline() })).toMatchObject({ status: "unavailable", reason: "invalid_timeline_shape" });
+  });
+});
+
+describe("observed source timeline edge cases", () => {
+  // Captured public address/timeline responses on 2026-09-28, reduced to the
+  // factual fields used by this classifier. These are observed opening amounts.
+  it.each([
+    ["Hasserisvej 124B", 2_595_000, "2026-05-07"],
+    ["Estlandsgade 1", 1_595_000, "2025-09-01"],
+    ["Hasserishøj 2", 20_000_000, "2024-09-27"],
+    ["Hadsundvej 26B", 1_825_000, "2024-08-02"],
+    ["Peder Skrams Gade 35", 1_695_000, "2025-05-22"],
+    ["Vesterbro 19A", 995_000, "2025-04-15"],
+    ["Samsøgade 19", 1_095_000, "2026-01-19"],
+    ["Kong Christians Alle 21", 3_695_000, "2025-08-20"],
+    ["Elme Alle 12", 5_598_000, "2026-08-31"],
+  ])("recovers %s from the source opening corroborated by its active case", (name, price, originalDate) => {
+    const fixture = edgeCases.find(row => row.name === name)!;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({
+      status: "exact", price, originalDate, identityConfirmed: true, listingStatus: "active",
+    });
+  });
+
+  it.each(["Hasserisvej 124B", "Estlandsgade 1", "Hasserishøj 2", "Hadsundvej 26B"])("requires the case percentage to corroborate a repriced reopening at %s", name => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === name)!);
+    fixture.address.cases[0]!.priceChangePercentage = 0;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "inconsistent_reopening_price", price: null });
+  });
+
+  it.each(["Peder Skrams Gade 35", "Vesterbro 19A"])("validates the explicit simultaneous reopening adjustment at %s", name => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === name)!);
+    const adjustment = fixture.timeline.find(event => event.type === "price_change" && fixture.timeline.some(other => other.type === "open" && other.at === event.at))!;
+    adjustment.aux!.difference = -1;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "inconsistent_reopening_adjustment", price: null });
+  });
+
+  it.each(["normal", "other", "unknown"])("does not mistake a %s transaction for the observed family transfer", saleType => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === "Kong Christians Alle 21")!);
+    fixture.timeline.find(event => event.type === "sold")!.aux!.type = saleType;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "sale_after_current_episode_opening", price: null });
+  });
+
+  it("does not ignore a family transfer without corroboration of the same listing journey", () => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === "Kong Christians Alle 21")!);
+    fixture.address.cases[0]!.priceChangePercentage = 0;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "sale_after_current_episode_opening", price: null });
+  });
+
+  it("requires the family transfer to match the address registration", () => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === "Kong Christians Alle 21")!);
+    fixture.address.registrations = [];
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "sale_after_current_episode_opening", price: null });
+  });
+
+  it.each(["closing_price", "old_realtor_days", "current_realtor", "total_days", "later_close", "old_price_path"])("does not ignore an unmatched overlapping closure: %s", brokenEvidence => {
+    const fixture = structuredClone(edgeCases.find(row => row.name === "Elme Alle 12")!);
+    const current = fixture.address.cases[0]!;
+    const close = fixture.timeline.find(event => event.type === "closed")!;
+    if (brokenEvidence === "closing_price") close.price = 5_700_000;
+    if (brokenEvidence === "old_realtor_days") current.timeOnMarket.total.realtors.find(row => row.days === 378)!.days = 377;
+    if (brokenEvidence === "current_realtor") current.realtor.realtorID = OTHER_ID;
+    if (brokenEvidence === "total_days") current.timeOnMarket.total.days = 404;
+    if (brokenEvidence === "later_close") close.at = "2026-09-02T11:27:01.867941Z";
+    if (brokenEvidence === "old_price_path") fixture.timeline.find(event => event.type === "price_change")!.aux!.difference = -1;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason: "inconsistent_pause_price", price: null });
+  });
+
+  it.each([
+    ["Nældevej 57", "opening_does_not_match_current_episode"],
+  ])("keeps unresolved source evidence at %s explicit", (name, reason) => {
+    const fixture = edgeCases.find(row => row.name === name)!;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({ status: "conflict", reason, price: null });
   });
 });
 

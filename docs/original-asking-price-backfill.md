@@ -2,7 +2,7 @@
 
 The authenticated production crawl API can audit and backfill the original asking price for every stored property. It enumerates property UUIDs without filtering out sources, statuses, or legacy provenance. Every row receives an explicit outcome; enumeration completion does not mean every original price was available.
 
-The source lookup binds a Boligsiden case ID to its own source address, unique active case, and a unique opening in the public address timeline corroborated by the current time on market. Its subsequent price changes must agree with the active case. Continuous same-price pauses are permitted when there is no intervening sale. An address match alone, today's asking price, a different campaign, or an old sold listing cannot supply an original asking price. Unsupported sources, blocked requests, ambiguous history, and missing evidence are reported without inventing values.
+The source lookup binds a Boligsiden case ID to its own source address, unique active case, and an opening in the public address timeline corroborated by the current time on market. Subsequent prices must agree with the active case. Repriced reopenings require an explicit adjustment or a cumulative percentage that corroborates the recorded opening amount. A brief broker overlap requires both broker durations and the earlier price path to match; a family transfer requires matching registration evidence. Percentages never manufacture an exact original when the opening is missing. An address match alone, today's asking price, a different campaign, or an old sold listing cannot supply an original asking price. Unsupported sources, blocked requests, ambiguous history, and missing evidence are reported without inventing values.
 
 ## Production procedure
 

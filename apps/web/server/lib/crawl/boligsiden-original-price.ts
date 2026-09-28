@@ -72,8 +72,9 @@ function timestamp(value: unknown): number | null {
 
 /** The public address timeline has no case IDs. Join through the address's
  * unique active case, then corroborate a unique opening with its source
- * duration and complete price-change path. A pause may retain that duration,
- * but a reopening must preserve the exact closing price with no intervening sale. */
+ * duration and complete price-change path. Repriced reopenings need either an
+ * explicit matching adjustment or the case's cumulative percentage to corroborate
+ * the observed opening amount; percentages never reconstruct a missing price. */
 export function classifyBoligsidenOriginalAsking(
   input: BoligsidenOriginalAskingInput,
   addressPayload: unknown,
@@ -105,7 +106,7 @@ export function classifyBoligsidenOriginalAsking(
   const observedStamp = timestamp(result.observedAt);
   if (observedStamp === null || observedStamp > Date.now()) return fail("conflict", "invalid_observation_time");
   if (!Array.isArray(timelinePayload)) return fail("unavailable", "invalid_timeline_shape");
-  const events: { at: string; stamp: number; price: number | null; type: string; difference: number | null }[] = [];
+  const events: { at: string; stamp: number; price: number | null; type: string; difference: number | null; saleType: string | null }[] = [];
   for (const raw of timelinePayload) {
     const event = object(raw);
     const type = text(event?.type);
@@ -114,18 +115,41 @@ export function classifyBoligsidenOriginalAsking(
     if (stamp === null || stamp > observedStamp) return fail("conflict", "invalid_or_future_timeline_event");
     const difference = object(event?.aux)?.difference;
     events.push({ at: event!.at as string, stamp, price: positive(event?.price) ? event.price : null,
-      type, difference: typeof difference === "number" && Number.isFinite(difference) ? difference : null });
+      type, difference: typeof difference === "number" && Number.isFinite(difference) ? difference : null,
+      saleType: type === "sold" ? text(object(event?.aux)?.type) : null });
   }
   events.sort((a, b) => a.stamp - b.stamp);
-  const unique = events.filter((event, index) => index === 0 || JSON.stringify(event) !== JSON.stringify(events[index - 1]));
+  const deduplicated = events.filter((event, index) => index === 0 || JSON.stringify(event) !== JSON.stringify(events[index - 1]));
+  const unique: typeof events = [];
+  for (let index = 0; index < deduplicated.length; index++) {
+    const event = deduplicated[index]!;
+    const next = deduplicated[index + 1];
+    // Boligsiden can publish the same reopening as both open and price_change.
+    // Merge only this exact pair; its explicit delta is checked against the
+    // preceding asking price below, without applying the adjustment twice.
+    if (next && event.at === next.at && event.price !== null && event.price === next.price &&
+      deduplicated[index + 2]?.stamp !== event.stamp &&
+      [event.type, next.type].includes("open") && [event.type, next.type].includes("price_change")) {
+      const open = event.type === "open" ? event : next;
+      const change = event.type === "price_change" ? event : next;
+      if (change.difference !== null) {
+        unique.push({ ...open, difference: change.difference });
+        index++;
+        continue;
+      }
+    }
+    unique.push(event);
+  }
   const openings = unique.flatMap((event, index) => event.type === "open" ? [index] : []);
   if (openings.length === 0) return fail("missing", "no_original_open_event");
   if (result.latestEpisodeDays === null) return fail("conflict", "current_episode_duration_missing");
   // Source day counts and event timestamps can straddle midnight/refresh cycles.
-  const matchingOpenings = openings.filter(index => {
+  const dayDistance = (index: number) => {
     const calendarDays = Math.floor((Date.parse(result.observedAt.slice(0, 10)) - Date.parse(unique[index]!.at.slice(0, 10))) / DAY);
-    return Math.abs(calendarDays - result.latestEpisodeDays!) <= 1;
-  });
+    return Math.abs(calendarDays - result.latestEpisodeDays!);
+  };
+  const exactDayOpenings = openings.filter(index => dayDistance(index) === 0);
+  const matchingOpenings = exactDayOpenings.length ? exactDayOpenings : openings.filter(index => dayDistance(index) <= 1);
   if (matchingOpenings.length === 0) return fail("conflict", "opening_does_not_match_current_episode");
   if (matchingOpenings.length !== 1) return fail("conflict", "multiple_openings_match_current_episode");
   const opening = matchingOpenings[0]!;
@@ -135,18 +159,67 @@ export function classifyBoligsidenOriginalAsking(
   const original = unique[opening]!;
   result.previousOpenCount = unique.slice(0, opening).filter(event => event.type === "open").length;
   if (original.price === null) return fail("missing", "original_open_price_missing");
+  if (original.difference !== null) return fail("conflict", "ambiguous_original_open_adjustment");
+  const sourcePercentage = current.priceChangePercentage;
+  const percentageCorroboratesPrice = (price: number | null): boolean => price !== null && result.currentPrice !== null && typeof sourcePercentage === "number" &&
+    Number.isFinite(sourcePercentage) && sourcePercentage > -100 &&
+    Math.abs(((result.currentPrice - price) / price) * 100 - sourcePercentage) <= 0.005_000_001;
+  const percentageCorroborates = percentageCorroboratesPrice(original.price);
+  const differentlyPricedAdjacentOpenings = openings.filter(index => dayDistance(index) <= 1 && unique[index]!.price !== original.price);
+  if (differentlyPricedAdjacentOpenings.length && (!percentageCorroborates || differentlyPricedAdjacentOpenings.some(index =>
+    unique[index]!.price === null || percentageCorroboratesPrice(unique[index]!.price)))) return fail("conflict", "adjacent_opening_price_conflict");
   const journey = unique.slice(opening + 1);
+  const previousAgentClosure = (closing: typeof original): boolean => {
+    // During a one-day agent handover the old agent can close its advertisement
+    // after the new listing opens. Bind that close to the old price path AND
+    // the source's two distinct realtor durations, never merely to a lower price.
+    if (!percentageCorroborates || sourcePercentage !== 0 || original.price !== result.currentPrice || dayDistance(opening) !== 0) return false;
+    const overlapDays = Math.floor((Date.parse(closing.at.slice(0, 10)) - Date.parse(original.at.slice(0, 10))) / DAY);
+    if (overlapDays < 0 || overlapDays > 1 || closing.price === original.price) return false;
+    const currentRealtor = uuid(object(current.realtor)?.realtorID);
+    const total = object(object(current.timeOnMarket)?.total);
+    const realtors = Array.isArray(total?.realtors) ? total.realtors.map(object).filter((row): row is JsonObject => row !== null) : [];
+    if (!currentRealtor || realtors.length !== 2 || realtors.filter(row => uuid(row.realtorId) === currentRealtor && row.days === result.latestEpisodeDays).length !== 1) return false;
+    const previousOpening = openings.filter(index => index < opening).pop();
+    if (previousOpening === undefined) return false;
+    const previous = unique[previousOpening]!;
+    if (previous.price === null) return false;
+    let previousPrice = previous.price;
+    for (const event of unique.slice(previousOpening + 1, opening)) {
+      if (event.type !== "price_change" || event.price === null ||
+        (event.difference !== null && Math.abs(previousPrice + event.difference - event.price) > 1)) return false;
+      previousPrice = event.price;
+    }
+    if (closing.price !== previousPrice) return false;
+    const priorDays = Math.floor((Date.parse(closing.at.slice(0, 10)) - Date.parse(previous.at.slice(0, 10))) / DAY);
+    const combinedDays = Math.floor((Date.parse(result.observedAt.slice(0, 10)) - Date.parse(previous.at.slice(0, 10))) / DAY);
+    return total?.days === combinedDays && realtors.filter(row => uuid(row.realtorId) !== null && uuid(row.realtorId) !== currentRealtor && row.days === priorDays).length === 1;
+  };
   let latestPrice = original.price;
   let active = true;
   for (const event of journey) {
-    if (event.type === "sold") return fail("conflict", "sale_after_current_episode_opening");
+    if (event.type === "sold") {
+      // A registered family transfer is not a market sale ending this listing.
+      // Retain it only when the source still identifies the same active journey
+      // and independently corroborates the observed opening amount.
+      const matchingFamilyRegistration = Array.isArray(address?.registrations) && address.registrations.some(raw => {
+        const registration = object(raw);
+        return registration?.type === "family" && registration.date === event.at.slice(0, 10) && registration.amount === event.price;
+      });
+      if (event.saleType === "family" && active && percentageCorroborates && matchingFamilyRegistration) continue;
+      return fail("conflict", "sale_after_current_episode_opening");
+    }
     if (event.type === "closed") {
+      if (active && event.price !== latestPrice && previousAgentClosure(event)) continue;
       if (!active || event.price !== latestPrice) return fail("conflict", "inconsistent_pause_price");
       active = false;
       continue;
     }
     if (event.type === "open") {
-      if (active || event.price !== latestPrice) return fail("conflict", "inconsistent_reopening_price");
+      if (active || event.price === null) return fail("conflict", "inconsistent_reopening_price");
+      if (event.difference !== null && Math.abs(latestPrice + event.difference - event.price) > 1) return fail("conflict", "inconsistent_reopening_adjustment");
+      if (event.price !== latestPrice && event.difference === null && !percentageCorroborates) return fail("conflict", "inconsistent_reopening_price");
+      latestPrice = event.price;
       active = true;
       continue;
     }
