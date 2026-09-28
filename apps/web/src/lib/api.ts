@@ -35,6 +35,7 @@ import type { AdminUser, Conversation, Invitation, Message, NotificationType, Pr
 import type { PropertyLookupResult } from "@shared/types/property-lookup";
 import type { SchoolDistrictResult } from "@shared/types/school-district";
 import type { LimfjordLanguage, LimfjordNoiseResult } from "@shared/types/limfjord-noise";
+import type { MiljoegisNoiseReport, NoiseMetric, NoiseSource } from "@shared/types/miljoegis-noise";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -89,6 +90,11 @@ export function getSchoolDistrict(id: string): Promise<SchoolDistrictResult> {
 
 export function getLimfjordNoise(id: string, language: LimfjordLanguage, signal?: AbortSignal): Promise<LimfjordNoiseResult> {
   const query = new URLSearchParams({ id, resource: "limfjord-noise", lang: language });
+  return request(`/properties?${query}`, { signal });
+}
+
+export function getMiljoegisNoise(id: string, source: NoiseSource, metric: NoiseMetric, signal?: AbortSignal): Promise<MiljoegisNoiseReport> {
+  const query = new URLSearchParams({ id, resource: "miljoegis-noise", source, metric });
   return request(`/properties?${query}`, { signal });
 }
 

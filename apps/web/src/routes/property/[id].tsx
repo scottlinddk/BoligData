@@ -27,6 +27,7 @@ import { useUserProfile } from "@/hooks/use-user-profile";
 import { RecommendModal } from "@/components/recommend-modal";
 import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
+import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
 const actionClass = "flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors";
@@ -170,6 +171,7 @@ export function PropertyDetailPage() {
             {comparablesQuery.isLoading ? <div className="space-y-4"><LoadingStatus>{tx("Henter sammenlignelige boliger…", "Loading comparable homes…")}</LoadingStatus><Skeleton className="h-24 w-full rounded-xl" /></div>
               : <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />}
           </DetailSection>
+          <MiljoegisNoisePanel propertyId={property.id} />
           <LimfjordNoisePanel propertyId={property.id} />
           <DetailSection title={tx("Dokumentation og opmærksomhedspunkter", "Documents and things to check")} subtitle={tx("Tjekliste og status for de offentlige kilder", "Checklist and public data source status")}>
             <div className="space-y-4"><DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} /><RegisterSourcesPanel sources={registerSources} isLoading={lookupQuery.isLoading} isError={lookupQuery.isError} onRetry={() => lookupQuery.refetch()} /></div>

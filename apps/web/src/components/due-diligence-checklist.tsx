@@ -2,7 +2,7 @@ import type { RiskFlags } from "@shared/types/index";
 import { riskStatuses } from "@shared/utils/risk-status";
 import { useI18n, type TranslateFn } from "@/i18n/i18n";
 
-const MILJOEGIS_NOISE_MAP_URL = "https://miljoegis.mim.dk/spatialmap?profile=stoej";
+const MILJOEGIS_NOISE_MAP_URL = "https://miljoegis.mim.dk/spatialmap?profile=noise";
 const MILJOEPORTAL_SOIL_MAP_URL = "https://arealinformation.miljoeportal.dk/";
 const BBR_URL = "https://bbr.dk/";
 

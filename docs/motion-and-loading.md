@@ -41,7 +41,7 @@ is still running. It should never delay an action or imply data has arrived.
 
 - Frontend, API and shared-package TypeScript checks.
 - Production Vite build.
-- 1,111 Vitest tests, including nine query-observer tests covering pagination,
+- 1,137 Vitest tests after integrating the noise-panel changes from main, including nine query-observer tests covering pagination,
   changed filters/boundaries, account changes and failed refreshes.
 - Local Chromium checks with intercepted fixture responses: anchor positioning/focus,
   async deep links, image failure, favorite failure, search states and dialog interaction.
