@@ -33,6 +33,7 @@ import type {
 } from "@shared/types/api";
 import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
 import type { PropertyLookupResult } from "@shared/types/property-lookup";
+import type { SchoolDistrictResult } from "@shared/types/school-district";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -79,6 +80,10 @@ export function searchProperties(query: SearchPropertiesQuery): Promise<SearchPr
 
 export function getProperty(id: string): Promise<PropertyDetailResponse> {
   return request(`/properties?id=${id}`);
+}
+
+export function getSchoolDistrict(id: string): Promise<SchoolDistrictResult> {
+  return request(`/properties?id=${encodeURIComponent(id)}&resource=school-district`);
 }
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
