@@ -1,13 +1,13 @@
 .property-map {
-  --map-pin-border: #285fbd;
-  --map-pin-text: #214f9b;
-  --map-focus: #729fe8;
+  --map-pin-border: var(--color-border-strong);
+  --map-pin-text: var(--color-text-primary);
+  --map-focus: var(--color-brand);
   background: var(--color-surface-alt);
 }
 :root.dark .property-map {
-  --map-pin-border: #8bb7ff;
-  --map-pin-text: #d5e4ff;
-  --map-focus: #8bb7ff;
+  --map-pin-border: var(--color-border-strong);
+  --map-pin-text: var(--color-text-primary);
+  --map-focus: var(--color-brand);
 }
 .property-map-panel {
   background: var(--color-surface);
@@ -41,7 +41,7 @@
 .property-map-control {
   min-height: 40px;
   padding: 8px 11px;
-  border-radius: 8px;
+  border-radius: 999px;
   color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 600;
@@ -58,6 +58,7 @@
   cursor: pointer;
 }
 .property-map-cluster:focus-visible { outline: 3px solid var(--map-focus); outline-offset: 3px; }
+:root.dark .property-map-cluster { color: var(--color-accent-text); }
 .property-map-control:hover { background: var(--color-surface-hover); }
 .property-map-control:focus-visible { outline: 3px solid var(--map-focus); outline-offset: 2px; }
 .property-map-control:disabled { opacity: .5; cursor: not-allowed; }

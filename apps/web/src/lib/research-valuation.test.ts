@@ -67,12 +67,29 @@ describe("data-based listing price reference", () => {
     expect(estimateResearchPrice(leapRequest).primary.count).toBe(5);
   });
 
-  it("requires five unique transactions rather than five source rows", () => {
+  it("shows four unique transactions without counting duplicate source rows twice", () => {
     const four = Array.from({ length: 4 }, (_, index) => sale(index));
     const duplicate = { ...four[0]!, id: "second-source", source: "Other register" };
     const result = estimateResearchPrice(input([...four, duplicate]));
-    expect(result.status).toBe("insufficient_data");
-    expect(result.primary).toMatchObject({ count: 4, median: null, q1: null, q3: null });
+    expect(result.status).toBe("available");
+    expect(result.primary).toMatchObject({ count: 4, median: 3_500_000, q1: 3_290_000, q3: 3_710_000 });
+    expect(result.baseline.median).toBe(3_500_000);
+    expect(result.firstAskingReference.median).toBeCloseTo(3_220_000);
+    expect(result.warnings.map(reason => reason.code)).toContain("thin_time_group_sample");
+    expect(result.noDataReasons).toEqual([]);
+  });
+
+  it.each([1, 2, 3, 4])("shows the actual available evidence from %i eligible sales", count => {
+    const result = estimateResearchPrice(input(Array.from({ length: count }, (_, index) => sale(index))));
+    expect(result.primary).toMatchObject({ status: "available", count, median: 3_080_000 + (count - 1) * 140_000 });
+    expect(result.firstAskingReference.status).toBe("available");
+    expect(result.warnings.map(reason => reason.code)).toContain("thin_time_group_sample");
+    expect(result.snapshot.minimumSales).toBe(1);
+  });
+
+  it("does not invent a comparable reference when no eligible sale exists", () => {
+    const result = estimateResearchPrice(input([]));
+    expect(result.primary).toMatchObject({ status: "insufficient_data", count: 0, median: null, q1: null, q3: null });
     expect(result.baseline.median).toBeNull();
     expect(result.firstAskingReference.median).toBeNull();
     expect(result.noDataReasons.map(reason => reason.code)).toContain("insufficient_time_group_sales");
@@ -83,7 +100,7 @@ describe("data-based listing price reference", () => {
     const conflict = { ...rows[0]!, id: "later-area-source", soldPrice: rows[0]!.soldPrice! + 1, areaAtSale: false };
     const result = estimateResearchPrice(input([...rows, conflict]));
     expect(result.primary.count).toBe(4);
-    expect(result.primary.median).toBeNull();
+    expect(result.primary.median).toBe(3_780_000);
     expect(result.excluded.filter(row => row.reason.includes("Modstridende kilder"))).toHaveLength(2);
   });
 
@@ -131,12 +148,14 @@ describe("data-based listing price reference", () => {
     expect(result.excluded.filter(row => row.scope === "time_group")).toHaveLength(6);
   });
 
-  it("requires a separate five-pair sample for the optional first-asking reference", () => {
+  it("uses available documented price pairs independently of the primary sale count", () => {
     const rows = Array.from({ length: 6 }, (_, index) => sale(index, { firstAsking: index < 4 ? 5_000_000 : null }));
     const result = estimateResearchPrice(input(rows));
     expect(result.primary.status).toBe("available");
-    expect(result.firstAskingReference).toMatchObject({ status: "insufficient_data", count: 4, median: null, medianTotalFallPercent: null });
-    expect(result.warnings.map(warning => warning.code)).toContain("insufficient_first_asking_pairs");
+    expect(result.firstAskingReference).toMatchObject({ status: "available", count: 4 });
+    expect(result.firstAskingReference.medianTotalFallPercent).toBeCloseTo(30);
+    expect(result.firstAskingReference.median).toBeCloseTo(3_220_000);
+    expect(result.warnings.map(warning => warning.code)).toContain("thin_first_asking_sample");
   });
 
   it("preserves negative historical price falls and anchors only to documented first asking", () => {

@@ -37,7 +37,7 @@ function RootLayout() {
   return (
     <div className="min-h-full overflow-x-clip font-sans text-ink">
       <Header />
-      <main className={pathname === "/" ? "w-full" : "mx-auto max-w-6xl"}>
+      <main className={pathname === "/" || pathname.startsWith("/property/") ? "w-full" : "mx-auto max-w-6xl"}>
         <Outlet />
       </main>
       <RecommendationAlerts />

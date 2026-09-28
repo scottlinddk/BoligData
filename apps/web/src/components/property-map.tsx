@@ -26,20 +26,21 @@ const BOUNDARY_SOURCE = "search-boundary";
 const PROPERTY_SOURCE = "search-properties";
 const CLUSTER_LAYER = "property-clusters";
 const POINT_LAYER = "property-points";
-const BLUE = "#285fbd";
+const MAP_BOUNDARY = "#97603a";
+const MAP_CLUSTER = "#20221f";
 const OVERLAY_SOURCES = [BOUNDARY_SOURCE, PROPERTY_SOURCE];
 
 function applyOverlayTheme(map: maplibregl.Map, theme: Theme) {
   const dark = theme === "dark";
   if (!map.getLayer("boundary-fill")) return;
-  const line = dark ? "#8bb7ff" : BLUE;
+  const line = dark ? "#f2bd95" : MAP_BOUNDARY;
   map.setPaintProperty("boundary-fill", "fill-color", line);
   map.setPaintProperty("boundary-fill", "fill-opacity", ["case", ["==", ["get", "kind"], "saved"], dark ? 0.18 : 0.13, dark ? 0.12 : 0.09]);
   for (const id of ["boundary-saved-line", "boundary-draft-line"]) map.setPaintProperty(id, "line-color", line);
-  map.setPaintProperty("boundary-vertices", "circle-color", dark ? "#151e2b" : "#fff");
+  map.setPaintProperty("boundary-vertices", "circle-color", dark ? "#20231f" : "#fff");
   map.setPaintProperty("boundary-vertices", "circle-stroke-color", line);
-  map.setPaintProperty(CLUSTER_LAYER, "circle-color", dark ? "#2d64cd" : BLUE);
-  map.setPaintProperty(CLUSTER_LAYER, "circle-stroke-color", dark ? "#b7d1ff" : "#fff");
+  map.setPaintProperty(CLUSTER_LAYER, "circle-color", dark ? "#f7bb8d" : MAP_CLUSTER);
+  map.setPaintProperty(CLUSTER_LAYER, "circle-stroke-color", dark ? "#20231f" : "#fff");
 }
 
 function createPopupContent(property: Property, t: TranslateFn, language: "da" | "en", onNavigate: (path: string) => void) {
@@ -71,12 +72,12 @@ function createPopupContent(property: Property, t: TranslateFn, language: "da" |
 
 function installLayers(map: maplibregl.Map) {
   map.addSource(BOUNDARY_SOURCE, { type: "geojson", data: boundaryMapData(null, []) });
-  map.addLayer({ id: "boundary-fill", type: "fill", source: BOUNDARY_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": BLUE, "fill-opacity": ["case", ["==", ["get", "kind"], "saved"], 0.13, 0.09] } });
-  map.addLayer({ id: "boundary-saved-line", type: "line", source: BOUNDARY_SOURCE, filter: ["==", ["get", "kind"], "saved"], paint: { "line-color": BLUE, "line-width": 3 } });
-  map.addLayer({ id: "boundary-draft-line", type: "line", source: BOUNDARY_SOURCE, filter: ["in", ["get", "kind"], ["literal", ["draft-line", "draft-fill"]]], paint: { "line-color": BLUE, "line-width": 3, "line-dasharray": [2, 1.5] } });
-  map.addLayer({ id: "boundary-vertices", type: "circle", source: BOUNDARY_SOURCE, filter: ["==", ["get", "kind"], "vertex"], paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": BLUE, "circle-stroke-width": 3 } });
+  map.addLayer({ id: "boundary-fill", type: "fill", source: BOUNDARY_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": MAP_BOUNDARY, "fill-opacity": ["case", ["==", ["get", "kind"], "saved"], 0.13, 0.09] } });
+  map.addLayer({ id: "boundary-saved-line", type: "line", source: BOUNDARY_SOURCE, filter: ["==", ["get", "kind"], "saved"], paint: { "line-color": MAP_BOUNDARY, "line-width": 3 } });
+  map.addLayer({ id: "boundary-draft-line", type: "line", source: BOUNDARY_SOURCE, filter: ["in", ["get", "kind"], ["literal", ["draft-line", "draft-fill"]]], paint: { "line-color": MAP_BOUNDARY, "line-width": 3, "line-dasharray": [2, 1.5] } });
+  map.addLayer({ id: "boundary-vertices", type: "circle", source: BOUNDARY_SOURCE, filter: ["==", ["get", "kind"], "vertex"], paint: { "circle-radius": 6, "circle-color": "#fff", "circle-stroke-color": MAP_BOUNDARY, "circle-stroke-width": 3 } });
   map.addSource(PROPERTY_SOURCE, { type: "geojson", data: propertyMapData([]), cluster: true, clusterMaxZoom: 15, clusterRadius: 54 });
-  map.addLayer({ id: CLUSTER_LAYER, type: "circle", source: PROPERTY_SOURCE, filter: ["has", "point_count"], paint: { "circle-color": BLUE, "circle-radius": ["step", ["get", "point_count"], 20, 25, 24, 100, 28], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+  map.addLayer({ id: CLUSTER_LAYER, type: "circle", source: PROPERTY_SOURCE, filter: ["has", "point_count"], paint: { "circle-color": MAP_CLUSTER, "circle-radius": ["step", ["get", "point_count"], 20, 25, 24, 100, 28], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
   // Invisible hit geometry tells us which unclustered price pills are actually visible.
   map.addLayer({ id: POINT_LAYER, type: "circle", source: PROPERTY_SOURCE, filter: ["!", ["has", "point_count"]], paint: { "circle-radius": 1, "circle-opacity": 0 } });
 }

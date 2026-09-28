@@ -143,12 +143,14 @@ def extract(source):
         "minimumSample": intervals["I6"].value,
         "observedMinDays": min(observed_days),
         "observedMaxDays": max(observed_days),
-        "roundingDkk": calculator["E9"].value,
+        # Display precision is an application choice; preserve the original workbook setting.
+        "roundingDkk": 10_000,
+        "sourceRoundingDkk": calculator["E9"].value,
         "saleYears": sale_years,
         "propertyTypes": ["villa"],
         "postalCodes": ["9000"],
         "scopeDescription": "Udvalgte villaer i kildearkets kortudsnit i Aalborg/Hasseris; ikke alle salg i Aalborg eller et landsdækkende udvalg.",
-        "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 50.000 kr.",
+        "methodDescription": "Første udbudspris × (1 − median af samlet prisfald fra første udbud til salg) for seneste udbudsperiodes liggetidsgruppe. Afrundet til 10.000 kr.",
         "limitations": [
             "Historisk prisreference; liggetid alene dokumenterer hverken markedsværdi eller acceptchance.",
             "Q1–Q3 dækker de midterste 50 % af historiske prisfald og er ikke et konfidensinterval for boligens værdi.",

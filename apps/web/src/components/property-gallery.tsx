@@ -1,119 +1,82 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ListingImage } from "@shared/types/index";
 import { getImageSrcSet, getImageUrl } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 
-interface PropertyGalleryProps {
-  images: ListingImage[];
-  alt: string;
-}
-
-/** Thumbnails span roughly half a phone screen up to a quarter of the 900px column. */
-const THUMB_WIDTHS = [400, 600, 900, 1200];
-const THUMB_ASPECT = 4 / 3;
-/** The lightbox fills the viewport, so it needs full-screen-retina sizes. */
-const LIGHTBOX_WIDTHS = [900, 1400, 2000, 2800];
-const LIGHTBOX_ASPECT = 3 / 2;
-
-/** Thumbnail grid of the remaining photos plus a full-screen lightbox. */
-export function PropertyGallery({ images, alt }: PropertyGalleryProps) {
-  const { t } = useI18n();
+/** Compact photo story, with every image available in a native modal dialog. */
+export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: string }) {
+  const { t, language } = useI18n();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLButtonElement | null>(null);
+  const isOpen = openIndex !== null;
 
   useEffect(() => {
-    if (openIndex === null) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpenIndex(null);
-      if (e.key === "ArrowLeft") setOpenIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length));
-      if (e.key === "ArrowRight") setOpenIndex((i) => (i === null ? i : (i + 1) % images.length));
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openIndex, images.length]);
+    if (!isOpen) return;
+    const modal = dialog.current;
+    modal?.showModal();
+    closeButton.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      modal?.close();
+      document.body.style.overflow = previousOverflow;
+      returnFocus.current?.focus();
+    };
+  }, [isOpen]);
 
-  if (images.length === 0) return null;
+  function open(index: number, button: HTMLButtonElement) {
+    returnFocus.current = button;
+    setOpenIndex(index);
+  }
+  function photo(image: ListingImage, index: number, hero = false) {
+    return <img src={getImageUrl(image, hero ? 1800 : 600, hero ? 1200 : 400)}
+      srcSet={getImageSrcSet(image, hero ? [600, 900, 1200, 1800] : [300, 600, 900], 3 / 2)}
+      sizes={hero ? "(min-width: 1024px) 760px, 100vw" : "(min-width: 1024px) 180px, 25vw"}
+      alt={`${alt} · ${index + 1}`} loading={hero ? "eager" : "lazy"} fetchPriority={hero ? "high" : "auto"}
+      onError={event => { if (event.currentTarget.src !== image.url) { event.currentTarget.srcset = ""; event.currentTarget.src = image.url; } }}
+      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" />;
+  }
 
-  return (
-    <>
-      <h2 className="mt-6 text-xl font-bold tracking-tight text-ink">{t("detail.gallery")}</h2>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 md:grid-cols-3">
-        {images.map((image, i) => (
-          <button
-            key={image.url}
-            type="button"
-            onClick={() => setOpenIndex(i)}
-            className="aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface-alt"
-          >
-            <img
-              src={getImageUrl(image, 900, 675)}
-              srcSet={getImageSrcSet(image, THUMB_WIDTHS, THUMB_ASPECT)}
-              sizes="(min-width: 768px) 300px, 50vw"
-              alt={alt}
-              loading="lazy"
-              onError={(e) => {
-                if (e.currentTarget.src !== image.url) {
-                  e.currentTarget.srcset = "";
-                  e.currentTarget.src = image.url;
-                }
-              }}
-              className="h-full w-full object-cover"
-            />
-          </button>
-        ))}
-      </div>
+  if (!images.length) return <div className="flex aspect-[3/2] items-center justify-center rounded-2xl bg-surface-alt text-sm text-ink-faint">{t("property.noPhoto")}</div>;
 
-      {openIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-          onClick={() => setOpenIndex(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setOpenIndex(null)}
-            aria-label={t("detail.galleryClose")}
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg text-white"
-          >
-            ✕
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpenIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length));
-            }}
-            aria-label={t("detail.galleryPrev")}
-            className="absolute left-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white"
-          >
-            ‹
-          </button>
-          <img
-            src={getImageUrl(images[openIndex]!, 2000, 1333)}
-            srcSet={getImageSrcSet(images[openIndex]!, LIGHTBOX_WIDTHS, LIGHTBOX_ASPECT)}
-            sizes="100vw"
-            alt={alt}
-            onClick={(e) => e.stopPropagation()}
-            onError={(e) => {
-              const original = images[openIndex!]!.url;
-              if (e.currentTarget.src !== original) {
-                e.currentTarget.srcset = "";
-                e.currentTarget.src = original;
-              }
-            }}
-            className="max-h-full max-w-full rounded-xl object-contain"
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpenIndex((i) => (i === null ? i : (i + 1) % images.length));
-            }}
-            aria-label={t("detail.galleryNext")}
-            className="absolute right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white"
-          >
-            ›
-          </button>
-        </div>
-      )}
-    </>
-  );
+  return <section aria-label={t("detail.gallery")}>
+    <button type="button" onClick={event => open(0, event.currentTarget)}
+      aria-label={`${t("detail.gallery")} · ${images.length} ${language === "da" ? "billeder" : "photos"}`}
+      className="group relative block aspect-[3/2] w-full overflow-hidden rounded-2xl bg-surface-alt text-left">
+      {photo(images[0]!, 0, true)}
+      <span className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold text-neutral-900 shadow-sm">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-4 w-4" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2" /><path d="m7 5 1-2h4l1 2" /><circle cx="10" cy="10.5" r="3" /></svg>
+        {language === "da" ? "Se alle billeder" : "View all photos"} · {images.length}
+      </span>
+    </button>
+    {images.length > 1 && <div className="mt-3 grid grid-cols-4 gap-2.5">
+      {images.slice(1, 5).map((image, index) => <button key={`${image.url}-${index}`} type="button"
+        onClick={event => open(index + 1, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${index + 2}`}
+        className="group relative aspect-[3/2] overflow-hidden rounded-xl bg-surface-alt">
+        {photo(image, index + 1)}
+        {index === 3 && images.length > 5 && <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xl font-medium text-white">+{images.length - 5}</span>}
+      </button>)}
+    </div>}
+    {openIndex !== null && <dialog ref={dialog} aria-label={t("detail.gallery")}
+      onClose={() => setOpenIndex(null)} onCancel={() => setOpenIndex(null)}
+      onClick={event => { if (event.target === event.currentTarget) setOpenIndex(null); }}
+      onKeyDown={event => {
+        if (event.key === "ArrowLeft") { event.preventDefault(); setOpenIndex(index => (index! - 1 + images.length) % images.length); }
+        if (event.key === "ArrowRight") { event.preventDefault(); setOpenIndex(index => (index! + 1) % images.length); }
+      }}
+      className="fixed inset-0 m-auto h-[100dvh] max-h-none w-screen max-w-none bg-black/95 p-4 text-white backdrop:bg-black/80 open:flex open:items-center open:justify-center">
+      <button ref={closeButton} type="button" onClick={() => setOpenIndex(null)} aria-label={t("detail.galleryClose")}
+        className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-xl">×</button>
+      <p aria-live="polite" className="absolute left-5 top-6 text-sm">{openIndex + 1} / {images.length}</p>
+      <img src={getImageUrl(images[openIndex]!, 2000, 1333)} alt={`${alt} · ${openIndex + 1}`}
+        onError={event => { const original = images[openIndex]!.url; if (event.currentTarget.src !== original) event.currentTarget.src = original; }}
+        className="max-h-[85dvh] max-w-full rounded-lg object-contain" />
+      {images.length > 1 && <>
+        <button type="button" onClick={() => setOpenIndex(index => (index! - 1 + images.length) % images.length)} aria-label={t("detail.galleryPrev")} className="absolute left-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-3xl sm:left-6">‹</button>
+        <button type="button" onClick={() => setOpenIndex(index => (index! + 1) % images.length)} aria-label={t("detail.galleryNext")} className="absolute right-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-3xl sm:right-6">›</button>
+      </>}
+    </dialog>}
+  </section>;
 }

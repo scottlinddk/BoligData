@@ -46,6 +46,8 @@ export type WorkbookPriceReferenceStatus =
 
 export interface WorkbookPriceReferenceResult {
   status: WorkbookPriceReferenceStatus;
+  /** Scope is disclosed, never confused with locally matched comparable sales. */
+  applicability: "sample_scope" | "broad_scenario";
   reason: string | null;
   referencePrice: number | null;
   /** Lower price uses Q3 of discount; upper price uses Q1. */
@@ -68,16 +70,18 @@ const validPrice = (price: number | null): price is number =>
  *
  * Both bracket endpoints are inclusive. Prices follow Excel ROUND(x / step, 0)
  * for positive amounts. Negative discounts (sales above asking) remain intact.
- * Property type/postcode are only coarse scope checks: the original selected
- * Aalborg/Hasseris map polygon is unavailable and is disclosed in metadata.
+ * Property type/postcode describe applicability, not availability: outside the
+ * workbook's sample this is explicitly a broad historical scenario.
  */
 export function calculateWorkbookPriceReference(
   input: WorkbookPriceReferenceInput,
   model: WorkbookPriceReferenceModel = WORKBOOK_PRICE_REFERENCE_MODEL,
 ): WorkbookPriceReferenceResult {
   const metadata = model.metadata;
+  const withinSampleScope = metadata.propertyTypes.includes(input.propertyType?.trim().toLowerCase() ?? "")
+    && metadata.postalCodes.includes(input.postalCode?.trim() ?? "");
   const empty: WorkbookPriceReferenceResult = {
-    status: "available", reason: null, referencePrice: null, lowerPrice: null,
+    status: "available", applicability: withinSampleScope ? "sample_scope" : "broad_scenario", reason: null, referencePrice: null, lowerPrice: null,
     upperPrice: null, gapAmount: null, gapPercent: null, medianDiscountPercent: null,
     bracket: null, metadata,
   };
@@ -85,13 +89,6 @@ export function calculateWorkbookPriceReference(
     bracket: WorkbookPriceReferenceBracket | null = null): WorkbookPriceReferenceResult =>
     ({ ...empty, status, reason, bracket });
 
-  if (!metadata.propertyTypes.includes(input.propertyType?.trim().toLowerCase() ?? "")
-      || !metadata.postalCodes.includes(input.postalCode?.trim() ?? "")) {
-    return unavailable("outside_scope", "Prisreferencen dækker udvalgte villaer i Aalborg/Hasseris (9000). Boligen kan ikke matches til dette grundlag.");
-  }
-  if (!validPrice(input.firstAsking)) {
-    return unavailable("missing_first_asking", "En dokumenteret første udbudspris mangler. Dagens pris kan ikke erstatte den.");
-  }
   if (input.latestEpisodeDays === null || !Number.isInteger(input.latestEpisodeDays) || input.latestEpisodeDays < 0) {
     return unavailable("missing_days", "Der mangler et dokumenteret antal dage i seneste udbudsperiode.");
   }
@@ -113,6 +110,12 @@ export function calculateWorkbookPriceReference(
       || bracket.q1DiscountFraction > bracket.medianDiscountFraction
       || bracket.medianDiscountFraction > bracket.q3DiscountFraction) {
     return unavailable("invalid_model", "Datagrundlagets prisfald eller afrunding er ugyldige.", bracket);
+  }
+  if (!validPrice(input.firstAsking)) {
+    return {
+      ...unavailable("missing_first_asking", "En dokumenteret første udbudspris mangler. Dagens pris kan ikke erstatte den.", bracket),
+      medianDiscountPercent: bracket.medianDiscountFraction * 100,
+    };
   }
   const round = (value: number) => Math.round(value / metadata.roundingDkk) * metadata.roundingDkk;
   const referencePrice = round(input.firstAsking * (1 - bracket.medianDiscountFraction));

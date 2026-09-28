@@ -10,7 +10,7 @@ const i18n = vi.hoisted(() => ({ language: "da" }));
 vi.mock("@/i18n/i18n", () => ({ useI18n: () => i18n }));
 
 const NOW = "2026-09-27T12:00:00.000Z";
-const startDate = new Date(Date.parse(NOW) - 188 * 86_400_000).toISOString().slice(0, 10);
+const startDate = new Date(Date.parse(NOW) - 188 * 86_390_000).toISOString().slice(0, 10);
 const property = {
   id: "subject", address: "Testvej 1", dataMode: "real", status: "active", propertyType: "villa", postalCode: "9000",
   municipality: "Aalborg", listingSource: "boligsiden", externalId: "case-1", listingDate: startDate,
@@ -45,7 +45,7 @@ afterEach(() => vi.useRealTimers());
 describe("listing workbook reference integration", () => {
   it("uses the documented first asking price, not another discount on the current asking price", () => {
     const result = workbookListingReference(property, history());
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_800_000, lowerPrice: 4_650_000, upperPrice: 5_100_000, gapAmount: 400_000 });
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000, lowerPrice: 4_660_000, upperPrice: 5_080_000, gapAmount: 390_000 });
     expect(result.listing.time.latestEpisodeDays).toBe(188);
     expect(result.firstAsking).toBe(5_500_000);
     expect(result.estimatedFirst).toBeNull();
@@ -67,7 +67,7 @@ describe("listing workbook reference integration", () => {
 
   it("uses a labelled source-derived scenario when the first-listing event has no price", () => {
     const result = workbookListingReference(property, history({ events: [{ ...first, price: null }], observations: [askingChange] }));
-    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_800_000, gapAmount: 400_000 });
+    expect(result.reference).toMatchObject({ status: "available", referencePrice: 4_810_000, gapAmount: 390_000 });
     expect(result.firstAsking).toBeCloseTo(5_200_000 / (1 - 0.0545));
     expect(result.estimatedFirst).toMatchObject({ changePercent: -5.45, observedAt: NOW });
     expect(result.listing.firstAsking).toBeNull();
@@ -80,7 +80,7 @@ describe("listing workbook reference integration", () => {
     }] });
     data.episodes[0] = { ...data.episodes[0]!, startDate: null, datePrecision: "unknown" };
     const result = workbookListingReference({ ...property, listingDate: null }, data);
-    expect(result.reference.referencePrice).toBe(4_800_000);
+    expect(result.reference.referencePrice).toBe(4_810_000);
     expect(result.listing.time.latestEpisodeDays).toBe(188);
     expect(result.listing.time.firstDocumentedListing).toBeNull();
     expect(result.listing.latestEpisodeSource?.observedAt).toBe(NOW);
@@ -145,9 +145,9 @@ describe("prominent price by time on market card", () => {
     const html = render();
     expect(html).toContain('data-state="available"');
     expect(html).toContain("Pris efter liggetid");
-    expect(html).toContain("4.800.000");
+    expect(html).toContain("4.810.000");
     expect(html).toContain("5.200.000");
-    expect(html).toContain("400.000");
+    expect(html).toContain("390.000");
     expect(html).toContain("over prisreferencen");
     expect(html).toContain("281 historiske villasalg");
     expect(html).toContain("2026-09-27");
@@ -159,7 +159,7 @@ describe("prominent price by time on market card", () => {
     i18n.language = "en";
     const html = render();
     expect(html).toContain("Price by time on market");
-    expect(html).toContain("4,800,000");
+    expect(html).toContain("4,810,000");
     expect(html).toContain("above the price reference");
     expect(html).toContain("not a market valuation");
     const missing = render({ history: history({ events: [] }) });
@@ -173,12 +173,12 @@ describe("prominent price by time on market card", () => {
     expect(da).toContain("Omtrentlig prisreference");
     expect(da).toContain("beregnet fra Boligsidens afrundede prisændring");
     expect(da).toContain("omtrentligt scenario");
-    expect(da).toContain("4.800.000");
+    expect(da).toContain("4.810.000");
     i18n.language = "en";
     const en = render({ history: data });
     expect(en).toContain("Approximate price reference");
     expect(en).toContain("approximate scenario");
-    expect(en).toContain("4,800,000");
+    expect(en).toContain("4,810,000");
   });
 
   it("does not present stale cached evidence as a successful calculation after a request fails", () => {
@@ -198,16 +198,44 @@ describe("prominent price by time on market card", () => {
     expect(truncated).not.toContain('data-testid="workbook-target-price"');
   });
 
-  it("shows the scope limitation instead of extrapolating the Aalborg villa sample", () => {
+  it("shows a clearly labelled broad historical scenario outside the original sample scope", () => {
     const html = render({ property: { ...property, postalCode: "8000" } });
-    expect(html).toContain("andre boligtyper eller postnumre");
+    expect(html).toContain("Bredt historisk scenario");
+    expect(html).toContain("ikke baseret på lokale, sammenlignelige handler");
+    expect(html).toContain('data-testid="workbook-target-price"');
+  });
+
+  it("shows historical observations without a first asking price or any comparable sales", () => {
+    const html = render({ history: history({ events: [], transactions: [] }) });
+    expect(html).toContain('data-testid="workbook-historical-discount"');
+    expect(html).toContain("12,5 %");
+    expect(html).toContain("22 handler");
+    expect(html).toContain('data-testid="workbook-historical-groups"');
+    expect(html).not.toContain('data-testid="workbook-target-price"');
+  });
+
+  it("keeps the broad sample scope visible beside a discount when first asking is missing", () => {
+    const html = render({ property: { ...property, postalCode: "8000" }, history: history({ events: [] }) });
+    expect(html).toContain('data-testid="workbook-historical-discount"');
+    expect(html).toContain('data-testid="workbook-broad-scenario"');
+    expect(html).toContain("ikke baseret på lokale, sammenlignelige handler");
+    expect(html.indexOf('data-testid="workbook-broad-scenario"')).toBeLessThan(html.indexOf("<details"));
+    expect(html).not.toContain('data-testid="workbook-target-price"');
+  });
+
+  it("explains 10,000-kr rounding and retains all historical groups when listing time is missing", () => {
+    const data = history();
+    data.episodes[0] = { ...data.episodes[0]!, startDate: null, datePrecision: "unknown" };
+    const html = render({ property: { ...property, listingDate: null }, history: data });
+    expect(html).toContain("Beløb afrundes til 10.000 kr.");
+    expect(html).toContain('data-testid="workbook-historical-groups"');
     expect(html).not.toContain('data-testid="workbook-target-price"');
   });
 
   it("shows below-reference prices as below, without suggesting a negative reduction", () => {
     const html = render({ property: { ...property, price: 4_700_000 } });
-    expect(html).toContain("100.000");
+    expect(html).toContain("110.000");
     expect(html).toContain("under prisreferencen");
-    expect(html).not.toContain("-100.000");
+    expect(html).not.toContain("-110.000");
   });
 });

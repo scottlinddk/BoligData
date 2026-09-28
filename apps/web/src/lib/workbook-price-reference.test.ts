@@ -11,15 +11,15 @@ const example: WorkbookPriceReferenceInput = {
 };
 
 describe("workbook liggetid reference", () => {
-  it("reproduces Prisberegner row 14, including inverted discount quartiles and current-price gap", () => {
+  it("uses workbook discounts with 10,000-kr rounding, inverted quartiles and current-price gap", () => {
     const reference = calculateWorkbookPriceReference(example);
     expect(reference).toMatchObject({
-      status: "available", referencePrice: 4_800_000, lowerPrice: 4_650_000,
-      upperPrice: 5_100_000, gapAmount: 400_000,
+      status: "available", referencePrice: 4_810_000, lowerPrice: 4_660_000,
+      upperPrice: 5_080_000, gapAmount: 390_000,
       bracket: { fromDays: 181, toDays: 240, count: 22 },
-      metadata: { eligibleCount: 281, rowCount: 437, snapshotDate: "2026-09-27" },
+      metadata: { eligibleCount: 281, rowCount: 437, snapshotDate: "2026-09-27", roundingDkk: 10_000, sourceRoundingDkk: 50_000 },
     });
-    expect(reference.gapPercent).toBeCloseTo(7.6923076923);
+    expect(reference.gapPercent).toBeCloseTo(7.5);
     expect(reference.medianDiscountPercent).toBeCloseTo(12.4985251124);
   });
 
@@ -83,14 +83,27 @@ describe("workbook liggetid reference", () => {
 
   it("can show the historical reference without inventing a gap when current asking is missing", () => {
     expect(calculateWorkbookPriceReference({ ...example, currentAsking: null })).toMatchObject({
-      status: "available", referencePrice: 4_800_000, gapAmount: null, gapPercent: null,
+      status: "available", referencePrice: 4_810_000, gapAmount: null, gapPercent: null,
     });
   });
 
-  it.each([{ propertyType: "ejerlejlighed" }, { postalCode: "8000" }, { propertyType: null }, { postalCode: null }])("blocks unsupported or unknown property scope %j", (scope) => {
+  it.each([{ propertyType: "ejerlejlighed" }, { postalCode: "8000" }, { propertyType: null }, { postalCode: null }])("labels other or unknown property scope as a broad scenario %j", (scope) => {
     expect(calculateWorkbookPriceReference({ ...example, ...scope })).toMatchObject({
-      status: "outside_scope", referencePrice: null,
+      status: "available", applicability: "broad_scenario", referencePrice: 4_810_000,
     });
+  });
+
+  it("keeps historical discounts visible when the listing's first asking price is missing", () => {
+    const result = calculateWorkbookPriceReference({ ...example, firstAsking: null });
+    expect(result).toMatchObject({ status: "missing_first_asking", referencePrice: null, bracket: { count: 22, label: "181–240" } });
+    expect(result.medianDiscountPercent).toBeCloseTo(12.4985251124);
+  });
+
+  it("rounds all scenario bounds to the nearest 10,000, including halfway amounts", () => {
+    const model = structuredClone(WORKBOOK_PRICE_REFERENCE_MODEL);
+    model.brackets = model.brackets.map(bracket => ({ ...bracket, q1DiscountFraction: 0, medianDiscountFraction: 0, q3DiscountFraction: 0 }));
+    expect(calculateWorkbookPriceReference({ ...example, firstAsking: 4_805_000 }, model)).toMatchObject({ referencePrice: 4_810_000, lowerPrice: 4_810_000, upperPrice: 4_810_000 });
+    expect(calculateWorkbookPriceReference({ ...example, firstAsking: 4_804_999 }, model).referencePrice).toBe(4_800_000);
   });
 
   it("does not display a price below the workbook's minimum sample size", () => {
@@ -110,7 +123,7 @@ describe("workbook liggetid reference", () => {
     expect(calculateWorkbookPriceReference({ ...example, firstAsking: 4_000_000, currentAsking: 4_000_000 }, model))
       .toMatchObject({ status: "available", referencePrice: 4_200_000, lowerPrice: 4_000_000,
         upperPrice: 4_400_000, medianDiscountPercent: -5, gapAmount: -200_000, gapPercent: -5 });
-    expect(calculateWorkbookPriceReference({ ...example, currentAsking: 4_500_000 }).gapAmount).toBe(-300_000);
+    expect(calculateWorkbookPriceReference({ ...example, currentAsking: 4_500_000 }).gapAmount).toBe(-310_000);
   });
 
   it("fails closed for overlapping brackets or invalid quartiles", () => {

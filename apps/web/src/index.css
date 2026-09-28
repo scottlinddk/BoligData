@@ -8,27 +8,30 @@ body,
   height: 100%;
 }
 
-/* Shared listing, research and account palette. Status colors retain their meaning. */
+/* A quiet, editorial palette shared by listings, research and account screens. */
 :root {
   color-scheme: light;
 
   --color-bg: #ffffff;
   --gradient-bg: none;
   --color-surface: #ffffff;
-  --color-surface-alt: #f3f6fa;
-  --color-surface-hover: #eaf0f8;
-  --color-border: #e6e9ee;
-  --color-border-strong: #cfd7e3;
-  --color-text-primary: #0b1f43;
-  --color-text-secondary: #627084;
-  --color-text-tertiary: #748091;
-  --color-cta: #2866d9;
-  --color-cta-hover: #1e53ba;
+  --color-surface-alt: #f5f6f4;
+  --color-surface-hover: #eceee9;
+  --color-border: #e6e8e2;
+  --color-border-strong: #bfc5ba;
+  --color-text-primary: #20221f;
+  --color-text-secondary: #62685e;
+  --color-text-tertiary: #686f63;
+  --color-cta: #20221f;
+  --color-cta-hover: #383d34;
   --color-cta-text: #ffffff;
-  --color-brand: #2866d9;
-  --color-brand-hover: #1e53ba;
-  --color-brand-soft: #edf3ff;
-  --color-brand-text: #2058be;
+  --color-brand: #97603a;
+  --color-brand-hover: #794724;
+  --color-brand-soft: #fff0e4;
+  --color-brand-text: #85502c;
+  --color-accent: #f7bb8d;
+  --color-accent-hover: #f2ac75;
+  --color-accent-text: #342417;
   --color-success: #3f7a3b;
   --color-success-soft: #e4f1e1;
   --color-success-text: #2e5c2b;
@@ -37,37 +40,40 @@ body,
   --color-warning-text: #88530c;
   --color-danger: #b4321f;
   --color-danger-soft: #fbe3de;
-  --color-unknown: #748091;
-  --color-unknown-soft: #eef2f6;
-  --color-unknown-text: #627084;
-  --color-footer-bg: #1b1f24;
-  --color-footer-border: #30363d;
-  --color-footer-text: #ffffff;
-  --color-footer-muted: #b8bec8;
-  --shadow-card: 0 1px 3px rgba(11, 31, 67, 0.05);
-  --shadow-lift: 0 8px 28px rgba(11, 31, 67, 0.12);
+  --color-unknown: #686f63;
+  --color-unknown-soft: #eceee9;
+  --color-unknown-text: #62685e;
+  --color-footer-bg: #171916;
+  --color-footer-border: #383c34;
+  --color-footer-text: #fafbf7;
+  --color-footer-muted: #bfc5b8;
+  --shadow-card: 0 2px 8px rgba(32, 34, 31, 0.035);
+  --shadow-lift: 0 14px 36px rgba(32, 34, 31, 0.1);
 }
 
 :root.dark {
   color-scheme: dark;
 
-  --color-bg: #0e141e;
+  --color-bg: #171917;
   --gradient-bg: none;
-  --color-surface: #151e2b;
-  --color-surface-alt: #1c2839;
-  --color-surface-hover: #25344a;
-  --color-border: #2a384c;
-  --color-border-strong: #52657f;
-  --color-text-primary: #f4f7fd;
-  --color-text-secondary: #b7c4d8;
-  --color-text-tertiary: #98a9c0;
-  --color-cta: #2d67d8;
-  --color-cta-hover: #326cdd;
-  --color-cta-text: #ffffff;
-  --color-brand: #8bb7ff;
-  --color-brand-hover: #b6d1ff;
-  --color-brand-soft: #1c3354;
-  --color-brand-text: #adcfff;
+  --color-surface: #20231f;
+  --color-surface-alt: #282c26;
+  --color-surface-hover: #343930;
+  --color-border: #383e33;
+  --color-border-strong: #65705d;
+  --color-text-primary: #f5f5ef;
+  --color-text-secondary: #c0c7b9;
+  --color-text-tertiary: #a6af9e;
+  --color-cta: #f5f5ef;
+  --color-cta-hover: #e1e7d9;
+  --color-cta-text: #20231f;
+  --color-brand: #f2bd95;
+  --color-brand-hover: #ffd6b6;
+  --color-brand-soft: #3d3026;
+  --color-brand-text: #f5c7a4;
+  --color-accent: #f7bb8d;
+  --color-accent-hover: #ffd0ab;
+  --color-accent-text: #342417;
   --color-success: #6fd68a;
   --color-success-soft: #142a1e;
   --color-success-text: #8fe3a4;
@@ -76,13 +82,13 @@ body,
   --color-warning-text: #f3cd8e;
   --color-danger: #ff9c90;
   --color-danger-soft: #3b2227;
-  --color-unknown: #98a9c0;
-  --color-unknown-soft: #223046;
-  --color-unknown-text: #b7c4d8;
-  --color-footer-bg: #0b1018;
-  --color-footer-border: #243043;
-  --color-footer-text: #f4f7fd;
-  --color-footer-muted: #a7b5c9;
+  --color-unknown: #a6af9e;
+  --color-unknown-soft: #343930;
+  --color-unknown-text: #c0c7b9;
+  --color-footer-bg: #10120f;
+  --color-footer-border: #343930;
+  --color-footer-text: #f5f5ef;
+  --color-footer-muted: #b8c1b0;
   --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.2);
   --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
@@ -122,7 +128,7 @@ body {
   color: var(--color-text-primary);
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
-  transition: color 0.25s ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 ::selection {
@@ -131,11 +137,16 @@ body {
 }
 
 input, select, textarea {
-  accent-color: var(--color-cta);
+  accent-color: var(--color-brand);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
 }
 
 :root.dark dialog::backdrop {
-  background: rgba(3, 8, 16, 0.72);
+  background: rgba(10, 12, 9, 0.76);
 }
 
 .ds-mono {
@@ -145,8 +156,24 @@ input, select, textarea {
 
 .ds-display {
   font-family: "Inter", system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.ds-editorial {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.025em;
+}
+
+.ds-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
 }
 
 :focus-visible {
