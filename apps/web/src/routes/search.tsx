@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePropertySearch } from "@/hooks/use-property-search";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
@@ -10,6 +10,7 @@ import { countActiveFilters } from "@/components/filter-fields";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
 import { FiltersSheet } from "@/components/filters-sheet";
 import { PropertyCard } from "@/components/property-card";
+import { PropertyCardSkeleton } from "@/components/ui/loading";
 import { LockedPropertyCard } from "@/components/locked-property-card";
 import { PropertyMap } from "@/components/property-map";
 import { Footer } from "@/components/footer";
@@ -32,6 +33,8 @@ export function SearchPage() {
   const { showToast } = useToast();
   const { createSearch } = useSavedSearches();
   const isMobile = useMediaQuery("(max-width: 899px)");
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const resultsRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
   const [offset, setOffset] = useState(0);
@@ -49,9 +52,9 @@ export function SearchPage() {
   useEffect(() => { setOffset(0); setSelectedIds(new Set()); }, [searchParams]);
   const { data, isLoading, isFetching, isError, error, refetch } = usePropertySearch(filters, offset, pageSize);
   const authenticated = data?.authenticated ?? Boolean(user);
-  const properties = isError ? [] : data?.properties ?? [];
-  const summaries = isError ? [] : data?.summaries ?? [];
-  const total = isError ? 0 : data?.total ?? 0;
+  const properties = data?.properties ?? [];
+  const summaries = data?.summaries ?? [];
+  const total = data?.total ?? 0;
   const limit = data?.limit ?? pageSize;
   const activeFilterCount = countActiveFilters(filters);
   const showMap = authenticated && (isMobile ? mobileTab === "map" : desktopMap);
@@ -64,6 +67,11 @@ export function SearchPage() {
   function toggleSelected(id: string) {
     setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
+  function goToPage(nextOffset: number) {
+    setOffset(nextOffset);
+    resultsRef.current?.focus({ preventScroll: true });
+    resultsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "instant" : "smooth", block: "start" });
+  }
   async function handleSaveSearch() {
     const name = saveSearchName.trim();
     if (!name || savingSearch) return;
@@ -75,7 +83,8 @@ export function SearchPage() {
     } catch { showToast(t("search.saveSearchError"), "error"); }
     finally { setSavingSearch(false); }
   }
-  const range = total > 0 ? t("search.range", { from: offset + 1, to: Math.min(offset + limit, total), total }) : t("search.noResults");
+  const displayedOffset = data?.offset ?? offset;
+  const range = isLoading ? t("search.loading") : !data ? "" : total > 0 ? t("search.range", { from: displayedOffset + 1, to: Math.min(displayedOffset + limit, total), total }) : t("search.noResults");
   const grid = `grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 ${!showMap ? "xl:grid-cols-3" : "min-[900px]:grid-cols-1 min-[1100px]:grid-cols-2"}`;
   const title = filters.location ? tx(`Boliger til salg i ${filters.location}`, `Homes for sale in ${filters.location}`) : filters.polygon ? tx("Boliger i dit markerede område", "Homes in your drawn area") : tx("Find dit næste hjem", "Find your next home");
   const mapSelected = isMobile ? mobileTab === "map" : desktopMap;
@@ -92,7 +101,7 @@ export function SearchPage() {
           <h1 className="text-[34px] font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-[46px]">{filters.location || filters.polygon ? title : <>{tx("Find dit næste", "Find your next")} <span className="font-serif font-normal italic">{tx("hjem", "home")}</span></>}</h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">{tx("Gå på opdagelse i boligerne. Få overblik over priser, historik og området.", "Explore the homes. Get a clear view of prices, history and the neighbourhood.")}</p>
         </div>
-        {authenticated && <button onClick={() => setSaveSearchOpen(v => !v)} className={pill} aria-expanded={saveSearchOpen}><span aria-hidden="true">♡</span>{t("search.saveSearch")}</button>}
+        {authenticated && <button onClick={() => setSaveSearchOpen(v => !v)} disabled={savingSearch} className={`${pill} disabled:cursor-wait disabled:opacity-50`} aria-expanded={saveSearchOpen}><span aria-hidden="true">♡</span>{t("search.saveSearch")}</button>}
       </div>
       <div className="mb-8 rounded-[22px] bg-surface-alt p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-2.5" role="search">
@@ -110,22 +119,21 @@ export function SearchPage() {
           {viewToggle}
         </div>
         {filters.polygon && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><span className="rounded-full bg-brand-soft px-3 py-1.5 font-medium text-brand-text">{tx("Søger i markeret område", "Searching your drawn area")}</span><button className="text-ink-soft underline underline-offset-2 hover:text-ink" onClick={() => handleFilterChange({ polygon: null })}>{tx("Fjern afgrænsning", "Remove boundary")} ×</button></div>}
-        {saveSearchOpen && <form className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4" onSubmit={e => { e.preventDefault(); void handleSaveSearch(); }}><input aria-label={t("search.saveSearchNamePlaceholder")} autoFocus value={saveSearchName} onChange={e => setSaveSearchName(e.target.value)} placeholder={t("search.saveSearchNamePlaceholder")} className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm" /><button className={primary} disabled={savingSearch || !saveSearchName.trim()}>{t("search.saveSearchConfirm")}</button><button type="button" onClick={() => setSaveSearchOpen(false)} className={pill}>{t("common.cancel")}</button>{filters.polygon && <p className="w-full text-xs text-ink-soft">{tx("Det markerede område gemmes sammen med filtrene.", "The drawn area will be saved with your filters.")}</p>}</form>}
+        {saveSearchOpen && <form className="ui-enter mt-4 flex flex-wrap gap-2 border-t border-border pt-4" onSubmit={e => { e.preventDefault(); void handleSaveSearch(); }}><input aria-label={t("search.saveSearchNamePlaceholder")} autoFocus disabled={savingSearch} value={saveSearchName} onChange={e => setSaveSearchName(e.target.value)} placeholder={t("search.saveSearchNamePlaceholder")} className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm disabled:opacity-50" /><button className={primary} aria-busy={savingSearch} disabled={savingSearch || !saveSearchName.trim()}>{savingSearch && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{savingSearch ? t("common.saving") : t("search.saveSearchConfirm")}</button><button type="button" disabled={savingSearch} onClick={() => setSaveSearchOpen(false)} className={`${pill} disabled:opacity-50`}>{t("common.cancel")}</button>{filters.polygon && <p className="w-full text-xs text-ink-soft">{tx("Det markerede område gemmes sammen med filtrene.", "The drawn area will be saved with your filters.")}</p>}</form>}
       </div>
       <div className={showMap && !isMobile ? "grid items-start gap-7 min-[900px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:gap-9" : ""}>
-        <section className="min-w-0" aria-label={tx("Boligsøgning", "Property search")}>
+        <section ref={resultsRef} tabIndex={-1} className="min-w-0 scroll-mt-24 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" aria-label={tx("Boligsøgning", "Property search")}>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-ink-soft">
-            <span role="status">{isLoading ? t("search.loading") : tx(`${total.toLocaleString("da-DK")} boliger`, `${total.toLocaleString("en-GB")} homes`)}</span>
+            <span role="status" aria-atomic="true" className="inline-flex min-h-6 items-center gap-2">{isFetching && <span className="ui-spinner h-3.5 w-3.5" aria-hidden="true" />}{isFetching ? data ? tx("Opdaterer boliger…", "Updating homes…") : t("search.loading") : isError && !data ? tx("Boligerne kunne ikke indlæses", "Homes could not be loaded") : tx(`${total.toLocaleString("da-DK")} boliger`, `${total.toLocaleString("en-GB")} homes`)}</span>
             <label className="flex min-w-0 items-center gap-1.5">{t("filters.sortBy")}<select aria-label={t("filters.sortBy")} value={`${filters.sortField}:${filters.sortDirection}`} onChange={e => { const [sortField, sortDirection] = e.target.value.split(":"); handleFilterChange({ sortField: sortField as FiltersWithSort["sortField"], sortDirection: sortDirection as FiltersWithSort["sortDirection"] }); }} className="max-w-44 bg-transparent py-1 font-medium text-ink focus:outline-brand">{SORT_OPTIONS.map(value => <option value={value} key={value}>{t(`sort.${value}`)}</option>)}</select></label>
           </div>
         {canRecommend && <p className="mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{t("recommend.selectHint")}</p>}
         {!authenticated && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl bg-brand-soft p-4 text-sm text-brand-text"><p className="flex-1">{t("search.signInForDetails")}</p><Link to="/auth/signin" className={primary}>{t("nav.signIn")}</Link></div>}
+        {isError && <div role="alert" className="ui-enter mb-5 rounded-xl border border-danger-soft bg-danger-soft p-5"><p className="font-medium text-danger">{t("search.error")}</p>{filters.polygon && <p className="mt-1 text-sm text-ink-soft">{error?.message}</p>}<button disabled={isFetching} onClick={() => refetch()} className={`${pill} mt-3 disabled:opacity-50`}>{isFetching && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{t("common.retry")}</button></div>}
         {showList && <div aria-busy={isFetching}>
-          {isFetching && !isLoading && <p role="status" className="mb-3 text-xs text-ink-soft">{t("search.loading")}</p>}
-          {isLoading && <div className={grid}>{Array.from({ length: 6 }).map((_, i) => <div key={i} className="animate-pulse"><div className="aspect-[1.2] rounded-2xl bg-surface-alt" /><div className="mt-4 h-5 w-1/2 rounded bg-surface-alt" /><div className="mt-2 h-3 w-4/5 rounded bg-surface-alt" /></div>)}</div>}
-          {isError && <div role="alert" className="rounded-xl border border-danger-soft bg-danger-soft p-5"><p className="font-medium text-danger">{t("search.error")}</p>{filters.polygon && <p className="mt-1 text-sm text-ink-soft">{error?.message}</p>}<button onClick={() => refetch()} className={`${pill} mt-3`}>{t("common.retry")}</button></div>}
-          {!isLoading && !isError && (authenticated ? properties.length > 0 ? <div className={grid} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div className={grid}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="py-8 text-center text-ink-soft">{t("search.noResults")}</p>)}
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-xs text-ink-soft"><span>{range}</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2">{t("search.pageSize")}<select value={pageSize} onChange={e => { setOffset(0); setPageSize(Number(e.target.value)); }} className="rounded-lg border border-border bg-surface p-1.5 text-ink">{PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}</select></label><div className="flex gap-1.5"><button disabled={offset === 0 || isFetching} onClick={() => setOffset(Math.max(0, offset - limit))} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.previous")}</button><button disabled={offset + limit >= total || isFetching} onClick={() => setOffset(offset + limit)} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.next")}</button></div></div></div>
+          {isLoading && <div className={grid} aria-hidden="true">{Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)}</div>}
+          {!isLoading && data && <div className={`transition-opacity duration-200 motion-reduce:transition-none ${isFetching ? "opacity-60" : "opacity-100"}`}>{authenticated ? properties.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="ui-enter rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="ui-enter py-8 text-center text-ink-soft">{t("search.noResults")}</p>}</div>}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-xs text-ink-soft"><span>{range}</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2">{t("search.pageSize")}<select value={pageSize} disabled={isFetching} onChange={e => { goToPage(0); setPageSize(Number(e.target.value)); }} className="rounded-lg border border-border bg-surface p-1.5 text-ink disabled:opacity-50">{PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}</select></label><div className="flex gap-1.5"><button disabled={offset === 0 || isFetching} onClick={() => goToPage(Math.max(0, offset - limit))} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.previous")}</button><button disabled={offset + limit >= total || isFetching} onClick={() => goToPage(offset + limit)} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.next")}</button></div></div></div>
         </div>}
         </section>
         {showMap && <aside aria-label={tx("Kort over boliger", "Map of homes")} className={`overflow-hidden rounded-[22px] border border-border ${isMobile ? "relative h-[68dvh] min-h-[430px]" : "sticky top-20 h-[calc(100dvh-7rem)] min-h-[500px] max-h-[900px] self-start"}`}>
@@ -135,7 +143,7 @@ export function SearchPage() {
     </div>
     <Footer />
     {filtersOpen && <FiltersSheet filters={filters} onChange={handleFilterChange} onClose={() => setFiltersOpen(false)} />}
-    {canRecommend && selectedIds.size > 0 && <div className="fixed inset-x-0 bottom-5 z-40 flex justify-center px-4"><div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2.5 shadow-lift"><span className="text-sm font-semibold">{t("recommend.selectedCount", { count: selectedIds.size })}</span><button onClick={() => setSelectedIds(new Set())} className={pill}>{t("common.cancel")}</button><button onClick={() => setRecommendOpen(true)} className={primary}>{t("recommend.cta")}</button></div></div>}
+    {canRecommend && selectedIds.size > 0 && <div className="ui-enter fixed inset-x-0 bottom-5 z-40 flex justify-center px-4"><div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2.5 shadow-lift"><span className="text-sm font-semibold">{t("recommend.selectedCount", { count: selectedIds.size })}</span><button onClick={() => setSelectedIds(new Set())} className={pill}>{t("common.cancel")}</button><button onClick={() => setRecommendOpen(true)} className={primary}>{t("recommend.cta")}</button></div></div>}
     {recommendOpen && <RecommendModal propertyIds={Array.from(selectedIds)} propertyCount={selectedIds.size} onClose={() => setRecommendOpen(false)} onSent={() => setSelectedIds(new Set())} />}
   </>;
 }

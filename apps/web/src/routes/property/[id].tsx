@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ListingSource } from "@shared/types/index";
@@ -26,6 +26,7 @@ import { useToast } from "@/components/toast";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { RecommendModal } from "@/components/recommend-modal";
 import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
+import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
@@ -48,6 +49,7 @@ export function PropertyDetailPage() {
   const { profile } = useUserProfile();
   const [recommendOpen, setRecommendOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const priceReference = useRef<HTMLDivElement>(null);
   const researchDetails = useRef<HTMLDetailsElement>(null);
   const canRecommend = profile?.role === "advisor" || profile?.role === "agent";
   const detailQuery = useQuery({ queryKey: ["property", id], queryFn: () => getProperty(id!), enabled: !!id });
@@ -61,9 +63,20 @@ export function PropertyDetailPage() {
     enabled: !!listing, staleTime: 5 * 60 * 1000, retry: 1,
   });
 
+  // The anchor may not exist yet when a shared section link first loads.
+  useEffect(() => {
+    if (!listing) return;
+    const target = window.location.hash === "#price-reference" ? priceReference.current
+      : window.location.hash === "#research-details" ? researchDetails.current : null;
+    if (!target) return;
+    if (target instanceof HTMLDetailsElement) target.open = true;
+    target.scrollIntoView({ block: "start" });
+    (target instanceof HTMLDetailsElement ? target.querySelector("summary") : target)?.focus({ preventScroll: true });
+  }, [listing?.id]);
+
   if (detailQuery.isLoading) return <PropertyDetailSkeleton />;
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) return <p className="p-6 text-danger">{t("search.signInForDetails")} <Link to="/auth/signin" className="underline">{t("nav.signIn")}</Link></p>;
-  if (detailQuery.isError || !detailQuery.data) return <p className="p-6 text-danger">{t("detail.notFound")}</p>;
+  if (detailQuery.isError || !detailQuery.data) return <div role="alert" className="mx-auto max-w-[1240px] p-6 text-danger"><p>{t("detail.notFound")}</p><button type="button" disabled={detailQuery.isFetching} onClick={() => { void detailQuery.refetch(); }} className="mt-3 inline-flex items-center gap-2 rounded font-semibold underline disabled:opacity-50">{detailQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>;
 
   const { property, enrichment } = detailQuery.data;
   const empty = t("detail.empty");
@@ -93,13 +106,13 @@ export function PropertyDetailPage() {
   }
 
   return <>
-    <article className="mx-auto max-w-[1240px] px-4 pb-28 pt-6 sm:px-8 sm:pt-8 lg:pb-16">
+    <article className="ui-enter mx-auto max-w-[1240px] px-4 pb-28 pt-6 sm:px-8 sm:pt-8 lg:pb-16">
       <nav aria-label={tx("Brødkrumme", "Breadcrumb")} className="mb-6 flex items-center gap-3 text-xs text-ink-soft">
         <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
       </nav>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
         <div className="min-w-0 space-y-7">
-          <PropertyGallery images={photos} alt={property.address} />
+          <PropertyGallery key={property.id} images={photos} alt={property.address} />
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium text-ink-soft">
               <span className="rounded-full bg-surface-alt px-3 py-1.5">{t(`propertyType.${property.propertyType}` as TranslationKey)}</span>
@@ -119,7 +132,7 @@ export function PropertyDetailPage() {
             </dl>
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
-          <div id="price-reference" className="scroll-mt-28 [&>section]:mt-0">
+          <div ref={priceReference} id="price-reference" tabIndex={-1} aria-labelledby="workbook-price-title" className="section-anchor rounded-2xl [&>section]:mt-0">
             <WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />
           </div>
           {property.description && <section className="rounded-2xl bg-surface-alt p-5 sm:p-7">
@@ -154,8 +167,9 @@ export function PropertyDetailPage() {
           </section>
           <SchoolDistrictPanel propertyId={property.id} />
           <DetailSection title={tx("Handler og sammenlignelige boliger", "Sales and comparable homes")} subtitle={tx("Tidligere salg, handler i nærheden og pris pr. m²", "Previous sales, nearby transactions and price per m²")}>
-            {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 font-semibold underline">{t("common.retry")}</button></div>}
-            <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />
+            {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" disabled={comparablesQuery.isFetching} onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 inline-flex items-center gap-2 font-semibold underline disabled:opacity-50">{comparablesQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>}
+            {comparablesQuery.isLoading ? <div className="space-y-4"><LoadingStatus>{tx("Henter sammenlignelige boliger…", "Loading comparable homes…")}</LoadingStatus><Skeleton className="h-24 w-full rounded-xl" /></div>
+              : <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />}
           </DetailSection>
           <MiljoegisNoisePanel propertyId={property.id} />
           <LimfjordNoisePanel propertyId={property.id} />
@@ -169,8 +183,8 @@ export function PropertyDetailPage() {
             <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em]">{formatDkk(property.price)}</p>
             <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
             <div className="my-5 flex items-center justify-between gap-3 border-y border-border py-4 text-sm"><span className="text-ink-soft">{tx("Aktuel liggetid", "Current time on market")}</span><span className="font-semibold">{days !== null ? `${days} ${tx("dage", "days")}` : empty}</span></div>
-            <a href="#price-reference" className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a>
-            <button type="button" onClick={handleSave} disabled={saving} aria-pressed={saved} className={`${actionClass} mt-3 w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50`}><span aria-hidden="true">{saved ? "♥" : "♡"}</span>{saved ? t("property.saved") : t("property.save")}</button>
+            <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a>
+            <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} className={`${actionClass} mt-3 w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50`}>{saving ? <Spinner /> : <span aria-hidden="true">{saved ? "♥" : "♡"}</span>}{saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")}</button>
           </div>
           <section className="rounded-2xl bg-surface-alt p-6">
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{tx("Din næste fremvisning", "Your next viewing")}</p>
@@ -183,7 +197,7 @@ export function PropertyDetailPage() {
           <p className="px-2 text-xs leading-5 text-ink-faint">{tx("Annonce fra", "Listing from")} {SOURCE_NAMES[property.listingSource]} · {tx("Opdateret", "Updated")} {property.updatedAt.slice(0, 10)}</p>
         </aside>
       </div>
-      <details ref={researchDetails} id="research-details" className="group mt-10 scroll-mt-28 rounded-2xl border border-border bg-surface-alt p-5 sm:p-7">
+      <details ref={researchDetails} id="research-details" className="section-anchor group mt-10 rounded-2xl border border-border bg-surface-alt p-5 sm:p-7">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
           <div><span className="block text-2xl font-medium tracking-tight">{tx("Din boligundersøgelse", "Your property research")}</span><span className="mt-1 block text-sm text-ink-soft">{tx("Gå i dybden med pris, historik, budget og dine egne noter.", "Explore pricing, history, budget and your own notes.")}</span></div>
           <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl transition-transform group-open:rotate-45">+</span>
@@ -193,7 +207,7 @@ export function PropertyDetailPage() {
       {recommendOpen && <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
         <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{t("detail.price")}</p><p className="text-base font-semibold">{formatDkk(property.price)}</p></div>
-        <button type="button" onClick={handleSave} disabled={saving} aria-pressed={saved} aria-label={saved ? t("property.saved") : t("property.save")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl disabled:opacity-50">{saved ? "♥" : "♡"}</button>
+        <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl disabled:opacity-50">{saving ? <Spinner /> : saved ? "♥" : "♡"}</button>
         {property.listingUrl ? <a href={property.listingUrl} target="_blank" rel="noopener noreferrer" className={`${actionClass} bg-cta text-cta-text`}>{tx("Se annonce", "View listing")} ↗</a> : <button type="button" onClick={openResearch} className={`${actionClass} bg-cta text-cta-text`}>{tx("Undersøg", "Research")}</button>}
       </div>
     </article>
@@ -211,7 +225,9 @@ function DetailSection({ title, subtitle, children }: { title: string; subtitle:
   </details>;
 }
 function PropertyDetailSkeleton() {
-  return <div aria-busy="true" className="mx-auto max-w-[1240px] animate-pulse px-4 py-8 sm:px-8">
-    <div className="mb-6 h-4 w-40 rounded bg-surface-alt" /><div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]"><div><div className="aspect-[3/2] rounded-2xl bg-surface-alt" /><div className="mt-7 h-10 w-2/3 rounded bg-surface-alt" /><div className="mt-4 h-5 w-1/3 rounded bg-surface-alt" /></div><div className="h-80 rounded-2xl bg-surface-alt" /></div>
+  const { language } = useI18n();
+  return <div className="mx-auto max-w-[1240px] px-4 py-8 sm:px-8">
+    <LoadingStatus className="sr-only">{language === "da" ? "Henter bolig…" : "Loading home…"}</LoadingStatus>
+    <Skeleton className="mb-6 h-4 w-40" /><div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]"><div><Skeleton className="aspect-[3/2] rounded-2xl" /><Skeleton className="mt-7 h-10 w-2/3" /><Skeleton className="mt-4 h-5 w-1/3" /></div><Skeleton className="h-80 rounded-2xl" /></div>
   </div>;
 }

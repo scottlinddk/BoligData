@@ -181,8 +181,53 @@ input::placeholder, textarea::placeholder {
   outline-offset: 3px;
 }
 
+/* Section links clear the 80px sticky header and leave room for focus outlines. */
+.section-anchor {
+  scroll-margin-top: 6rem;
+}
+
+.ui-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+@keyframes ui-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ui-pulse {
+  50% { opacity: .5; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  .ui-enter { animation: ui-enter 180ms ease-out; }
+  .ui-fade-in { animation: ui-fade-in 180ms ease-out; }
+  .ui-spinner { animation: ui-spin 800ms linear infinite; }
+  .ui-skeleton { animation: ui-pulse 1.8s ease-in-out infinite; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @media print {

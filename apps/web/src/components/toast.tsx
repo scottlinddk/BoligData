@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 export type ToastVariant = "success" | "error" | "info";
@@ -26,6 +26,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idRef = useRef(0);
 
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
   const showToast = useCallback((message: string, variant: ToastVariant = "info") => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     idRef.current += 1;
@@ -42,15 +46,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           key={toast.id}
           role="status"
-          className={`fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-full border border-border border-l-4 ${styles.border} bg-surface px-4 py-3 shadow-lift animate-fade-up`}
+          className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2"
         >
-          <span
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${styles.iconLabel}`}
-            aria-hidden="true"
-          >
-            {styles.icon}
-          </span>
-          <span className="text-sm font-semibold leading-snug text-ink">{toast.message}</span>
+          <div className={`ui-enter flex items-center gap-3 rounded-full border border-border border-l-4 ${styles.border} bg-surface px-4 py-3 shadow-lift`}>
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${styles.iconLabel}`}
+              aria-hidden="true"
+            >
+              {styles.icon}
+            </span>
+            <span className="text-sm font-semibold leading-snug text-ink">{toast.message}</span>
+          </div>
         </div>
       )}
     </ToastContext.Provider>

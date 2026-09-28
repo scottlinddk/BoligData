@@ -3,6 +3,32 @@ import type { ListingImage } from "@shared/types/index";
 import { getImageSrcSet, getImageUrl } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 import { fallbackToOriginalImage } from "@/lib/image-fallback";
+import { LoadingStatus, Skeleton } from "@/components/ui/loading";
+
+function GalleryPhoto({ image, alt, variant }: { image: ListingImage; alt: string; variant: "hero" | "thumbnail" | "modal" }) {
+  const { t, language } = useI18n();
+  const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+  const hero = variant === "hero";
+  const modal = variant === "modal";
+
+  return <div aria-busy={state === "loading"} className={`relative h-full w-full ${modal ? "pointer-events-none flex items-center justify-center text-white/80" : "text-ink-faint"}`}>
+    {state === "loading" && (modal
+      ? <LoadingStatus className="absolute inset-0 justify-center text-white/80">{language === "da" ? "Henter billede…" : "Loading photo…"}</LoadingStatus>
+      : <Skeleton className="absolute inset-0 h-full w-full rounded-none" />)}
+    {state === "error" ? <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm">{t("property.noPhoto")}</span>
+      : <img src={getImageUrl(image, modal ? 2000 : hero ? 1800 : 600, modal ? 1333 : hero ? 1200 : 400)}
+        srcSet={modal ? undefined : getImageSrcSet(image, hero ? [600, 900, 1200, 1800] : [300, 600, 900], 3 / 2)}
+        sizes={modal ? undefined : hero ? "(min-width: 1024px) 760px, 100vw" : "(min-width: 1024px) 180px, 25vw"}
+        alt={alt} loading={variant === "thumbnail" ? "lazy" : "eager"} fetchPriority={hero ? "high" : "auto"}
+        onLoad={() => setState("loaded")}
+        onError={event => {
+          const element = event.currentTarget;
+          if (!element.srcset && element.getAttribute("src") === image.url) setState("error");
+          else fallbackToOriginalImage(element, image.url);
+        }}
+        className={`transition-[opacity,transform] duration-300 ${modal ? "pointer-events-auto max-h-full max-w-full rounded-lg object-contain" : "h-full w-full object-cover motion-safe:group-hover:scale-[1.025]"} ${state === "loaded" ? "opacity-100" : "opacity-0"}`} />}
+  </div>;
+}
 
 /** Compact photo story, with every image available in a native modal dialog. */
 export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: string }) {
@@ -32,12 +58,7 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
     setOpenIndex(index);
   }
   function photo(image: ListingImage, index: number, hero = false) {
-    return <img src={getImageUrl(image, hero ? 1800 : 600, hero ? 1200 : 400)}
-      srcSet={getImageSrcSet(image, hero ? [600, 900, 1200, 1800] : [300, 600, 900], 3 / 2)}
-      sizes={hero ? "(min-width: 1024px) 760px, 100vw" : "(min-width: 1024px) 180px, 25vw"}
-      alt={`${alt} · ${index + 1}`} loading={hero ? "eager" : "lazy"} fetchPriority={hero ? "high" : "auto"}
-      onError={event => fallbackToOriginalImage(event.currentTarget, image.url)}
-      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" />;
+    return <GalleryPhoto key={image.url} image={image} alt={`${alt} · ${index + 1}`} variant={hero ? "hero" : "thumbnail"} />;
   }
 
   if (!images.length) return <div className="flex aspect-[3/2] items-center justify-center rounded-2xl bg-surface-alt text-sm text-ink-faint">{t("property.noPhoto")}</div>;
@@ -67,13 +88,13 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
         if (event.key === "ArrowLeft") { event.preventDefault(); setOpenIndex(index => (index! - 1 + images.length) % images.length); }
         if (event.key === "ArrowRight") { event.preventDefault(); setOpenIndex(index => (index! + 1) % images.length); }
       }}
-      className="fixed inset-0 m-auto h-[100dvh] max-h-none w-screen max-w-none bg-black/95 p-4 text-white backdrop:bg-black/80 open:flex open:items-center open:justify-center">
+      className="ui-fade-in fixed inset-0 m-auto h-[100dvh] max-h-none w-screen max-w-none bg-black/95 p-4 text-white backdrop:bg-black/80 open:flex open:items-center open:justify-center">
       <button ref={closeButton} type="button" onClick={() => setOpenIndex(null)} aria-label={t("detail.galleryClose")}
         className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-xl">×</button>
       <p aria-live="polite" className="absolute left-5 top-6 text-sm">{openIndex + 1} / {images.length}</p>
-      <img key={openIndex} src={getImageUrl(images[openIndex]!, 2000, 1333)} alt={`${alt} · ${openIndex + 1}`}
-        onError={event => fallbackToOriginalImage(event.currentTarget, images[openIndex]!.url)}
-        className="max-h-[85dvh] max-w-full rounded-lg object-contain" />
+      <div className="pointer-events-none h-[85dvh] w-full max-w-[1800px]">
+        <GalleryPhoto key={images[openIndex]!.url} image={images[openIndex]!} alt={`${alt} · ${openIndex + 1}`} variant="modal" />
+      </div>
       {images.length > 1 && <>
         <button type="button" onClick={() => setOpenIndex(index => (index! - 1 + images.length) % images.length)} aria-label={t("detail.galleryPrev")} className="absolute left-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-3xl sm:left-6">‹</button>
         <button type="button" onClick={() => setOpenIndex(index => (index! + 1) % images.length)} aria-label={t("detail.galleryNext")} className="absolute right-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-3xl sm:right-6">›</button>
