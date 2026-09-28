@@ -258,6 +258,27 @@ describe("mapBoligsidenCase", () => {
     expect(listing?.images).toEqual([]);
   });
 
+  it("retains nested size metadata from the live Boligsiden imageSources payload", () => {
+    // Same field structure/presets as the public feed checked 2026-09-28.
+    const base = "https://images.boligsiden.dk/images/case/example";
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      images: [{ imageSources: [
+        { url: `${base}/100x80/photo.webp`, size: { width: 100, height: 80 } },
+        { url: `${base}/600x400/photo.webp`, size: { width: 600, height: 400 } },
+        { url: `${base}/1440x960/photo.webp`, size: { width: 1440, height: 960 } },
+        { url: `${base}/broken/photo.webp`, size: { width: -1, height: "invalid" } },
+      ] }],
+    });
+    expect(listing?.images).toEqual([{
+      url: `${base}/100x80/photo.webp`, category: "photo", sources: [
+        { url: `${base}/100x80/photo.webp`, width: 100, height: 80 },
+        { url: `${base}/600x400/photo.webp`, width: 600, height: 400 },
+        { url: `${base}/1440x960/photo.webp`, width: 1440, height: 960 },
+      ],
+    }]);
+  });
+
   it("keeps an image whose imageSources lack width/height metadata", () => {
     const listing = mapBoligsidenCase({
       ...boligsidenCase,

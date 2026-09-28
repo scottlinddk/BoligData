@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ListingImage } from "@shared/types/index";
 import { getImageSrcSet, getImageUrl } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
+import { fallbackToOriginalImage } from "@/lib/image-fallback";
 
 /** Compact photo story, with every image available in a native modal dialog. */
 export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: string }) {
@@ -35,7 +36,7 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
       srcSet={getImageSrcSet(image, hero ? [600, 900, 1200, 1800] : [300, 600, 900], 3 / 2)}
       sizes={hero ? "(min-width: 1024px) 760px, 100vw" : "(min-width: 1024px) 180px, 25vw"}
       alt={`${alt} · ${index + 1}`} loading={hero ? "eager" : "lazy"} fetchPriority={hero ? "high" : "auto"}
-      onError={event => { if (event.currentTarget.src !== image.url) { event.currentTarget.srcset = ""; event.currentTarget.src = image.url; } }}
+      onError={event => fallbackToOriginalImage(event.currentTarget, image.url)}
       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" />;
   }
 
@@ -70,8 +71,8 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
       <button ref={closeButton} type="button" onClick={() => setOpenIndex(null)} aria-label={t("detail.galleryClose")}
         className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-xl">×</button>
       <p aria-live="polite" className="absolute left-5 top-6 text-sm">{openIndex + 1} / {images.length}</p>
-      <img src={getImageUrl(images[openIndex]!, 2000, 1333)} alt={`${alt} · ${openIndex + 1}`}
-        onError={event => { const original = images[openIndex]!.url; if (event.currentTarget.src !== original) event.currentTarget.src = original; }}
+      <img key={openIndex} src={getImageUrl(images[openIndex]!, 2000, 1333)} alt={`${alt} · ${openIndex + 1}`}
+        onError={event => fallbackToOriginalImage(event.currentTarget, images[openIndex]!.url)}
         className="max-h-[85dvh] max-w-full rounded-lg object-contain" />
       {images.length > 1 && <>
         <button type="button" onClick={() => setOpenIndex(index => (index! - 1 + images.length) % images.length)} aria-label={t("detail.galleryPrev")} className="absolute left-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-3xl sm:left-6">‹</button>

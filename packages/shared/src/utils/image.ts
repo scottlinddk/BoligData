@@ -1,19 +1,28 @@
-import type { ListingImage } from "../types/index.js";
+import type { ListingImage, ListingImageSource } from "../types/index.js";
 
 /**
- * Boligsiden's image CDN encodes the rendered size as a `/WxH/` path
- * segment (e.g. .../case/<id>/100x80/<img>.webp) and serves the same image
- * at other sizes when that segment is rewritten. Live-crawled listings
- * carry only the default (tiny) thumbnail URL with no sized `sources`, so
- * rewriting the segment is how we get a sharp image out of them. Components
- * should keep `image.url` as an onError fallback in case a particular size
- * is ever refused.
+ * The CDN only serves fixed presets: arbitrary sizes such as 800x500 and
+ * 2000x1333 return 403. These landscape presets were verified against the
+ * live feed and CDN on 2026-09-28 (see docs/listing-image-resolution.md).
+ * Recover variants for old rows whose mapper discarded nested dimensions,
+ * so those listings improve immediately without a database rewrite/recrawl.
  */
-const BOLIGSIDEN_SIZE_SEGMENT = /\/\d{2,4}x\d{2,4}\//;
+const BOLIGSIDEN_PRESETS = [[300, 200], [600, 400], [1440, 960]] as const;
+const BOLIGSIDEN_IMAGE_PATH = /^(\/images\/case\/[^/]+\/)\d{2,4}x\d{2,4}(\/[^/]+\.webp)$/i;
 
-function resizeBoligsidenUrl(url: string, width: number, height: number): string | null {
-  if (!url.includes("images.boligsiden.dk") || !BOLIGSIDEN_SIZE_SEGMENT.test(url)) return null;
-  return url.replace(BOLIGSIDEN_SIZE_SEGMENT, `/${width}x${height}/`);
+function availableSources(image: ListingImage): ListingImageSource[] {
+  if (image.sources.length > 0) return image.sources;
+  try {
+    const url = new URL(image.url);
+    const path = BOLIGSIDEN_IMAGE_PATH.exec(url.pathname);
+    if (url.origin !== "https://images.boligsiden.dk" || !path) return [];
+    return BOLIGSIDEN_PRESETS.map(([width, height]) => {
+      url.pathname = `${path[1]}${width}x${height}${path[2]}`;
+      return { url: url.href, width, height };
+    });
+  } catch {
+    return [];
+  }
 }
 
 interface ImageVariant {
@@ -23,32 +32,26 @@ interface ImageVariant {
 }
 
 /**
- * Resolves one variant for a target box, never knowingly returning something
- * smaller than asked for: the smallest pre-sized source that *covers* the box
- * wins, then a CDN rewrite to the exact size, then the largest source we have.
- *
- * Picking by closest area (what this used to do) would happily hand back a
- * 100x80 thumbnail for a 600x400 box, which is what made cards look soft.
+ * Prefer the smallest available variant that covers the requested box.
+ * If the source cannot supply that resolution, use its largest image;
+ * never invent a CDN size or claim upscaled pixels in a srcset descriptor.
  */
 function pickVariant(image: ListingImage, targetWidth: number, targetHeight: number): ImageVariant {
-  const covering = [...image.sources]
+  const sources = availableSources(image);
+  const covering = [...sources]
     .filter((s) => s.width >= targetWidth && s.height >= targetHeight)
     .sort((a, b) => a.width * a.height - b.width * b.height)[0];
   if (covering) return { url: covering.url, width: covering.width };
 
-  const rewritten = resizeBoligsidenUrl(image.url, targetWidth, targetHeight);
-  if (rewritten) return { url: rewritten, width: targetWidth };
-
-  const largest = [...image.sources].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+  const largest = [...sources].sort((a, b) => b.width * b.height - a.width * a.height)[0];
   if (largest) return { url: largest.url, width: largest.width };
 
   return { url: image.url, width: targetWidth };
 }
 
 /**
- * Picks the best-matching variant for a target width/height. Falls back to
- * rewriting Boligsiden CDN URLs to the target size, or the original `url`
- * when neither is available (e.g. Boliga listings).
+ * Picks a source-provided variant or a verified legacy Boligsiden preset.
+ * Other sources without variant metadata keep their original URL.
  */
 export function getImageUrl(image: ListingImage, targetWidth: number, targetHeight: number): string {
   return pickVariant(image, targetWidth, targetHeight).url;
