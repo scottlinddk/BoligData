@@ -165,7 +165,7 @@ describe("bounded source original-price retrieval", () => {
   });
 
   it("finds a stale-price case in the postcode feed without using its new price as original", async () => {
-    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 0, cases: [] })
+    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 0, cases: null })
       .mockResolvedValueOnce({ totalHits: 1, cases: [{ caseID: CASE_ID, address: { addressID: ADDRESS_ID } }] })
       .mockResolvedValueOnce(address()).mockResolvedValueOnce(timeline());
     expect(await (await resolver())({ ...input, addressId: null, currentAsking: 3_995_000 })).toMatchObject({ status: "exact", price: 4_495_000 });
@@ -173,18 +173,38 @@ describe("bounded source original-price retrieval", () => {
   });
 
   it("reports a complete current feed without the case as not current", async () => {
-    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 0, cases: [] });
+    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 0, cases: null });
     expect(await (await resolver())({ ...input, addressId: null, currentAsking: null })).toMatchObject({ status: "not_current", price: null, identityConfirmed: false });
   });
 
   it("reports bounded discovery as unavailable, not proof of a missing original", async () => {
-    for (let page = 0; page < 5; page++) {
-      vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 600, cases: Array.from({ length: 100 }, (_, index) => ({
+    for (let page = 0; page < 20; page++) {
+      vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 2_100, cases: Array.from({ length: 100 }, (_, index) => ({
         caseID: `00000000-0000-0000-0000-${String(page * 100 + index).padStart(12, "0")}`, address: { addressID: ADDRESS_ID },
       })) });
     }
     expect(await (await resolver())({ ...input, addressId: null, currentAsking: null })).toMatchObject({ status: "unavailable", reason: "bounded_search", price: null });
-    expect(fetchJson).toHaveBeenCalledTimes(5);
+    expect(fetchJson).toHaveBeenCalledTimes(20);
+  });
+
+  it("discovers a case beyond the former 500-case limit and shares the complete postcode snapshot", async () => {
+    for (let page = 0; page < 6; page++) {
+      vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 601, cases: Array.from({ length: 100 }, (_, index) => ({
+        caseID: `00000000-0000-0000-0000-${String(page * 100 + index).padStart(12, "0")}`, address: { addressID: ADDRESS_ID },
+      })) });
+    }
+    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 601, cases: [{ caseID: CASE_ID, address: { addressID: ADDRESS_ID } }] })
+      .mockResolvedValueOnce(address()).mockResolvedValueOnce(timeline());
+    const fetchOriginal = await resolver();
+    expect(await fetchOriginal({ ...input, addressId: null, currentAsking: null })).toMatchObject({ status: "exact", price: 4_495_000 });
+    expect(fetchJson).toHaveBeenCalledTimes(9);
+    expect(await fetchOriginal({ ...input, sourceListingId: OTHER_ID, addressId: null, currentAsking: null })).toMatchObject({ status: "not_current", reason: "source_case_absent_from_current_postcode_feed" });
+    expect(fetchJson).toHaveBeenCalledTimes(9);
+  });
+
+  it.each([undefined, 1])("does not interpret null cases with total %s as a valid empty source", async totalHits => {
+    vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits, cases: null });
+    expect(await (await resolver())({ ...input, addressId: null, currentAsking: null })).toMatchObject({ status: "unavailable", reason: "invalid_case_search_shape" });
   });
 
   it("does not treat repeated pages as complete postcode coverage", async () => {
@@ -204,7 +224,7 @@ describe("bounded source original-price retrieval", () => {
 
   it("reports source denial without retrying or substituting a price", async () => {
     vi.mocked(fetchJson).mockRejectedValueOnce(new HttpError(403, "https://api.boligsiden.dk/addresses/source"));
-    expect(await (await resolver())(input)).toMatchObject({ status: "unavailable", reason: "http_403", price: null });
+    expect(await (await resolver())(input)).toMatchObject({ status: "unavailable", reason: "http_403", price: null, sourceAddressId: ADDRESS_ID, timelineUrl: `https://api.boligsiden.dk/addresses/${ADDRESS_ID}/timeline` });
     expect(fetchJson).toHaveBeenCalledTimes(1);
   });
 });

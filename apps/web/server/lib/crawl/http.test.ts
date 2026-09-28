@@ -4,6 +4,7 @@ import { stubFetch } from "../test-support/stub-fetch.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("redactUrl", () => {
@@ -37,5 +38,31 @@ describe("fetchJson error messages", () => {
     expect(error).toBeInstanceOf(HttpError);
     expect((error as Error).message).toContain("HTTP 404");
     expect((error as Error).message).not.toContain("osy65dzsecret");
+  });
+
+  it.each([429, 503])("does not wait for Retry-After on its final attempt after HTTP %s", async status => {
+    vi.useFakeTimers();
+    const started = Date.now();
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status, headers: { "Retry-After": "30" } }));
+
+    await expect(fetchJson("https://api.boligsiden.dk/search/cases", { attempts: 1, timeoutMs: 6_000 })).rejects.toMatchObject({ status });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(Date.now()).toBe(started);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("still honors Retry-After when another attempt remains", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const fetch = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { "Retry-After": "1" } }))
+      .mockResolvedValueOnce(Response.json({ available: true }));
+    const pending = fetchJson("https://api.boligsiden.dk/search/cases", { attempts: 2, baseDelayMs: 0 });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2);
+    await expect(pending).resolves.toEqual({ available: true });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

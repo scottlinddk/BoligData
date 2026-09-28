@@ -123,7 +123,7 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOptions
         if (!error.retryable) throw error;
         lastError = error;
         const wait = retryAfterMs(res);
-        if (wait !== null) await sleep(wait);
+        if (wait !== null && attempt + 1 < attempts) await sleep(wait);
         continue;
       }
 
