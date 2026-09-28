@@ -24,6 +24,7 @@ import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useToast } from "@/components/toast";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { RecommendModal } from "@/components/recommend-modal";
+import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
 const actionClass = "flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors";
@@ -153,6 +154,7 @@ export function PropertyDetailPage() {
             {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 font-semibold underline">{t("common.retry")}</button></div>}
             <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />
           </DetailSection>
+          <LimfjordNoisePanel propertyId={property.id} />
           <DetailSection title={tx("Dokumentation og opmærksomhedspunkter", "Documents and things to check")} subtitle={tx("Tjekliste og status for de offentlige kilder", "Checklist and public data source status")}>
             <div className="space-y-4"><DueDiligenceChecklist riskFlags={enrichment?.riskFlags ?? null} /><RegisterSourcesPanel sources={registerSources} isLoading={lookupQuery.isLoading} isError={lookupQuery.isError} onRetry={() => lookupQuery.refetch()} /></div>
           </DetailSection>
