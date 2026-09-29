@@ -34,6 +34,9 @@ export interface BoligsidenOriginalAskingResult {
   sourceListingId: string;
   sourceAddressId: string | null;
   scope: "listing";
+  /** Which source duration establishes the beginning of the asking-price history. */
+  priceScope?: "current_listing" | "total_marketing_period";
+  totalDays?: number | null;
   reason: string | null;
   observedAt: string;
   identityConfirmed: boolean;
@@ -59,7 +62,7 @@ function empty(input: BoligsidenOriginalAskingInput, addressId: string | null = 
     sourceListingId: input.sourceListingId, sourceAddressId: addressId, scope: "listing",
     reason: null, observedAt: input.observedAt ?? new Date().toISOString(),
     identityConfirmed: false, listingStatus: "unknown", currentPrice: null,
-    latestEpisodeDays: null, previousOpenCount: 0,
+    latestEpisodeDays: null, previousOpenCount: 0, priceScope: "current_listing", totalDays: null,
   };
 }
 
@@ -72,7 +75,9 @@ function timestamp(value: unknown): number | null {
 
 /** The public address timeline has no case IDs. Join through the address's
  * unique active case, then corroborate a unique opening with its source
- * duration and complete price-change path. Repriced reopenings need either an
+ * duration and complete price-change path. Then walk previous broker periods
+ * backwards to account for the total source duration, excluding handover gaps.
+ * Repriced reopenings within the current broker period need either an
  * explicit matching adjustment or the case's cumulative percentage to corroborate
  * the observed opening amount; percentages never reconstruct a missing price. */
 export function classifyBoligsidenOriginalAsking(
@@ -110,7 +115,14 @@ export function classifyBoligsidenOriginalAsking(
   if (nestedAddress?.addressID !== undefined && uuid(nestedAddress.addressID) !== sourceAddressId) return fail("conflict", "case_address_mismatch");
   result.currentPrice = positive(current.priceCash) ? current.priceCash : null;
   const duration = object(object(current.timeOnMarket)?.current)?.days;
-  result.latestEpisodeDays = typeof duration === "number" && Number.isSafeInteger(duration) && duration >= 0 ? duration : null;
+  const validDays = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 36_500;
+  result.latestEpisodeDays = validDays(duration) ? duration : null;
+  const total = object(current.timeOnMarket)?.total;
+  if (total !== undefined) {
+    const days = object(total)?.days;
+    if (!validDays(days) || (result.latestEpisodeDays !== null && days < result.latestEpisodeDays)) return fail("conflict", "invalid_total_market_duration");
+    result.totalDays = days;
+  }
   const observedStamp = timestamp(result.observedAt);
   if (observedStamp === null || observedStamp > Date.now()) return fail("conflict", "invalid_observation_time");
   if (!Array.isArray(timelinePayload)) return fail("unavailable", "invalid_timeline_shape");
@@ -205,6 +217,7 @@ export function classifyBoligsidenOriginalAsking(
   };
   let latestPrice = original.price;
   let active = true;
+  let overlappingClosure: typeof original | null = null;
   for (const event of journey) {
     if (event.type === "sold") {
       // A registered family transfer is not a market sale ending this listing.
@@ -218,7 +231,10 @@ export function classifyBoligsidenOriginalAsking(
       return fail("conflict", "sale_after_current_episode_opening");
     }
     if (event.type === "closed") {
-      if (active && event.price !== latestPrice && previousAgentClosure(event)) continue;
+      if (active && event.price !== latestPrice && previousAgentClosure(event)) {
+        overlappingClosure = event;
+        continue;
+      }
       if (!active || event.price !== latestPrice) return fail("conflict", "inconsistent_pause_price");
       active = false;
       continue;
@@ -239,7 +255,62 @@ export function classifyBoligsidenOriginalAsking(
   }
   if (!active) return fail("not_current", "timeline_closed_after_latest_open");
   if (result.currentPrice === null || latestPrice !== result.currentPrice) return fail("conflict", "timeline_current_price_mismatch");
-  return { ...result, status: "exact", price: original.price, originalDate: original.at.slice(0, 10), originalAt: original.at };
+  let first = original;
+  if (result.totalDays !== null && result.totalDays !== undefined) {
+    // Current days can include same-broker pauses. Keep that source-verified
+    // span intact; do not subtract every closed/open gap in the timeline.
+    // Earlier broker periods contribute their open-to-close days. Off-market
+    // handover gaps contribute none, and a verified overlap is counted once.
+    const calendarDays = (from: string, to: string) => (Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / DAY;
+    let coveredDays = result.latestEpisodeDays;
+    let cursor = opening;
+    while (coveredDays < result.totalDays) {
+      const closing = overlappingClosure ?? unique[cursor - 1];
+      let index = overlappingClosure ? cursor - 1 : cursor - 2;
+      overlappingClosure = null;
+      if (!closing) return fail("missing", "total_market_opening_missing");
+      if (closing.type === "sold") return fail("conflict", "sale_between_market_periods");
+      if (closing.type !== "closed" || closing.price === null) return fail("conflict", "incomplete_previous_market_period");
+      const nextOpening = unique[cursor]!;
+      const resetAt = new Date(`${closing.at.slice(0, 10)}T00:00:00Z`);
+      resetAt.setUTCFullYear(resetAt.getUTCFullYear() + 3);
+      if (Date.parse(nextOpening.at.slice(0, 10)) >= resetAt.getTime()) return fail("conflict", "market_period_reset_after_long_gap");
+      const changes: typeof events = [];
+      for (; index >= 0 && unique[index]!.type !== "open"; index--) {
+        const event = unique[index]!;
+        if (event.type === "sold") return fail("conflict", "sale_between_market_periods");
+        if (event.type !== "price_change") return fail("conflict", "incomplete_previous_market_period");
+        changes.unshift(event);
+      }
+      const previous = unique[index];
+      if (!previous || previous.price === null) return fail("missing", "total_market_opening_missing");
+      if (previous.difference !== null) return fail("conflict", "ambiguous_original_open_adjustment");
+      let priorPrice = previous.price;
+      for (const change of changes) {
+        if (change.price === null || change.stamp <= previous.stamp || change.stamp >= closing.stamp ||
+            (change.difference !== null && Math.abs(priorPrice + change.difference - change.price) > 1)) return fail("conflict", "inconsistent_previous_price_path");
+        priorPrice = change.price;
+      }
+      if (priorPrice !== closing.price || closing.stamp <= previous.stamp) return fail("conflict", "inconsistent_previous_price_path");
+      const endAt = closing.stamp > nextOpening.stamp ? nextOpening.at : closing.at;
+      coveredDays += calendarDays(previous.at, endAt);
+      if (coveredDays > result.totalDays) return fail("conflict", "previous_period_exceeds_total_duration");
+      first = previous;
+      cursor = index;
+    }
+    // An additional zero-day broker period consumes no duration budget. The
+    // total alone cannot establish which of those openings began the journey.
+    const priorClose = unique[cursor - 1];
+    const priorOpenIndex = openings.filter(index => index < cursor).at(-1);
+    if (priorClose?.type === "closed" && priorOpenIndex !== undefined &&
+        calendarDays(unique[priorOpenIndex]!.at, priorClose.at) === 0 &&
+        !unique.slice(priorOpenIndex + 1, cursor).some(event => event.type === "sold")) {
+      return fail("conflict", "ambiguous_zero_day_market_period");
+    }
+    result.priceScope = "total_marketing_period";
+    result.previousOpenCount = unique.slice(0, cursor).filter(event => event.type === "open").length;
+  }
+  return { ...result, status: "exact", price: first.price, originalDate: first.at.slice(0, 10), originalAt: first.at };
 }
 
 interface PostcodeDiscovery { addresses: Map<string, string>; complete: boolean; reason: string | null }

@@ -187,6 +187,56 @@ describe("original asking-price backfill", () => {
     expect(db.writes()).toEqual([]);
   });
 
+  it("replaces the v1 broker opening with total-period evidence without changing historical rows", async () => {
+    const previous = evidence({ source_version: "original-price-backfill/v1", verification_status: "conflict", conflict_group: "source_original_price_conflict",
+      effective_date: "2026-03-26", value: { price: 6_250_000, sourceListingId: caseId, scope: "listing", originalDate: "2026-03-26" } });
+    const before = structuredClone(previous);
+    const db = database([property()], [episode()], [previous]);
+    fetchOriginal.mockResolvedValue(exact({ price: 6_498_000, originalDate: "2025-09-20", priceScope: "total_marketing_period", totalDays: 373 }));
+    expect((await runOriginalPriceBackfill(db.client, options())).results[0]).toMatchObject({ outcome: "would_persist", priceScope: "total_marketing_period", totalDays: 373 });
+    expect(db.writes()).toEqual([]);
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("persisted");
+    expect(db.writes()).toHaveLength(1);
+    expect(db.writes()[0]!.value).toMatchObject({ source_version: "original-price-backfill/v2", verification_status: "verified", conflict_group: null,
+      value: { price: 6_498_000, originalDate: "2025-09-20", priceScope: "total_marketing_period", totalDays: 373 } });
+    expect(db.tables.source_observations![0]).toEqual(before);
+    db.calls.length = 0;
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("already_present");
+    expect(db.writes()).toEqual([]);
+  });
+
+  it("upgrades unchanged v1 amounts and supports a newly opened zero-day period", async () => {
+    const db = database([property()], [episode()], [evidence({ source_version: "original-price-backfill/v1" })]);
+    fetchOriginal.mockResolvedValue(exact({ priceScope: "total_marketing_period", totalDays: 0 }));
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("persisted");
+    expect(db.writes()[0]!.value).toMatchObject({ source_version: "original-price-backfill/v2", value: { totalDays: 0 } });
+  });
+
+  it.each([null, -1, 1.5, 36_501, Number.NaN])("rejects unproven total-period duration %j", async totalDays => {
+    const db = database([property()], [episode()]);
+    fetchOriginal.mockResolvedValue(exact({ priceScope: "total_marketing_period", totalDays }));
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]).toMatchObject({ outcome: "conflict", reason: "invalid_total_period_duration" });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it.each(["original-price-backfill/v2", "manual-review/1", undefined])("preserves contradictory total-period or unrelated evidence from %j", async sourceVersion => {
+    const db = database([property()], [episode()], [evidence({ source_version: sourceVersion,
+      value: { price: 4_600_000, sourceListingId: caseId, scope: "listing", originalDate: "2025-06-20",
+        ...(sourceVersion === "original-price-backfill/v2" ? { priceScope: "total_marketing_period", totalDays: 465 } : {}) } })]);
+    fetchOriginal.mockResolvedValue(exact({ priceScope: "total_marketing_period", totalDays: 465 }));
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("conflict");
+    expect(db.writes()[0]!.value).toMatchObject({ source_version: "original-price-backfill/v2", verification_status: "conflict" });
+  });
+
+  it("keeps a current-listing fallback independent of previously proven total-period evidence", async () => {
+    const db = database([property()], [episode()], [evidence({ source_version: "original-price-backfill/v2",
+      value: { price: 4_600_000, sourceListingId: caseId, scope: "listing", originalDate: "2025-06-20", priceScope: "total_marketing_period", totalDays: 465 } })]);
+    fetchOriginal.mockResolvedValue(exact({ priceScope: "current_listing", totalDays: null }));
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("persisted");
+    expect(db.writes()[0]!.value).toMatchObject({ source_version: "original-price-backfill/v1", value: { priceScope: "current_listing" } });
+    expect(db.tables.source_observations![0]!.value.price).toBe(4_600_000);
+  });
+
   it("requires evidence belonging to the selected episode, never another listing period", async () => {
     const db = database([property()], [episode()], [evidence({ episode_id: "old-episode" })]);
     expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("persisted");

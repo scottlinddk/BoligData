@@ -134,6 +134,38 @@ describe("source-reported original asking integration", () => {
     expect(html).toContain("The original listing date is not provided");
     expect(html).not.toContain("Estimated original asking price");
   });
+
+  it("labels retained current-agent originals explicitly without changing the workbook calculation", () => {
+    const observation = { ...exactOriginal, sourceVersion: "original-price-backfill/v1", effectiveDate: startDate, datePrecision: "day" as const,
+      value: { ...exactOriginal.value as Record<string, unknown>, originalDate: startDate } };
+    const data = history({ events: [], observations: [observation] });
+    const result = workbookListingReference(property, data);
+    expect(result.exactOriginal).toMatchObject({ price: 5_500_000, priceScope: "current_listing" });
+    expect(result.reference).toEqual(workbookListingReference(property, history({ events: [], observations: [exactOriginal] })).reference);
+    const da = render({ history: data });
+    expect(da).toContain("Oprindelig pris hos nuværende mægler");
+    expect(da).toContain("Udbudsdato hos nuværende mægler");
+    expect(da).toContain("hele udbudsforløbet er endnu ikke dokumenteret");
+    expect(da).not.toContain("Oprindelig udbudspris oplyst af kilden");
+    i18n.language = "en";
+    const en = render({ history: data });
+    expect(en).toContain("Original price with current agent");
+    expect(en).toContain("Listing date with current agent");
+    expect(en).not.toContain("Source-reported original asking price");
+  });
+
+  it("keeps the original-asking label for a verified total marketing period", () => {
+    const data = history({ events: [], observations: [{ ...exactOriginal, sourceVersion: "original-price-backfill/v2",
+      effectiveDate: startDate, datePrecision: "day", value: { ...exactOriginal.value as Record<string, unknown>,
+        originalDate: startDate, priceScope: "total_marketing_period", totalDays: 188 } }] });
+    const da = render({ history: data });
+    expect(da).toContain("Oprindelig udbudspris");
+    expect(da).not.toContain("Oprindelig pris hos nuværende mægler");
+    i18n.language = "en";
+    const en = render({ history: data });
+    expect(en).toContain("Source-reported original asking price");
+    expect(en).not.toContain("Original price with current agent");
+  });
 });
 
 describe("listing workbook reference integration", () => {

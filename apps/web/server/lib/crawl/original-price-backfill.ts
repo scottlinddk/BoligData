@@ -23,6 +23,7 @@ export interface OriginalPriceBackfillRow {
   sourceListingId: string; address: string; postalCode: string | null; listingUrl: string | null; currentAsking: number | null;
   sourceAddressId?: string | null; sourceUrl?: string | null; timelineUrl?: string | null;
   originalPrice?: number; originalDate?: string | null; reason?: string;
+  priceScope?: "total_marketing_period" | "current_listing"; totalDays?: number | null;
 }
 
 const key = (...parts: unknown[]) => createHash("sha256").update(JSON.stringify(parts)).digest("hex");
@@ -87,14 +88,19 @@ export async function runOriginalPriceBackfill(client: SupabaseClient, options: 
     if (source.status !== "exact") return result(source.status, reason ? { reason } : {});
     if (!source.identityConfirmed || source.listingStatus !== "active" || source.sourceListingId.toLowerCase() !== property.external_id.toLowerCase() || source.scope !== "listing" ||
         source.price === null || !Number.isFinite(source.price) || source.price <= 0) return result("conflict");
-    const details = { originalPrice: source.price, originalDate: source.originalDate };
+    const totalPeriod = source.priceScope === "total_marketing_period";
+    if (totalPeriod && (typeof source.totalDays !== "number" || !Number.isSafeInteger(source.totalDays) || source.totalDays < 0 || source.totalDays > 36_500)) {
+      return result("conflict", { reason: "invalid_total_period_duration" });
+    }
+    const details = { originalPrice: source.price, originalDate: source.originalDate,
+      ...(source.priceScope ? { priceScope: source.priceScope, totalDays: source.totalDays ?? null } : {}) };
 
     // A successful resolver binds an exact original to this source case. Never
     // create links from an unconfirmed address match or a missing/blocked source.
     const [episodeResult, evidenceResult] = await Promise.all([
       client.from("listing_episodes").select("id,campaign_id,source,status,data_mode,ingest_key,start_date,end_date")
         .eq("property_id", property.id).eq("source", "boligsiden").eq("source_listing_id", property.external_id).is("owner_id", null),
-      client.from("source_observations").select("id,ingest_key,value,episode_id,verification_status,conflict_group,observed_at,effective_date,date_precision")
+      client.from("source_observations").select("id,ingest_key,value,episode_id,verification_status,conflict_group,observed_at,effective_date,date_precision,source_version")
         .eq("property_id", property.id).eq("source", "boligsiden").eq("field_name", "original_asking_price")
         .eq("method", "source_reported_original_asking").eq("data_mode", "real").is("owner_id", null),
     ]);
@@ -118,10 +124,17 @@ export async function runOriginalPriceBackfill(client: SupabaseClient, options: 
     if (candidate && episodes.some(row => row.id !== candidate.id && row.ingest_key === episodeKey)) return result("ambiguous_episode", details);
     const evidence = evidenceResult.data ?? [];
     const currentEvidence = evidence.filter(row => candidate && row.episode_id === candidate.id &&
-      typeof row.value?.sourceListingId === "string" && row.value.sourceListingId.toLowerCase() === property.external_id.toLowerCase() && row.value?.scope === "listing");
+      typeof row.value?.sourceListingId === "string" && row.value.sourceListingId.toLowerCase() === property.external_id.toLowerCase() && row.value?.scope === "listing")
+      .filter(row => totalPeriod
+        // v1 measured the current broker's opening. A proven total-period
+        // opening replaces that interpretation without deleting its audit row.
+        // Unknown/manual versions remain comparable and cannot be hidden.
+        ? !(row.source_version === "original-price-backfill/v1" && [undefined, "current_listing"].includes(row.value?.priceScope))
+        : !(row.source_version === "original-price-backfill/v2" && row.value?.priceScope === "total_marketing_period"));
     const conflicts = currentEvidence.some(row => row.verification_status === "conflict" ||
       (typeof row.value?.price === "number" && row.value.price > 0 && row.value.price !== source.price));
     const matching = currentEvidence.find(row => row.verification_status === "verified" && !row.conflict_group &&
+      (!totalPeriod || (row.source_version === "original-price-backfill/v2" && row.value?.priceScope === "total_marketing_period")) &&
       row.value?.price === source.price && row.value?.originalDate === source.originalDate && row.effective_date === source.originalDate &&
       row.date_precision === (source.originalDate ? "day" : "unknown") && typeof row.observed_at === "string" && /^\d{4}-\d{2}-\d{2}T/.test(row.observed_at) &&
       Number.isFinite(Date.parse(row.observed_at)) && Date.parse(row.observed_at) <= Date.parse(observedAt));
@@ -154,18 +167,20 @@ export async function runOriginalPriceBackfill(client: SupabaseClient, options: 
       }
     }
     if (!episodeId) return result("write_failed", details);
-    const ingestKey = key("original-asking-price/v1", property.id, property.external_id.toLowerCase(), episodeId, source.price, source.originalDate, conflicts ? "conflict" : "verified");
+    const version = totalPeriod ? "v2" : "v1";
+    const ingestKey = key(`original-asking-price/${version}`, property.id, property.external_id.toLowerCase(), episodeId, source.price, source.originalDate, conflicts ? "conflict" : "verified");
     const existing = evidence.find(row => row.ingest_key === ingestKey);
     if (existing) return result(conflicts || existing !== matching ? "conflict" : "already_present", details);
     const saved = await client.from("source_observations").upsert({
       property_id: property.id, owner_id: null, episode_id: episodeId, ingest_key: ingestKey,
       field_name: "original_asking_price", value: { price: source.price, sourceListingId: property.external_id, scope: "listing", originalDate: source.originalDate,
-        sourceAddressId: source.sourceAddressId, timelineUrl: source.timelineUrl, originalAt: source.originalAt },
+        sourceAddressId: source.sourceAddressId, timelineUrl: source.timelineUrl, originalAt: source.originalAt,
+        ...(source.priceScope ? { priceScope: source.priceScope, totalDays: source.totalDays ?? null } : {}) },
       source: "boligsiden", source_url: source.sourceUrl, observed_at: observedAt,
       effective_date: source.originalDate, date_precision: source.originalDate ? "day" : "unknown",
       method: "source_reported_original_asking", verification_status: conflicts ? "conflict" : "verified", data_mode: "real",
       conflict_group: conflicts ? "source_original_price_conflict" : null,
-      source_version: "original-price-backfill/v1",
+      source_version: `original-price-backfill/${version}`,
     }, { onConflict: "ingest_key", ignoreDuplicates: true });
     return result(saved.error ? "write_failed" : conflicts ? "conflict" : "persisted", details);
   });
