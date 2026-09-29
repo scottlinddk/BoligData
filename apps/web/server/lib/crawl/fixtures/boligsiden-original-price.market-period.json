@@ -1,0 +1,886 @@
+[
+  {
+    "name": "Bakkevænget 20",
+    "observedAt": "2026-09-29T07:15:54.0619194Z",
+    "sourceListingId": "fb63209f-4bce-4b9d-8494-b557c6d361bf",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/bakkevaenget-20-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50c9-bc0a-32b8-e044-0003ba298018",
+      "slugAddress": "bakkevaenget-20-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "fb63209f-4bce-4b9d-8494-b557c6d361bf",
+          "status": "open",
+          "priceCash": 5795000,
+          "priceChangePercentage": -7.28,
+          "timeOnMarket": {
+            "current": {
+              "days": 187
+            },
+            "total": {
+              "days": 346,
+              "realtors": [
+                {
+                  "days": 187,
+                  "realtorId": "5b781f91-8bca-498b-b889-422e83706cb5",
+                  "realtorName": "Hansen & Thoft"
+                },
+                {
+                  "days": 159,
+                  "realtorId": "a6d7f36c-f07d-406d-9ffe-fb8b9e0e3905",
+                  "realtorName": "Nybolig Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "5b781f91-8bca-498b-b889-422e83706cb5"
+          }
+        }
+      ],
+      "registrations": []
+    },
+    "timeline": [
+      {
+        "at": "2026-08-07T10:02:49.685606Z",
+        "aux": {
+          "difference": -200000,
+          "differencePercentage": -3.34
+        },
+        "price": 5795000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-02T12:35:46.040528Z",
+        "aux": {
+          "difference": -255000,
+          "differencePercentage": -4.08
+        },
+        "price": 5995000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-03-26T14:09:38.962324Z",
+        "price": 6250000,
+        "type": "open"
+      },
+      {
+        "at": "2026-03-08T16:31:36.632514Z",
+        "price": 6498000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-09-30T11:00:46.823043Z",
+        "price": 6498000,
+        "type": "open"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 6498000,
+      "originalDate": "2025-09-30"
+    }
+  },
+  {
+    "name": "Årestrupsvej 4",
+    "observedAt": "2026-09-29T07:15:54.2542098Z",
+    "sourceListingId": "60af38e8-559d-4eee-b8f3-1bfb89bf2c93",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/aarestrupsvej-4-0-th-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50cb-11f7-32b8-e044-0003ba298018",
+      "slugAddress": "aarestrupsvej-4-0-th-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "60af38e8-559d-4eee-b8f3-1bfb89bf2c93",
+          "status": "open",
+          "priceCash": 875000,
+          "priceChangePercentage": 0,
+          "timeOnMarket": {
+            "current": {
+              "days": 96
+            },
+            "total": {
+              "days": 96,
+              "realtors": [
+                {
+                  "days": 96,
+                  "realtorId": "f7182fdf-250d-4f5b-aadb-df04ab4a231b",
+                  "realtorName": "RealMæglerne Aalborg Ann & Christian ApS"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "f7182fdf-250d-4f5b-aadb-df04ab4a231b"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 500642,
+          "area": 86,
+          "date": "2001-10-01",
+          "municipalityCode": 851,
+          "propertyNumber": 426256,
+          "registrationID": "3733196",
+          "type": "family"
+        },
+        {
+          "amount": 472047,
+          "date": "1999-10-12",
+          "municipalityCode": 851,
+          "propertyNumber": 426256,
+          "registrationID": "3733197",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-06-25T12:26:13.867399Z",
+        "price": 875000,
+        "type": "open"
+      },
+      {
+        "at": "2001-10-01T00:00:00Z",
+        "aux": {
+          "type": "family"
+        },
+        "price": 500642,
+        "type": "sold"
+      },
+      {
+        "at": "1999-10-12T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 472047,
+        "type": "sold"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 875000,
+      "originalDate": "2026-06-25"
+    }
+  },
+  {
+    "name": "Estlandsgade 1",
+    "observedAt": "2026-09-29T07:15:54.3863442Z",
+    "sourceListingId": "881d1b4b-a0cc-4393-9098-58e817258279",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/estlandsgade-1-2-mf-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50c9-f041-32b8-e044-0003ba298018",
+      "slugAddress": "estlandsgade-1-2-mf-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "881d1b4b-a0cc-4393-9098-58e817258279",
+          "status": "open",
+          "priceCash": 1398000,
+          "priceChangePercentage": -12.35,
+          "timeOnMarket": {
+            "current": {
+              "days": 393
+            },
+            "total": {
+              "days": 393,
+              "realtors": [
+                {
+                  "days": 393,
+                  "realtorId": "bf93749d-6889-4bb8-82e0-1fc7af21556e",
+                  "realtorName": "EDC Danebo"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "bf93749d-6889-4bb8-82e0-1fc7af21556e"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 998000,
+          "area": 61,
+          "date": "2005-08-01",
+          "municipalityCode": 851,
+          "propertyNumber": 613005,
+          "registrationID": "3753434",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-07-15T11:48:03.764402Z",
+        "aux": {
+          "difference": -97000,
+          "differencePercentage": -6.49
+        },
+        "price": 1398000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-03-28T14:40:18.2837Z",
+        "price": 1495000,
+        "type": "open"
+      },
+      {
+        "at": "2026-02-25T09:21:01.9182Z",
+        "price": 1595000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-09-01T13:00:31.141901Z",
+        "price": 1595000,
+        "type": "open"
+      },
+      {
+        "at": "2005-08-01T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 998000,
+        "type": "sold"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 1595000,
+      "originalDate": "2025-09-01"
+    }
+  },
+  {
+    "name": "Peder Skrams Gade 35",
+    "observedAt": "2026-09-29T07:15:54.591108Z",
+    "sourceListingId": "463bab68-a4a6-4827-8d74-9115cf18f244",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/peder-skrams-gade-35-0-tv-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50ca-7edd-32b8-e044-0003ba298018",
+      "slugAddress": "peder-skrams-gade-35-0-tv-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "463bab68-a4a6-4827-8d74-9115cf18f244",
+          "status": "open",
+          "priceCash": 1525000,
+          "priceChangePercentage": -10.03,
+          "timeOnMarket": {
+            "current": {
+              "days": 495
+            },
+            "total": {
+              "days": 495,
+              "realtors": [
+                {
+                  "days": 495,
+                  "realtorId": "29262ec1-e604-4bb6-80e1-76807839fc8d",
+                  "realtorName": "Estate Aalborg"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "29262ec1-e604-4bb6-80e1-76807839fc8d"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 1600000,
+          "area": 70,
+          "date": "2019-11-19",
+          "municipalityCode": 851,
+          "propertyNumber": 460306,
+          "registrationID": "5353311",
+          "type": "normal"
+        },
+        {
+          "amount": 1548000,
+          "date": "2016-07-19",
+          "livingArea": 70,
+          "municipalityCode": 851,
+          "perAreaPrice": 22114,
+          "propertyNumber": 460306,
+          "registrationID": "4901148",
+          "type": "normal"
+        },
+        {
+          "amount": 990000,
+          "date": "2012-12-20",
+          "municipalityCode": 851,
+          "propertyNumber": 460306,
+          "registrationID": "4443637",
+          "type": "normal"
+        },
+        {
+          "amount": 795000,
+          "date": "2004-10-22",
+          "municipalityCode": 851,
+          "propertyNumber": 460306,
+          "registrationID": "3737114",
+          "type": "normal"
+        },
+        {
+          "amount": 365000,
+          "date": "1992-03-23",
+          "municipalityCode": 851,
+          "propertyNumber": 460306,
+          "registrationID": "3737113",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-09-08T09:08:38.349862Z",
+        "aux": {
+          "difference": -70000,
+          "differencePercentage": -4.39
+        },
+        "price": 1525000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-03T11:52:13.833931Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -5.9
+        },
+        "price": 1595000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-06-03T11:52:13.833931Z",
+        "price": 1595000,
+        "type": "open"
+      },
+      {
+        "at": "2025-12-03T13:19:15.304555Z",
+        "price": 1695000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-05-22T13:39:33.309972Z",
+        "price": 1695000,
+        "type": "open"
+      },
+      {
+        "at": "2019-11-19T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 1600000,
+        "type": "sold"
+      },
+      {
+        "at": "2016-07-20T07:02:22.767Z",
+        "price": 1548000,
+        "type": "closed"
+      },
+      {
+        "at": "2016-07-19T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 1548000,
+        "type": "sold"
+      },
+      {
+        "at": "2016-07-01T17:00:03.583Z",
+        "price": 1548000,
+        "type": "open"
+      },
+      {
+        "at": "2012-12-20T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 990000,
+        "type": "sold"
+      },
+      {
+        "at": "2012-08-21T11:34:08.193Z",
+        "price": 1050000,
+        "type": "closed"
+      },
+      {
+        "at": "2012-04-21T09:12:00.533Z",
+        "aux": {
+          "difference": -48000,
+          "differencePercentage": -4.37
+        },
+        "price": 1050000,
+        "type": "price_change"
+      },
+      {
+        "at": "2012-04-03T09:28:00.823Z",
+        "aux": {
+          "difference": -52000,
+          "differencePercentage": -4.52
+        },
+        "price": 1098000,
+        "type": "price_change"
+      },
+      {
+        "at": "2011-10-20T00:00:44.143Z",
+        "price": 1150000,
+        "type": "open"
+      },
+      {
+        "at": "2004-10-22T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 795000,
+        "type": "sold"
+      },
+      {
+        "at": "1992-03-23T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 365000,
+        "type": "sold"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 1695000,
+      "originalDate": "2025-05-22"
+    }
+  },
+  {
+    "name": "Hasserisvej 124B",
+    "observedAt": "2026-09-29T07:15:54.7864743Z",
+    "sourceListingId": "faf207e0-8542-45c7-b6ae-73dbf7df455d",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/hasserisvej-124b-1-mf-9000-aalborg",
+    "address": {
+      "addressID": "2c576194-1bc0-446d-b123-3ab2ac63b917",
+      "slugAddress": "hasserisvej-124b-1-mf-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "faf207e0-8542-45c7-b6ae-73dbf7df455d",
+          "status": "open",
+          "priceCash": 2399000,
+          "priceChangePercentage": -7.55,
+          "timeOnMarket": {
+            "current": {
+              "days": 145
+            },
+            "total": {
+              "days": 221,
+              "realtors": [
+                {
+                  "days": 26,
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
+                  "realtorName": "Thorkild Kristensen Hasseris"
+                },
+                {
+                  "days": 50,
+                  "realtorId": "4bf16ab2-d24b-4806-a6d3-ab4a5af837f0",
+                  "realtorName": "EDC Poul Erik Bech"
+                },
+                {
+                  "days": 145,
+                  "realtorId": "a8a92591-01a1-4e8a-972c-a25fce0a92cf",
+                  "realtorName": "home Aalborg - Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "a8a92591-01a1-4e8a-972c-a25fce0a92cf"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 2531517,
+          "area": 69,
+          "date": "2017-11-14",
+          "municipalityCode": 851,
+          "propertyNumber": 637931,
+          "registrationID": "5149653",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-09-10T11:23:20.779718Z",
+        "price": 2399000,
+        "type": "open"
+      },
+      {
+        "at": "2026-09-07T19:24:31.854036Z",
+        "price": 2475000,
+        "type": "closed"
+      },
+      {
+        "at": "2026-08-11T07:34:30.199452Z",
+        "aux": {
+          "difference": -120000,
+          "differencePercentage": -4.62
+        },
+        "price": 2475000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-05-07T08:54:37.459411Z",
+        "price": 2595000,
+        "type": "open"
+      },
+      {
+        "at": "2023-12-20T14:40:18.453925Z",
+        "price": 2295000,
+        "type": "closed"
+      },
+      {
+        "at": "2023-10-31T13:43:07.544889Z",
+        "price": 2295000,
+        "type": "open"
+      },
+      {
+        "at": "2023-10-25T07:44:47.474704Z",
+        "price": 2495000,
+        "type": "closed"
+      },
+      {
+        "at": "2023-06-21T09:19:16.760857Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -3.85
+        },
+        "price": 2495000,
+        "type": "price_change"
+      },
+      {
+        "at": "2023-03-23T10:49:24.931224Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -3.71
+        },
+        "price": 2595000,
+        "type": "price_change"
+      },
+      {
+        "at": "2022-11-22T11:21:06.241375Z",
+        "price": 2695000,
+        "type": "open"
+      },
+      {
+        "at": "2017-11-20T14:15:30.683Z",
+        "price": 2499000,
+        "type": "closed"
+      },
+      {
+        "at": "2017-11-14T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 2531517,
+        "type": "sold"
+      },
+      {
+        "at": "2017-09-14T11:39:06.043Z",
+        "aux": {
+          "difference": 100000,
+          "differencePercentage": 4.17
+        },
+        "price": 2499000,
+        "type": "price_change"
+      },
+      {
+        "at": "2017-08-03T11:00:27.857Z",
+        "price": 2399000,
+        "type": "open"
+      },
+      {
+        "at": "2017-08-02T23:32:43.927Z",
+        "price": 2399000,
+        "type": "closed"
+      },
+      {
+        "at": "2017-08-01T00:00:00Z",
+        "price": 2399000,
+        "type": "open"
+      },
+      {
+        "at": "2017-06-19T11:46:07.813Z",
+        "price": 2249000,
+        "type": "closed"
+      },
+      {
+        "at": "2017-03-15T00:00:00Z",
+        "price": 2249000,
+        "type": "open"
+      }
+    ]
+  },
+  {
+    "name": "Samsøgade 19",
+    "observedAt": "2026-09-29T07:15:54.9549522Z",
+    "sourceListingId": "39c09c7d-e62b-4483-8746-654e367f7062",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/samsoegade-19-1-tv-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50ca-a186-32b8-e044-0003ba298018",
+      "slugAddress": "samsoegade-19-1-tv-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "39c09c7d-e62b-4483-8746-654e367f7062",
+          "status": "open",
+          "priceCash": 1045000,
+          "priceChangePercentage": -4.57,
+          "timeOnMarket": {
+            "current": {
+              "days": 253
+            },
+            "total": {
+              "days": 429,
+              "realtors": [
+                {
+                  "days": 176,
+                  "realtorId": "068f1962-5d71-4d59-be14-dca2882ad69a",
+                  "realtorName": "RealMæglerne Brian Harbo"
+                },
+                {
+                  "days": 253,
+                  "realtorId": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3",
+                  "realtorName": "Nybolig Aalborg Lejligheder"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "c3348aae-fecd-42bb-9b0d-7d134c01f4d3"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 950000,
+          "area": 67,
+          "date": "2021-03-08",
+          "municipalityCode": 851,
+          "propertyNumber": 486801,
+          "registrationID": "5560434",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-04-08T14:04:21.845396Z",
+        "aux": {
+          "difference": -50000,
+          "differencePercentage": -4.57
+        },
+        "price": 1045000,
+        "type": "price_change"
+      },
+      {
+        "at": "2026-01-20T15:03:33.694248Z",
+        "price": 1095000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-19T12:47:03.073083Z",
+        "price": 1095000,
+        "type": "closed"
+      },
+      {
+        "at": "2026-01-19T11:47:53.003224Z",
+        "price": 1095000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-13T13:39:24.053176Z",
+        "price": 1145000,
+        "type": "closed"
+      },
+      {
+        "at": "2025-11-03T13:07:14.346819Z",
+        "aux": {
+          "difference": -100000,
+          "differencePercentage": -8.03
+        },
+        "price": 1145000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-09-02T12:50:34.405077Z",
+        "aux": {
+          "difference": -50000,
+          "differencePercentage": -3.86
+        },
+        "price": 1245000,
+        "type": "price_change"
+      },
+      {
+        "at": "2025-07-21T06:41:57.56518Z",
+        "price": 1295000,
+        "type": "open"
+      },
+      {
+        "at": "2021-03-08T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 950000,
+        "type": "sold"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 1295000,
+      "originalDate": "2025-07-21"
+    }
+  },
+  {
+    "name": "Hasserishøj 2",
+    "observedAt": "2026-09-29T07:15:55.1405884Z",
+    "sourceListingId": "501bfaee-fa31-4873-b19e-5ef6ccec2649",
+    "sourceUrl": "https://www.boligsiden.dk/adresse/hasserishoej-2-9000-aalborg",
+    "address": {
+      "addressID": "0a3f50ca-14d8-32b8-e044-0003ba298018",
+      "slugAddress": "hasserishoej-2-9000-aalborg",
+      "isOnMarket": true,
+      "hasMultipleCases": false,
+      "cases": [
+        {
+          "caseID": "501bfaee-fa31-4873-b19e-5ef6ccec2649",
+          "status": "open",
+          "priceCash": 18895000,
+          "priceChangePercentage": -5.53,
+          "timeOnMarket": {
+            "current": {
+              "days": 732
+            },
+            "total": {
+              "days": 732,
+              "realtors": [
+                {
+                  "days": 732,
+                  "realtorId": "0573c09d-bcd0-430d-add5-2ab3ae2155b9",
+                  "realtorName": "Thorkild Kristensen Hasseris"
+                }
+              ]
+            }
+          },
+          "realtor": {
+            "realtorID": "0573c09d-bcd0-430d-add5-2ab3ae2155b9"
+          }
+        }
+      ],
+      "registrations": [
+        {
+          "amount": 11200000,
+          "area": 329,
+          "date": "2021-02-25",
+          "livingArea": 339,
+          "municipalityCode": 851,
+          "perAreaPrice": 33038,
+          "propertyNumber": 107134,
+          "registrationID": "5551168",
+          "type": "normal"
+        },
+        {
+          "amount": 5200000,
+          "area": 364,
+          "date": "2003-02-14",
+          "municipalityCode": 851,
+          "propertyNumber": 107134,
+          "registrationID": "3709700",
+          "type": "normal"
+        },
+        {
+          "amount": 3350000,
+          "area": 364,
+          "date": "1994-09-06",
+          "municipalityCode": 851,
+          "propertyNumber": 107134,
+          "registrationID": "3709699",
+          "type": "normal"
+        }
+      ]
+    },
+    "timeline": [
+      {
+        "at": "2026-02-03T17:32:11.12061Z",
+        "price": 18895000,
+        "type": "open"
+      },
+      {
+        "at": "2026-01-29T10:40:13.167493Z",
+        "price": 20000000,
+        "type": "closed"
+      },
+      {
+        "at": "2024-09-27T13:01:37.036693Z",
+        "price": 20000000,
+        "type": "open"
+      },
+      {
+        "at": "2021-02-25T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 11200000,
+        "type": "sold"
+      },
+      {
+        "at": "2021-02-17T08:44:04.293Z",
+        "price": 12300000,
+        "type": "closed"
+      },
+      {
+        "at": "2020-06-10T10:42:31.26Z",
+        "price": 12300000,
+        "type": "open"
+      },
+      {
+        "at": "2018-04-25T16:46:01.54Z",
+        "price": 14500000,
+        "type": "closed"
+      },
+      {
+        "at": "2017-09-28T11:52:10.15Z",
+        "price": 14500000,
+        "type": "open"
+      },
+      {
+        "at": "2003-02-14T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 5200000,
+        "type": "sold"
+      },
+      {
+        "at": "1994-09-06T00:00:00Z",
+        "aux": {
+          "type": "normal"
+        },
+        "price": 3350000,
+        "type": "sold"
+      }
+    ],
+    "expected": {
+      "status": "exact",
+      "price": 20000000,
+      "originalDate": "2024-09-27"
+    }
+  }
+]

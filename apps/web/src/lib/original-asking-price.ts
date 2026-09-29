@@ -10,6 +10,7 @@ export interface OriginalAskingPriceEvidence {
   sourceUrl: string | null;
   observedAt: string;
   originalDate: string | null;
+  priceScope?: "total_marketing_period" | "current_listing";
 }
 export interface OriginalAskingPriceResolution {
   status: "available" | "missing" | "incomplete" | "invalid" | "conflict";
@@ -43,8 +44,18 @@ export function originalAskingPrice(property: Property, history?: ResearchHistor
   if (!episode.id || episode.endDate !== null || !Number.isFinite(episodeTime) || episodeTime > retrieved) return empty("invalid");
   const start = episode.datePrecision === "day" && episode.startDate !== null ? parseResearchDay(episode.startDate) : null;
   if (episode.datePrecision === "day" && episode.startDate !== null && (start === null || start > episodeTime)) return empty("invalid");
-  const matching = candidates.filter(row => row.episodeId === episode.id);
+  let matching = candidates.filter(row => row.episodeId === episode.id);
   if (matching.length === 0) return empty("missing");
+  const hasTotalPeriod = matching.some(row => row.sourceVersion === "original-price-backfill/v2"
+    && valueObject(row)?.priceScope === "total_marketing_period" && exactValue(row, property.externalId) !== null
+    && Number.isFinite(timestamp(row.observedAt)) && timestamp(row.observedAt) <= retrieved
+    && (start === null || timestamp(row.observedAt) >= start));
+  if (hasTotalPeriod) {
+    // Only the known v1 derivation is superseded: it measured the latest
+    // broker's opening. Keep unrelated and v2 contradictions visible.
+    matching = matching.filter(row => !(row.sourceVersion === "original-price-backfill/v1"
+      && (valueObject(row)?.priceScope === undefined || valueObject(row)?.priceScope === "current_listing")));
+  }
   const observed = matching.map(row => ({ row, time: timestamp(row.observedAt) }));
   if (observed.some(({ time }) => !Number.isFinite(time) || time > retrieved || (start !== null && time < start))) return empty("invalid");
   const newest = Math.max(...observed.map(item => item.time));
@@ -64,14 +75,23 @@ export function originalAskingPrice(property: Property, history?: ResearchHistor
   const originals = values.map(value => value!.originalDate).filter((value): value is string => value !== null);
   if (new Set(originals).size > 1) return empty("conflict");
   const selected = latest[0]!.row;
+  const currentListing = selected.sourceVersion === "original-price-backfill/v1" || valueObject(selected)?.priceScope === "current_listing";
   return { status: "available", evidence: { price, episodeId: episode.id, source: selected.source, sourceListingId: property.externalId,
-    sourceUrl: selected.sourceUrl, observedAt: selected.observedAt, originalDate: originals[0] ?? null } };
+    sourceUrl: selected.sourceUrl, observedAt: selected.observedAt, originalDate: originals[0] ?? null,
+    ...(hasTotalPeriod ? { priceScope: "total_marketing_period" as const } : currentListing ? { priceScope: "current_listing" as const } : {}) } };
+}
+
+function valueObject(row: ResearchObservation): Record<string, unknown> | null {
+  return row.value && typeof row.value === "object" && !Array.isArray(row.value) ? row.value as Record<string, unknown> : null;
 }
 
 function exactValue(row: ResearchObservation, sourceListingId: string): { price: number; originalDate: string | null } | null {
   if (row.method !== "source_reported_original_asking" || !["unverified", "verified"].includes(row.verificationStatus)
       || row.conflictGroup || !row.value || typeof row.value !== "object" || Array.isArray(row.value)) return null;
-  const { price, sourceListingId: reportedId, scope, originalDate } = row.value as Record<string, unknown>;
+  const { price, sourceListingId: reportedId, scope, originalDate, priceScope, totalDays } = row.value as Record<string, unknown>;
+  if (priceScope !== undefined && priceScope !== "current_listing" && priceScope !== "total_marketing_period") return null;
+  if (priceScope === "total_marketing_period" && (row.sourceVersion !== "original-price-backfill/v2"
+    || typeof totalDays !== "number" || !Number.isSafeInteger(totalDays) || totalDays < 0 || totalDays > 36_500 || typeof originalDate !== "string")) return null;
   if (reportedId !== sourceListingId || scope !== "listing" || typeof price !== "number" || !Number.isFinite(price) || price <= 0
       || price > 1_000_000_000) return null;
   if (originalDate === null) return row.effectiveDate === null && row.datePrecision === "unknown" ? { price, originalDate } : null;

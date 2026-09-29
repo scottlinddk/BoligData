@@ -209,19 +209,24 @@ describe("observed source timeline edge cases", () => {
   // Captured public address/timeline responses on 2026-09-28, reduced to the
   // factual fields used by this classifier. These are observed opening amounts.
   it.each([
-    ["Hasserisvej 124B", 2_595_000, "2026-05-07"],
     ["Estlandsgade 1", 1_595_000, "2025-09-01"],
     ["Hasserishøj 2", 20_000_000, "2024-09-27"],
     ["Hadsundvej 26B", 1_825_000, "2024-08-02"],
     ["Peder Skrams Gade 35", 1_695_000, "2025-05-22"],
-    ["Vesterbro 19A", 995_000, "2025-04-15"],
-    ["Samsøgade 19", 1_095_000, "2026-01-19"],
+    ["Samsøgade 19", 1_295_000, "2025-07-21"],
     ["Kong Christians Alle 21", 3_695_000, "2025-08-20"],
-    ["Elme Alle 12", 5_598_000, "2026-08-31"],
+    ["Elme Alle 12", 5_995_000, "2025-08-19"],
   ])("recovers %s from the source opening corroborated by its active case", (name, price, originalDate) => {
     const fixture = edgeCases.find(row => row.name === name)!;
     expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({
       status: "exact", price, originalDate, identityConfirmed: true, listingStatus: "active",
+    });
+  });
+
+  it.each(["Hasserisvej 124B", "Vesterbro 19A"])("does not report a broker's original as the total original when older openings are absent: %s", name => {
+    const fixture = edgeCases.find(row => row.name === name)!;
+    expect(classifyBoligsidenOriginalAsking({ sourceListingId: fixture.sourceListingId, observedAt: NOW }, fixture.address, fixture.timeline)).toMatchObject({
+      status: "missing", reason: "total_market_opening_missing", price: null,
     });
   });
 

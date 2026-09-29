@@ -22,6 +22,8 @@ Success requires real source data, exhausted pagination and successful database 
 
 For every observed listing the existing ingest updates the asking price, `last_seen_at`, listing history and dated source-reported liggetid. This happens even if the asking price is unchanged. New source sales and stale enrichment are refreshed by the same pipeline. No inferred listing start date or disappearance is introduced: an unseen listing is not marked sold or withdrawn, even after a scan. A moving paginated feed is not a historical snapshot.
 
+Successful scheduled refreshes also trigger the separate [original asking-price backfill](original-asking-price-backfill.md). It checks the oldest opening within Boligsiden's total marketing period across broker changes and upgrades old current-broker evidence without deleting historical observations. A manual weekly/runner dispatch requires a separate `mode=original-prices` dispatch for the same follow-up.
+
 ## Checking a run
 
 Check the `crawl.runner_config` log for effective postcode ranges and caps. `crawl.boligsiden.scope` reports the upstream total and whether postcode narrowing was sent. `crawl.runner_summary` must report `ok: true` and `complete: true`; the source report identifies skipped records and database failures. Read-only provenance verification runs before and after ingestion.
