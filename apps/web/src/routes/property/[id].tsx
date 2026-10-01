@@ -7,6 +7,8 @@ import { formatDkk, pricePerSqm } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { researchListingTime } from "@/lib/research-listing-time";
+import { reportedMarketingPeriod } from "@/lib/reported-listing-duration";
+import { ListingDurationSummary } from "@/components/listing-duration-summary";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ListingFactsPanel, PropertyDescription } from "@/components/listing-details";
 import { CadastralPanel } from "@/components/cadastral-panel";
@@ -93,6 +95,7 @@ export function PropertyDetailPage() {
   const floorplan = getFloorplan(property.images);
   const listingTime = researchListingTime(property, listingHistory.data);
   const days = listingTime.time.latestEpisodeDays;
+  const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
 
   async function handleSave() {
     if (saving) return;
@@ -181,7 +184,7 @@ export function PropertyDetailPage() {
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{t("detail.price")}</p>
             <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em]">{formatDkk(property.price)}</p>
             <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
-            <div className="my-5 flex items-center justify-between gap-3 border-y border-border py-4 text-sm"><span className="text-ink-soft">{tx("Aktuel liggetid", "Current time on market")}</span><span className="font-semibold">{days !== null ? `${days} ${tx("dage", "days")}` : empty}</span></div>
+            <ListingDurationSummary currentDays={days} period={marketingPeriod} />
             <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a>
             <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} className={`${actionClass} mt-3 w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50`}>{saving ? <Spinner /> : <span aria-hidden="true">{saved ? "♥" : "♡"}</span>}{saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")}</button>
           </div>

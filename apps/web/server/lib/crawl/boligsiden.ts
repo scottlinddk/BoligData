@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ListingImage, SaleType, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
-import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
+import type { RawListing, ReportedRealtorPeriod, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import {
@@ -93,12 +93,33 @@ function mapPostalCode(raw: unknown): string | null {
   return new Set(codes).size === 1 ? String(codes[0]) : null;
 }
 
-function mapReportedTimeOnMarket(value: unknown): RawListing["reported_time_on_market"] {
+function mapReportedTimeOnMarket(value: unknown, currentRealtor: unknown): RawListing["reported_time_on_market"] {
   const days = (candidate: unknown): number | null =>
     typeof candidate === "number" && Number.isSafeInteger(candidate) && candidate >= 0 && candidate <= 36_500 ? candidate : null;
   const latestEpisodeDays = days(get(value, "current", "days"));
   const totalDays = days(get(value, "total", "days"));
-  return latestEpisodeDays !== null || totalDays !== null ? { latestEpisodeDays, totalDays } : undefined;
+  if (latestEpisodeDays === null && totalDays === null) return undefined;
+  const realtors = mapRealtorPeriods(get(value, "total", "realtors"), days);
+  const currentRealtorId = isUuid(currentRealtor) ? currentRealtor.toLowerCase() : null;
+  return {
+    latestEpisodeDays, totalDays,
+    ...(realtors && totalDays !== null ? { realtors } : {}),
+    ...(realtors && currentRealtorId ? { currentRealtorId } : {}),
+  };
+}
+
+/** All-or-nothing: a partial breakdown would understate earlier brokers, so a
+ * single malformed or duplicated row drops the whole list. */
+function mapRealtorPeriods(value: unknown, days: (candidate: unknown) => number | null): ReportedRealtorPeriod[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const periods: ReportedRealtorPeriod[] = [];
+  for (const row of value) {
+    const realtorId = get(row, "realtorId");
+    const share = days(get(row, "days"));
+    if (!isUuid(realtorId) || share === null) return null;
+    periods.push({ realtorId: realtorId.toLowerCase(), realtorName: asNonEmptyString(get(row, "realtorName")), days: share });
+  }
+  return new Set(periods.map(period => period.realtorId)).size === periods.length ? periods : null;
 }
 
 /**
@@ -243,7 +264,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   const images = (Array.isArray(r.images) ? r.images : [])
     .map(mapImage)
     .filter((img): img is ListingImage => img !== null);
-  const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket);
+  const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket, get(r, "realtor", "realtorID"));
   const changePercent = typeof r.priceChangePercentage === "number" && Number.isFinite(r.priceChangePercentage)
     && r.priceChangePercentage > -100 ? r.priceChangePercentage : null;
   const sourceAddressId = get(r, "address", "addressID");

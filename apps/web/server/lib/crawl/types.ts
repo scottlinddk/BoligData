@@ -43,10 +43,28 @@ export interface RawListing {
   sold_price_history: SoldPriceEntry[];
   /** Provider-reported durations, observed as-is. They do not document a
    * calendar start date or independently establish continuous active time. */
-  reported_time_on_market?: { latestEpisodeDays: number | null; totalDays: number | null };
+  reported_time_on_market?: ReportedTimeOnMarket;
   /** Rounded provider percentage, retained separately from a documented first
    * asking price. It can support an explicitly approximate price scenario. */
   reported_price_change?: { currentAsking: number; changePercent: number };
+}
+
+/** One broker's share of the provider's total marketing period. */
+export interface ReportedRealtorPeriod {
+  realtorId: string;
+  realtorName: string | null;
+  days: number;
+}
+
+export interface ReportedTimeOnMarket {
+  latestEpisodeDays: number | null;
+  totalDays: number | null;
+  /** Provider's per-broker breakdown of `totalDays`. Omitted when the source
+   * does not supply a complete, well-formed list. Shares can overlap by a day
+   * at a handover, so they need not sum exactly to `totalDays`. */
+  realtors?: ReportedRealtorPeriod[];
+  /** The current listing's broker, so the breakdown can mark it. */
+  currentRealtorId?: string;
 }
 
 export interface SourceCrawlStats {

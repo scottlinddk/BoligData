@@ -127,6 +127,33 @@ describe("mapBoligsidenCase", () => {
     expect(mapBoligsidenCase({ ...boligsidenCase, timeOnMarket: 464 })).not.toHaveProperty("reported_time_on_market");
   });
 
+  it("retains the per-broker breakdown of the total period (Hasserisvej 278 broker change)", () => {
+    const current = "5b781f91-8bca-498b-b889-422e83706cb5";
+    const previous = "0573c09d-bcd0-430d-add5-2ab3ae2155b9";
+    const realtors = [
+      { days: 119, realtorId: current.toUpperCase(), realtorName: "Hansen & Thoft" },
+      { days: 45, realtorId: previous, realtorName: "Thorkild Kristensen Hasseris" },
+    ];
+    const mapped = (rows: unknown, realtorID: unknown = current) => mapBoligsidenCase({
+      ...boligsidenCase, realtor: { name: "Hansen & Thoft", realtorID },
+      timeOnMarket: { current: { days: 119 }, total: { days: 164, realtors: rows } },
+    })?.reported_time_on_market;
+    expect(mapped(realtors)).toEqual({
+      latestEpisodeDays: 119, totalDays: 164, currentRealtorId: current,
+      realtors: [
+        { realtorId: current, realtorName: "Hansen & Thoft", days: 119 },
+        { realtorId: previous, realtorName: "Thorkild Kristensen Hasseris", days: 45 },
+      ],
+    });
+    // Older payloads omit names; the identity and days still count.
+    expect(mapped([{ days: 164, realtorId: current }])?.realtors).toEqual([{ realtorId: current, realtorName: null, days: 164 }]);
+    expect(mapped(realtors, "not-a-uuid")).not.toHaveProperty("currentRealtorId");
+    // A partial list would understate earlier brokers, so it is dropped whole.
+    for (const invalid of [[], null, "x", [realtors[0], { days: 45 }], [realtors[0], { ...realtors[1], days: -1 }], [realtors[0], realtors[0]]]) {
+      expect(mapped(invalid)).toEqual({ latestEpisodeDays: 119, totalDays: 164 });
+    }
+  });
+
   it("maps a valid case to a RawListing", () => {
     const listing = mapBoligsidenCase(boligsidenCase);
     expect(listing).toEqual({
