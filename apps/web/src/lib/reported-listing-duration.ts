@@ -12,6 +12,73 @@ function observationTime(value: string): number | null {
  * or total campaign duration. The chronology adapter decides whether this dated
  * count can supply its current-listing duration. */
 export function reportedListingDuration(property: Property, history?: ResearchHistoryResponse, asOf = new Date().toISOString()): { days: number; observedAt: string } | null {
+  const latest = latestReportedDuration(property, history, asOf, value => validDays(value.latestEpisodeDays));
+  return latest ? { days: latest.parsed, observedAt: latest.observedAt } : null;
+}
+
+export interface ReportedRealtorPeriod {
+  realtorId: string;
+  realtorName: string | null;
+  days: number;
+  isCurrent: boolean;
+}
+
+/** The source's total marketing period at this address, which can span earlier
+ * listings with the same or another broker. It is the source's own count:
+ * handover gaps are excluded and broker shares may overlap by a day. */
+export interface ReportedMarketingPeriod {
+  totalDays: number;
+  currentDays: number;
+  observedAt: string;
+  /** Null when the source did not supply a usable per-broker breakdown. */
+  realtors: ReportedRealtorPeriod[] | null;
+  /** True/false only when the breakdown proves it; null when earlier periods
+   * exist but their broker is unknown. Never inferred from day counts alone. */
+  brokerChanged: boolean | null;
+}
+
+export function reportedMarketingPeriod(property: Property, history?: ResearchHistoryResponse, asOf = new Date().toISOString()): ReportedMarketingPeriod | null {
+  const latest = latestReportedDuration(property, history, asOf, parseMarketingPeriod, (a, b) => JSON.stringify(a) === JSON.stringify(b));
+  return latest ? { ...latest.parsed, observedAt: latest.observedAt } : null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function validDays(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 36_500 ? value : null;
+}
+
+function parseMarketingPeriod(value: Record<string, unknown>): Omit<ReportedMarketingPeriod, "observedAt"> | null {
+  const currentDays = validDays(value.latestEpisodeDays);
+  const totalDays = validDays(value.totalDays);
+  if (currentDays === null || totalDays === null || totalDays < currentDays) return null;
+  const currentRealtorId = typeof value.currentRealtorId === "string" && UUID.test(value.currentRealtorId) ? value.currentRealtorId : null;
+  const realtors = parseRealtors(value.realtors, totalDays, currentRealtorId);
+  const brokerChanged = realtors ? realtors.length > 1 : totalDays === currentDays ? false : null;
+  return { totalDays, currentDays, realtors, brokerChanged };
+}
+
+/** All-or-nothing, like the crawler: a partial list would hide earlier brokers. */
+function parseRealtors(value: unknown, totalDays: number, currentRealtorId: string | null): ReportedRealtorPeriod[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const rows: ReportedRealtorPeriod[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+    const row = raw as Record<string, unknown>;
+    const days = validDays(row.days);
+    if (typeof row.realtorId !== "string" || !UUID.test(row.realtorId) || days === null || days > totalDays) return null;
+    if (row.realtorName !== null && row.realtorName !== undefined && typeof row.realtorName !== "string") return null;
+    const realtorName = typeof row.realtorName === "string" ? row.realtorName.trim() || null : null;
+    rows.push({ realtorId: row.realtorId, realtorName, days, isCurrent: row.realtorId === currentRealtorId });
+  }
+  if (new Set(rows.map(row => row.realtorId)).size !== rows.length) return null;
+  return rows.sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent) || b.days - a.days);
+}
+
+function latestReportedDuration<T>(
+  property: Property, history: ResearchHistoryResponse | undefined, asOf: string,
+  parse: (value: Record<string, unknown>) => T | null, same: (a: T, b: T) => boolean = Object.is,
+): { parsed: T; observedAt: string } | null {
   if (!history || property.dataMode !== "real" || property.status !== "active") return null;
   if (!property.id?.trim() || !property.listingSource?.trim() || !property.externalId?.trim()) return null;
   // A clipped observation list can still contain this dated claim. A clipped
@@ -37,11 +104,10 @@ export function reportedListingDuration(property: Property, history?: ResearchHi
     if (stamp === null || stamp > retrieved || observation.effectiveDate !== observation.observedAt.slice(0, 10)) return [];
     const value = observation.value;
     if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
-    const days = (value as Record<string, unknown>).latestEpisodeDays;
-    if (typeof days !== "number" || !Number.isInteger(days) || days < 0 || days > 36_500) return [];
-    return [{ days, observedAt: observation.observedAt, stamp, id: observation.id }];
+    const parsed = parse(value as Record<string, unknown>);
+    return parsed === null ? [] : [{ parsed, observedAt: observation.observedAt, stamp, id: observation.id }];
   }).sort((a, b) => b.stamp - a.stamp || a.id.localeCompare(b.id));
   const latest = candidates[0];
-  if (!latest || candidates.some(candidate => candidate.stamp === latest.stamp && candidate.days !== latest.days)) return null;
-  return { days: latest.days, observedAt: latest.observedAt };
+  if (!latest || candidates.some(candidate => candidate.stamp === latest.stamp && !same(candidate.parsed, latest.parsed))) return null;
+  return { parsed: latest.parsed, observedAt: latest.observedAt };
 }

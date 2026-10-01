@@ -4,7 +4,7 @@ import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import type { MergedPropertyFacts } from "./property-facts";
 import type { ResearchListingTimeResult } from "./research-listing-time";
 import { reportedListingDuration } from "./reported-listing-duration";
-export { reportedListingDuration } from "./reported-listing-duration";
+export { reportedListingDuration, reportedMarketingPeriod, type ReportedMarketingPeriod } from "./reported-listing-duration";
 
 const positive = (value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 

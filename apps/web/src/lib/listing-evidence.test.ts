@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Enrichment, Property, SoldPriceEntry } from "@shared/types/index";
-import { listingEvidence, reportedListingDuration } from "./listing-evidence";
+import { listingEvidence, reportedListingDuration, reportedMarketingPeriod } from "./listing-evidence";
 import type { ResearchEpisode, ResearchHistoryResponse, ResearchObservation } from "@shared/types/research-api";
 import { mergePropertyFacts, type MergedPropertyFacts } from "./property-facts";
 import { researchListingTime } from "./research-listing-time";
@@ -129,6 +129,52 @@ describe("explicit source-reported listing duration", () => {
     expect(reportedListingDuration(liveProperty, history([unrelated, older, observation()]))).toEqual({ days: 137, observedAt });
     expect(reportedListingDuration(liveProperty, history([observation({ value: { latestEpisodeDays: null, totalDays: 450 } })]))).toBeNull();
     expect(reportedListingDuration(liveProperty, history([observation({ value: { latestEpisodeDays: 0, totalDays: 450 } })]))?.days).toBe(0);
+  });
+
+  describe("total marketing period", () => {
+    const current = "5b781f91-8bca-498b-b889-422e83706cb5";
+    const previous = "0573c09d-bcd0-430d-add5-2ab3ae2155b9";
+    const hasserisvej = { latestEpisodeDays: 119, totalDays: 164, currentRealtorId: current, realtors: [
+      { realtorId: previous, realtorName: "Thorkild Kristensen Hasseris", days: 45 },
+      { realtorId: current, realtorName: "Hansen & Thoft", days: 119 },
+    ] };
+    const period = (value: unknown) => reportedMarketingPeriod(liveProperty, history([observation({ value })]));
+
+    it("reports the source total with the current broker first and proves a broker change", () => {
+      expect(period(hasserisvej)).toEqual({ totalDays: 164, currentDays: 119, observedAt, brokerChanged: true, realtors: [
+        { realtorId: current, realtorName: "Hansen & Thoft", days: 119, isCurrent: true },
+        { realtorId: previous, realtorName: "Thorkild Kristensen Hasseris", days: 45, isCurrent: false },
+      ] });
+    });
+
+    it("distinguishes a same-broker relisting from a broker change", () => {
+      const relisted = period({ latestEpisodeDays: 30, totalDays: 90, currentRealtorId: current, realtors: [{ realtorId: current, realtorName: null, days: 90 }] });
+      expect(relisted).toMatchObject({ totalDays: 90, currentDays: 30, brokerChanged: false });
+    });
+
+    it("never infers a broker change from day counts alone", () => {
+      // Stored before the breakdown was captured: earlier periods, broker unknown.
+      expect(period({ latestEpisodeDays: 119, totalDays: 164 })).toMatchObject({ totalDays: 164, realtors: null, brokerChanged: null });
+      expect(period({ latestEpisodeDays: 119, totalDays: 119 })).toMatchObject({ brokerChanged: false, realtors: null });
+    });
+
+    it("drops a malformed breakdown whole but keeps the source total", () => {
+      for (const realtors of [[], [{ realtorId: current, days: 200 }], [{ realtorId: "x", days: 5 }], [hasserisvej.realtors[0], hasserisvej.realtors[0]],
+        [{ realtorId: current, days: 5, realtorName: 7 }]]) {
+        expect(period({ ...hasserisvej, realtors })).toMatchObject({ totalDays: 164, realtors: null, brokerChanged: null });
+      }
+    });
+
+    it("rejects missing or contradictory totals", () => {
+      for (const value of [{ latestEpisodeDays: 119, totalDays: null }, { latestEpisodeDays: 119 }, { latestEpisodeDays: 119, totalDays: 100 }, { latestEpisodeDays: null, totalDays: 164 }]) {
+        expect(period(value)).toBeNull();
+      }
+    });
+
+    it("refuses same-time observations that disagree", () => {
+      const twin = observation({ id: "twin", value: { ...hasserisvej, totalDays: 170 } });
+      expect(reportedMarketingPeriod(liveProperty, history([observation({ value: hasserisvej }), twin]))).toBeNull();
+    });
   });
 
   it.each([-1, 1.5, 36_501, "137", Number.NaN, Number.POSITIVE_INFINITY, null, undefined])("rejects invalid source counts %j", days => {
