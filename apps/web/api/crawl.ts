@@ -42,7 +42,8 @@ function parseRequest(body: unknown): CrawlRequest | null {
  * Response contract used by the scheduled workflow:
  * - POST { mode: "verify" } runs SELECT-only, shared-data verification
  * - POST { mode: "original-prices", dryRun, afterId?, batchSize } audits or
- *   adds original-price source evidence for at most eight stored listings
+ *   refreshes original-price evidence and reconciles source-confirmed removals
+ *   for at most eight stored listings (dry runs never write)
  * - POST { offset, batchSize } ingests a bounded listing slice (batchSize 1–50)
  * - POST with no body preserves the existing full ingest behavior
  * - 200 { ok: true, reports }  — every source fetched and ingested cleanly

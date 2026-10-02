@@ -116,7 +116,7 @@ function PreviewPhoto({ photo, alt }: { photo?: ListingImage; alt: string }) {
 }
 
 export function WorkspacePropertyPreview({ property, children }: { property: Property; children?: ReactNode }) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const photo = getPhotos(property.images)[0];
   return <div>
@@ -125,9 +125,13 @@ export function WorkspacePropertyPreview({ property, children }: { property: Pro
       <PreviewPhoto key={`${property.id}:${photo?.url}`} photo={photo} alt={property.address} />
       <span className="absolute bottom-3 left-3 rounded-full bg-surface px-2.5 py-1 text-[10px] font-semibold text-ink shadow-card">{property.listingSource}</span>
     </div>
+    {property.status !== "active" && <p className="mt-4"><span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning-text">{t(`property.status.${property.status}`)}</span></p>}
     <h2 className="mt-4 break-words text-lg font-semibold leading-7 tracking-tight text-ink">{property.address}</h2>
     <p className="mt-0.5 text-xs text-ink-soft">{[property.postalCode, property.municipality].filter(Boolean).join(" ")}</p>
-    <p className="mt-4 text-2xl font-bold tracking-[-0.04em] text-ink">{formatDkk(property.price)}</p>
+    <div className="mt-4">
+      {property.status !== "active" && <p className="mb-1 text-xs text-ink-soft">{t("property.lastAskingPrice")}</p>}
+      <p className="text-2xl font-bold tracking-[-0.04em] text-ink">{formatDkk(property.price)}</p>
+    </div>
     <dl className="workspace-property-facts mt-4 grid grid-cols-3 gap-2">
       <WorkspaceStat label={tx("Boligareal", "Living area")} value={`${property.sqm} m²`} />
       <WorkspaceStat label={tx("Rum i annoncen", "Listed rooms")} value={property.rooms || "—"} />

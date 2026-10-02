@@ -14,10 +14,12 @@ type PropertyRow = {
   id: string; listing_source: string; external_id: string; status: string;
   data_mode: string; listing_url: string | null; address: string; postal_code: string | null; price: number;
   current_episode_key: string | null; listing_date: string | null; listing_date_definition: string;
+  updated_at: string; last_seen_at: string | null;
 };
 type EvidenceRow = { id: string; ingest_key?: string; campaign_id?: string | null; source: string; status?: string; data_mode?: string; start_date?: string | null; end_date?: string | null };
 type Outcome = "unsupported_source" | "nonlive_data" | "invalid_source_identity" | "missing" | "unavailable" | "conflict" | "not_current"
-  | "ambiguous_episode" | "would_persist" | "persisted" | "already_present" | "read_failed" | "write_failed";
+  | "ambiguous_episode" | "would_persist" | "persisted" | "already_present" | "read_failed" | "write_failed"
+  | "would_remove" | "would_withdraw" | "removed" | "withdrawn" | "stale";
 export interface OriginalPriceBackfillRow {
   id: string; source: string; status: string; dataMode: string; outcome: Outcome;
   sourceListingId: string; address: string; postalCode: string | null; listingUrl: string | null; currentAsking: number | null;
@@ -27,11 +29,11 @@ export interface OriginalPriceBackfillRow {
 }
 
 const key = (...parts: unknown[]) => createHash("sha256").update(JSON.stringify(parts)).digest("hex");
-const COLUMNS = "id,listing_source,external_id,status,data_mode,listing_url,address,postal_code,price,current_episode_key,listing_date,listing_date_definition";
+const COLUMNS = "id,listing_source,external_id,status,data_mode,listing_url,address,postal_code,price,current_episode_key,listing_date,listing_date_definition,updated_at,last_seen_at";
 
-/** Enumerates stored IDs, including unsupported/legacy rows. Only source-backed
- * evidence and any missing source identity links are written; never properties,
- * asking prices, enrichments, or other observations. Dry runs make SELECTs only. */
+/** Enumerates stored IDs, including unsupported/legacy rows. Adds source-backed
+ * price evidence and reconciles explicitly off-market, identity-bound addresses:
+ * keep favorites as withdrawn, remove unsaved listings. Dry runs never write. */
 export async function runOriginalPriceBackfill(client: SupabaseClient, options: OriginalPriceBackfillOptions) {
   if (typeof options.dryRun !== "boolean" || !Number.isInteger(options.batchSize) || options.batchSize < 1 || options.batchSize > 8 ||
       (options.afterId !== null && !isUuid(options.afterId))) throw new Error("Invalid original-price batch options");
@@ -85,6 +87,19 @@ export async function runOriginalPriceBackfill(client: SupabaseClient, options: 
     } catch { return result("unavailable", { reason: "source_request_failed" }); }
     sourceDetails = { sourceAddressId: source.sourceAddressId ?? addressId ?? null, sourceUrl: source.sourceUrl ?? null, timelineUrl: source.timelineUrl ?? null };
     const reason = typeof source.reason === "string" && /^[a-z][a-z0-9_]{0,79}$/.test(source.reason) ? source.reason : undefined;
+    if (source.status === "not_current" && reason === "source_address_off_market" && addressId &&
+        source.sourceAddressId === addressId && source.sourceListingId.toLowerCase() === property.external_id.toLowerCase()) {
+      try {
+        const retired = await client.rpc("reconcile_off_market_property", {
+          p_property_id: property.id, p_source_listing_id: property.external_id, p_source_address_id: addressId,
+          p_expected_updated_at: property.updated_at, p_expected_last_seen_at: property.last_seen_at,
+          p_observed_at: observedAt, p_source_url: source.sourceUrl, p_source_reason: reason, p_dry_run: options.dryRun,
+        });
+        const outcomes = ["would_remove", "would_withdraw", "removed", "withdrawn", "stale", "conflict", "missing"] as const;
+        const outcome = outcomes.find(value => value === retired.data);
+        return result(retired.error || !outcome ? "write_failed" : outcome, { reason });
+      } catch { return result("write_failed", { reason: "off_market_reconciliation_failed" }); }
+    }
     if (source.status !== "exact") return result(source.status, reason ? { reason } : {});
     if (!source.identityConfirmed || source.listingStatus !== "active" || source.sourceListingId.toLowerCase() !== property.external_id.toLowerCase() || source.scope !== "listing" ||
         source.price === null || !Number.isFinite(source.price) || source.price <= 0) return result("conflict");
