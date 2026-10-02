@@ -53,7 +53,8 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
-  const daysOnMarket = property.listingDate ? daysBetween(property.listingDate) : null;
+  const active = property.status === "active";
+  const daysOnMarket = active && property.listingDate ? daysBetween(property.listingDate) : null;
   const photos = getPhotos(property.images);
   const photo = photos[0] ?? null;
   const saved = isSaved(property.id);
@@ -85,13 +86,15 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
         {photos.length > 1 && <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1.5 text-[10px] leading-none text-white backdrop-blur-sm"><svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2" /><circle cx="8" cy="8" r="2.5" /></svg>{photos.length}</span>}
       </div>
       <div className="px-0.5 pb-1 pt-4">
+        {!active && <p className="mb-2"><span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning-text">{t(`property.status.${property.status}`)}</span></p>}
+        {!active && <p className="mb-1 text-[11px] text-ink-soft">{t("property.lastAskingPrice")}</p>}
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
           <p className="text-[19px] font-semibold leading-6 tracking-[-0.035em]">{formatDkk(property.price)}</p>
           <p className="flex shrink-0 items-center gap-1.5 text-xs text-ink-soft"><span>{t("property.sqm", { sqm: property.sqm })}</span>{property.rooms != null && property.rooms > 0 && <><span aria-hidden="true">·</span><span title={language === "da" ? "Annoncerede rum, ikke dokumenterede soveværelser" : "Advertised rooms, not documented bedrooms"}>{property.rooms} {language === "da" ? "rum" : "rooms"}</span></>}</p>
         </div>
         <h3 className="mt-2 text-sm font-medium leading-5 transition-colors group-hover:text-brand-text">{displayAddress}</h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-ink-soft">
-          <span>{t("property.pricePerSqm", { price: formatDkk(pricePerSqm(property.price, property.sqm)) })}</span><span aria-hidden="true">·</span><span>{daysLabel}</span>
+          <span>{t("property.pricePerSqm", { price: formatDkk(pricePerSqm(property.price, property.sqm)) })}</span>{active && <><span aria-hidden="true">·</span><span>{daysLabel}</span></>}
           {property.bbrData?.energyLabel && <span title={t("property.bbr.energyLabelTitle")} className="rounded border border-border px-1.5 font-semibold">{property.bbrData.energyLabel}</span>}
           {property.bbrData?.heatingInstallation && <span title={t("property.bbr.heatingTitle")}>{property.bbrData.heatingInstallation}</span>}
         </div>

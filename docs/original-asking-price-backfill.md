@@ -8,7 +8,7 @@ The source timeline must still reconcile with the active listing and its current
 
 ## Production procedure
 
-Deploy the change to both the production API and frontend before dispatching this workflow. The frontend must understand the new evidence version before it can show corrected totals alongside retained older observations. The existing `VERCEL_URL`, `CRON_SECRET`, and optional `VERCEL_AUTOMATION_BYPASS_SECRET` repository secrets authenticate the request. The API uses its existing production service-role database connection; no new credentials are required or printed.
+Apply `026_off_market_properties.sql`, then deploy the production API and frontend before dispatching this workflow. The frontend must understand the evidence version and label retained off-market favorites. The existing `VERCEL_URL`, `CRON_SECRET`, and optional `VERCEL_AUTOMATION_BYPASS_SECRET` repository secrets authenticate the request. The API uses its existing production service-role database connection; no new credentials are required or printed.
 
 1. Run a read-only audit from the deployed default branch:
 
@@ -48,13 +48,21 @@ Dry runs perform no database writes, including no campaign or episode creation. 
 
 Validated total-period observations use `source_version: original-price-backfill/v2` and include `priceScope: total_marketing_period` and the observed total duration. The existing `scope: listing` and current `episode_id` still bind the evidence to the verified active case; they do not claim that its earliest opening belongs to the latest broker. The original date may precede the current episode's start. A later refresh with the same original/date is idempotent even though the source's duration increases.
 
-The v1 backfill selected the current broker's opening. Those observations remain intact for auditing, but a valid v2 total-period observation for the same case and episode supersedes their interpretation. This is an explicit derivation-version correction: it does not delete records or hide disagreements from other versions or within v2. Conflicting v2 evidence continues to display as a conflict. A subsequent current-listing fallback cannot downgrade already proven total-period evidence. No schema migration or destructive data cleanup is required; rerun the original-price write backfill after deployment to correct existing listings.
+The v1 backfill selected the current broker's opening. Those observations remain intact for auditing, but a valid v2 total-period observation for the same case and episode supersedes their interpretation. This is an explicit derivation-version correction: it does not delete records or hide disagreements from other versions or within v2. Conflicting v2 evidence continues to display as a conflict. A subsequent current-listing fallback cannot downgrade already proven total-period evidence. Rerun the original-price write backfill after deployment to correct existing listings.
 
 An unresolved total-history lookup remains in the backfill report and does not erase previously saved evidence. If only valid v1/current-listing evidence remains, the frontend explicitly labels its amount “Oprindelig pris hos nuværende mægler” / “Original price with current agent” and explains that the original for the full marketing period is not yet documented. The existing workbook calculation can continue using that clearly labelled input; its arithmetic is unchanged. Only validated total-period evidence restores the generic original-asking-price label for these refreshed observations.
 
 If the live source confirms the exact active case, a matching unknown-provenance episode may be promoted to real/active while retaining its existing chronology. Missing shared campaign and episode links use the regular crawler's canonical keys; a minimal episode has an unknown start instead of a fabricated date. Ambiguous episodes or a closed episode occupying the canonical key are reported for reconciliation. Conflicting original-price observations within the same interpretation remain additive and explicitly marked as conflicts.
 
-The backfill does not update `properties`, current asking prices, first-listing events, sales, descriptions, areas, or enrichment tables. Today's asking price may narrow source discovery but never becomes the original asking price.
+The price-evidence path does not update `properties`, current asking prices, first-listing events, sales, descriptions, areas, or enrichment tables. Today's asking price may narrow source discovery but never becomes the original asking price.
+
+## Source-confirmed removals
+
+The same refresh checks whether Boligsiden explicitly reports an address off market, with no current cases. Cleanup requires an existing verified link between the stored listing's exact source case and that source address. A missing result in a bounded feed, a failed request, an ambiguous address, or a generic `not_current` result never authorizes removal. A removal does not prove a sale.
+
+Migration 026 provides a service-role-only transaction that rechecks this identity and the property snapshot. If any user has favorited the property, it is retained with status `withdrawn`, its matching current shared episode is marked `removed`, and a verified market-status observation is saved. No end date or sale price is invented. The UI labels it “Fjernet fra markedet” / “Removed from market,” labels the amount as the last asking price, and stops active listing-day counters.
+
+If nobody has favorited it, the property is deleted along with listing-specific records covered by existing foreign-key cascades, including unsaved assessments and listing history. Conversations remain with their property link cleared. The property row lock serializes the favorite check with concurrent favorite inserts, and changed `updated_at` or `last_seen_at` values produce `stale` instead of retiring a newer listing. Dry runs only read and report `would_remove` or `would_withdraw`; write runs report `removed` or `withdrawn`. Review these counters alongside price-evidence outcomes.
 
 ## Ongoing refresh
 

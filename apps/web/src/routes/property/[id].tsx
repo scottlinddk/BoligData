@@ -87,6 +87,8 @@ export function PropertyDetailPage() {
   if (detailQuery.isError || !detailQuery.data) return <div role="alert" className="mx-auto max-w-[1240px] p-6 text-danger"><p>{t("detail.notFound")}</p><button type="button" disabled={detailQuery.isFetching} onClick={() => { void detailQuery.refetch(); }} className="mt-3 inline-flex items-center gap-2 rounded font-semibold underline disabled:opacity-50">{detailQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>;
 
   const { property, enrichment, listingDetails = null } = detailQuery.data;
+  const active = property.status === "active";
+  const priceLabel = t(active ? "detail.price" : "property.lastAskingPrice");
   const empty = t("detail.empty");
   const facts = mergePropertyFacts(property, enrichment, lookupQuery.data ?? null);
   const registerSources = summarizeLookupSources(lookupQuery.data ?? null);
@@ -125,14 +127,14 @@ export function PropertyDetailPage() {
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium text-ink-soft">
               <span className="rounded-full bg-surface-alt px-3 py-1.5">{t(`propertyType.${property.propertyType}` as TranslationKey)}</span>
-              <span className="rounded-full bg-surface-alt px-3 py-1.5">{property.status === "active" ? tx("Til salg", "For sale") : tx("Afsluttet udbud", "Listing closed")}</span>
+              <span className={`rounded-full px-3 py-1.5 ${active ? "bg-surface-alt" : "bg-warning-soft font-semibold text-warning-text"}`}>{t(`property.status.${property.status}`)}</span>
             </div>
             <h1 className="ds-display text-3xl leading-tight text-ink sm:text-[40px]">{property.address}</h1>
             <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft">
               <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M16 8c0 4-6 9-6 9S4 12 4 8a6 6 0 1 1 12 0Z" /><circle cx="10" cy="8" r="2" /></svg>
               {[property.postalCode, property.municipality].filter(Boolean).join(" ")}
             </p>
-            <p className="mt-4 text-2xl font-semibold tracking-tight lg:hidden">{formatDkk(property.price)}</p>
+            <div className="mt-4 lg:hidden">{!active && <p className="mb-1 text-xs text-ink-soft">{priceLabel}</p>}<p className="text-2xl font-semibold tracking-tight">{formatDkk(property.price)}</p></div>
             <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 border-y border-border py-5 sm:grid-cols-4">
               <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
               <Stat label={t("detail.rooms")} value={property.rooms ? String(property.rooms) : empty} />
@@ -181,17 +183,17 @@ export function PropertyDetailPage() {
         </div>
         <aside aria-label={tx("Pris og næste skridt", "Price and next steps")} className="row-start-2 space-y-5 lg:col-start-2 lg:row-start-1">
           <div className="rounded-2xl bg-surface-alt p-6">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{t("detail.price")}</p>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{priceLabel}</p>
             <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em]">{formatDkk(property.price)}</p>
             <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
-            <ListingDurationSummary currentDays={days} period={marketingPeriod} />
-            <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a>
+            {active && <><ListingDurationSummary currentDays={days} period={marketingPeriod} />
+              <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a></>}
             <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} className={`${actionClass} mt-3 w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50`}>{saving ? <Spinner /> : <span aria-hidden="true">{saved ? "♥" : "♡"}</span>}{saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")}</button>
           </div>
           <section className="rounded-2xl bg-surface-alt p-6">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{tx("Din næste fremvisning", "Your next viewing")}</p>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{active ? tx("Din næste fremvisning", "Your next viewing") : tx("Tidligere annonce", "Former listing")}</p>
             <h2 className="mt-3 text-xl font-medium">{property.agentName || tx("Se mere hos mægleren", "Explore the agent's listing")}</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{tx("Find fremvisning, salgsopstilling og kontaktoplysninger i den originale annonce.", "Find viewing times, sales documents and contact details in the original listing.")}</p>
+            <p className="mt-2 text-sm leading-6 text-ink-soft">{active ? tx("Find fremvisning, salgsopstilling og kontaktoplysninger i den originale annonce.", "Find viewing times, sales documents and contact details in the original listing.") : tx("Boligen er ikke længere til salg. Oplysningerne er bevaret til reference. Den viste pris er den seneste udbudspris, ikke en salgspris.", "This home is no longer for sale. Its details are retained for reference. The displayed price is the last asking price, not a sale price.")}</p>
             {property.listingUrl ? <BrokerListingLink url={property.listingUrl} source={property.listingSource} className={`${actionClass} mt-5 bg-cta text-cta-text hover:bg-cta-hover`} /> : <p className="mt-4 text-xs text-ink-soft">{tx("Link til mægleren er ikke oplyst.", "An agent listing link is not available.")}</p>}
             <button type="button" onClick={openResearch} className={`${actionClass} mt-3 w-full border border-border-strong text-ink hover:bg-surface-hover`}>{tx("Undersøg boligen", "Research this home")}</button>
             {canRecommend && <button type="button" onClick={() => setRecommendOpen(true)} className="mt-4 w-full rounded py-1 text-sm font-medium text-ink-soft underline underline-offset-4">{t("recommend.cta")}</button>}
@@ -208,7 +210,7 @@ export function PropertyDetailPage() {
       </details>
       {recommendOpen && <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
-        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{t("detail.price")}</p><p className="text-base font-semibold">{formatDkk(property.price)}</p></div>
+        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{priceLabel}</p><p className="text-base font-semibold">{formatDkk(property.price)}</p></div>
         <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl disabled:opacity-50">{saving ? <Spinner /> : saved ? "♥" : "♡"}</button>
         {property.listingUrl ? <a href={property.listingUrl} target="_blank" rel="noopener noreferrer" className={`${actionClass} bg-cta text-cta-text`}>{tx("Se annonce", "View listing")} ↗</a> : <button type="button" onClick={openResearch} className={`${actionClass} bg-cta text-cta-text`}>{tx("Undersøg", "Research")}</button>}
       </div>

@@ -11,7 +11,7 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")
 const caseId = "c4ed5ff9-9e86-4995-8250-c88a62189f27";
 const key = (...parts: unknown[]) => createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 type Row = Record<string, any>;
-const property = (n = 1, extra: Row = {}) => ({ id: id(n), listing_source: "boligsiden", external_id: caseId, status: "active", data_mode: "real", listing_url: "https://www.boligsiden.dk/adresse/example", address: "Example 1", postal_code: "2000", price: 4_195_000, current_episode_key: null, listing_date: null, listing_date_definition: "unknown", ...extra });
+const property = (n = 1, extra: Row = {}) => ({ id: id(n), listing_source: "boligsiden", external_id: caseId, status: "active", data_mode: "real", listing_url: "https://www.boligsiden.dk/adresse/example", address: "Example 1", postal_code: "2000", price: 4_195_000, current_episode_key: null, listing_date: null, listing_date_definition: "unknown", updated_at: "2026-09-28T00:00:00Z", last_seen_at: "2026-09-28T00:00:00Z", ...extra });
 const episode = (extra: Row = {}) => ({ id: "episode-1", property_id: id(1), campaign_id: "campaign-1", source: "boligsiden", source_listing_id: caseId, owner_id: null, status: "active", data_mode: "real", ingest_key: key("episode", "boligsiden", caseId, "real", null), ...extra });
 const exact = (extra: Row = {}) => ({ status: "exact", price: 4_495_000, originalDate: "2025-06-20", sourceUrl: "https://www.boligsiden.dk/adresse/example", sourceListingId: caseId, scope: "listing", observedAt: "2026-09-28T00:00:00Z", identityConfirmed: true, listingStatus: "active", ...extra });
 const evidence = (extra: Row = {}) => ({ id: "evidence-1", property_id: id(1), episode_id: "episode-1", owner_id: null, source: "boligsiden", field_name: "original_asking_price", method: "source_reported_original_asking", data_mode: "real", verification_status: "verified", observed_at: "2025-06-21T12:00:00Z", effective_date: "2025-06-20", date_precision: "day", value: { price: 4_495_000, sourceListingId: caseId, scope: "listing", originalDate: "2025-06-20" }, ...extra });
@@ -59,7 +59,8 @@ function database(properties: Row[], episodes: Row[] = [], observations: Row[] =
     };
     return query;
   };
-  return { client: { from } as unknown as SupabaseClient, calls, tables, writes: () => calls.filter(call => call.action !== "select") };
+  const rpc = vi.fn().mockResolvedValue({ data: "withdrawn", error: null });
+  return { client: { from, rpc } as unknown as SupabaseClient, rpc, calls, tables, writes: () => calls.filter(call => call.action !== "select") };
 }
 beforeEach(() => { vi.clearAllMocks(); fetchOriginal.mockResolvedValue(exact()); });
 const options = (extra = {}) => ({ dryRun: true, afterId: null, batchSize: 4, ...extra });
@@ -326,5 +327,50 @@ describe("original asking-price backfill", () => {
     expect(result.results[1]!.outcome).toBe("unsupported_source");
     expect(fetchOriginal).not.toHaveBeenCalled();
     expect(db.writes()).toEqual([]);
+  });
+
+  it.each(["would_remove", "would_withdraw", "removed", "withdrawn", "stale"])("reconciles explicit off-market evidence through the favorite-safe RPC: %s", async outcome => {
+    const db = database([property()], [], [sourceIdentity()]);
+    db.rpc.mockResolvedValue({ data: outcome, error: null });
+    fetchOriginal.mockResolvedValue(exact({ status: "not_current", reason: "source_address_off_market", sourceAddressId: id(90), identityConfirmed: false, listingStatus: "unknown" }));
+    const dryRun = outcome.startsWith("would_");
+    const report = await runOriginalPriceBackfill(db.client, options({ dryRun }));
+    expect(report.results[0]).toMatchObject({ outcome, reason: "source_address_off_market" });
+    expect(db.rpc).toHaveBeenCalledExactlyOnceWith("reconcile_off_market_property", {
+      p_property_id: id(1), p_source_listing_id: caseId, p_source_address_id: id(90),
+      p_expected_updated_at: property().updated_at, p_expected_last_seen_at: property().last_seen_at,
+      p_observed_at: expect.any(String), p_source_url: "https://www.boligsiden.dk/adresse/example",
+      p_source_reason: "source_address_off_market", p_dry_run: dryRun,
+    });
+    expect(db.writes()).toEqual([]);
+  });
+
+  it.each([
+    { reason: "source_case_absent_from_current_postcode_feed" }, { reason: "source_case_closed" },
+    { reason: "source_case_not_unique_at_address" }, { sourceAddressId: id(91) }, { sourceListingId: id(91) },
+    { status: "unavailable" },
+  ])("never retires ambiguous, absent, mismatched or failed source evidence %j", async overrides => {
+    const db = database([property()], [], [sourceIdentity()]);
+    fetchOriginal.mockResolvedValue(exact({ status: "not_current", reason: "source_address_off_market", sourceAddressId: id(90), ...overrides }));
+    await runOriginalPriceBackfill(db.client, options({ dryRun: false }));
+    expect(db.rpc).not.toHaveBeenCalled(); expect(db.writes()).toEqual([]);
+  });
+
+  it("does not remove an address discovered without a trusted stored source-case link", async () => {
+    const db = database([property()]);
+    fetchOriginal.mockResolvedValue(exact({ status: "not_current", reason: "source_address_off_market", sourceAddressId: id(90) }));
+    expect((await runOriginalPriceBackfill(db.client, options({ dryRun: false }))).results[0]!.outcome).toBe("not_current");
+    expect(db.rpc).not.toHaveBeenCalled(); expect(db.writes()).toEqual([]);
+  });
+
+  it.each(["error", "throw", "unexpected"])("holds the cursor on an off-market reconciliation %s", async failure => {
+    const db = database([property(), property(2, { listing_source: "boliga" })], [], [sourceIdentity()]);
+    fetchOriginal.mockResolvedValue(exact({ status: "not_current", reason: "source_address_off_market", sourceAddressId: id(90) }));
+    if (failure === "throw") db.rpc.mockRejectedValue(new Error("private database failure"));
+    else db.rpc.mockResolvedValue({ data: failure === "unexpected" ? "unrecognized" : null, error: failure === "error" ? { message: "private database failure" } : null });
+    const result = await runOriginalPriceBackfill(db.client, options({ dryRun: false, afterId: id(0) }));
+    expect(result.ok).toBe(false); expect(result.batch.nextAfterId).toBe(id(0));
+    expect(result.results.map(row => row.outcome)).toEqual(["write_failed", "unsupported_source"]);
+    expect(JSON.stringify(result)).not.toContain("private database failure");
   });
 });

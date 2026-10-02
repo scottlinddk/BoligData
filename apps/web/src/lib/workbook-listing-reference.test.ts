@@ -636,4 +636,17 @@ describe("prominent price by time on market card", () => {
     expect(html).toContain("under ‘Burde koste’");
     expect(html).not.toContain("-110.000");
   });
+
+  it.each(["sold", "withdrawn"] as const)("labels the stored asking price as historical for %s listings", status => {
+    const input = { property: { ...property, status } };
+    const da = render(input);
+    expect(da).toContain("Seneste udbudspris");
+    expect(da).not.toMatch(/aktuel udbudspris|dagens pris|dagens udbud/i);
+    expect(da).toContain('data-testid="workbook-historical-groups"');
+    i18n.language = "en";
+    const en = render(input);
+    expect(en).toContain("Last asking price");
+    expect(en).not.toMatch(/current asking/i);
+    expect(en).toContain("The last asking price is used only for comparison");
+  });
 });

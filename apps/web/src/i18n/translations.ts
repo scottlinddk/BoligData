@@ -69,6 +69,10 @@ const da = {
   "sort.daysOnMarket:asc": "Dage til salg",
 
   "property.daysOnMarket": "{days} kalenderdage siden oplyst start",
+  "property.status.active": "Til salg",
+  "property.status.withdrawn": "Fjernet fra markedet",
+  "property.status.sold": "Solgt",
+  "property.lastAskingPrice": "Seneste udbudspris",
   "property.sqm": "{sqm} m²",
   "property.pricePerSqm": "{price}/m²",
   "property.noPhoto": "Intet foto endnu",
@@ -502,6 +506,10 @@ const en: Translations = {
   "sort.daysOnMarket:asc": "Days on market",
 
   "property.daysOnMarket": "{days} calendar days since reported start",
+  "property.status.active": "For sale",
+  "property.status.withdrawn": "Removed from market",
+  "property.status.sold": "Sold",
+  "property.lastAskingPrice": "Last asking price",
   "property.sqm": "{sqm} m²",
   "property.pricePerSqm": "{price}/m²",
   "property.noPhoto": "No photo yet",
