@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createBuyingProject, type BuyingProject } from "@shared/analysis";
@@ -15,6 +15,7 @@ import { buttonClass, inputClass, Money, primaryClass, Status, useResearchText }
 
 const PAGE_SIZE = 6;
 type ProjectView = "candidates" | "profile" | "statistics" | "import";
+const MarketIndex = lazy(() => import("@/components/research/market-index").then(module => ({ default: module.MarketIndex })));
 
 export function ResearchPage() {
   const tx = useResearchText();
@@ -175,6 +176,7 @@ export function ResearchPage() {
       {message && <p role="status" className="mt-3 text-sm">{message}</p>}
     </>}
     {tab === "statistics" && <>
+      <Suspense fallback={<LoadingStatus>{tx("Henter markedsindeks…", "Loading market index…")}</LoadingStatus>}><MarketIndex /></Suspense>
       {historyQuery.isError ? <WorkspaceEmpty title={tx("Salgshistorikken kunne ikke hentes", "Could not load sales history")} description={tx("Prøv at hente handlerne igen.", "Try loading transactions again.")} action={<button type="button" className={buttonClass} onClick={() => void historyQuery.refetch()}>{tx("Prøv igen", "Try again")}</button>} /> : historyQuery.isPending ? <><LoadingStatus>{tx("Henter salgshistorik…", "Loading sales history…")}</LoadingStatus><Skeleton className="mt-4 h-48 w-full" /></> : <>
         {historyQuery.data?.truncated && <p role="status" className="mb-3 text-sm text-warning-text">{tx("Delvist dataudtræk — statistikken dækker kun de hentede rækker.", "Partial extract — statistics cover retrieved rows only.")}</p>}
         <ResearchStatistics transactions={historyQuery.data?.transactions ?? []} dataVersion={historyQuery.data?.dataVersion ?? "unavailable"} minResidentialArea={project?.minResidentialArea} />

@@ -285,6 +285,22 @@ async function researchChecks(main, page, report, tx, properties) {
   await main.getByText(tx("Profil gemt. Kandidater genberegnes med de nye krav.", "Profile saved. Candidates are recalculated with the new requirements."), { exact: true }).waitFor();
   assert(report.apiWrites.some(write => write.resource === "research-project" && write.body?.project.name === "Opdateret lokalt testprojekt"));
   await main.getByRole("button", { name: tx("Statistik", "Statistics"), exact: false }).first().click();
+  const marketIndex = main.getByTestId("market-index");
+  await marketIndex.getByRole("heading", { name: tx("Sammenlign tal for områder i Danmark", "Compare figures for areas in Denmark"), exact: true }).waitFor();
+  await marketIndex.getByLabel(tx("Vælg område", "Select an area"), { exact: true }).selectOption("Aalborg");
+  await marketIndex.getByRole("img", { name: /Aalborg/ }).waitFor();
+  const originalViewport = page.viewportSize();
+  for (const width of [1200, 768, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const layout = await marketIndex.evaluate(element => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+      panelRight: element.getBoundingClientRect().right,
+    }));
+    assert(layout.documentWidth <= layout.viewportWidth + 1 && layout.panelRight <= layout.viewportWidth + 1, `Market index must remain contained at ${width}px`);
+  }
+  await page.setViewportSize(originalViewport);
+  report.checks.push("Statistics retains the lazy-loaded market index and municipality comparison after merging main");
   await main.getByRole("button", { name: "Import", exact: false }).first().click();
   await main.getByRole("button", { name: tx("Kandidater", "Candidates"), exact: false }).first().click();
   report.checks.push("Buying project retains private profile saving and access to candidates, statistics and import");
