@@ -47,5 +47,6 @@ export function useSavedProperties() {
     toggle,
     properties: favoritesQuery.data?.properties ?? [],
     isLoading: favoritesQuery.isLoading,
+    isError: favoritesQuery.isError,
   };
 }

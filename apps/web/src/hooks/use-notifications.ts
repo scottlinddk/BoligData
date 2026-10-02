@@ -25,6 +25,7 @@ export function useNotifications(options: { unreadOnly?: boolean; type?: Notific
   return {
     notifications,
     isLoading: query.isLoading,
+    isError: query.isError,
     markRead: markReadMutation.mutateAsync,
     isMarkingRead: markReadMutation.isPending,
     markAllRead,

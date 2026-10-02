@@ -34,13 +34,14 @@ import "./index.css";
 
 function RootLayout() {
   const { pathname } = useLocation();
+  const isWorkspace = ["/research", "/dashboard", "/recommendations"].includes(pathname.replace(/\/$/, ""));
   return (
     <div className="min-h-full overflow-x-clip font-sans text-ink">
       <Header />
-      <main className={pathname === "/" || pathname.startsWith("/property/") ? "w-full" : "mx-auto max-w-6xl"}>
+      <main className={pathname === "/" || pathname.startsWith("/property/") || isWorkspace ? "w-full" : "mx-auto max-w-6xl"}>
         <Outlet />
       </main>
-      <RecommendationAlerts />
+      {pathname.replace(/\/$/, "") !== "/recommendations" && <RecommendationAlerts />}
     </div>
   );
 }
