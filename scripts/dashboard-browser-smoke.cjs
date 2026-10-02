@@ -287,7 +287,7 @@ async function researchChecks(main, page, report, tx, properties) {
   await main.getByRole("button", { name: tx("Statistik", "Statistics"), exact: false }).first().click();
   const marketIndex = main.getByTestId("market-index");
   await marketIndex.getByRole("heading", { name: tx("Sammenlign tal for områder i Danmark", "Compare figures for areas in Denmark"), exact: true }).waitFor();
-  await marketIndex.getByLabel(tx("Vælg område", "Select an area"), { exact: true }).selectOption("Aalborg");
+  await marketIndex.getByRole("combobox", { name: /Vælg område|Select an area/ }).selectOption("Aalborg");
   await marketIndex.getByRole("img", { name: /Aalborg/ }).waitFor();
   const originalViewport = page.viewportSize();
   for (const width of [1200, 768, 320]) {
