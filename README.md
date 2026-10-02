@@ -52,6 +52,11 @@ The committed `apps/web/.env.production` holds the real (non-secret) Supabase UR
 
 ## Data ingest status
 
+**Boligsiden market index:** the Statistics tab in the buying project includes
+Denmark/municipality comparisons for published Villa/Rækkehus sale prices per m².
+The initial snapshot contains 188 months through August 2026. Refresh it with
+`pnpm data:market-index`; see [source, coverage and refresh instructions](docs/boligsiden-market-index.md).
+
 Real Boliga and Boligsiden clients live in `apps/web/server/lib/crawl/{boliga,boligsiden}.ts`, behind the `CRAWL_MOCK_MODE` flag (default `true`, which reads local fixtures so the app stays demoable against seeded data). Instead of HTML scraping, they call the **unofficial JSON APIs** that boliga.dk's and boligsiden.dk's own frontends use — far more reliable than parsing markup, but unauthenticated and undocumented, so field shapes may drift. The clients defend against that: per-record mapping skips and counts malformed entries, requests have timeouts and retry with backoff (honoring `Retry-After`), pagination is capped (`CRAWL_MAX_PAGES` / `CRAWL_MAX_LISTINGS`), and pages are fetched with a polite delay.
 
 **Boliga is currently blocked from Vercel** (confirmed 2026-07-10): every request gets `HTTP 403` from datacenter IPs, and browser-like headers (UA, Referer/Origin, `sec-ch-*`) didn't change that, so it's an IP-range block rather than a fingerprint check. Boligsiden has no such block and ingests live data cleanly. Use `CRAWL_SOURCES` (comma-separated, e.g. `CRAWL_SOURCES=boligsiden`) to run only the working source(s) — unset, empty, or containing no recognized source name falls back to both. Re-enable Boliga once it's reachable again (a residential/rotating proxy in front of that one client, or a different execution host).
