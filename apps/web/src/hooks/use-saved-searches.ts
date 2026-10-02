@@ -32,6 +32,7 @@ export function useSavedSearches() {
   return {
     searches: searchesQuery.data ?? [],
     isLoading: searchesQuery.isLoading,
+    isError: searchesQuery.isError,
     createSearch: createMutation.mutateAsync,
     updateAlert: updateAlertMutation.mutateAsync,
   };
