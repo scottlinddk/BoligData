@@ -18,7 +18,7 @@ interface Props {
 export function WorkbookPriceReferenceCard({ property, history, loading, failed, onRetry }: Props) {
   const tx = useResearchText();
   const { language } = useI18n();
-  const { listing, reference, firstAsking, estimatedFirst, exactOriginal, originalPriceConflict, lastSourceCheck, stale, invalidSourceTiming } = workbookListingReference(property, history);
+  const { listing, reference, timeScope, firstAsking, estimatedFirst, exactOriginal, originalPriceConflict, lastSourceCheck, stale, invalidSourceTiming } = workbookListingReference(property, history);
   const { metadata, bracket } = reference;
   const ready = reference.status === "available";
   const historicalDataAvailable = bracket !== null && reference.medianDiscountPercent !== null;
@@ -82,7 +82,7 @@ export function WorkbookPriceReferenceCard({ property, history, loading, failed,
       {originalPriceConflict && <p role="status" className="mt-3 text-sm text-warning-text">{tx("Kilderne angiver forskellige oprindelige udbudspriser. ‘Burde koste’ afventer afklaring af prisgrundlaget.", "The sources report conflicting original asking prices. ‘Should cost’ requires this conflict to be resolved.")}</p>}
       {historicalDataAvailable && <>
         <p data-testid="workbook-time-basis" className="mt-4 text-xs text-ink-soft">
-          {allSales ? tx("Liggetid ukendt · samlet historisk grundlag", "Time on market unknown · full historical sample") : <>{reference.latestEpisodeDays} {tx("dage på markedet", "days on market")} · {tx("Tidsgruppe", "Time group")}: {bracket!.label} {tx("dage", "days")}</>}
+          {allSales ? tx("Liggetid ukendt · samlet historisk grundlag", "Time on market unknown · full historical sample") : <>{reference.latestEpisodeDays} {timeScope === "total_marketing_period" ? tx("dage på markedet i alt", "days on market in total") : tx("dage på markedet", "days on market")} · {tx("Tidsgruppe", "Time group")}: {bracket!.label} {tx("dage", "days")}</>}
           {" · "}{bracket!.count} {tx("historiske handler", "historical sales")} · {percent(reference.medianDiscountPercent!)} {tx("medianfald", "median reduction")}
         </p>
         {nearestBracket && <p data-testid="workbook-nearest-bracket" className="mt-2 text-xs text-ink-soft">{tx(`Liggetiden er uden for de observerede ${metadata.observedMinDays}–${metadata.observedMaxDays} dage. Den nærmeste historiske tidsgruppe anvendes.`, `Time on market is outside the observed ${metadata.observedMinDays}–${metadata.observedMaxDays} days. The nearest historical time group is used.`)}</p>}

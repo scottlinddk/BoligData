@@ -168,6 +168,44 @@ describe("source-reported original asking integration", () => {
   });
 });
 
+describe("time on market matched to the original price's period", () => {
+  // Hasserisvej 278 shape: 45 days with an earlier broker plus the current one.
+  const earlierOpening = new Date(Date.parse(NOW) - 600 * 86_400_000).toISOString().slice(0, 10);
+  const duration: ResearchObservation = { ...askingChange, id: "duration", fieldName: "reported_time_on_market", method: "source_reported_duration",
+    value: { latestEpisodeDays: 188, totalDays: 233 } };
+  const totalOriginal: ResearchObservation = { ...exactOriginal, sourceVersion: "original-price-backfill/v2", effectiveDate: earlierOpening, datePrecision: "day",
+    value: { ...exactOriginal.value as Record<string, unknown>, originalDate: earlierOpening, priceScope: "total_marketing_period", totalDays: 233 } };
+
+  it("brackets a total-period original by the source's total days, not the current broker's", () => {
+    const data = history({ events: [], observations: [totalOriginal, duration] });
+    const result = workbookListingReference(property, data);
+    expect(result.timeScope).toBe("total_marketing_period");
+    expect(result.reference).toMatchObject({ status: "available", latestEpisodeDays: 233, baselinePrice: 5_500_000, bracket: { label: "181–240" } });
+    expect(result.listing.time.latestEpisodeDays).toBe(188);
+    expect(render({ history: data })).toContain("233 dage på markedet i alt");
+  });
+
+  it("moves to the bracket the total days fall in", () => {
+    const longer = { ...duration, value: { latestEpisodeDays: 188, totalDays: 300 } };
+    const result = workbookListingReference(property, history({ events: [], observations: [totalOriginal, longer] }));
+    expect(result.reference).toMatchObject({ latestEpisodeDays: 300, bracket: { label: "241–365" } });
+  });
+
+  it("keeps the current listing's days when the original only covers the current broker", () => {
+    const data = history({ events: [], observations: [exactOriginal, { ...duration, value: { latestEpisodeDays: 188, totalDays: 300 } }] });
+    const result = workbookListingReference(property, data);
+    expect(result.timeScope).toBe("current_listing");
+    expect(result.reference).toMatchObject({ latestEpisodeDays: 188, bracket: { label: "181–240" } });
+    expect(render({ history: data })).not.toContain("i alt");
+  });
+
+  it("falls back to the current listing's days when the source total is unavailable", () => {
+    const result = workbookListingReference(property, history({ events: [], observations: [totalOriginal] }));
+    expect(result.timeScope).toBe("current_listing");
+    expect(result.reference.latestEpisodeDays).toBe(188);
+  });
+});
+
 describe("listing workbook reference integration", () => {
   it("uses the documented first asking price, not another discount on the current asking price", () => {
     const result = workbookListingReference(property, history());

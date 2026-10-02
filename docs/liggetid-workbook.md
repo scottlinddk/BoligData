@@ -92,6 +92,17 @@ Time matching follows three explicit paths:
   the listing's duration. Medians and quartiles are calculated over the original
   observations, never as a mean or median of the ten bracket medians.
 
+The subject's duration follows the scope of its original asking price. When that
+original is a verified total-marketing-period price (`priceScope:
+total_marketing_period`, for example after a broker change), the lookup uses the
+source's total days (`timeOnMarket.total.days`), so the duration and the price
+basis cover the same period. Otherwise it uses the current listing's days. The
+calculator field keeps the name `latestEpisodeDays`; the adapter's `timeScope`
+records which duration was used. The workbook's own durations are Boliga
+latest-episode days, and 62 of the 281 eligible sales had an earlier period, so
+the historical side is not total-period throughout. This is a known limitation
+of the dataset, not something the subject lookup can correct.
+
 Each eligible sale has equal weight. The calculation is
 `baselinePrice × (1 − median historical total price fall)`. Q3 of the discount
 produces the lower scenario price; Q1 produces the upper price. Sales above

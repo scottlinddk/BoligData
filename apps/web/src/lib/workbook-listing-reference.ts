@@ -4,6 +4,7 @@ import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import { researchListingTime } from "./research-listing-time";
 import { reportedAskingPrice } from "./reported-asking-price";
 import { originalAskingPrice } from "./original-asking-price";
+import { reportedMarketingPeriod } from "./reported-listing-duration";
 
 /** The reference is anchored to the original asking price. A complete source
  * price/percentage pair may reconstruct it, but today's asking price is only
@@ -44,10 +45,17 @@ export function workbookListingReference(property: Property, history?: ResearchH
   const estimatedFirst = !exactOriginal && !exactBlocked && !invalidSourceTiming && listing.firstAsking === null && listing.campaignId !== null && !history?.truncated && !hasFirstPriceEvidence
     ? reportedAskingPrice(property, history) : null;
   const firstAsking = exactBlocked ? null : exactOriginal?.price ?? (invalidSourceTiming ? null : listing.firstAsking ?? estimatedFirst?.firstAsking ?? null);
+  // Match the time to the price basis: an original from the total marketing
+  // period (across earlier listings and brokers) pairs with the source's total
+  // days; an original from the current listing keeps the current listing's days.
+  const marketingPeriod = reportedMarketingPeriod(property, history);
+  const timeScope: "total_marketing_period" | "current_listing" = !exactBlocked && exactOriginal?.priceScope === "total_marketing_period" && marketingPeriod !== null
+    ? "total_marketing_period" : "current_listing";
+  const referenceDays = invalidSourceTiming ? null : timeScope === "total_marketing_period" ? marketingPeriod!.totalDays : listing.time.latestEpisodeDays;
   const reference = calculateWorkbookPriceReference({
     firstAsking,
     currentAsking: property.price,
-    latestEpisodeDays: invalidSourceTiming ? null : listing.time.latestEpisodeDays,
+    latestEpisodeDays: referenceDays,
     propertyType: property.propertyType,
     postalCode: property.postalCode,
   });
@@ -55,7 +63,7 @@ export function workbookListingReference(property: Property, history?: ResearchH
   const stamp = candidate ? timestamp(candidate) : NaN;
   const lastSourceCheck = !invalidSourceTiming && candidate && Number.isFinite(stamp) && stamp <= cutoff ? candidate : null;
   return {
-    listing, reference, firstAsking, estimatedFirst, exactOriginal: exactBlocked ? null : exactOriginal,
+    listing, reference, timeScope, marketingPeriod, firstAsking, estimatedFirst, exactOriginal: exactBlocked ? null : exactOriginal,
     originalPriceConflict: exactConflict, originalPriceEvidenceStatus: exactResolution.status, lastSourceCheck, invalidSourceTiming,
     stale: lastSourceCheck !== null && Date.now() - Date.parse(lastSourceCheck) > 8 * 86_400_000,
   };
