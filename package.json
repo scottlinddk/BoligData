@@ -11,7 +11,7 @@
     "build": "pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm --filter web lint",
-    "test": "node --test scripts/update-market-index.test.mjs && pnpm -r test",
+    "test": "node --test scripts/update-market-index.test.mjs scripts/verify-search-boundary.test.mjs && pnpm -r test",
     "data:market-index": "node scripts/update-market-index.mjs"
   }
 }

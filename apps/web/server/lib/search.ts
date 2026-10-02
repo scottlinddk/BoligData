@@ -84,7 +84,7 @@ function resolveSort(sortField: string, sortDirection: string) {
 /**
  * Anonymous callers only ever see the listing name (address) plus the total
  * match count; signing in reveals the full record. This is enforced here
- * (not just hidden in the UI) by selecting fewer columns for the anon path.
+ * (not just hidden in the UI) by mapping anonymous rows to address-only summaries.
  */
 export async function searchProperties(
   client: SupabaseClient,
@@ -99,8 +99,10 @@ export async function searchProperties(
   const boundary = typeof query.polygon === "string" ? parseSearchBoundary(query.polygon) : null;
   if (query.polygon !== undefined && query.polygon !== null && !boundary) throw new InvalidSearchBoundaryError();
   // Spatial filtering happens before count/range, never on an already-paginated browser result.
+  // Older PostgREST versions cannot sort/filter RPC columns excluded by select.
+  // Keep the full row internally; rowToPropertySummary strips it for anonymous callers.
   let builder = (boundary
-    ? client.rpc("properties_in_boundary", { boundary }, { count: "exact" }).select(columns)
+    ? client.rpc("properties_in_boundary", { boundary }, { count: "exact" }).select("*")
     : client.from("properties").select(columns, { count: "exact" }))
     .eq("status", "active");
 

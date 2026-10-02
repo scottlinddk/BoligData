@@ -282,13 +282,13 @@ describe("searchProperties", () => {
     expect(calls).toContainEqual({ method: "range", args: [2, 3] });
   });
 
-  it("keeps polygon searches address-only for anonymous callers and includes polygon edges", async () => {
+  it("keeps RPC sort columns available internally while returning only anonymous addresses", async () => {
     const calls: { method: string; args: unknown[] }[] = [];
     const result = await searchProperties(fakeClient(ROWS, [], calls), { polygon: "[[9,57],[10,57],[10,58],[9,58]]" }, false);
     expect(result.properties).toEqual([]);
-    expect(result.summaries).toHaveLength(3);
-    expect(result.summaries[0]).not.toHaveProperty("price");
-    expect(calls).toContainEqual({ method: "select", args: ["id, address", undefined] });
+    expect(result.summaries).toEqual(ROWS.map(({ id, address }) => ({ id, address })));
+    expect(calls).toContainEqual({ method: "select", args: ["*", undefined] });
+    expect(calls).toContainEqual({ method: "order", args: ["listing_date", { ascending: false }] });
   });
 
   it("rejects invalid provided polygons before querying instead of returning unrestricted results", async () => {
