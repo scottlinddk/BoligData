@@ -17,6 +17,7 @@ import {
 import { useI18n } from "@/i18n/i18n";
 import type { TranslationKey } from "@/i18n/translations";
 import type { ListingRecommendation, Property } from "@shared/types/index";
+import { canSendRecommendations } from "@/lib/roles";
 
 type RecommendationStatus = ListingRecommendation["status"];
 type RecommendationFilter = "all" | RecommendationStatus;
@@ -52,7 +53,7 @@ export function RecommendationsPage() {
     </DashboardWorkspace>;
   }
 
-  return profile?.role === "advisor" || profile?.role === "agent"
+  return canSendRecommendations(profile?.role)
     ? <SentRecommendations />
     : <ReceivedRecommendations />;
 }

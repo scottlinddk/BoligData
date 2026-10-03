@@ -18,6 +18,7 @@ import { RecommendModal } from "@/components/recommend-modal";
 import { useToast } from "@/components/toast";
 import { useI18n } from "@/i18n/i18n";
 import type { PropertyType } from "@shared/types/index";
+import { canSendRecommendations } from "@/lib/roles";
 
 const pill = "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:border-border-strong hover:bg-surface-alt";
 const primary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-cta-text transition hover:bg-cta-hover disabled:opacity-40";
@@ -45,7 +46,7 @@ export function SearchPage() {
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState("");
   const [savingSearch, setSavingSearch] = useState(false);
-  const canRecommend = profile?.role === "advisor" || profile?.role === "agent";
+  const canRecommend = canSendRecommendations(profile?.role);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recommendOpen, setRecommendOpen] = useState(false);
   // Browser back/forward and saved-search links can change the search too.

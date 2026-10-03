@@ -58,7 +58,7 @@ async function handleList(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
-  const auth = await requireRole(req, res, ["advisor", "agent"]);
+  const auth = await requireRole(req, res, ["advisor", "agent", "admin"]);
   if (!auth) return;
 
   const client = getAnonClient(auth.jwt);

@@ -31,6 +31,7 @@ import { RecommendModal } from "@/components/recommend-modal";
 import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
+import { canSendRecommendations } from "@/lib/roles";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
 const actionClass = "flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors";
@@ -54,7 +55,7 @@ export function PropertyDetailPage() {
   const [saving, setSaving] = useState(false);
   const priceReference = useRef<HTMLDivElement>(null);
   const researchDetails = useRef<HTMLDetailsElement>(null);
-  const canRecommend = profile?.role === "advisor" || profile?.role === "agent";
+  const canRecommend = canSendRecommendations(profile?.role);
   const detailQuery = useQuery({ queryKey: ["property", id], queryFn: () => getProperty(id!), enabled: !!id });
   const comparablesQuery = useQuery({ queryKey: ["comparables", id], queryFn: () => getComparables(id!), enabled: !!id });
   const listing = detailQuery.data?.property;
