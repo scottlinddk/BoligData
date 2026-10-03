@@ -20,6 +20,10 @@ interface PropertyMapProps {
   filters?: PropertyFilters;
   onSelect?: (property: Property) => void;
   onBoundaryChange?: (polygon: string | null) => void;
+  /** Lets a map-only layout (mobile) jump to the list of homes in the drawn area. */
+  onShowList?: () => void;
+  /** Total homes matching the active search, shown on the list button. */
+  listTotal?: number;
 }
 
 const BOUNDARY_SOURCE = "search-boundary";
@@ -82,7 +86,7 @@ function installLayers(map: maplibregl.Map) {
   map.addLayer({ id: POINT_LAYER, type: "circle", source: PROPERTY_SOURCE, filter: ["!", ["has", "point_count"]], paint: { "circle-radius": 1, "circle-opacity": 0 } });
 }
 
-export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }: PropertyMapProps) {
+export function PropertyMap({ properties, filters, onSelect, onBoundaryChange, onShowList, listTotal }: PropertyMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const drawButtonRef = useRef<HTMLButtonElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -404,11 +408,14 @@ export function PropertyMap({ properties, filters, onSelect, onBoundaryChange }:
       </div>
     </div>}
     {!ready && <div role="status" className="property-map-caption pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm"><span className="property-map-panel rounded-lg px-4 py-3">{mapError ? tx("Kortet kunne ikke indlæses. Boligerne kan stadig ses i listen.", "The map could not load. Listings remain available in the list.") : tx("Indlæser kort…", "Loading map…")}</span></div>}
-    {ready && <div aria-live="polite" className="property-map-panel property-map-caption pointer-events-none absolute bottom-7 left-3 z-10 max-w-[calc(100%-24px)] rounded-lg px-3 py-2 text-xs">
+    {ready && <div className="pointer-events-none absolute bottom-7 left-3 z-10 flex max-w-[calc(100%-24px)] flex-col items-start gap-2">
+    {onShowList && polygon !== null && !invalidSavedBoundary && !drawing && <button type="button" className="property-map-control property-map-primary pointer-events-auto" onClick={onShowList}>{listTotal === undefined ? tx("Vis boliger i området", "Show homes in area") : tx(`Vis ${listTotal.toLocaleString("da-DK")} boliger i området`, `Show ${listTotal.toLocaleString("en-GB")} homes in area`)}</button>}
+    <div aria-live="polite" className="property-map-panel property-map-caption pointer-events-none rounded-lg px-3 py-2 text-xs">
       {mapStyleTheme.changing && <p>{tx("Opdaterer korttema…", "Updating map theme…")}</p>}
       {mapStyleTheme.error && <p>{tx("Korttemaet kunne ikke indlæses fuldt. Prøv at skifte tema igen.", "The map theme could not fully load. Try switching the theme again.")}</p>}
       {mapError && <p>{tx("Nogle kortdata kunne ikke indlæses.", "Some map data could not load.")}</p>}
       {searchError ? <p>{tx("Boligerne kunne ikke opdateres. Prøv at flytte kortet eller ændre filtrene.", "Listings could not refresh. Try moving the map or changing filters.")}</p> : searching ? <p>{tx("Opdaterer boliger i kortudsnittet…", "Updating listings in this map area…")}</p> : <p>{filters && viewportTotal !== null && viewportTotal > mappedCount ? tx(`Viser ${mappedCount} af ${viewportTotal} boliger. Zoom ind for flere.`, `Showing ${mappedCount} of ${viewportTotal} listings. Zoom in for more.`) : tx(`${mappedCount} boliger på kortet`, `${mappedCount} listings on the map`)}{polygon && !invalidSavedBoundary ? tx(" · Tegnet område aktivt", " · Drawn area active") : ""}</p>}
+    </div>
     </div>}
   </div>;
 }

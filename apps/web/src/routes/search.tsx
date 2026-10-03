@@ -137,7 +137,7 @@ export function SearchPage() {
         </div>}
         </section>
         {showMap && <aside aria-label={tx("Kort over boliger", "Map of homes")} className={`overflow-hidden rounded-[22px] border border-border ${isMobile ? "relative h-[68dvh] min-h-[430px]" : "sticky top-20 h-[calc(100dvh-7rem)] min-h-[500px] max-h-[900px] self-start"}`}>
-          <PropertyMap properties={properties} filters={filters} onBoundaryChange={polygon => handleFilterChange({ polygon })} />
+          <PropertyMap properties={properties} filters={filters} onBoundaryChange={polygon => handleFilterChange({ polygon })} onShowList={isMobile ? () => setMobileTab("list") : undefined} listTotal={data ? total : undefined} />
         </aside>}
       </div>
     </div>
