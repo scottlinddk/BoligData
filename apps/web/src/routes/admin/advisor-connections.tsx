@@ -7,6 +7,7 @@ import {
   listAdminUsers,
 } from "@/lib/api";
 import { useI18n } from "@/i18n/i18n";
+import { isConnectionProfessional } from "@/lib/roles";
 
 export function AdminAdvisorConnectionsPage() {
   const { t } = useI18n();
@@ -33,7 +34,7 @@ export function AdminAdvisorConnectionsPage() {
   });
 
   const users = usersQuery.data?.users ?? [];
-  const professionals = users.filter((u) => u.role === "advisor" || u.role === "agent");
+  const professionals = users.filter((u) => isConnectionProfessional(u.role));
   const emailById = new Map(users.map((u) => [u.id, u.email]));
   const roleById = new Map(users.map((u) => [u.id, u.role]));
   const connections = connectionsQuery.data?.connections ?? [];
@@ -65,7 +66,7 @@ export function AdminAdvisorConnectionsPage() {
           <option value="">{t("admin.advisorConnections.advisor")}</option>
           {professionals.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.email} ({t(p.role === "agent" ? "role.agent" : "role.advisor")})
+              {p.email} ({t(p.role === "agent" ? "role.agent" : p.role === "admin" ? "role.admin" : "role.advisor")})
             </option>
           ))}
         </select>
@@ -106,7 +107,7 @@ export function AdminAdvisorConnectionsPage() {
                 {emailById.get(c.advisorId) ?? c.advisorId}
                 {professionalRole && (
                   <span className="ml-1.5 rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-brand-text">
-                    {t(professionalRole === "agent" ? "role.agent" : "role.advisor")}
+                    {t(professionalRole === "agent" ? "role.agent" : professionalRole === "admin" ? "role.admin" : "role.advisor")}
                   </span>
                 )}
                 <span className="mx-1.5 text-ink-soft">→</span>
