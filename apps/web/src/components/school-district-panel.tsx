@@ -36,9 +36,12 @@ export function SchoolDistrictContent({ result, loading, failed, onRetry }: {
             : tx("Klassetrin ikke oplyst", "Grades not provided")}</p>
         </li>)}
       </ul>}
-      <p className="mt-4 text-xs text-ink-soft">{tx("Kildens sikkerhed", "Source confidence")}: {confidence} · {tx("Hentet", "Retrieved")} {new Date(result.checkedAt).toLocaleDateString(language === "da" ? "da-DK" : "en-GB")}{result.source && ` · ${tx("Kildestatus", "Source status")}: ${result.source}`}</p>
+      <p className="mt-4 text-xs text-ink-soft">{result.provider !== "lifa" && <>{tx("Kildens sikkerhed", "Source confidence")}: {confidence} · </>}{tx("Hentet", "Retrieved")} {new Date(result.checkedAt).toLocaleDateString(language === "da" ? "da-DK" : "en-GB")}{result.source && ` · ${tx("Kildestatus", "Source status")}: ${result.source}`}</p>
     </>}
-    <p className="mt-4 text-xs leading-5 text-ink-soft">{tx("Vejledende oplysninger fra Skoledistrikt.dk, baseret på GeoFA og LIFA AdresseService. Distrikter, kapacitet og kommunale regler kan ændre sig. Bekræft altid skoleplaceringen hos kommunen.", "Advisory information from Skoledistrikt.dk, based on GeoFA and LIFA AdresseService. Districts, capacity and municipal rules can change. Always confirm the school assignment with the municipality.")}</p>
+    <p className="mt-4 text-xs leading-5 text-ink-soft">{result?.provider === "lifa"
+      ? tx("Vejledende oplysninger fra LIFA AdresseService, der daglig kobler adresser med kommunernes skoledistrikter.", "Advisory information from LIFA AdresseService, which matches addresses to the municipalities' school districts daily.")
+      : tx("Vejledende oplysninger fra Skoledistrikt.dk, baseret på GeoFA og LIFA AdresseService.", "Advisory information from Skoledistrikt.dk, based on GeoFA and LIFA AdresseService.")}
+      {" "}{tx("Distrikter, kapacitet og kommunale regler kan ændre sig. Bekræft altid skoleplaceringen hos kommunen.", "Districts, capacity and municipal rules can change. Always confirm the school assignment with the municipality.")}</p>
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium">
       <a href="https://skoledistrikt.dk/" target="_blank" rel="noopener noreferrer" className="underline">{tx("Slå adresse op på Skoledistrikt.dk", "Look up the address on Skoledistrikt.dk")} ↗</a>
       {result?.status !== "unavailable" && result?.addressId && <a href={result.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">{tx("Se kildedata", "View source data")} ↗</a>}
