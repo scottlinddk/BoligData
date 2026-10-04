@@ -10,7 +10,7 @@ vi.mock("@/hooks/use-school-district", () => ({ useSchoolDistrict: vi.fn() }));
 const result: SchoolDistrictResult = {
   status: "available", reason: null, addressId: "0a3f509c-b58c-32b8-e044-0003ba298018", address: "Slåenvej 18, 9000 Aalborg",
   municipality: "Aalborg", matches: [{ schoolName: "Gl. Hasseris Skole", firstGrade: 0, lastGrade: 9, schoolUrl: "https://skoledistrikt.dk/skole/aalborg/gl-hasseris-skole" },
-    { schoolName: "Overbygningsskole", firstGrade: 7, lastGrade: 10, schoolUrl: null }], confidence: "high", source: "CACHE",
+    { schoolName: "Overbygningsskole", firstGrade: 7, lastGrade: 10, schoolUrl: null }], confidence: "high", provider: "skoledistrikt", source: "CACHE",
   sourceUrl: "https://skoledistrikt.dk/api/school-district/by-address?id=0a3f509c-b58c-32b8-e044-0003ba298018",
   checkedAt: "2026-09-28T12:00:00.000Z", disclaimer: "Resultatet er vejledende.",
 };
@@ -42,5 +42,14 @@ describe("school district panel", () => {
     const failed = render({ result: { ...result, status: "unavailable", reason: "upstream_unavailable", matches: [] } });
     expect(failed).toContain("Prøv igen"); expect(failed).not.toContain("Se kildedata");
     expect(render({ result: undefined, failed: true })).toContain("kunne ikke hentes");
+  });
+
+  it("attributes LIFA AdresseService results to LIFA and omits the confidence it does not provide", () => {
+    const html = render({ result: { ...result, provider: "lifa", confidence: "unknown", source: "LIFA AdresseService", disclaimer: null,
+      sourceUrl: "https://adresseservice.lifa.dk/api/AdresseDistrikter/Skole?id=0a3f509c-b58c-32b8-e044-0003ba298018" } });
+    expect(html).toContain("Vejledende oplysninger fra LIFA AdresseService");
+    expect(html).not.toContain("fra Skoledistrikt.dk");
+    expect(html).not.toContain("Kildens sikkerhed");
+    expect(html).toContain("adresseservice.lifa.dk/api/AdresseDistrikter/Skole");
   });
 });

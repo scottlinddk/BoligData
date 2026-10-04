@@ -13,7 +13,7 @@ const id = "0a3f509c-b58c-32b8-e044-0003ba298018";
 const schoolResult: Awaited<ReturnType<typeof lookupSchoolDistrict>> = {
   status: "available", reason: null, addressId: id, address: "Slåenvej 18, 9000 Aalborg", municipality: "Aalborg",
   matches: [{ schoolName: "Gl. Hasseris Skole", schoolUrl: null, firstGrade: 0, lastGrade: 9 }],
-  confidence: "high", source: "CACHE", sourceUrl: `https://skoledistrikt.dk/api/school-district/by-address?id=${id}`,
+  confidence: "high", provider: "skoledistrikt", source: "CACHE", sourceUrl: `https://skoledistrikt.dk/api/school-district/by-address?id=${id}`,
   checkedAt: "2026-09-28T12:00:00Z", disclaimer: null,
 };
 function request(query: Record<string, string> = { id, resource: "school-district" }): VercelRequest {
