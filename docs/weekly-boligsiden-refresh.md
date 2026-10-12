@@ -6,7 +6,7 @@ The scheduled runner uses `--weekly`. To run the same refresh manually, select *
 
 ## Configuration and credentials
 
-The runner pulls the existing Vercel production environment with repository Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`. If Vercel redacts protected values as `[SENSITIVE]`, supply repository Actions secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; these override the downloaded values. The runner refuses redacted database credentials before creating a database client.
+The runner pulls the existing Vercel production environment with repository Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`. If Vercel redacts protected values as `[SENSITIVE]`, supply repository Actions secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; these override the downloaded values. `SUPABASE_URL` is optional: it is a public value, so when it is redacted and no secret is set the runner uses `VITE_SUPABASE_URL` from `apps/web/.env.production`. `SUPABASE_SERVICE_ROLE_KEY` has no such fallback. The runner refuses redacted database credentials before creating a database client.
 
 `DATAFORDELER_API_KEY` is an optional Actions secret for register enrichment. Missing credentials or unavailable register services leave those facts unavailable. They do not substitute fixture data. Environment files are not logged or uploaded and are removed in an always-run cleanup step.
 
