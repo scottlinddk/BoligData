@@ -86,6 +86,12 @@ jobs:
           # Vercel does not export protected production values. Optional runner
           # secrets take precedence over the downloaded placeholders.
           if [ -n "$RUNNER_SUPABASE_URL" ]; then export SUPABASE_URL="$RUNNER_SUPABASE_URL"; fi
+          # The project URL is public (it ships in the browser bundle), so when
+          # it is neither a secret nor exported by Vercel, use the committed one.
+          if [ -z "${SUPABASE_URL:-}" ] || [ "${SUPABASE_URL:-}" = "[SENSITIVE]" ]; then
+            public_url="$(sed -n 's/^VITE_SUPABASE_URL=//p' apps/web/.env.production | tr -d "\"'\r" | head -n 1)"
+            if [ -n "$public_url" ]; then export SUPABASE_URL="$public_url"; fi
+          fi
           if [ -n "$RUNNER_SUPABASE_SERVICE_ROLE_KEY" ]; then export SUPABASE_SERVICE_ROLE_KEY="$RUNNER_SUPABASE_SERVICE_ROLE_KEY"; fi
           if [ -n "$RUNNER_DATAFORDELER_API_KEY" ]; then export DATAFORDELER_API_KEY="$RUNNER_DATAFORDELER_API_KEY"; fi
           node --env-file=.vercel/.env.production.local apps/web/.crawl-build/apps/web/server/lib/crawl/run-cli.js "${args[@]}"
