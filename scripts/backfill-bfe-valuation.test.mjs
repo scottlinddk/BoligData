@@ -5,6 +5,7 @@ import {
   SERVICES,
   addressIdsByProperty,
   buildValuationRows,
+  classifyAddressId,
   createDatafordeler,
   createThrottle,
   parseArgs,
@@ -265,4 +266,13 @@ test('API key never appears in a GraphQL error surfaced to the caller', async ()
   const fetchImpl = async () => ({ status: 200, ok: true, headers: new Headers(), json: async () => ({ errors: [{ message: 'bad url ?apiKey=SECRET123 here' }] }) });
   const client = createDatafordeler({ apiKey: 'SECRET123', throttle: async () => {}, fetchImpl, env: { DATAFORDELER_DAR_VERSION: 'v3' }, sleep: async () => {} });
   await assert.rejects(client.post(SERVICES.DAR, '{ x }'), (err) => !String(err.message).includes('SECRET123'));
+});
+
+test('classifyAddressId tells a unit address from an access address', async () => {
+  const idIn = (id) => (query) => (query.includes(JSON.stringify(id)) ? [{ id_lokalId: id }] : []);
+  const { client } = makeClient({ data: { DAR_Adresse: idIn(ADDRESS), DAR_Husnummer: idIn(HUSNUMMER) } });
+  assert.deepEqual(await classifyAddressId(client, ADDRESS), { ok: true, value: 'adresse' });
+  assert.deepEqual(await classifyAddressId(client, HUSNUMMER), { ok: true, value: 'husnummer' });
+  assert.deepEqual(await classifyAddressId(client, GRUND), { ok: true, value: 'none' });
+  assert.equal((await classifyAddressId(client, 'nope')).ok, false);
 });
