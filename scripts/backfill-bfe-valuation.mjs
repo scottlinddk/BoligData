@@ -110,9 +110,10 @@ export function positiveInt(value) {
 
 export const USAGE = `Usage: node scripts/backfill-bfe-valuation.mjs [options]
   --discover            print field names of the DAR/BBR/VUR types used, then exit
-  --probe               check that Boligsiden addressId resolves to the stored id_lokalid (no writes)
+  --probe               classify addressId/id_lokalid (DAR_Adresse vs DAR_Husnummer), compare derived and stored ids,
+                        and list which VUR valuation years exist (no writes)
   --write               persist results (default is a dry run)
-  --limit <n>           process at most n properties (probe: sample size, default 5)
+  --limit <n>           process at most n properties (probe: sample size, default 20)
   --rps <n>             Datafordeler requests per second, 0.1 to 10 (default 2)
   --no-sold-first       do not process properties with sales first
   --fix-apartment-bfe   overwrite a stored parcel-level bfe_nummer on apartments with the unit BFE`;
@@ -304,6 +305,19 @@ export async function resolveHusnummer(client, addressId) {
   if (ids.length > 1) return fail(`DAR_Adresse references several husnumre (${ids.join(', ')})`);
   if (!UUID.test(ids[0])) return fail('the husnummer reference is not a UUID');
   return ok(ids[0].toLowerCase());
+}
+
+/**
+ * Which DAR entity does an id belong to? DAR keeps unit addresses (DAR_Adresse, floor/door) and
+ * access addresses (DAR_Husnummer, the entrance) as separate UUID spaces, so a Boligsiden addressId
+ * and a stored id_lokalid can be the same kind of id or not. Returns 'adresse', 'husnummer',
+ * 'both' (never expected, reported if seen) or 'none'.
+ */
+export async function classifyAddressId(client, id) {
+  if (!UUID.test(String(id))) return fail('not a UUID');
+  const hit = async (entity) => (await queryNodes(client, SERVICES.DAR, entity, `id_lokalId: { eq: ${JSON.stringify(String(id).toLowerCase())} }`, 'id_lokalId')).length > 0;
+  const [adresse, husnummer] = [await hit('DAR_Adresse'), await hit('DAR_Husnummer')];
+  return ok(adresse && husnummer ? 'both' : adresse ? 'adresse' : husnummer ? 'husnummer' : 'none');
 }
 
 /** Houses: husnummer -> built building -> parcel (Grund) -> BFE of the parcel. */
@@ -522,7 +536,7 @@ async function persist(db, property, r, opts) {
   for (const [path, body] of patches) await db.patch(path, body);
   if (r.valuations.length) {
     const observed_at = new Date().toISOString();
-    await db.upsert('property_valuations', r.valuations.map((v) => ({ property_id: property.id, bfe_nummer: r.bfe, ...v, source: 'datafordeler_vur', data_mode: 'real', observed_at })), 'property_id,valuation_year');
+    await db.upsert('property_valuations', r.valuations.map((v) => ({ property_id: property.id, bfe_nummer: r.bfe, bfe_type: UNIT_TYPES.has(property.property_type) ? 'EL' : 'SFE', ...v, source: 'datafordeler_vur', data_mode: 'real', observed_at })), 'property_id,valuation_year');
   }
 }
 
@@ -583,17 +597,38 @@ export async function main(argv, env = process.env) {
   if (addresses.size === 0) console.log('Warning: no source_address_id observations matched (filters: source=boligsiden, conflict_group is null).');
 
   if (opts.probe) {
-    const sample = properties.filter((p) => p.id_lokalid && addresses.has(p.id)).slice(0, opts.limit ?? 5);
-    if (sample.length === 0) throw new Error('no property has both a stored id_lokalid and a Boligsiden addressId to compare');
-    let match = 0, mismatch = 0, failed = 0;
+    const sample = properties.filter((p) => addresses.has(p.id)).slice(0, opts.limit ?? 20);
+    if (sample.length === 0) throw new Error('no property has a Boligsiden addressId to probe');
+    const classes = { addressId: new Map(), storedId: new Map() };
+    const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
+    const years = new Map();
+    let match = 0, mismatch = 0, failed = 0, noStored = 0, valued = 0;
     for (const p of sample) {
+      const c = await classifyAddressId(client, addresses.get(p.id));
+      bump(classes.addressId, c.ok ? c.value : `error: ${c.reason}`);
+      if (p.id_lokalid) {
+        const s = await classifyAddressId(client, p.id_lokalid);
+        bump(classes.storedId, s.ok ? s.value : `error: ${s.reason}`);
+      }
       const r = await resolveHusnummer(client, addresses.get(p.id));
-      if (!r.ok) { failed++; console.log(`FAIL      ${p.id}  ${r.reason}`); }
+      if (!p.id_lokalid) noStored++;
+      else if (!r.ok) { failed++; console.log(`FAIL      ${p.id}  ${r.reason}`); }
       else if (r.value === String(p.id_lokalid).toLowerCase()) { match++; console.log(`MATCH     ${p.id}`); }
       else { mismatch++; console.log(`MISMATCH  ${p.id}  derived ${r.value} but stored ${p.id_lokalid}`); }
+      // Read-only: resolve the BFE and list which valuation years VUR holds for it.
+      const res = await processProperty(client, p, addresses.get(p.id));
+      if (res.valuations.length > 0) {
+        valued++;
+        for (const v of res.valuations) bump(years, v.valuation_year);
+      }
     }
-    console.log(`\nprobe: ${match} match, ${mismatch} mismatch, ${failed} failed of ${sample.length}`);
-    if (mismatch > 0 || match === 0) process.exitCode = 1;
+    const show = (m) => [...m.entries()].map(([k, n]) => `${k}=${n}`).join(', ') || '-';
+    console.log(`\nid class of Boligsiden addressId: ${show(classes.addressId)}`);
+    console.log(`id class of stored id_lokalid:    ${show(classes.storedId)}`);
+    console.log(`derived vs stored id_lokalid: ${match} match, ${mismatch} mismatch, ${failed} failed, ${noStored} without stored id (of ${sample.length})`);
+    console.log(`VUR: ${valued} of ${sample.length} properties have valuations; years: ${show(new Map([...years].sort((a, b) => a[0] - b[0])))}`);
+    if (![...years.keys()].some((y) => y >= 2020)) console.log('GATE: VUR returned no valuation year >= 2020. Do not build on the new-system valuations (SPAR) until this is explained.');
+    if (mismatch > 0 || (match === 0 && noStored < sample.length)) process.exitCode = 1;
     return;
   }
 

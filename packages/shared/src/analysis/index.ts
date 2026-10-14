@@ -6,3 +6,4 @@ export * from "./condition.js";
 export * from "./statistics.js";
 export * from "./valuation.js";
 export * from "./workbook-price-reference.js";
+export * from "./spar.js";
