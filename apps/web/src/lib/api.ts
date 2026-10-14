@@ -34,6 +34,7 @@ import type {
 import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
 import type { PropertyLookupResult } from "@shared/types/property-lookup";
 import type { SchoolDistrictResult } from "@shared/types/school-district";
+import type { SparListingEstimate } from "@shared/types/spar";
 import type { LimfjordLanguage, LimfjordNoiseResult } from "@shared/types/limfjord-noise";
 import type { MiljoegisNoiseReport, NoiseMetric, NoiseSource } from "@shared/types/miljoegis-noise";
 import { supabase } from "./supabase";
@@ -86,6 +87,10 @@ export function getProperty(id: string): Promise<PropertyDetailResponse> {
 
 export function getSchoolDistrict(id: string): Promise<SchoolDistrictResult> {
   return request(`/properties?id=${encodeURIComponent(id)}&resource=school-district`);
+}
+
+export function getSparEstimate(id: string): Promise<SparListingEstimate> {
+  return request(`/properties?id=${encodeURIComponent(id)}&resource=spar`);
 }
 
 export function getLimfjordNoise(id: string, language: LimfjordLanguage, signal?: AbortSignal): Promise<LimfjordNoiseResult> {
