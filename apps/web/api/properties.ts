@@ -14,6 +14,7 @@ import { rowToEnrichment, rowToProperty } from "../server/lib/row-mappers.js";
 import { InvalidSearchBoundaryError, searchProperties } from "../server/lib/search.js";
 import { getComparables } from "../server/lib/comparables.js";
 import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
+import { handleSpar } from "../server/lib/spar.handler.js";
 import { handleLimfjordNoise } from "../server/lib/limfjord-noise-handler.js";
 import { handleMiljoegisNoise } from "../server/lib/miljoegis-noise/handler.js";
 import { fetchBoligsidenDetails } from "../server/lib/boligsiden-listing-details.js";
@@ -110,6 +111,10 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
     }
     if (str(req.query.resource) === "school-district") {
       await handleSchoolDistrict(client, res, id);
+      return;
+    }
+    if (str(req.query.resource) === "spar") {
+      await handleSpar(client, res, id);
       return;
     }
     if (req.query.resource === "limfjord-noise") {
