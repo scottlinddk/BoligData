@@ -106,12 +106,12 @@ export function SearchPage() {
       </div>
       <div className="mb-8 rounded-[22px] bg-surface-alt p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-2.5" role="search">
-          <label className="relative min-w-[180px] flex-[1_1_220px]">
+          <label className="relative basis-full sm:min-w-[220px] sm:flex-[1_1_220px] sm:basis-auto">
             <span className="sr-only">{t("filters.location")}</span>
             <input type="search" value={filters.location ?? ""} onChange={e => handleFilterChange({ location: e.target.value || null })} placeholder={tx("By, postnummer eller adresse", "City, postcode or address")} className="h-12 w-full rounded-full border border-border bg-surface py-2 pl-11 pr-4 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft" />
             <svg className="pointer-events-none absolute left-4 top-4 text-ink-soft" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.7" /><path d="m16 16 5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
           </label>
-          <select aria-label={t("filters.propertyType")} className={`${pill} h-12 min-w-0 max-w-44 flex-1 pr-7 sm:flex-none`} value={filters.propertyTypes && filters.propertyTypes.length > 1 ? "multiple" : filters.propertyTypes?.[0] ?? ""} onChange={e => handleFilterChange({ propertyTypes: e.target.value ? [e.target.value as PropertyType] : null })}>
+          <select aria-label={t("filters.propertyType")} className={`${pill} h-12 min-w-[9.5rem] max-w-full flex-1 pr-7 sm:max-w-44 sm:flex-none`} value={filters.propertyTypes && filters.propertyTypes.length > 1 ? "multiple" : filters.propertyTypes?.[0] ?? ""} onChange={e => handleFilterChange({ propertyTypes: e.target.value ? [e.target.value as PropertyType] : null })}>
             <option value="">{t("filters.propertyType")}</option>
             {filters.propertyTypes && filters.propertyTypes.length > 1 && <option value="multiple">{tx("Flere boligtyper", "Multiple types")}</option>}
             {PROPERTY_TYPE_OPTIONS.map(value => <option key={value} value={value}>{t(`propertyType.${value}`)}</option>)}
