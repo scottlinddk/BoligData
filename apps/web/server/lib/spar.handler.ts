@@ -31,8 +31,8 @@ async function loadSegment(client: SupabaseClient, isUnit: boolean, asOf: string
   const valuations: SparValuationRow[] = valRows.flatMap((r) => {
     const value = Number(r.assessed_property_value_dkk);
     if (!Number.isFinite(value) || value <= 0) return [];
-    // registered_at is not filled by the backfill yet. observed_at is when we first held the value, which is
-    // a safe "known by" date for a live estimate but not for a backtest.
+    // registered_at comes from VUR's registration date when the backfill could read it. Otherwise observed_at
+    // (when we first held the value) is a safe "known by" date for a live estimate but not for a backtest.
     const knownAt = (r.registered_at ?? r.observed_at) as string | null;
     return [{ propertyId: String(r.property_id), bfe: String(r.bfe_nummer), bfeType: r.bfe_type as SparValuationRow["bfeType"],
       valuationYear: Number(r.valuation_year), value, registeredAt: knownAt }];
