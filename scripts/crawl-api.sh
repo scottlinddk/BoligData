@@ -7,15 +7,36 @@ if [ -n "${BYPASS_SECRET:-}" ]; then
   headers+=(-H "x-vercel-protection-bypass: ${BYPASS_SECRET}" -H "x-vercel-set-bypass-cookie: true")
 fi
 
+# Every batch re-fetches the source feed before slicing, so its duration varies
+# with upstream latency and can occasionally pass the function limit. A batch
+# that timed out never advanced the cursor and ingestion is idempotent, so the
+# same request is retried a bounded number of times before the job fails.
+max_attempts=${CRAWL_REQUEST_ATTEMPTS:-3}
+if ! [[ "$max_attempts" =~ ^[1-5]$ ]]; then
+  echo "::error::CRAWL_REQUEST_ATTEMPTS must be an integer from 1 to 5."
+  exit 1
+fi
+
 request() {
-  local body="$1" http_code
-  if ! http_code=$(curl -sS --connect-timeout 10 --max-time 75 -X POST "${VERCEL_URL}/api/crawl" "${headers[@]}" \
-    --data "$body" -o response.json -w '%{http_code}'); then
+  local body="$1" http_code attempt curl_status
+  for ((attempt=1; attempt<=max_attempts; attempt++)); do
+    curl_status=0
+    http_code=$(curl -sS --connect-timeout 10 --max-time 75 -X POST "${VERCEL_URL}/api/crawl" "${headers[@]}" \
+      --data "$body" -o response.json -w '%{http_code}') || curl_status=$?
+    # 504 = function limit; curl 28 = client timeout. Both are transient.
+    if [ "$curl_status" = "28" ] || { [ "$curl_status" = "0" ] && [ "$http_code" = "504" ]; }; then
+      if ((attempt < max_attempts)); then
+        echo "::warning::Crawl request timed out (attempt $attempt/$max_attempts). Retrying the same batch; the cursor has not advanced."
+        sleep $((attempt * 5))
+        continue
+      fi
+      echo "::error::The crawl batch exceeded the function execution limit $max_attempts times. Previously persisted batches remain saved; resume with start_offset."
+      return 1
+    fi
+    break
+  done
+  if [ "$curl_status" != "0" ]; then
     echo "::error::The crawl API could not be reached. Re-run this workflow to retry persisted progress."
-    return 1
-  fi
-  if [ "$http_code" = "504" ]; then
-    echo "::error::The crawl batch exceeded the function execution limit. Previously persisted batches remain saved."
     return 1
   fi
   if ! jq -e 'type == "object"' response.json > /dev/null 2>&1; then
