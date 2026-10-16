@@ -34,9 +34,14 @@ describe("estimateForListing", () => {
     expect(r).toMatchObject({ status: "insufficient_data", reason: "too_few_sales", fairPrice: null, index: null });
   });
 
-  it("reports a stale index when the newest sale is more than 12 months old", () => {
+  it("still shows an old index, flagged with its age", () => {
     const segment = buildSparSegment({ asOf: "2027-01-01", isUnit: false, ...market(40) });
-    expect(estimateForListing(segment, { propertyId: "p0", askingPrice: null }).reason).toBe("stale_index");
+    const r = estimateForListing(segment, { propertyId: "p0", askingPrice: null });
+    expect(r.status).toBe("available");
+    expect(r.index!.stale).toBe(true);
+    expect(r.index!.ageMonths).toBeGreaterThan(12);
+    const fresh = estimateForListing(buildSparSegment({ asOf: "2025-10-01", isUnit: false, ...market(40) }), { propertyId: "p0", askingPrice: null });
+    expect(fresh.index!.stale).toBe(false);
   });
 
   it("has no estimate for a property without a valuation", () => {

@@ -7,7 +7,7 @@ export type SparListingStatus = "available" | "no_valuation" | "insufficient_dat
 export interface SparListingEstimate {
   status: SparListingStatus;
   /** Why the estimate is missing, for status other than "available". */
-  reason: "no_valuation_for_property" | "valuation_vintage_mismatch" | "too_few_sales" | "stale_index" | null;
+  reason: "no_valuation_for_property" | "valuation_vintage_mismatch" | "too_few_sales" | null;
   isUnit: boolean;
   /** Public valuation the estimate is based on. */
   valuation: { valueDkk: number; year: number; bfe: string } | null;
@@ -22,6 +22,10 @@ export interface SparListingEstimate {
     nSales: number;
     valuationVintage: number;
     preliminary: boolean;
+    /** Months from the newest index month to the as-of date. Old levels are shown with their age. */
+    ageMonths: number;
+    /** True when the newest index month is more than 12 months old. */
+    stale: boolean;
   } | null;
   /** valuation x ratio. The band includes in-sample single-property spread, so it is a rough prediction interval. */
   fairPrice: { estimate: number; lo80: number; hi80: number; lo95: number; hi95: number } | null;

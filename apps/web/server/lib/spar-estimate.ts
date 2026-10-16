@@ -6,8 +6,8 @@ import type { SparListingEstimate } from "../../../../packages/shared/src/types/
 
 /** Below this many trimmed free-trade sales the index is noise, so no estimate is shown. */
 export const SPAR_MIN_SALES = 20;
-/** The newest index month must be at most this many months before the as-of date. */
-export const SPAR_MAX_STALE_MONTHS = 12;
+/** An index whose newest month is older than this is still shown, but flagged as old. */
+export const SPAR_STALE_AFTER_MONTHS = 12;
 
 export interface SparValuationRow extends SparValuation { propertyId: string }
 export interface SparSaleRow { id: string; propertyId: string; soldDate: string; price: number; saleType: string | null }
@@ -22,7 +22,9 @@ export interface SparSegment {
   points: LocalLevelPoint[];
   /** Spread of one sale's log ratio around the smoothed level (in-sample). */
   residualSd: number;
-  unavailable: "too_few_sales" | "stale_index" | null;
+  unavailable: "too_few_sales" | null;
+  /** Months from the newest index month to the as-of date. Shown to the user, never used to hide the estimate. */
+  ageMonths: number;
 }
 
 const monthIndex = (period: string) => { const [y, m] = period.split("-").map(Number); return y! * 12 + (m! - 1); };
@@ -44,7 +46,7 @@ export function buildSparSegment(input: { asOf: string; isUnit: boolean; valuati
   for (const v of valuationByProperty.values()) counts.set(v.valuationYear, (counts.get(v.valuationYear) ?? 0) + 1);
   const vintage = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] ?? null;
   const empty = (unavailable: SparSegment["unavailable"], nSales = 0): SparSegment =>
-    ({ isUnit: input.isUnit, asOf: input.asOf, vintage, valuationByProperty, nSales, points: [], residualSd: 0, unavailable });
+    ({ isUnit: input.isUnit, asOf: input.asOf, vintage, valuationByProperty, nSales, points: [], residualSd: 0, unavailable, ageMonths: 0 });
   if (vintage === null) return empty("too_few_sales");
 
   const sparSales: SparSale[] = [];
@@ -58,12 +60,12 @@ export function buildSparSegment(input: { asOf: string; isUnit: boolean; valuati
   const points = localLevelIndex(sparSales, { granularity: "month", asOf: input.asOf });
   const last = points[points.length - 1];
   if (!last) return empty("too_few_sales", kept.length);
-  if (monthIndex(input.asOf.slice(0, 7)) - monthIndex(last.period) > SPAR_MAX_STALE_MONTHS) return empty("stale_index", kept.length);
+  const ageMonths = Math.max(0, monthIndex(input.asOf.slice(0, 7)) - monthIndex(last.period));
 
   const level = new Map(points.map((p) => [p.period, p.estimate]));
   const residuals = kept.map((s) => Math.log(s.price / s.valuation) - Math.log(level.get(s.agreementDate.slice(0, 7))!));
   const residualSd = Math.sqrt(residuals.reduce((a, r) => a + r * r, 0) / Math.max(residuals.length - 1, 1));
-  return { isUnit: input.isUnit, asOf: input.asOf, vintage, valuationByProperty, nSales: kept.length, points, residualSd, unavailable: null };
+  return { isUnit: input.isUnit, asOf: input.asOf, vintage, valuationByProperty, nSales: kept.length, points, residualSd, unavailable: null, ageMonths };
 }
 
 export function estimateForListing(segment: SparSegment, listing: { propertyId: string; askingPrice: number | null }): SparListingEstimate {
@@ -83,7 +85,8 @@ export function estimateForListing(segment: SparSegment, listing: { propertyId: 
   const asking = listing.askingPrice !== null && listing.askingPrice > 0 ? listing.askingPrice : null;
   return {
     ...base, status: "available", reason: null, valuation,
-    index: { period: point.period, ratio: point.estimate, lo80: point.lo80, hi80: point.hi80, nPeriod: point.n, nSales: segment.nSales, valuationVintage: segment.vintage!, preliminary: point.preliminary },
+    index: { period: point.period, ratio: point.estimate, lo80: point.lo80, hi80: point.hi80, nPeriod: point.n, nSales: segment.nSales, valuationVintage: segment.vintage!, preliminary: point.preliminary,
+      ageMonths: segment.ageMonths, stale: segment.ageMonths > SPAR_STALE_AFTER_MONTHS },
     fairPrice: fair,
     askingVsFair: asking === null ? null : asking / fair.estimate - 1,
   };

@@ -14,8 +14,8 @@ export function SparContent({ result, loading, failed, onRetry }: { result?: Spa
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const fair = result?.status === "available" ? result : null;
-  const unavailableText = result?.reason === "too_few_sales" || result?.reason === "stale_index"
-    ? tx("Der er for få eller for gamle handler til et pålideligt SPAR-niveau for denne boligtype endnu.", "There are too few or too old sales for a reliable SPAR level for this property type yet.")
+  const unavailableText = result?.reason === "too_few_sales"
+    ? tx("Der er for få handler til et pålideligt SPAR-niveau for denne boligtype endnu.", "There are too few sales for a reliable SPAR level for this property type yet.")
     : result?.reason === "valuation_vintage_mismatch"
       ? tx("Boligens vurdering er fra et andet vurderingsår end resten af markedsindekset og kan ikke sammenlignes.", "This home's valuation is from a different valuation year than the rest of the market index and cannot be compared.")
       : tx("Vi har endnu ikke en offentlig vurdering for denne bolig.", "We do not have a public valuation for this home yet.");
@@ -38,6 +38,10 @@ export function SparContent({ result, loading, failed, onRetry }: { result?: Spa
       </dl>
       {fair.askingVsFair !== null && fair.askingPrice !== null && <p className="mt-4 text-sm">{tx("Udbudspris", "Asking price")} {formatDkk(fair.askingPrice)}: <strong>{pct(fair.askingVsFair)}</strong> {tx("i forhold til estimatet", "relative to the estimate")}
         {fair.askingPrice >= fair.fairPrice.lo80 && fair.askingPrice <= fair.fairPrice.hi80 && <> ({tx("inden for 80 % intervallet", "inside the 80% interval")})</>}.</p>}
+      {fair.index.stale && <p role="note" className="mt-4 rounded-xl border border-border p-3 text-sm">
+        {tx(`Gammelt niveau: seneste handel i indekset er fra ${fair.index.period}, ${fair.index.ageMonths} måneder siden. Markedet kan have flyttet sig, så læs estimatet med lav sikkerhed.`,
+          `Old level: the newest sale in the index is from ${fair.index.period}, ${fair.index.ageMonths} months ago. The market may have moved, so read the estimate with low confidence.`)}
+      </p>}
       <p className="mt-4 text-xs leading-5 text-ink-soft">
         {tx(`Estimat, ikke Danmarks Statistiks tal. Bygger på ${fair.index.nSales} frie handler (${fair.isUnit ? "ejerlejligheder" : "huse"}) mod vurderingsåret ${fair.index.valuationVintage}; seneste måned har ${fair.index.nPeriod} handler.`,
           `An estimate, not Statistics Denmark data. Based on ${fair.index.nSales} free-trade sales (${fair.isUnit ? "apartments" : "houses"}) against valuation year ${fair.index.valuationVintage}; the latest month has ${fair.index.nPeriod} sales.`)}

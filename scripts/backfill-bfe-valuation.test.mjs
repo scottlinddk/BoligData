@@ -8,6 +8,7 @@ import {
   classifyAddressId,
   createDatafordeler,
   createThrottle,
+  isoTimestamp,
   parseArgs,
   pickBfe,
   pickField,
@@ -275,4 +276,23 @@ test('classifyAddressId tells a unit address from an access address', async () =
   assert.deepEqual(await classifyAddressId(client, HUSNUMMER), { ok: true, value: 'husnummer' });
   assert.deepEqual(await classifyAddressId(client, GRUND), { ok: true, value: 'none' });
   assert.equal((await classifyAddressId(client, 'nope')).ok, false);
+});
+
+test('buildValuationRows keeps the earliest registration date and omits it when unusable', () => {
+  const fields = { year: 'y', assessed: 'a', land: 'l', registered: 'r' };
+  const { rows } = buildValuationRows(
+    [
+      { y: 2022, a: 100, l: 10, r: '2023-05-01T00:00:00Z' },
+      { y: 2022, a: 100, l: 10, r: '2022-11-01T00:00:00Z' }, // same value, earlier registration wins
+      { y: 2024, a: 200, l: 20, r: 'not a date' },
+      { y: 2026, a: 300, l: 30, r: '2999-01-01T00:00:00Z' }, // future date is never "known"
+    ],
+    fields,
+  );
+  assert.deepEqual(rows, [
+    { valuation_year: 2022, assessed_property_value_dkk: 100, assessed_land_value_dkk: 10, registered_at: '2022-11-01T00:00:00.000Z' },
+    { valuation_year: 2024, assessed_property_value_dkk: 200, assessed_land_value_dkk: 20 },
+    { valuation_year: 2026, assessed_property_value_dkk: 300, assessed_land_value_dkk: 30 },
+  ]);
+  assert.equal(isoTimestamp(undefined), null);
 });

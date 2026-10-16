@@ -106,6 +106,14 @@ export function positiveInt(value) {
   return rounded > 0 && rounded <= 1e12 ? rounded : null;
 }
 
+/** ISO timestamp for a parseable date between 1990 and now, else null (a future date is never "known"). */
+export function isoTimestamp(value, now = Date.now()) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms) || ms < Date.UTC(1990, 0, 1) || ms > now) return null;
+  return new Date(ms).toISOString();
+}
+
 /* ---------------------------------------------------------------- arguments */
 
 export const USAGE = `Usage: node scripts/backfill-bfe-valuation.mjs [options]
@@ -380,15 +388,21 @@ export function buildValuationRows(nodes, fields) {
     const land = fields.land ? positiveInt(node[fields.land]) : null;
     if (year === null || year < 1990 || year > 2100 || (assessed === null && land === null)) continue;
     const row = { valuation_year: year, assessed_property_value_dkk: assessed, assessed_land_value_dkk: land };
+    const registered = fields.registered ? isoTimestamp(node[fields.registered]) : null;
     const seen = byYear.get(year);
-    if (!seen) byYear.set(year, { row, conflict: false });
-    else if (seen.row.assessed_property_value_dkk !== assessed || seen.row.assessed_land_value_dkk !== land) seen.conflict = true;
+    if (!seen) byYear.set(year, { row, conflict: false, registered });
+    else {
+      if (seen.row.assessed_property_value_dkk !== assessed || seen.row.assessed_land_value_dkk !== land) seen.conflict = true;
+      // The same value registered twice: it was known from the earlier registration.
+      if (registered !== null && (seen.registered === null || registered < seen.registered)) seen.registered = registered;
+    }
   }
   const rows = [];
   let conflictYears = 0;
-  for (const { row, conflict } of byYear.values()) {
+  for (const { row, conflict, registered } of byYear.values()) {
     if (conflict) conflictYears++;
-    else rows.push(row);
+    // registered_at stays absent (never null-overwritten) when the register gives no usable date.
+    else rows.push(registered === null ? row : { ...row, registered_at: registered });
   }
   return { rows: rows.sort((a, b) => a.valuation_year - b.valuation_year), conflictYears };
 }
@@ -402,10 +416,14 @@ export async function resolveValuations(client, bfe) {
     assessed: pickField(info.keys(), 'ejendomsvaerdi', 'vurderetejendomsvaerdi', 'ejendomsvurderingbeloeb'),
     land: pickField(info.keys(), 'grundvaerdi', 'vurderetgrundvaerdi'),
     year: pickField(info.keys(), 'vurderingsaar', 'vurderingaar', 'vurderingsaartal'),
+    // Optional: when the register itself registered this valuation. It is what makes a backtest
+    // honest, because a valuation must not be used for a date before it was known. Unverified
+    // against the live schema, so a miss only leaves registered_at empty (see --discover).
+    registered: pickField(info.keys(), 'registreringfra', 'registreringstid'),
   };
   if (!fields.assessed && !fields.land) return fail(`no assessed-value field on VUR_Ejendomsvurdering; fields: ${summarize(info)}`);
   if (!fields.year) return fail(`no valuation-year field on VUR_Ejendomsvurdering; fields: ${summarize(info)}`);
-  const selection = unique([fields.assessed, fields.land, fields.year].filter(Boolean)).join(' ');
+  const selection = unique([fields.assessed, fields.land, fields.year, fields.registered].filter(Boolean)).join(' ');
   const nodes = await queryNodes(client, SERVICES.VUR, 'VUR_Ejendomsvurdering', `${fields.bfe}: { eq: ${JSON.stringify(bfe)} }`, selection);
   const { rows, conflictYears } = buildValuationRows(nodes, fields);
   if (rows.length === 0) return fail(conflictYears > 0 ? 'every valuation year had conflicting values' : `no usable valuation for BFE ${bfe}`);
