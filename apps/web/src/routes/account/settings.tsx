@@ -4,7 +4,9 @@ import { AccountSubNav } from "@/components/account-subnav";
 import {
   getAppSettings,
   getProfile,
+  listNewListingsRuns,
   listRegisteredAgents,
+  triggerNewListingsFetch,
   updateAppSettings,
   updateProfile,
 } from "@/lib/api";
@@ -86,6 +88,24 @@ export function AccountSettingsPage() {
     queryKey: ["admin", "agents"],
     queryFn: listRegisteredAgents,
     enabled: role === "admin",
+  });
+  const runsQuery = useQuery({
+    queryKey: ["admin", "new-listings-runs"],
+    queryFn: listNewListingsRuns,
+    enabled: role === "admin",
+    // Poll while a run is queued or in progress so the status updates by itself.
+    refetchInterval: (query) =>
+      query.state.data?.runs.some((run) => run.status !== "completed") ? 15_000 : false,
+  });
+  const hasActiveRun = runsQuery.data?.runs.some((run) => run.status !== "completed") ?? false;
+  const fetchMutation = useMutation({
+    mutationFn: triggerNewListingsFetch,
+    onSuccess: () => {
+      showToast(t("settings.fetchListingsStarted"), "success");
+      // GitHub registers the run a moment after the dispatch is accepted.
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["admin", "new-listings-runs"] }), 3_000);
+    },
+    onError: (err) => showToast(err instanceof Error ? err.message : t("settings.fetchListingsError"), "error"),
   });
   const broadcastMutation = useMutation({
     mutationFn: (broadcastEnabled: boolean) => updateAppSettings({ broadcastEnabled }),
@@ -218,6 +238,49 @@ export function AccountSettingsPage() {
                 {appSettingsQuery.data?.settings.broadcastEnabled ? "On" : "Off"}
               </button>
             </div>
+          </div>
+
+          <div className="mb-4 rounded-[20px] border border-border bg-surface p-4">
+            <h2 className="mb-3 font-mono text-xs font-bold uppercase tracking-widest text-ink-soft">
+              {t("settings.fetchListingsCard")}
+            </h2>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-ink">{t("settings.fetchListingsHint")}</span>
+              <button
+                type="button"
+                onClick={() => fetchMutation.mutate()}
+                disabled={fetchMutation.isPending || hasActiveRun}
+                className="shrink-0 rounded-full bg-cta px-4 py-2 text-sm font-bold text-cta-text transition-colors hover:bg-cta-hover disabled:opacity-50"
+              >
+                {hasActiveRun ? t("settings.fetchListingsRunning") : t("settings.fetchListingsButton")}
+              </button>
+            </div>
+            {runsQuery.isError ? (
+              <p className="text-sm font-semibold text-ink-soft">{t("settings.fetchListingsRunsError")}</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {runsQuery.data?.runs.map((run) => (
+                  <li key={run.id} className="flex items-center justify-between rounded-xl border border-border p-2.5">
+                    <a
+                      href={run.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-semibold text-ink underline-offset-2 hover:underline"
+                    >
+                      #{run.runNumber} · {new Date(run.createdAt).toLocaleString()}
+                    </a>
+                    <span className="flex gap-1.5">
+                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-ink-soft">
+                        {t(`settings.fetchListingsTrigger.${run.trigger}` as TranslationKey)}
+                      </span>
+                      <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-ink-soft">
+                        {run.conclusion ?? run.status}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="mb-4 rounded-[20px] border border-border bg-surface p-4">

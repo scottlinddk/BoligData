@@ -4,6 +4,7 @@ import type {
   AdvisorConnectionsResponse,
   AgentListingsResponse,
   AppSettingsResponse,
+  NewListingsRunsResponse,
   ApproveListingBody,
   ComparablesResponse,
   ConversationsResponse,
@@ -314,4 +315,14 @@ export function updateAppSettings(body: UpdateAppSettingsBody): Promise<AppSetti
 
 export function listRegisteredAgents(): Promise<RegisteredAgentsResponse> {
   return request(`/admin?resource=agents`);
+}
+
+// --- Admin: new-listings GitHub Actions workflow ---
+
+export function listNewListingsRuns(): Promise<NewListingsRunsResponse> {
+  return request(`/admin?resource=new-listings`);
+}
+
+export function triggerNewListingsFetch(): Promise<{ ok: true }> {
+  return request(`/admin?resource=new-listings`, { method: "POST" });
 }
