@@ -54,9 +54,19 @@ export interface NearbySale {
   lon: number;
 }
 
+/**
+ * How the subject's own sale history was identified, so an empty list can say why.
+ * - `matched`: one Boligsiden address was identified as this address (its history may still be empty: never sold).
+ * - `not_found`: no address in the search box carries this street, number and postcode.
+ * - `ambiguous`: several do (units in one building), so none can be given the history.
+ * - `null`: no identity was supplied, so none was attempted.
+ */
+export type HistoryMatch = "matched" | "not_found" | "ambiguous";
+
 export interface BoligsidenSales {
   /** Registered sales of the subject address itself, newest first. Empty when the point matched no address. */
   priceHistory: SoldPriceEntry[];
+  historyMatch: HistoryMatch | null;
   /** Most recent registered sales of *other* addresses in the box, nearest first. */
   nearbySales: NearbySale[];
 }
@@ -151,7 +161,14 @@ function mockSales(lat: number, lon: number): BoligsidenSales {
     lat: lat + i * 0.001,
     lon: lon + i * 0.001,
   }));
-  return { priceHistory, nearbySales };
+  return { priceHistory, historyMatch: null, nearbySales };
+}
+
+/** The register's own spelling of the subject address, used to pick it out of the results by text. */
+export interface SubjectAddressText {
+  road: string;
+  houseNumber: string;
+  zipCode: string;
 }
 
 export interface NearbySalesOptions {
@@ -160,6 +177,24 @@ export interface NearbySalesOptions {
   /** An explicitly resolved Boligsiden address/unit identifier. Coordinates
    * alone cannot distinguish apartments or neighbouring properties. */
   subjectAddressId?: string;
+  /**
+   * Identity by address text, for when no Boligsiden id is known. Street, house number and postcode must all
+   * equal the register's, and exactly one record may. It is a weaker identity than an id, and stronger than
+   * coordinates: the same text on several records (units in a building) is refused as ambiguous.
+   * Ignored when `subjectAddressId` is given.
+   */
+  subjectAddress?: SubjectAddressText;
+}
+
+const fold = (value: string): string => value.toLowerCase().replace(/\s+/g, "");
+
+/** Whether a search record is the address with this exact street, house number and postcode. */
+export function recordIsAddress(record: Record<string, unknown>, subject: SubjectAddressText): boolean {
+  const road = asNonEmptyString(asRecord(record.road)?.name) ?? asNonEmptyString(record.roadName);
+  const houseNumber = asNonEmptyString(record.houseNumber);
+  const zip = asPositiveInt(record.zipCode);
+  return road !== null && houseNumber !== null && zip !== null &&
+    fold(road) === fold(subject.road) && fold(houseNumber) === fold(subject.houseNumber) && String(zip) === subject.zipCode.trim();
 }
 
 async function search(params: URLSearchParams): Promise<ParsedAddress[]> {
@@ -220,10 +255,21 @@ export async function lookupBoligsidenSales(
       ),
     ]);
 
+    const subjectAddress = options.subjectAddress;
     const identityMatches = options.subjectAddressId
       ? subjectMatches.filter((entry) => entry.record.addressID === options.subjectAddressId)
-      : [];
+      : subjectAddress
+        ? subjectMatches.filter((entry) => recordIsAddress(entry.record, subjectAddress))
+        : [];
     const subject = identityMatches.length === 1 ? identityMatches[0] : undefined;
+    const attempted = Boolean(options.subjectAddressId) || subjectAddress !== undefined;
+    const historyMatch: HistoryMatch | null = !attempted
+      ? null
+      : subject
+        ? "matched"
+        : identityMatches.length > 1
+          ? "ambiguous"
+          : "not_found";
 
     const nearbySales: NearbySale[] = neighbourhood
       .filter((entry) => haversineMeters(lat, lon, entry.lat, entry.lon) > SUBJECT_MATCH_METERS)
@@ -249,7 +295,7 @@ export async function lookupBoligsidenSales(
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
       .slice(0, limit);
 
-    return sourceOk({ priceHistory: subject?.history ?? [], nearbySales });
+    return sourceOk({ priceHistory: subject?.history ?? [], historyMatch, nearbySales });
   } catch (err) {
     return sourceFailed(err);
   }

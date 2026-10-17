@@ -31,6 +31,8 @@ const husnummerBody = {
   husnummer: {
     id_lokalid: dawaRecord.id,
     adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
+    vejnavn: "Floravej",
+    husnummertekst: "6",
     adgangspunkt: { koordinater: { x: 553173.08, y: 6322838.76 } },
     postnummer: { navn: "Aalborg", postnr: "9000" },
     navngivenvejkommunedel: { kommune: "0851" },
@@ -108,7 +110,22 @@ const HOUSE_CHAIN: Record<string, unknown[]> = {
   ],
 };
 
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; chain?: Record<string, unknown[]> } = {}) {
+/** Boligsiden's record of Floravej 6, as its address search answers it. */
+const BOLIGSIDEN_FLORAVEJ_6 = {
+  addressID: "boligsiden-id-we-do-not-know",
+  addressType: "villa",
+  coordinates: { lat: 57.04592, lon: 9.8764 },
+  road: { name: "Floravej" },
+  houseNumber: "6",
+  zipCode: 9000,
+  cityName: "Aalborg",
+  registrations: [
+    { amount: 3_000_000, date: "2019-02-01", livingArea: 150, perAreaPrice: 20000, type: "normal" },
+    { amount: 1_495_000, date: "2004-08-23", area: 201, type: "family" },
+  ],
+};
+
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[] } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
@@ -119,7 +136,7 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ data: { [chainEntity]: { pageInfo: { hasNextPage: false }, nodes } } }) };
     }
     if (href.includes("api.boligsiden.dk/search/addresses")) {
-      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: [] }) };
+      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: overrides.boligsiden ?? [] }) };
     }
     const body = href.includes("adressevaelger.dk")
       ? husnummerBody
@@ -291,6 +308,39 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.scoringInputs.noiseZoneEstimate).toBe(57);
     expect(result.sources.find((s) => s.key === "bbr")?.mode).toBe("live");
     expect(result.sources.find((s) => s.key === "noise")?.mode).toBe("live");
+  });
+
+  it("attributes Boligsiden's sale history to the address by its street, number and postcode", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ boligsiden: [BOLIGSIDEN_FLORAVEJ_6] });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.priceHistoryMatch).toBe("matched");
+    expect(result.priceHistory.map((entry) => [entry.soldDate, entry.price, entry.saleType])).toEqual([
+      ["2019-02-01", 3_000_000, "normal"],
+      ["2004-08-23", 1_495_000, "family"],
+    ]);
+  });
+
+  it("gives no history, and says why, when Boligsiden has no address with this street, number and postcode", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ boligsiden: [{ ...BOLIGSIDEN_FLORAVEJ_6, houseNumber: "8" }] });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.priceHistoryMatch).toBe("not_found");
+    expect(result.priceHistory).toEqual([]);
+  });
+
+  it("does not attribute a history to a free-text listing lookup, which has no verified identity", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ boligsiden: [BOLIGSIDEN_FLORAVEJ_6] });
+
+    const result = await lookupProperty(input);
+
+    expect(result.priceHistoryMatch).toBeNull();
+    expect(result.priceHistory).toEqual([]);
   });
 
   it("finds a house's BFE and valuation from the husnummer, since the address register returns no parcel", async () => {

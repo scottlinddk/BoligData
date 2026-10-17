@@ -9,6 +9,7 @@ import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
+import { SalesHistoryCard } from "@/components/sales-history-card";
 import { SmartEstimateView } from "@/components/estimate/smart-estimate";
 import { SparContent } from "@/components/spar-panel";
 import { Footer } from "@/components/footer";
@@ -88,6 +89,8 @@ export function AddressReportPage() {
       <p className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm leading-6 text-ink-soft">{t("address.report.notListing")}</p>
     </header>
 
+    <SalesHistoryCard history={report.priceHistory} available={report.salesAvailable} match={report.priceHistoryMatch} />
+
     <BbrFactsPanel bbrData={bbrData} plotSqm={null} source={bbrData ? "register" : null} matrikelnr={report.matrikelnr} ejerlav={report.ejerlav} bfeNummer={report.bfeNummer}
       loading={lookupQuery.isFetching} failed={false} onRetry={() => { void lookupQuery.refetch(); }} />
 
@@ -100,7 +103,7 @@ export function AddressReportPage() {
       </dl> : <p className="mt-2 text-[12.5px] text-ink-soft">{t("address.report.valuationMissing")}</p>}
     </section>
 
-    <ComparablesPanel soldPriceHistory={report.priceHistory} priceHistorySource={report.priceHistory.length > 0 ? "register" : null}
+    <ComparablesPanel soldPriceHistory={[]} showHistory={false}
       nearbySales={report.nearbySales} comparables={[]} neighborhoodAvgPricePerSqm={null} />
 
     {spar !== undefined && <>

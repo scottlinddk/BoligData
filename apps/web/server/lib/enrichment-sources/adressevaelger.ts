@@ -75,6 +75,8 @@ export function parseHusnummer(raw: unknown): AddressCadastral | null {
     postalName: asNonEmptyString(postnummer?.navn),
     municipalityCode: asNonEmptyString(asRecord(husnummer.navngivenvejkommunedel)?.kommune),
     formattedAddress: asNonEmptyString(husnummer.adgangsadressebetegnelse),
+    streetName: asNonEmptyString(husnummer.vejnavn),
+    houseNumber: asNonEmptyString(husnummer.husnummertekst),
     resolvedVia: "adressevaelger",
   };
 }

@@ -137,6 +137,12 @@ export interface PropertyLookupResult {
   spar?: SparListingEstimate | null;
   /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */
   priceHistory: SoldPriceEntry[];
+  /**
+   * How the sale history was attributed to this address, so an empty list can say why. `matched`: identified (it
+   * may still be empty, the home was never sold). `not_found`: no Boligsiden address has this street, number and
+   * postcode. `ambiguous`: several do (units in a building). `null`: no attribution was attempted.
+   */
+  priceHistoryMatch: "matched" | "not_found" | "ambiguous" | null;
   /** Recent registered sales around this address, nearest first. */
   nearbySales: NearbySaleEntry[];
   renovationCategory: RenovationCategoryResult;

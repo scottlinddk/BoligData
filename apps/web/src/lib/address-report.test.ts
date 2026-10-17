@@ -19,7 +19,7 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
       floors: 1, roofMaterial: null, wallMaterial: null, basementSqm: null, toiletCount: null, bathroomCount: null,
     },
     publicValuation: { assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2025 },
-    valuationHistory: [], propertyClass: null,
+    valuationHistory: [], propertyClass: null, priceHistoryMatch: null,
     priceHistory: [{ soldDate: "2018-05-01", price: 2_100_000, pricePerSqm: 14_000, saleType: "normal" }],
     nearbySales: [{ address: "Floravej 8", soldDate: "2026-03-01", price: 2_500_000, pricePerSqm: 17_000, saleType: "normal", areaSqm: 150, propertyType: "villa", distanceMeters: 40, lat: 57.0460, lon: 9.8766 }],
     renovationCategory: { category: "B", isEstimate: true, symbol: "~", reason: "", source: "ai" },
@@ -57,6 +57,20 @@ describe("buildAddressReport", () => {
     expect(report.priceHistory).toEqual([]);
     expect(report.nearbySales).toEqual([]);
     expect(report.sources.find((s) => s.key === "publicValuation")?.error).toBe("no BFE");
+  });
+
+  it("says whether the sales register answered, and how the history was attributed", () => {
+    const live = buildAddressReport(lookup({ priceHistoryMatch: "matched" }));
+    expect(live).toMatchObject({ salesAvailable: true, priceHistoryMatch: "matched" });
+    expect(buildAddressReport(lookup({ priceHistoryMatch: "ambiguous" })).priceHistoryMatch).toBe("ambiguous");
+  });
+
+  it("makes an empty history 'unknown' rather than 'never sold' when the sales register did not answer", () => {
+    const report = buildAddressReport(lookup({
+      priceHistoryMatch: "matched",
+      sources: [live("address"), live("bbr"), live("publicValuation"), live("noise"), unavailable("sales", "HTTP 503")],
+    }));
+    expect(report).toMatchObject({ salesAvailable: false, priceHistoryMatch: null, priceHistory: [] });
   });
 
   it("treats an all-null BBR or valuation record as no data", () => {

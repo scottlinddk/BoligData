@@ -46,6 +46,9 @@ export interface AddressCadastral {
   municipalityCode: string | null;
   /** The address as the register spells it, e.g. "Floravej 6, 9000 Aalborg". */
   formattedAddress: string | null;
+  /** Street and house number as the register spells them. Set only by the Adressevælger path. */
+  streetName?: string | null;
+  houseNumber?: string | null;
   /**
    * Which upstream actually resolved this address. `"dar_fallback"` means DAWA
    * was unreachable (see the sunset note above) and the Datafordeler DAR
