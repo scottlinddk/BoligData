@@ -319,7 +319,24 @@ export async function resolveUnitBfe(client, addressId) {
   return bfeOfRelations(client, unitIds);
 }
 
-/** One row per valuation year; a year with two different answers is dropped and counted, never guessed. */
+/**
+ * VURMark on a VUR_Ejendomsvurdering row. 3 is the new, market based system (ids starting 3000...,
+ * ajourfoert years after the valuation date); 1 is the old annual system. This reading comes from
+ * the row pattern, not from the schema, which only says "source system and type".
+ */
+export const NEW_SYSTEM_MARK = 3;
+
+/**
+ * One row per valuation year, without a migration (option A), so the table cannot say which system
+ * a value came from. A year can hold several rows: the old and new system, or a regulation later in
+ * the year, or the same value re-registered after a correction. Rule, in order:
+ *   1. the new system beats the old one,
+ *   2. within a system the latest aendringDato wins,
+ *   3. rows with the same value as the winner are one valuation, known from the earliest of them,
+ *   4. a year whose top rows share system and date but disagree on value is dropped and counted.
+ * The old and new series sit at different levels (881,000 against 480,000 in the same year), so the
+ * stored series steps at the switch to the new system.
+ */
 export function buildValuationRows(nodes, fields) {
   const byYear = new Map();
   for (const node of nodes) {
@@ -327,28 +344,40 @@ export function buildValuationRows(nodes, fields) {
     const assessed = fields.assessed ? positiveInt(node[fields.assessed]) : null;
     const land = fields.land ? positiveInt(node[fields.land]) : null;
     if (year === null || year < 1990 || year > 2100 || (assessed === null && land === null)) continue;
-    const row = { valuation_year: year, assessed_property_value_dkk: assessed, assessed_land_value_dkk: land };
-    const registered = fields.registered ? isoTimestamp(node[fields.registered]) : null;
-    const seen = byYear.get(year);
-    if (!seen) byYear.set(year, { row, conflict: false, registered });
-    else {
-      if (seen.row.assessed_property_value_dkk !== assessed || seen.row.assessed_land_value_dkk !== land) seen.conflict = true;
-      // The same value registered twice: it was known from the earlier registration.
-      if (registered !== null && (seen.registered === null || registered < seen.registered)) seen.registered = registered;
-    }
+    const candidate = {
+      assessed,
+      land,
+      registered: fields.registered ? isoTimestamp(node[fields.registered]) : null,
+      isNew: fields.system ? Number(node[fields.system]) === NEW_SYSTEM_MARK : false,
+      effective: fields.effective && typeof node[fields.effective] === 'string' ? node[fields.effective] : '',
+    };
+    if (!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year).push(candidate);
   }
+  const sameValue = (x, y) => x.assessed === y.assessed && x.land === y.land;
   const rows = [];
   let conflictYears = 0;
-  for (const { row, conflict, registered } of byYear.values()) {
-    if (conflict) conflictYears++;
+  for (const [year, candidates] of byYear) {
+    const best = candidates.reduce((top, c) => (c.isNew !== top.isNew ? (c.isNew ? c : top) : c.effective > top.effective ? c : top));
+    const top = candidates.filter((c) => c.isNew === best.isNew && c.effective === best.effective);
+    if (top.some((c) => !sameValue(c, top[0]))) {
+      conflictYears++;
+      continue;
+    }
+    const registered = candidates
+      .filter((c) => c.isNew === best.isNew && sameValue(c, best))
+      .map((c) => c.registered)
+      .filter((r) => r !== null)
+      .sort()[0] ?? null;
+    const row = { valuation_year: year, assessed_property_value_dkk: best.assessed, assessed_land_value_dkk: best.land };
     // registered_at stays absent (never null-overwritten) when the register gives no usable date.
-    else rows.push(registered === null ? row : { ...row, registered_at: registered });
+    rows.push(registered === null ? row : { ...row, registered_at: registered });
   }
-  return { rows: rows.sort((a, b) => a.valuation_year - b.valuation_year), conflictYears };
+  return { rows: rows.sort((x, y) => x.valuation_year - y.valuation_year), conflictYears };
 }
 
 /** VUR has no BFE column on the valuation. BFE -> VUR_BFEKrydsreference -> VUR_Ejendomsvurdering.id. */
-const VUR_FIELDS = { year: 'aar', assessed: 'ejendomvaerdiBeloeb', land: 'grundvaerdiBeloeb', registered: 'ajourfoeringDato' };
+const VUR_FIELDS = { year: 'aar', assessed: 'ejendomvaerdiBeloeb', land: 'grundvaerdiBeloeb', registered: 'ajourfoeringDato', system: 'VURMark', effective: 'aendringDato' };
 
 export async function resolveValuations(client, bfe) {
   if (!BFE_PATTERN.test(bfe)) return fail('not a valid BFE number');

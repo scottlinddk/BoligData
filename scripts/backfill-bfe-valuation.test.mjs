@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   FatalError,
+  NEW_SYSTEM_MARK,
   GraphQlError,
   SERVICES,
   SMOKE_TARGETS,
@@ -406,4 +407,32 @@ test('dumpValuations prints each row oldest first and survives an error', async 
   const lines2 = [];
   await dumpValuations({ post: async () => { throw new GraphQlError(['nope']); } }, '1', (l) => lines2.push(l));
   assert.ok(lines2.some((l) => l.includes('ERROR')));
+});
+
+test('one row per year: new system first, then latest aendringDato, identical rows merge, ties on value drop the year', () => {
+  const fields = { year: 'y', assessed: 'a', land: 'l', registered: 'r', system: 'm', effective: 'e' };
+  const { rows, conflictYears } = buildValuationRows(
+    [
+      // 2020: old annual value and the new system value. The new one wins.
+      { y: 2020, a: 480_000, l: 95_900, r: '2021-02-13T12:44:44Z', m: 1, e: '2020-10-01' },
+      { y: 2020, a: 881_000, l: 480_000, r: '2025-03-18T01:13:56Z', m: NEW_SYSTEM_MARK, e: '2020-01-01' },
+      // 2003: January and October valuations in the old system. The later one wins.
+      { y: 2003, a: 23_400_000, l: 1, r: '2005-12-13T00:44:05Z', m: 1, e: '2003-01-01' },
+      { y: 2003, a: 24_900_000, l: 1, r: '2013-09-13T19:05:02Z', m: 1, e: '2003-10-01' },
+      // 2008: the same value re-registered after corrections. One valuation, known from the earliest registration.
+      { y: 2008, a: 38_000_000, l: 3, r: '2017-06-19T10:54:06Z', m: 1, e: '2017-04-19' },
+      { y: 2008, a: 38_000_000, l: 3, r: '2013-09-13T19:05:02Z', m: 1, e: '2008-10-01' },
+      { y: 2008, a: 38_000_000, l: 3, r: '2015-05-27T12:30:23Z', m: 1, e: '2015-05-27' },
+      // 2010: same system, same date, different values. Ambiguous, so dropped.
+      { y: 2010, a: 100, l: 1, m: 1, e: '2010-10-01' },
+      { y: 2010, a: 200, l: 1, m: 1, e: '2010-10-01' },
+    ],
+    fields,
+  );
+  assert.equal(conflictYears, 1);
+  assert.deepEqual(rows, [
+    { valuation_year: 2003, assessed_property_value_dkk: 24_900_000, assessed_land_value_dkk: 1, registered_at: '2013-09-13T19:05:02.000Z' },
+    { valuation_year: 2008, assessed_property_value_dkk: 38_000_000, assessed_land_value_dkk: 3, registered_at: '2013-09-13T19:05:02.000Z' },
+    { valuation_year: 2020, assessed_property_value_dkk: 881_000, assessed_land_value_dkk: 480_000, registered_at: '2025-03-18T01:13:56.000Z' },
+  ]);
 });
