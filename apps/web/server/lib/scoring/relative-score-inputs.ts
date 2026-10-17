@@ -29,15 +29,17 @@ export function extractScoringInputs(params: RelativeScoreInputsParams): Scoring
   const { input, areaSqm, renovationCategory, noiseExposureLden } = params;
   const assumptions = params.assumptions ?? DEFAULT_FINANCING_ASSUMPTIONS;
 
+  const askingPrice = input.askingPrice ?? null;
   const priceCeiling = assumptions.priceCeilingByRenovationCategory[renovationCategory.category];
-  const priceHeadroomDkk = priceCeiling - input.askingPrice;
+  // Headroom is "ceiling minus asking price"; with no asking price there is nothing to subtract.
+  const priceHeadroomDkk = askingPrice !== null ? priceCeiling - askingPrice : null;
   const areaMarginSqm = areaSqm !== null ? areaSqm - assumptions.minAreaSqm : null;
   const conditionProxy = CONDITION_PROXY_BY_CATEGORY[renovationCategory.category];
 
   const totalEncumbrancesDkk = input.totalEncumbrancesDkk ?? null;
   const legalRiskProxy =
-    totalEncumbrancesDkk !== null && input.askingPrice > 0
-      ? Math.max(0, 1 - totalEncumbrancesDkk / input.askingPrice)
+    totalEncumbrancesDkk !== null && askingPrice !== null && askingPrice > 0
+      ? Math.max(0, 1 - totalEncumbrancesDkk / askingPrice)
       : null;
 
   return {

@@ -67,10 +67,40 @@ describe("authenticated register lookup", () => {
   });
 
   it.each([
-    { address: query.address }, { ...query, askingPrice: "-1" },
+    { ...query, askingPrice: "-1" },
     { ...query, address: "x".repeat(301) }, { ...query, lat: "57" },
     { ...query, lat: "0", lon: "10" },
   ])("rejects malformed lookup input before quota consumption", async (values) => {
+    const { res, result } = response();
+    await handler(request(values), res);
+    expect(result.statusCode).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(lookupProperty).not.toHaveBeenCalled();
+  });
+
+  it("looks up a husnummer id with no asking price and no free-text address", async () => {
+    const id = "0a3f509c-38ed-32b8-e044-0003ba298018";
+    const { res, result } = response();
+    await handler(request({ husnummerId: id }), res);
+    expect(result.statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("consume_register_lookup_budget");
+    expect(lookupProperty).toHaveBeenCalledWith(expect.objectContaining({ husnummerId: id, address: "", askingPrice: null }));
+  });
+
+  it("still passes a listing's asking price through", async () => {
+    const { res } = response();
+    await handler(request(), res);
+    expect(lookupProperty).toHaveBeenCalledWith(expect.objectContaining({ askingPrice: 2_000_000, husnummerId: null }));
+  });
+
+  it.each<Record<string, string>>([
+    { husnummerId: "not-a-uuid" },
+    { husnummerId: "0a3f509c-38ed-32b8-e044-0003ba298018/../x" },
+    { address: query.address, askingPrice: "abc" },
+    { address: query.address, askingPrice: "0" },
+    { husnummerId: "0a3f509c-38ed-32b8-e044-0003ba298018", askingPrice: "-5" },
+    {},
+  ])("rejects an unusable identifier or a malformed price before quota consumption", async (values) => {
     const { res, result } = response();
     await handler(request(values), res);
     expect(result.statusCode).toBe(400);

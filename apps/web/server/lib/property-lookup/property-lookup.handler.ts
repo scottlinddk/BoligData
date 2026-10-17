@@ -5,6 +5,7 @@ import type {
   PropertyLookupSourceStatus,
 } from "../../../../../packages/shared/src/types/property-lookup.js";
 import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js";
+import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
@@ -16,15 +17,18 @@ import { classifyRenovationCategory } from "../screening/renovation-category.js"
 import { evaluateScreening } from "../screening/symbol-engine.js";
 import { extractScoringInputs } from "../scoring/relative-score-inputs.js";
 
-/** Maps a source's outcome onto the provenance entry that ships in the response. */
+/**
+ * Maps a source's outcome onto the provenance entry that ships in the response.
+ * `mockFlag` is null for a source that has no mock mode and is therefore never mock.
+ */
 function status(
   key: PropertyLookupSourceStatus["key"],
   register: string,
-  mockFlag: string,
+  mockFlag: string | null,
   result: SourceResult<unknown>,
 ): PropertyLookupSourceStatus {
   if (!result.ok) return { key, register, mode: "unavailable", error: result.error };
-  return { key, register, mode: mockModeEnabled(mockFlag) ? "mock" : "live", error: null };
+  return { key, register, mode: mockFlag !== null && mockModeEnabled(mockFlag) ? "mock" : "live", error: null };
 }
 
 const MODE_SEVERITY: Record<PropertyLookupDataMode, number> = { live: 0, mock: 1, unavailable: 2 };
@@ -58,15 +62,17 @@ export async function lookupProperty(
   input: PropertyLookupInput,
   assumptions: FinancingAssumptions = DEFAULT_FINANCING_ASSUMPTIONS,
 ): Promise<PropertyLookupResult> {
-  const cadastralResult = await lookupAddressCadastral(
-    input.address,
-    input.postalCode ?? null,
-    input.lat ?? 0,
-    input.lon ?? 0,
-  );
+  // An id the user picked in the Adressevælger autocomplete is resolved
+  // directly. It is not a free-text guess, and it is the only path that still
+  // works now that DAWA (the free-text resolver) is closed.
+  const addressMockFlag = input.husnummerId ? null : "ADDRESS_LOOKUP_MOCK_MODE";
+  const cadastralResult = input.husnummerId
+    ? await lookupHusnummerById(input.husnummerId)
+    : await lookupAddressCadastral(input.address, input.postalCode ?? null, input.lat ?? 0, input.lon ?? 0);
   // A successful mock lookup is still synthetic: its identifiers and
   // coordinates must not seed subsequent live register requests.
-  const cadastral = cadastralResult.ok && !mockModeEnabled("ADDRESS_LOOKUP_MOCK_MODE") ? cadastralResult.data : null;
+  const cadastral =
+    cadastralResult.ok && (addressMockFlag === null || !mockModeEnabled(addressMockFlag)) ? cadastralResult.data : null;
 
   const lat = cadastral?.lat ?? input.lat ?? null;
   const lon = cadastral?.lon ?? input.lon ?? null;
@@ -93,13 +99,14 @@ export async function lookupProperty(
   const noiseExposureLden = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data.ldenDb : null;
   const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
 
-  const addressRegisterLabel =
-    cadastral?.resolvedVia === "dar_fallback"
+  const addressRegisterLabel = input.husnummerId
+    ? "DAR via Adressevælger (adressevaelger.dk)"
+    : cadastral?.resolvedVia === "dar_fallback"
       ? "DAR via Datafordeler GraphQL (DAWA fallback)"
       : "DAR via DAWA (api.dataforsyningen.dk)";
 
   const sources: PropertyLookupSourceStatus[] = [
-    status("address", addressRegisterLabel, "ADDRESS_LOOKUP_MOCK_MODE", cadastralResult),
+    status("address", addressRegisterLabel, addressMockFlag, cadastralResult),
     status("bbr", "BBR via Datafordeler GraphQL", "BBR_MOCK_MODE", bbrResult),
     status("publicValuation", "VUR via Datafordeler GraphQL", "EJENDOMSVURDERING_MOCK_MODE", valuationResult),
     noiseResult === null
@@ -146,7 +153,7 @@ export async function lookupProperty(
   });
 
   return {
-    address: input.address,
+    address: input.address || cadastral?.formattedAddress || "",
     resolved: {
       idLokalid: cadastral?.idLokalid ?? null,
       matrikelnr: cadastral?.matrikelnr ?? null,

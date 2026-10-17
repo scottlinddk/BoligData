@@ -132,11 +132,21 @@ export interface PropertyLookupResult {
 
 /** Everything the caller must supply that no register can resolve on its own. */
 export interface PropertyLookupInput {
+  /** Free-text address. May be empty when `husnummerId` is given: the register's own spelling is then used. */
   address: string;
+  /**
+   * DAR husnummer UUID picked from the Adressevælger autocomplete. When set, the address is resolved by id
+   * instead of by free text, so there is no fuzzy match to get wrong.
+   */
+  husnummerId?: string | null;
   postalCode?: string | null;
   lat?: number | null;
   lon?: number | null;
-  askingPrice: number;
+  /**
+   * Listing price in DKK. Optional: an address looked up without a listing (a home that is not for sale) has none,
+   * and the price-dependent screening criteria then report "no asking price" instead of being evaluated.
+   */
+  askingPrice?: number | null;
   sellerTakeoverDate?: string | null;
   totalEncumbrancesDkk?: number | null;
   roomCountDefinition?: RoomCountDefinition;

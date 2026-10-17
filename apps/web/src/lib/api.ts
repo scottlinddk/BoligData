@@ -109,8 +109,12 @@ export function getComparables(id: string): Promise<ComparablesResponse> {
 }
 
 export interface PropertyLookupQuery {
+  /** Free text for a listing; may be empty when `husnummerId` identifies the address. */
   address: string;
-  askingPrice: number;
+  /** DAR husnummer UUID from the address autocomplete: an address that is not a listing. */
+  husnummerId?: string | null;
+  /** Omit for an address with no listing: there is then no price to screen. */
+  askingPrice?: number | null;
   postalCode?: string | null;
   lat?: number | null;
   lon?: number | null;
@@ -119,10 +123,10 @@ export interface PropertyLookupQuery {
 }
 
 /**
- * Live register read for one address: DAR/DAWA identifiers and coordinates,
- * BBR building facts, and the public valuation. Open endpoint — no bearer
- * token required — so this resolves for signed-out visitors too, and the
- * response is CDN-cached per query string.
+ * Live register read for one address: DAR identifiers and coordinates, BBR
+ * building facts, the public valuation, registered sales and nearby sales.
+ * Requires a signed-in account and spends one of its hourly register lookups
+ * (HTTP 429 when exhausted); the response is never publicly cached.
  *
  * `energyLabel` and `roomCount` are pass-throughs: no register in the pipeline
  * resolves either, so the endpoint screens against whatever the caller knows

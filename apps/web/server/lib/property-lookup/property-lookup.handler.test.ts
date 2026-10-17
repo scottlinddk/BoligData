@@ -25,6 +25,18 @@ const dawaRecord = {
 
 const parcelRecord = { bfenummer: 2340871 };
 
+/** Adressevælger `/husnumre/{id}` for the same address, as captured live on 2026-10-17. */
+const husnummerBody = {
+  status: "ok",
+  husnummer: {
+    id_lokalid: dawaRecord.id,
+    adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
+    adgangspunkt: { koordinater: { x: 553173.08, y: 6322838.76 } },
+    postnummer: { navn: "Aalborg", postnr: "9000" },
+    navngivenvejkommunedel: { kommune: "0851" },
+  },
+};
+
 const bbrBody = {
   data: {
     BBR_Bygning: {
@@ -90,7 +102,9 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
     if (href.includes("api.boligsiden.dk/search/addresses")) {
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: [] }) };
     }
-    const body = href.includes("adgangsadresser")
+    const body = href.includes("adressevaelger.dk")
+      ? husnummerBody
+      : href.includes("adgangsadresser")
       ? [dawaRecord]
       : href.includes("/jordstykker/")
         ? parcelRecord
@@ -219,5 +233,89 @@ describe("lookupProperty (mock mode)", () => {
     expect(first.priceHistory).toEqual([]);
     expect(first.nearbySales).toEqual([]);
     expect(first.scoringInputs.areaMarginSqm).toBeNull();
+  });
+});
+
+describe("lookupProperty by husnummer id (an address that is not a listing)", () => {
+  const byId: PropertyLookupInput = { address: "", husnummerId: dawaRecord.id };
+
+  it("resolves from the id alone, never touching the closed free-text register", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const fetchSpy = stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("adgangsadresser"))).toBe(false);
+    expect(urls.some((u) => u.includes(`adressevaelger.dk/husnumre/${dawaRecord.id}`))).toBe(true);
+    expect(result.address).toBe("Floravej 6, 9000 Aalborg");
+    expect(result.resolved).toMatchObject({
+      idLokalid: dawaRecord.id,
+      formattedAddress: "Floravej 6, 9000 Aalborg",
+      postalCode: "9000",
+    });
+    expect(result.resolved.lat).toBeCloseTo(57.0459, 3);
+    expect(result.resolved.lon).toBeCloseTo(9.8764, 3);
+    expect(result.sources.find((s) => s.key === "address")).toMatchObject({
+      mode: "live",
+      register: expect.stringContaining("Adressevælger"),
+    });
+  });
+
+  it("keys BBR, noise and sales off the resolved id and coordinates", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    expect(result.bbrData?.yearBuilt).toBe(1962);
+    expect(result.scoringInputs.noiseZoneEstimate).toBe(57);
+    expect(result.sources.find((s) => s.key === "bbr")?.mode).toBe("live");
+    expect(result.sources.find((s) => s.key === "noise")?.mode).toBe("live");
+  });
+
+  it("says why the public valuation is missing: this register does not resolve the parcel", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    expect(result.resolved.matrikelnr).toBeNull();
+    expect(result.resolved.bfeNummer).toBeNull();
+    expect(result.publicValuation).toBeNull();
+    const valuation = result.sources.find((s) => s.key === "publicValuation");
+    expect(valuation?.mode).toBe("unavailable");
+    expect(valuation?.error).toBeTruthy();
+  });
+
+  it("evaluates no price-based criterion without an asking price", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    expect(result.screening).toHaveLength(6);
+    const unavailable = result.screening.filter((c) => /No asking price/.test(c.reason)).map((c) => c.key);
+    expect(unavailable).toEqual(["priceCeiling", "monthlyCost", "encumbranceRatio"]);
+    expect(result.scoringInputs.priceHeadroomDkk).toBeNull();
+  });
+
+  it("reports an unknown id as an unavailable address with the upstream reason", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    vi.spyOn(globalThis, "fetch").mockImplementation((async () => ({
+      ok: false,
+      status: 404,
+      headers: new Headers(),
+      json: async () => ({}),
+    })) as unknown as typeof fetch);
+
+    const result = await lookupProperty(byId);
+
+    expect(result.resolved.idLokalid).toBeNull();
+    expect(result.resolved.lat).toBeNull();
+    const address = result.sources.find((s) => s.key === "address");
+    expect(address?.mode).toBe("unavailable");
+    expect(address?.error).toContain("404");
+    expect(result.dataMode).toBe("unavailable");
   });
 });
