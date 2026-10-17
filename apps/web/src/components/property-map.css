@@ -17,11 +17,11 @@
 .property-map-caption { color: var(--color-text-secondary); }
 .property-map-error { color: var(--color-danger); }
 .property-map-price {
-  border: 1.5px solid var(--map-pin-border);
+  border: 2px solid var(--color-surface);
   border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--map-pin-text);
-  padding: 5px 10px;
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  padding: 5px 11px;
   font-family: inherit;
   font-size: 12px;
   line-height: 1.25;
@@ -29,11 +29,12 @@
   white-space: nowrap;
   box-shadow: var(--shadow-lift);
   cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
 }
 .property-map-price:hover,
 .property-map-price:focus-visible {
-  background: var(--color-cta);
-  color: var(--color-cta-text);
+  background: var(--color-brand);
+  color: var(--color-surface);
   z-index: 2;
   outline: 3px solid var(--map-focus);
   outline-offset: 2px;

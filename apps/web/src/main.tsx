@@ -5,9 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@/i18n/i18n";
 import { ThemeProvider } from "@/theme/theme";
 import { Header } from "@/components/header";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { ToastProvider } from "@/components/toast";
 import { RecommendationAlerts } from "@/components/recommendation-alerts";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { AuthGuard } from "@/components/auth-guard";
 import { RoleGuard } from "@/components/role-guard";
 import { RouteErrorBoundary } from "@/components/error-boundary";
@@ -35,12 +36,15 @@ import "./index.css";
 function RootLayout() {
   const { pathname } = useLocation();
   const isWorkspace = ["/research", "/dashboard", "/recommendations"].includes(pathname.replace(/\/$/, ""));
+  const { user } = useAuth();
+  const hasTabBar = Boolean(user) && !pathname.startsWith("/property/") && !pathname.startsWith("/auth/");
   return (
     <div className="min-h-full overflow-x-clip font-sans text-ink">
       <Header />
-      <main className={pathname === "/" || pathname.startsWith("/property/") || isWorkspace ? "w-full" : "mx-auto max-w-6xl"}>
+      <main className={`${pathname === "/" || pathname.startsWith("/property/") || isWorkspace ? "w-full" : "mx-auto max-w-6xl"} ${hasTabBar ? "pb-[4.5rem] xl:pb-0" : ""}`}>
         <Outlet />
       </main>
+      <MobileTabBar />
       {pathname.replace(/\/$/, "") !== "/recommendations" && <RecommendationAlerts />}
     </div>
   );

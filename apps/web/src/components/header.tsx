@@ -30,8 +30,8 @@ export function Header() {
   const navClass = ({ isActive }: { isActive: boolean }) => `whitespace-nowrap rounded-full px-3.5 py-2.5 text-[12px] font-medium transition-colors ${isActive ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:bg-surface hover:text-ink"}`;
 
   return <header className="sticky top-0 z-40 border-b border-border bg-paper" onKeyDown={event => { if (event.key === "Escape") setMenuOpen(false); }}>
-    <div className="mx-auto grid h-20 max-w-[1680px] grid-cols-[auto_1fr_auto] items-center gap-5 px-5 sm:px-8 xl:px-12">
-        <Link to="/" onClick={() => setMenuOpen(false)} className="flex shrink-0 items-center gap-2.5 text-[22px] font-medium tracking-[-0.055em] text-ink">
+    <div className="mx-auto grid h-14 max-w-[1680px] sm:h-20 grid-cols-[auto_1fr_auto] items-center gap-5 px-5 sm:px-8 xl:px-12">
+        <Link to="/" onClick={() => setMenuOpen(false)} className="flex shrink-0 items-center gap-2.5 text-xl font-medium tracking-[-0.055em] text-ink sm:text-[22px]">
           <BrandMark className="h-8 w-8" />{t("app.name")}
         </Link>
         {!isMobile && <nav aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="flex items-center gap-0.5 justify-self-center rounded-full bg-surface-alt p-1">
@@ -51,7 +51,7 @@ export function Header() {
         </button>
       </div>}
     </div>
-    {isMobile && menuOpen && <nav id="mobile-main-menu" aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="max-h-[calc(100dvh-80px)] overflow-y-auto border-t border-border bg-paper px-5 py-4 animate-fade-up">
+    {isMobile && menuOpen && <nav id="mobile-main-menu" aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="max-h-[calc(100dvh-56px)] sm:max-h-[calc(100dvh-80px)] overflow-y-auto border-t border-border bg-paper px-5 py-4 animate-fade-up">
       <div className="grid gap-1">{links.map(link => <NavLink key={link.to} to={link.to} end={link.to === "/"} onClick={() => setMenuOpen(false)} className={navClass}>{link.label}</NavLink>)}</div>
       {user ? <div className="my-3 grid gap-1 border-y border-border py-3">
         {accountMenuItems.map(item => <Link key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-lg px-3.5 py-2 text-sm text-ink-soft hover:bg-surface-alt">

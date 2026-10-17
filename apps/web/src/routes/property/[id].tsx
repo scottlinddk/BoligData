@@ -7,6 +7,7 @@ import { formatDkk, pricePerSqm } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { researchListingTime } from "@/lib/research-listing-time";
+import { originalAskingPrice } from "@/lib/original-asking-price";
 import { reportedMarketingPeriod } from "@/lib/reported-listing-duration";
 import { ListingDurationSummary } from "@/components/listing-duration-summary";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
@@ -35,6 +36,18 @@ import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 import { canSendRecommendations } from "@/lib/roles";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
+const factIcons = {
+  area: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></>,
+  rooms: <><path d="M5 21V4h11v17M3 21h18M12 12h.01" /></>,
+  built: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>,
+  energy: <><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z" /></>,
+  type: <><path d="M3 11 12 4l9 7M5 10v10h14V10" /></>,
+};
+function FactChip({ icon, children }: { icon: keyof typeof factIcons; children: ReactNode }) {
+  return <li className="flex min-h-10 items-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-ink">
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0 text-ink-soft" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{factIcons[icon]}</svg>{children}
+  </li>;
+}
 const actionClass = "flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors";
 
 function BrokerListingLink({ url, source, className }: { url: string; source: ListingSource; className: string }) {
@@ -100,6 +113,9 @@ export function PropertyDetailPage() {
   const listingTime = researchListingTime(property, listingHistory.data);
   const days = listingTime.time.latestEpisodeDays;
   const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
+  // Only exact, source-reported original asking prices count; nothing is inferred.
+  const original = originalAskingPrice(property, listingHistory.data);
+  const priceCut = original.status === "available" && original.evidence && original.evidence.price > property.price ? original.evidence.price - property.price : null;
 
   async function handleSave() {
     if (saving) return;
@@ -119,25 +135,46 @@ export function PropertyDetailPage() {
   }
 
   return <>
-    <article className="ui-enter mx-auto max-w-[1240px] px-4 pb-28 pt-6 sm:px-8 sm:pt-8 lg:pb-16">
-      <nav aria-label={tx("Brødkrumme", "Breadcrumb")} className="mb-6 flex items-center gap-3 text-xs text-ink-soft">
+    <article className="ui-enter mx-auto max-w-[1240px] px-4 pb-28 pt-0 sm:px-8 sm:pt-8 lg:pb-16">
+      <nav aria-label={tx("Brødkrumme", "Breadcrumb")} className="mb-6 hidden items-center gap-3 text-xs text-ink-soft sm:flex">
         <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
       </nav>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
         <div className="min-w-0 space-y-7">
-          <PropertyGallery key={property.id} images={photos} alt={property.address} />
+          <div className="relative -mx-4 sm:mx-0">
+            <PropertyGallery key={property.id} images={photos} alt={property.address} />
+            <div className="pointer-events-none absolute inset-x-4 top-3 flex items-center justify-between sm:hidden">
+              <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} aria-label={t("detail.back")} className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-ink shadow-card backdrop-blur">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+              </button>
+              <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-ink shadow-card backdrop-blur disabled:opacity-60">
+                {saving ? <Spinner /> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>}
+              </button>
+            </div>
+          </div>
           <div>
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium text-ink-soft">
+            <div className="mb-4 lg:hidden">
+              {!active && <p className="mb-1 text-xs text-ink-soft">{priceLabel}</p>}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><p className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">{formatDkk(property.price)}</p>{priceCut !== null && <span title={tx("Nedsættelse siden den oprindelige udbudspris", "Reduction from the original asking price")} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-surface">{tx("Prisfald", "Price cut")}: {formatDkk(priceCut)}</span>}</div>
+            </div>
+            <ul aria-label={tx("Nøgletal", "Key facts")} className="mb-5 flex flex-wrap gap-2 sm:hidden">
+              <FactChip icon="type">{t(`propertyType.${property.propertyType}` as TranslationKey)}</FactChip>
+              <FactChip icon="area">{t("property.sqm", { sqm: property.sqm })}</FactChip>
+              {property.rooms ? <FactChip icon="rooms">{property.rooms} {tx("rum", "rooms")}</FactChip> : null}
+              {(facts.buildingYear || listingDetails?.facts.yearBuilt) ? <FactChip icon="built">{String(facts.buildingYear ?? listingDetails?.facts.yearBuilt)}</FactChip> : null}
+              {(listingDetails?.facts.energyLabel ?? facts.bbrData?.energyLabel) ? <FactChip icon="energy">{listingDetails?.facts.energyLabel ?? facts.bbrData?.energyLabel}</FactChip> : null}
+              {!active && <li className="flex min-h-10 items-center rounded-xl bg-warning-soft px-3 text-sm font-semibold text-warning-text">{t(`property.status.${property.status}`)}</li>}
+            </ul>
+            <div className="mb-3 hidden flex-wrap items-center gap-2 text-xs font-medium text-ink-soft sm:flex">
               <span className="rounded-full bg-surface-alt px-3 py-1.5">{t(`propertyType.${property.propertyType}` as TranslationKey)}</span>
               <span className={`rounded-full px-3 py-1.5 ${active ? "bg-surface-alt" : "bg-warning-soft font-semibold text-warning-text"}`}>{t(`property.status.${property.status}`)}</span>
             </div>
-            <h1 className="ds-display text-3xl leading-tight text-ink sm:text-[40px]">{property.address}</h1>
+            <h1 className="ds-display text-2xl leading-tight text-ink sm:text-[40px]">{property.address}</h1>
             <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-soft">
               <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M16 8c0 4-6 9-6 9S4 12 4 8a6 6 0 1 1 12 0Z" /><circle cx="10" cy="8" r="2" /></svg>
               {[property.postalCode, property.municipality].filter(Boolean).join(" ")}
             </p>
-            <div className="mt-4 lg:hidden">{!active && <p className="mb-1 text-xs text-ink-soft">{priceLabel}</p>}<p className="text-2xl font-semibold tracking-tight">{formatDkk(property.price)}</p></div>
-            <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 border-y border-border py-5 sm:grid-cols-4">
+                        <dl className="mt-6 hidden grid-cols-2 gap-x-5 gap-y-5 border-y border-border py-5 sm:grid sm:grid-cols-4">
               <Stat label={t("detail.size")} value={t("property.sqm", { sqm: property.sqm })} />
               <Stat label={t("detail.rooms")} value={property.rooms ? String(property.rooms) : empty} />
               <Stat label={t("detail.built")} value={facts.buildingYear || listingDetails?.facts.yearBuilt ? String(facts.buildingYear ?? listingDetails?.facts.yearBuilt) : empty} />
@@ -189,6 +226,7 @@ export function PropertyDetailPage() {
             <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{priceLabel}</p>
             <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em]">{formatDkk(property.price)}</p>
             <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
+            {priceCut !== null && <p className="mt-3"><span title={tx("Nedsættelse siden den oprindelige udbudspris", "Reduction from the original asking price")} className="inline-block rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-surface">{tx("Prisfald", "Price cut")}: {formatDkk(priceCut)}</span></p>}
             {active && <><ListingDurationSummary currentDays={days} period={marketingPeriod} />
               <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a></>}
             <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} className={`${actionClass} mt-3 w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50`}>{saving ? <Spinner /> : <span aria-hidden="true">{saved ? "♥" : "♡"}</span>}{saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")}</button>
@@ -212,8 +250,8 @@ export function PropertyDetailPage() {
         <ResearchWorkbench property={property} facts={facts} />
       </details>
       {recommendOpen && <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
-        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{priceLabel}</p><p className="text-base font-semibold">{formatDkk(property.price)}</p></div>
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 rounded-t-3xl border-t border-border bg-surface px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lift lg:hidden">
+        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{priceLabel}</p><p className="text-lg font-semibold tracking-tight">{formatDkk(property.price)}</p></div>
         <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl disabled:opacity-50">{saving ? <Spinner /> : saved ? "♥" : "♡"}</button>
         {property.listingUrl ? <a href={property.listingUrl} target="_blank" rel="noopener noreferrer" className={`${actionClass} bg-cta text-cta-text`}>{tx("Se annonce", "View listing")} ↗</a> : <button type="button" onClick={openResearch} className={`${actionClass} bg-cta text-cta-text`}>{tx("Undersøg", "Research")}</button>}
       </div>

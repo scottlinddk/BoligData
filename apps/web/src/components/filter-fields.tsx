@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { PropertyType } from "@shared/types/index";
 import type { FiltersWithSort } from "@/lib/url-filters";
 import { PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
@@ -36,6 +37,15 @@ function NumberField({
   );
 }
 
+function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="col-span-full">
+      <h3 className="mb-3 text-base font-semibold text-ink">{title}</h3>
+      <div className="grid grid-cols-2 gap-3">{children}</div>
+    </section>
+  );
+}
+
 /** Shared filter form fields, laid out by the caller (desktop sidebar vs. mobile bottom sheet). */
 export function FilterFields({
   filters,
@@ -43,7 +53,8 @@ export function FilterFields({
   fieldLabelClassName = "flex min-w-0 flex-col gap-2 text-xs font-medium text-ink-soft",
   fieldInputClassName = "w-full min-w-0 rounded-xl border border-border bg-surface px-3.5 py-3 text-sm font-normal text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft",
 }: FilterFieldsProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const tx = (da: string, en: string) => language === "da" ? da : en;
   const label = fieldLabelClassName;
   const input = fieldInputClassName;
 
@@ -74,14 +85,14 @@ export function FilterFields({
       </div>
 
       <fieldset className={`col-span-full ${label}`}>
-        <legend className="mb-3">{t("filters.propertyType")}</legend>
+        <legend className="mb-3 text-base font-semibold text-ink">{t("filters.propertyType")}</legend>
         <div className="flex flex-wrap gap-2">
           {PROPERTY_TYPE_OPTIONS.map((type) => {
             const checked = filters.propertyTypes?.includes(type) ?? false;
             return (
               <label
                 key={type}
-                className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium normal-case tracking-normal transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand ${
+                className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium normal-case tracking-normal transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand ${
                   checked ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-ink hover:bg-surface-hover"
                 }`}
               >
@@ -104,59 +115,27 @@ export function FilterFields({
         </div>
       </fieldset>
 
-      <div className="col-span-full grid grid-cols-2 gap-x-3 gap-y-4">
-        <NumberField
-          label={t("filters.minPrice")}
-          value={filters.minPrice}
-          onChange={(v) => onChange({ minPrice: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-        <NumberField
-          label={t("filters.maxPrice")}
-          value={filters.maxPrice}
-          onChange={(v) => onChange({ maxPrice: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-        <NumberField
-          label={t("filters.minSqm")}
-          value={filters.minSqm}
-          onChange={(v) => onChange({ minSqm: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-        <NumberField
-          label={t("filters.maxSqm")}
-          value={filters.maxSqm}
-          onChange={(v) => onChange({ maxSqm: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-        <NumberField
-          label={t("filters.minBuildingYear")}
-          value={filters.minBuildingYear}
-          onChange={(v) => onChange({ minBuildingYear: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-        <NumberField
-          label={t("filters.maxBuildingYear")}
-          value={filters.maxBuildingYear}
-          onChange={(v) => onChange({ maxBuildingYear: v })}
-          labelClassName={label}
-          inputClassName={input}
-        />
-      </div>
+      <FieldGroup title={tx("Pris", "Price")}>
+        <NumberField label={t("filters.minPrice")} value={filters.minPrice} onChange={(v) => onChange({ minPrice: v })} labelClassName={label} inputClassName={input} />
+        <NumberField label={t("filters.maxPrice")} value={filters.maxPrice} onChange={(v) => onChange({ maxPrice: v })} labelClassName={label} inputClassName={input} />
+      </FieldGroup>
+      <FieldGroup title={tx("Størrelse", "Size")}>
+        <NumberField label={t("filters.minSqm")} value={filters.minSqm} onChange={(v) => onChange({ minSqm: v })} labelClassName={label} inputClassName={input} />
+        <NumberField label={t("filters.maxSqm")} value={filters.maxSqm} onChange={(v) => onChange({ maxSqm: v })} labelClassName={label} inputClassName={input} />
+      </FieldGroup>
+      <FieldGroup title={tx("Byggeår", "Year built")}>
+        <NumberField label={t("filters.minBuildingYear")} value={filters.minBuildingYear} onChange={(v) => onChange({ minBuildingYear: v })} labelClassName={label} inputClassName={input} />
+        <NumberField label={t("filters.maxBuildingYear")} value={filters.maxBuildingYear} onChange={(v) => onChange({ maxBuildingYear: v })} labelClassName={label} inputClassName={input} />
+      </FieldGroup>
 
-      <NumberField
-        label={t("filters.maxDaysOnMarket")}
-        value={filters.maxDaysOnMarket}
-        onChange={(v) => onChange({ maxDaysOnMarket: v })}
-        labelClassName={label}
-        inputClassName={input}
-      />
-
+      <FieldGroup title={tx("Liggetid og sortering", "Time on market and sorting")}>
+        <NumberField
+          label={t("filters.maxDaysOnMarket")}
+          value={filters.maxDaysOnMarket}
+          onChange={(v) => onChange({ maxDaysOnMarket: v })}
+          labelClassName={label}
+          inputClassName={input}
+        />
       <label className={label}>
         {t("filters.sortBy")}
         <select
@@ -177,6 +156,7 @@ export function FilterFields({
           ))}
         </select>
       </label>
+      </FieldGroup>
     </>
   );
 }

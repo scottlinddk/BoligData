@@ -66,14 +66,21 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
   return <section aria-label={t("detail.gallery")}>
     <button type="button" onClick={event => open(0, event.currentTarget)}
       aria-label={`${t("detail.gallery")} · ${images.length} ${language === "da" ? "billeder" : "photos"}`}
-      className="group relative block aspect-[3/2] w-full overflow-hidden rounded-2xl bg-surface-alt text-left">
+      className="group relative block aspect-[4/3] w-full overflow-hidden bg-surface-alt text-left sm:aspect-[3/2] sm:rounded-2xl">
       {photo(images[0]!, 0, true)}
-      <span className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold text-neutral-900 shadow-sm">
+      <span className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-white/95 px-3.5 py-2 text-xs sm:bottom-4 sm:right-4 sm:px-4 font-semibold text-neutral-900 shadow-sm">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-4 w-4" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2" /><path d="m7 5 1-2h4l1 2" /><circle cx="10" cy="10.5" r="3" /></svg>
         {language === "da" ? "Se alle billeder" : "View all photos"} · {images.length}
       </span>
     </button>
-    {images.length > 1 && <div className="mt-3 grid grid-cols-4 gap-2.5">
+    {images.length > 1 && <ul className="mt-3 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden">
+      {images.slice(0, 8).map((image, index) => <li key={`${image.url}-m${index}`} className="shrink-0"><button type="button" onClick={event => open(index, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${index + 1}`}
+        className={`group relative block h-16 w-[4.5rem] overflow-hidden rounded-xl bg-surface-alt ${index === 0 ? "ring-2 ring-cta ring-offset-2 ring-offset-paper" : ""}`}>
+        {photo(image, index)}
+        {index === 7 && images.length > 8 && <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-medium text-white">+{images.length - 8}</span>}
+      </button></li>)}
+    </ul>}
+    {images.length > 1 && <div className="mt-3 hidden grid-cols-4 gap-2.5 sm:grid">
       {images.slice(1, 5).map((image, index) => <button key={`${image.url}-${index}`} type="button"
         onClick={event => open(index + 1, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${index + 2}`}
         className="group relative aspect-[3/2] overflow-hidden rounded-xl bg-surface-alt">
