@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { lastSearchPath } from "@/lib/search-session";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useI18n } from "@/i18n/i18n";
@@ -15,9 +16,10 @@ export function Header() {
   const { t, language } = useI18n();
   const isMobile = useMediaQuery("(max-width: 1279px)");
   const [menuOpen, setMenuOpen] = useState(false);
+  useLocation(); // Re-render on navigation so the search link tracks the latest search.
   const accountMenuItems = useAccountMenuItems();
   const links = [
-    { to: "/", label: t("nav.search") },
+    { to: lastSearchPath(), label: t("nav.search") },
     ...(user ? [
       { to: "/research", label: language === "da" ? "Boligprojekt" : "Buying project" },
       { to: "/dashboard", label: t("nav.dashboard") },
@@ -35,7 +37,7 @@ export function Header() {
           <BrandMark className="h-8 w-8" />{t("app.name")}
         </Link>
         {!isMobile && <nav aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="flex items-center gap-0.5 justify-self-center rounded-full bg-surface-alt p-1">
-          {links.map(link => <NavLink key={link.to} to={link.to} end={link.to === "/"} className={navClass}>{link.label}</NavLink>)}
+          {links.map(link => <NavLink key={link.to} viewTransition to={link.to} end={link.to.startsWith("/?") || link.to === "/"} className={navClass}>{link.label}</NavLink>)}
         </nav>}
       {!isMobile ? <div className="flex shrink-0 items-center gap-2">
         <LanguageSwitcher /><ThemeToggle />
@@ -52,7 +54,7 @@ export function Header() {
       </div>}
     </div>
     {isMobile && menuOpen && <nav id="mobile-main-menu" aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="max-h-[calc(100dvh-80px)] overflow-y-auto border-t border-border bg-paper px-5 py-4 animate-fade-up">
-      <div className="grid gap-1">{links.map(link => <NavLink key={link.to} to={link.to} end={link.to === "/"} onClick={() => setMenuOpen(false)} className={navClass}>{link.label}</NavLink>)}</div>
+      <div className="grid gap-1">{links.map(link => <NavLink key={link.to} viewTransition to={link.to} end={link.to.startsWith("/?") || link.to === "/"} onClick={() => setMenuOpen(false)} className={navClass}>{link.label}</NavLink>)}</div>
       {user ? <div className="my-3 grid gap-1 border-y border-border py-3">
         {accountMenuItems.map(item => <Link key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-lg px-3.5 py-2 text-sm text-ink-soft hover:bg-surface-alt">
           <span>{t(item.labelKey)}</span>{item.badge !== undefined && <span className="rounded-full bg-cta px-2 py-0.5 text-[10px] font-semibold text-cta-text">{item.badge}</span>}

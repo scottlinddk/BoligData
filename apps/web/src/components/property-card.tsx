@@ -78,7 +78,7 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect }:
   }
 
   return <article className="group relative min-w-0" data-testid="property-card">
-    <Link to={`/property/${property.id}`} className="block rounded-2xl text-ink">
+    <Link viewTransition to={`/property/${property.id}`} className="block rounded-2xl text-ink">
       <div className="relative aspect-[8/5] overflow-hidden rounded-2xl bg-surface-alt">
         {photo ? <CardPhoto key={photo.url} photo={photo} alt={property.address} /> : <NoPhoto />}
         <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">{property.listingSource}</span>

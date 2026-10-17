@@ -6,8 +6,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { parseFilters, serializeFilters, type FiltersWithSort } from "@/lib/url-filters";
+import { pageToOffset, readViewPrefs, writeLastSearch, writeViewPrefs } from "@/lib/search-session";
 import { countActiveFilters } from "@/components/filter-fields";
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
+import { PAGE_SIZE_OPTIONS, PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
 import { FiltersSheet } from "@/components/filters-sheet";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyCardSkeleton } from "@/components/ui/loading";
@@ -20,8 +21,8 @@ import { useI18n } from "@/i18n/i18n";
 import type { PropertyType } from "@shared/types/index";
 import { canSendRecommendations } from "@/lib/roles";
 
-const pill = "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:border-border-strong hover:bg-surface-alt";
-const primary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-cta-text transition hover:bg-cta-hover disabled:opacity-40";
+const pill = "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition active:scale-[0.98] hover:border-border-strong hover:bg-surface-alt";
+const primary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-cta-text transition active:scale-[0.98] hover:bg-cta-hover disabled:opacity-40";
 function ViewIcon({ map }: { map: boolean }) {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">{map ? <path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /> : <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>;
 }
@@ -38,19 +39,24 @@ export function SearchPage() {
   const resultsRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
-  const [offset, setOffset] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [initialView] = useState(readViewPrefs);
+  const [pageSize, setPageSize] = useState<number>(initialView.pageSize);
+  const offset = pageToOffset(searchParams.get("page"), pageSize);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"list" | "map">("list");
-  const [desktopMap, setDesktopMap] = useState(true);
+  const [mobileTab, setMobileTab] = useState<"list" | "map">(initialView.mobileTab);
+  const [desktopMap, setDesktopMap] = useState(initialView.desktopMap);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState("");
   const [savingSearch, setSavingSearch] = useState(false);
   const canRecommend = canSendRecommendations(profile?.role);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recommendOpen, setRecommendOpen] = useState(false);
-  // Browser back/forward and saved-search links can change the search too.
-  useEffect(() => { setOffset(0); setSelectedIds(new Set()); }, [searchParams]);
+  const filterKey = serializeFilters(filters).toString();
+  // Selections belong to one result set; a page change keeps them, a new search clears them.
+  useEffect(() => { setSelectedIds(new Set()); }, [filterKey]);
+  // Other pages link back to the last search, and view choices follow the user between visits.
+  useEffect(() => { writeLastSearch(searchParams.toString()); }, [searchParams]);
+  useEffect(() => { writeViewPrefs({ pageSize, desktopMap, mobileTab }); }, [pageSize, desktopMap, mobileTab]);
   const { data, isLoading, isFetching, isError, error, refetch } = usePropertySearch(filters, offset, pageSize);
   const authenticated = data?.authenticated ?? Boolean(user);
   const properties = data?.properties ?? [];
@@ -62,14 +68,16 @@ export function SearchPage() {
   const showList = !isMobile || mobileTab === "list";
 
   function handleFilterChange(patch: Partial<FiltersWithSort>) {
-    setOffset(0);
-    setSearchParams(serializeFilters({ ...filters, ...patch }));
+    // Replace, so typing in a field doesn't fill the history and Back leaves the search.
+    setSearchParams(serializeFilters({ ...filters, ...patch }), { replace: true });
   }
   function toggleSelected(id: string) {
     setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
   function goToPage(nextOffset: number) {
-    setOffset(nextOffset);
+    const params = new URLSearchParams(searchParams);
+    if (nextOffset > 0) params.set("page", String(Math.floor(nextOffset / pageSize) + 1)); else params.delete("page");
+    setSearchParams(params);
     resultsRef.current?.focus({ preventScroll: true });
     resultsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "instant" : "smooth", block: "start" });
   }
@@ -133,8 +141,8 @@ export function SearchPage() {
         {isError && <div role="alert" className="ui-enter mb-5 rounded-xl border border-danger-soft bg-danger-soft p-5"><p className="font-medium text-danger">{t("search.error")}</p>{filters.polygon && <p className="mt-1 text-sm text-ink-soft">{error?.message}</p>}<button disabled={isFetching} onClick={() => refetch()} className={`${pill} mt-3 disabled:opacity-50`}>{isFetching && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{t("common.retry")}</button></div>}
         {showList && <div aria-busy={isFetching}>
           {isLoading && <div className={grid} aria-hidden="true">{Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)}</div>}
-          {!isLoading && data && <div className={`transition-opacity duration-200 motion-reduce:transition-none ${isFetching ? "opacity-60" : "opacity-100"}`}>{authenticated ? properties.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="ui-enter rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="ui-enter py-8 text-center text-ink-soft">{t("search.noResults")}</p>}</div>}
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-xs text-ink-soft"><span>{range}</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2">{t("search.pageSize")}<select value={pageSize} disabled={isFetching} onChange={e => { goToPage(0); setPageSize(Number(e.target.value)); }} className="rounded-lg border border-border bg-surface p-1.5 text-ink disabled:opacity-50">{PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}</select></label><div className="flex gap-1.5"><button disabled={offset === 0 || isFetching} onClick={() => goToPage(Math.max(0, offset - limit))} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.previous")}</button><button disabled={offset + limit >= total || isFetching} onClick={() => goToPage(offset + limit)} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.next")}</button></div></div></div>
+          {!isLoading && data && <div className={`transition-opacity duration-200 motion-reduce:transition-none ${isFetching ? "opacity-60" : "opacity-100"}`}>{authenticated ? properties.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-stagger`} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="ui-enter rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="ui-enter py-8 text-center text-ink-soft">{t("search.noResults")}</p>}</div>}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-xs text-ink-soft"><span>{range}</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2">{t("search.pageSize")}<select value={pageSize} disabled={isFetching} onChange={e => { const size = Number(e.target.value); setPageSize(size); const params = new URLSearchParams(searchParams); params.delete("page"); setSearchParams(params, { replace: true }); resultsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "instant" : "smooth", block: "start" }); }} className="rounded-lg border border-border bg-surface p-1.5 text-ink disabled:opacity-50">{PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}</select></label><div className="flex gap-1.5"><button disabled={offset === 0 || isFetching} onClick={() => goToPage(Math.max(0, offset - limit))} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.previous")}</button><button disabled={offset + limit >= total || isFetching} onClick={() => goToPage(offset + limit)} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.next")}</button></div></div></div>
         </div>}
         </section>
         {showMap && <aside aria-label={tx("Kort over boliger", "Map of homes")} className={`overflow-hidden rounded-[22px] border border-border ${isMobile ? "relative h-[68dvh] min-h-[430px]" : "sticky top-20 h-[calc(100dvh-7rem)] min-h-[500px] max-h-[900px] self-start"}`}>
