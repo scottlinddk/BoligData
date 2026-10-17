@@ -17,6 +17,7 @@ import {
   pickBfe,
   positiveInt,
   processProperty,
+  registerId,
   redact,
   resolveValuations,
   selectCandidates,
@@ -350,4 +351,39 @@ test('diagnoseVur reports the crossref, the alternative route and survives a fai
   await diagnoseVur(broken, ['1'], (l) => lines2.push(l));
   assert.ok(lines2.some((l) => l.includes('ERROR')));
   assert.ok(!lines2.join('\n').includes('SECRET'));
+});
+
+test('register ids beyond positiveInt\'s cap are accepted, unsafe or fractional ones are not', async () => {
+  assert.equal(registerId(905183228372334), 905183228372334);
+  assert.equal(registerId('93061927943620'), 93061927943620);
+  assert.equal(registerId(0), null);
+  assert.equal(registerId(-5), null);
+  assert.equal(registerId(1.5), null);
+  assert.equal(registerId(2 ** 60), null); // would have lost precision on the way through JSON
+  assert.equal(registerId('12abc'), null);
+  assert.equal(positiveInt(905183228372334), null); // the cap that used to discard them
+
+  const { client, api } = makeClient({
+    data: {
+      VUR_BFEKrydsreference: () => [{ fkEjendomsvurderingID: 905183228372334 }, { fkEjendomsvurderingID: 905005860341679 }],
+      VUR_Ejendomsvurdering: () => [{ id: 905183228372334, aar: 2022, ejendomvaerdiBeloeb: 3_000_000, grundvaerdiBeloeb: 900_000 }],
+    },
+  });
+  const r = await resolveValuations(client, '399255');
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.value.map((v) => v.valuation_year), [2022]);
+  const val = api.calls.find((c) => c.query.includes('VUR_Ejendomsvurdering')).query;
+  assert.match(val, /id: \{ in: \[905183228372334, 905005860341679\] \}/);
+});
+
+test('a full page of cross-references or valuations is refused, never silently truncated', async () => {
+  const many = (n) => Array.from({ length: n }, (_, i) => ({ fkEjendomsvurderingID: 900000000000 + i, id: 900000000000 + i, aar: 2000 + (i % 30), ejendomvaerdiBeloeb: 1 + i }));
+  const { client: c1 } = makeClient({ data: { VUR_BFEKrydsreference: () => many(50) } });
+  const r1 = await resolveValuations(c1, '5000001');
+  assert.equal(r1.ok, false);
+  assert.match(r1.reason, /more than one page/);
+  const { client: c2 } = makeClient({ data: { VUR_Ejendomsvurdering: () => many(50) } });
+  assert.match((await resolveValuations(c2, '5000001')).reason, /more than one page/);
+  const { client: c3 } = makeClient({ data: { VUR_BFEKrydsreference: () => many(49) } });
+  assert.equal((await resolveValuations(c3, '5000001')).ok, true);
 });

@@ -79,6 +79,12 @@ const fail = (reason) => ({ ok: false, reason });
 const unique = (values) => [...new Set(values)];
 const asString = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' ? String(v) : null);
 const asNodes = (v) => (Array.isArray(v) ? v.filter((n) => n && typeof n === 'object' && !Array.isArray(n)) : []);
+/** Register row ids run to about 9e14, far past positiveInt's 1e12 cap for amounts and years. Exact integers only. */
+export function registerId(value) {
+  const n = typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value) : value;
+  return typeof n === 'number' && Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
 export function positiveInt(value) {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof n !== 'number' || !Number.isFinite(n)) return null;
@@ -347,9 +353,11 @@ const VUR_FIELDS = { year: 'aar', assessed: 'ejendomvaerdiBeloeb', land: 'grundv
 export async function resolveValuations(client, bfe) {
   if (!BFE_PATTERN.test(bfe)) return fail('not a valid BFE number');
   const refs = await queryNodes(client, SERVICES.VUR, 'VUR_BFEKrydsreference', `BFEnummer: { eq: ${Number(bfe)} }`, 'fkEjendomsvurderingID', { first: VUR_PAGE });
-  const ids = unique(refs.map((n) => positiveInt(n.fkEjendomsvurderingID)).filter((id) => id !== null));
+  const ids = unique(refs.map((n) => registerId(n.fkEjendomsvurderingID)).filter((id) => id !== null));
+  if (refs.length >= VUR_PAGE) return fail(`BFE ${bfe} has ${refs.length}+ valuation cross-references, more than one page (${VUR_PAGE}); refusing to keep a truncated list`);
   if (ids.length === 0) return fail(`no valuation registered for BFE ${bfe}`);
   const nodes = await queryNodes(client, SERVICES.VUR, 'VUR_Ejendomsvurdering', `id: { in: [${ids.join(', ')}] }`, `id ${Object.values(VUR_FIELDS).join(' ')}`, { first: VUR_PAGE });
+  if (nodes.length >= VUR_PAGE) return fail(`BFE ${bfe} has ${nodes.length}+ valuations, more than one page (${VUR_PAGE}); refusing to keep a truncated list`);
   const { rows, conflictYears } = buildValuationRows(nodes, VUR_FIELDS);
   if (rows.length === 0) return fail(conflictYears > 0 ? 'every valuation year had conflicting values' : `no usable valuation for BFE ${bfe}`);
   return { ok: true, value: rows, conflictYears };
@@ -517,7 +525,7 @@ export async function diagnoseVur(client, bfes, log = console.log) {
         ...(await run(`VUR_Vurderingsejendom ESRejendomsnummer=${nr}`, SERVICES.VUR, 'VUR_Vurderingsejendom', `ESRejendomsnummer: { eq: ${nr} }`, 'vurderingsejendomID VURejendomsid ESRejendomsnummer ESRkommunenummer', { first: 5 })),
       ];
       for (const h of hits) {
-        const id = positiveInt(h.vurderingsejendomID);
+        const id = registerId(h.vurderingsejendomID);
         if (id === null || seen.has(id)) continue;
         seen.add(id);
         await run(`VUR_Ejendomsvurdering fkVurderingsejendomID=${id}`, SERVICES.VUR, 'VUR_Ejendomsvurdering', `fkVurderingsejendomID: { eq: ${id} }`, 'id aar ejendomvaerdiBeloeb grundvaerdiBeloeb', { first: VUR_PAGE });
