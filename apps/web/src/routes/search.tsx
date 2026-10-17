@@ -14,6 +14,7 @@ import { PropertyCard } from "@/components/property-card";
 import { PropertyCardSkeleton } from "@/components/ui/loading";
 import { LockedPropertyCard } from "@/components/locked-property-card";
 import { PropertyMap } from "@/components/property-map";
+import { FilterSidebar } from "@/components/filter-sidebar";
 import { MapListingCarousel } from "@/components/map-listing-carousel";
 import { Footer } from "@/components/footer";
 import { RecommendModal } from "@/components/recommend-modal";
@@ -37,6 +38,7 @@ export function SearchPage() {
   const { createSearch } = useSavedSearches();
   const isMobile = useMediaQuery("(max-width: 899px)");
   const compactCards = useMediaQuery("(max-width: 639px)");
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const resultsRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,6 +73,8 @@ export function SearchPage() {
   const showList = !isMobile || mobileTab === "list";
   // On phones the map view drops the title block and sort row so map and cards share the screen.
   const mobileMapOpen = isMobile && showMap;
+  // Wide screens in list view get the always-visible filter column and a banner map.
+  const sidebar = isDesktop && authenticated && !showMap;
 
   function handleFilterChange(patch: Partial<FiltersWithSort>) {
     // Replace, so typing in a field doesn't fill the history and Back leaves the search.
@@ -112,11 +116,14 @@ export function SearchPage() {
       <div className={`mb-4 flex items-end justify-between gap-3 sm:mb-9 sm:flex-wrap sm:gap-5 ${mobileMapOpen ? "max-sm:hidden" : ""}`}>
         <div className="min-w-0 flex-1 sm:max-w-3xl sm:flex-none">
           <p className="mb-3 hidden text-[11px] font-medium uppercase tracking-[0.2em] text-ink-soft sm:block">{tx("Boliger til salg", "Homes for sale")}</p>
-          <h1 className="text-[28px] font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-[46px]">{filters.location || filters.polygon ? title : <>{tx("Find dit næste", "Find your next")} <span className="font-serif font-normal italic">{tx("hjem", "home")}</span></>}</h1>
-          <p className="mt-3 hidden max-w-xl text-sm leading-relaxed text-ink-soft sm:block">{tx("Gå på opdagelse i boligerne. Få overblik over priser, historik og området.", "Explore the homes. Get a clear view of prices, history and the neighbourhood.")}</p>
+          <h1 className="text-[28px] font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-[46px] xl:text-[38px]">{filters.location || filters.polygon ? title : <>{tx("Find dit næste", "Find your next")} <span className="font-serif font-normal italic">{tx("hjem", "home")}</span></>}</h1>
+          <p className="mt-3 hidden max-w-xl text-sm leading-relaxed text-ink-soft sm:block xl:hidden">{tx("Gå på opdagelse i boligerne. Få overblik over priser, historik og området.", "Explore the homes. Get a clear view of prices, history and the neighbourhood.")}</p>
         </div>
         {authenticated && <button onClick={() => setSaveSearchOpen(v => !v)} disabled={savingSearch} aria-label={t("search.saveSearch")} className={`${pill} !px-0 w-11 disabled:cursor-wait disabled:opacity-50 sm:w-auto sm:!px-4`} aria-expanded={saveSearchOpen}><span aria-hidden="true">♡</span><span className="hidden sm:inline">{t("search.saveSearch")}</span></button>}
       </div>
+      <div className={sidebar ? "xl:grid xl:grid-cols-[250px_minmax(0,1fr)] xl:items-start xl:gap-12" : ""}>
+      {sidebar && <div className="xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1"><FilterSidebar filters={filters} onChange={handleFilterChange} /></div>}
+      <div className="min-w-0">
       <div className="mb-5 sm:mb-8 sm:rounded-[22px] sm:bg-surface-alt sm:p-4">
         <div className="flex flex-wrap items-center gap-2.5" role="search">
           <label className="relative min-w-0 flex-1 sm:min-w-[220px] sm:flex-[1_1_220px]">
@@ -124,17 +131,21 @@ export function SearchPage() {
             <input type="search" value={filters.location ?? ""} onChange={e => handleFilterChange({ location: e.target.value || null })} placeholder={tx("By, postnummer eller adresse", "City, postcode or address")} className="h-12 w-full rounded-2xl border border-border bg-surface py-2 pl-11 pr-4 text-sm sm:rounded-full text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft" />
             <svg className="pointer-events-none absolute left-4 top-4 text-ink-soft" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.7" /><path d="m16 16 5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
           </label>
-          <select aria-label={t("filters.propertyType")} className={`${pill} hidden h-12 min-w-[9.5rem] max-w-full flex-1 pr-7 sm:inline-flex sm:max-w-44 sm:flex-none`} value={filters.propertyTypes && filters.propertyTypes.length > 1 ? "multiple" : filters.propertyTypes?.[0] ?? ""} onChange={e => handleFilterChange({ propertyTypes: e.target.value ? [e.target.value as PropertyType] : null })}>
+          <select aria-label={t("filters.propertyType")} className={`${pill} ${sidebar ? "xl:!hidden" : ""} hidden h-12 min-w-[9.5rem] max-w-full flex-1 pr-7 sm:inline-flex sm:max-w-44 sm:flex-none`} value={filters.propertyTypes && filters.propertyTypes.length > 1 ? "multiple" : filters.propertyTypes?.[0] ?? ""} onChange={e => handleFilterChange({ propertyTypes: e.target.value ? [e.target.value as PropertyType] : null })}>
             <option value="">{t("filters.propertyType")}</option>
             {filters.propertyTypes && filters.propertyTypes.length > 1 && <option value="multiple">{tx("Flere boligtyper", "Multiple types")}</option>}
             {PROPERTY_TYPE_OPTIONS.map(value => <option key={value} value={value}>{t(`propertyType.${value}`)}</option>)}
           </select>
-          <button className={`${pill} relative h-12 w-12 !rounded-2xl !px-0 sm:w-auto sm:!rounded-full sm:!px-4`} onClick={() => setFiltersOpen(true)} aria-label={tx("Filtre", "Filters")} aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" className="fill-surface" /><circle cx="15" cy="17" r="3" className="fill-surface" /></svg><span className="hidden sm:inline">{tx("Filtre", "Filters")}</span>{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-semibold text-surface sm:static sm:bg-brand-soft sm:font-normal sm:text-brand-text">{activeFilterCount}</span>}</button>
+          <button className={`${pill} ${sidebar ? "xl:!hidden" : ""} relative h-12 w-12 !rounded-2xl !px-0 sm:w-auto sm:!rounded-full sm:!px-4`} onClick={() => setFiltersOpen(true)} aria-label={tx("Filtre", "Filters")} aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" className="fill-surface" /><circle cx="15" cy="17" r="3" className="fill-surface" /></svg><span className="hidden sm:inline">{tx("Filtre", "Filters")}</span>{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-semibold text-surface sm:static sm:bg-brand-soft sm:font-normal sm:text-brand-text">{activeFilterCount}</span>}</button>
           <div className="hidden sm:block">{viewToggle}</div>
         </div>
         {filters.polygon && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><span className="rounded-full bg-brand-soft px-3 py-1.5 font-medium text-brand-text">{tx("Søger i markeret område", "Searching your drawn area")}</span><button className="text-ink-soft underline underline-offset-2 hover:text-ink" onClick={() => handleFilterChange({ polygon: null })}>{tx("Fjern afgrænsning", "Remove boundary")} ×</button></div>}
         {saveSearchOpen && <form className="ui-enter mt-4 flex flex-wrap gap-2 border-t border-border pt-4" onSubmit={e => { e.preventDefault(); void handleSaveSearch(); }}><input aria-label={t("search.saveSearchNamePlaceholder")} autoFocus disabled={savingSearch} value={saveSearchName} onChange={e => setSaveSearchName(e.target.value)} placeholder={t("search.saveSearchNamePlaceholder")} className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm disabled:opacity-50" /><button className={primary} aria-busy={savingSearch} disabled={savingSearch || !saveSearchName.trim()}>{savingSearch && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{savingSearch ? t("common.saving") : t("search.saveSearchConfirm")}</button><button type="button" disabled={savingSearch} onClick={() => setSaveSearchOpen(false)} className={`${pill} disabled:opacity-50`}>{t("common.cancel")}</button>{filters.polygon && <p className="w-full text-xs text-ink-soft">{tx("Det markerede område gemmes sammen med filtrene.", "The drawn area will be saved with your filters.")}</p>}</form>}
       </div>
+      {sidebar && <div className="relative mb-6 h-48 overflow-hidden rounded-md border border-border [&>div]:min-h-0">
+        <PropertyMap properties={properties} />
+        <button type="button" onClick={() => setDesktopMap(true)} className="absolute left-3 top-3 z-10 rounded-md bg-cta px-3.5 py-2 text-xs font-semibold text-cta-text shadow-card transition hover:bg-cta-hover">{tx("Vis på kort", "Show on map")}</button>
+      </div>}
       <div className={showMap && !isMobile ? "grid items-start gap-7 min-[900px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:gap-9" : ""}>
         <section ref={resultsRef} tabIndex={-1} className="min-w-0 scroll-mt-24 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" aria-label={tx("Boligsøgning", "Property search")}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-ink-soft sm:mb-6">
@@ -157,6 +168,8 @@ export function SearchPage() {
           </div>
           {isMobile && <MapListingCarousel properties={properties} selectedId={selectedMapId} />}
         </aside>}
+      </div>
+      </div>
       </div>
     </div>
     <Footer />

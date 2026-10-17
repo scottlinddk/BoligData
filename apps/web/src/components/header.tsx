@@ -29,20 +29,21 @@ export function Header() {
       ...(profile?.role === "agent" ? [{ to: "/agent", label: t("nav.agent") }] : []),
     ] : []),
   ];
+  const desktopNavClass = ({ isActive }: { isActive: boolean }) => `whitespace-nowrap border-b-2 py-1.5 text-[13px] font-medium transition-colors ${isActive ? "border-ink text-ink" : "border-transparent text-ink-soft hover:text-ink"}`;
   const navClass = ({ isActive }: { isActive: boolean }) => `whitespace-nowrap rounded-full px-3.5 py-2.5 text-[12px] font-medium transition-colors ${isActive ? "bg-surface text-ink shadow-card" : "text-ink-soft hover:bg-surface hover:text-ink"}`;
 
   return <header className="sticky top-0 z-40 border-b border-border bg-paper" onKeyDown={event => { if (event.key === "Escape") setMenuOpen(false); }}>
-    <div className="mx-auto grid h-14 max-w-[1680px] sm:h-20 grid-cols-[auto_1fr_auto] items-center gap-5 px-5 sm:px-8 xl:px-12">
-        <Link to="/" onClick={() => setMenuOpen(false)} className="flex shrink-0 items-center gap-2.5 text-xl font-medium tracking-[-0.055em] text-ink sm:text-[22px]">
+    <div className="mx-auto grid h-14 max-w-[1680px] sm:h-20 grid-cols-[auto_1fr_auto] xl:grid-cols-[1fr_auto_1fr] items-center gap-5 px-5 sm:px-8 xl:px-12">
+        <Link to="/" onClick={() => setMenuOpen(false)} className="flex shrink-0 items-center xl:col-start-2 xl:row-start-1 gap-2.5 text-xl font-medium tracking-[-0.055em] text-ink sm:text-[22px]">
           <BrandMark className="h-8 w-8" />{t("app.name")}
         </Link>
-        {!isMobile && <nav aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="flex items-center gap-0.5 justify-self-center rounded-full bg-surface-alt p-1">
-          {links.map(link => <NavLink key={link.to} viewTransition to={link.to} end={link.to.startsWith("/?") || link.to === "/"} className={navClass}>{link.label}</NavLink>)}
+        {!isMobile && <nav aria-label={language === "da" ? "Hovednavigation" : "Main navigation"} className="flex items-center gap-7 justify-self-start xl:col-start-1 xl:row-start-1">
+          {links.map(link => <NavLink key={link.to} viewTransition to={link.to} end={link.to.startsWith("/?") || link.to === "/"} className={desktopNavClass}>{link.label}</NavLink>)}
         </nav>}
-      {!isMobile ? <div className="flex shrink-0 items-center gap-2">
+      {!isMobile ? <div className="col-start-3 row-start-1 flex shrink-0 items-center gap-2 justify-self-end">
         <LanguageSwitcher /><ThemeToggle />
         <div className="ml-2">
-          {user ? <AccountMenu /> : <Link to="/auth/signin" className="flex min-h-10 items-center gap-4 rounded-full bg-accent px-5 py-2 text-[12px] font-semibold text-accent-text transition-colors hover:bg-accent-hover">
+          {user ? <AccountMenu /> : <Link to="/auth/signin" className="flex min-h-10 items-center gap-3 rounded-md bg-cta px-5 py-2 text-[13px] font-semibold text-cta-text transition-colors hover:bg-cta-hover">
             {t("nav.signIn")}<svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5" /></svg>
           </Link>}
         </div>

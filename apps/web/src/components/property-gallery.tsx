@@ -63,10 +63,30 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
 
   if (!images.length) return <div className="flex aspect-[3/2] items-center justify-center rounded-2xl bg-surface-alt text-sm text-ink-faint">{t("property.noPhoto")}</div>;
 
+  // From lg up four or more photos form a mosaic; fewer keep the single-hero layout.
+  const mosaic = images.length >= 4;
+  const hideOnMosaic = mosaic ? "lg:hidden" : "";
+  const count = language === "da" ? "billeder" : "photos";
+
   return <section aria-label={t("detail.gallery")}>
+    {mosaic && <div className="hidden h-[500px] grid-cols-[2fr_1fr_1fr] grid-rows-2 gap-2 lg:grid">
+      {[0, 1, 2].map(index => <button key={`${images[index]!.url}-mosaic-${index}`} type="button" onClick={event => open(index, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${index + 1}`}
+        className={`group relative overflow-hidden rounded-md bg-surface-alt ${["col-start-1 row-span-2 row-start-1", "col-start-2 row-start-1", "col-start-2 row-start-2"][index]}`}>
+        {photo(images[index]!, index, index === 0)}
+      </button>)}
+      <div className="col-start-3 row-span-2 row-start-1 flex min-h-0 flex-col gap-2">
+        <button type="button" onClick={event => open(3, event.currentTarget)} aria-label={`${t("detail.gallery")} · 4`} className="group relative min-h-0 flex-1 overflow-hidden rounded-md bg-surface-alt">
+          {photo(images[3]!, 3)}
+        </button>
+        <button type="button" onClick={event => open(0, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${images.length} ${count}`}
+          className="flex h-12 shrink-0 items-center justify-between rounded-md bg-cta px-5 text-sm font-medium text-cta-text transition hover:bg-cta-hover">
+          <span>{language === "da" ? "Vis alle billeder" : "Show all photos"}</span><span className="opacity-60">{images.length}</span>
+        </button>
+      </div>
+    </div>}
     <button type="button" onClick={event => open(0, event.currentTarget)}
       aria-label={`${t("detail.gallery")} · ${images.length} ${language === "da" ? "billeder" : "photos"}`}
-      className="group relative block aspect-[4/3] w-full overflow-hidden bg-surface-alt text-left sm:aspect-[3/2] sm:rounded-2xl">
+      className={`group relative block aspect-[4/3] w-full overflow-hidden bg-surface-alt text-left sm:aspect-[3/2] sm:rounded-2xl ${hideOnMosaic}`}>
       {photo(images[0]!, 0, true)}
       <span className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full bg-white/95 px-3.5 py-2 text-xs sm:bottom-4 sm:right-4 sm:px-4 font-semibold text-neutral-900 shadow-sm">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-4 w-4" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2" /><path d="m7 5 1-2h4l1 2" /><circle cx="10" cy="10.5" r="3" /></svg>
@@ -80,7 +100,7 @@ export function PropertyGallery({ images, alt }: { images: ListingImage[]; alt: 
         {index === 7 && images.length > 8 && <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-medium text-white">+{images.length - 8}</span>}
       </button></li>)}
     </ul>}
-    {images.length > 1 && <div className="mt-3 hidden grid-cols-4 gap-2.5 sm:grid">
+    {images.length > 1 && <div className={`mt-3 hidden grid-cols-4 gap-2.5 sm:grid ${hideOnMosaic}`}>
       {images.slice(1, 5).map((image, index) => <button key={`${image.url}-${index}`} type="button"
         onClick={event => open(index + 1, event.currentTarget)} aria-label={`${t("detail.gallery")} · ${index + 2}`}
         className="group relative aspect-[3/2] overflow-hidden rounded-xl bg-surface-alt">

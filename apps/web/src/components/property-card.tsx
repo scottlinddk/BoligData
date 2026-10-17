@@ -85,8 +85,8 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect, c
   const photoShape = compact ? "aspect-square sm:aspect-[8/5]" : "aspect-[8/5]";
 
   return <article className="group relative min-w-0" data-testid="property-card">
-    <Link viewTransition to={`/property/${property.id}`} className="block rounded-[20px] text-ink">
-      <div className={`relative ${photoShape} overflow-hidden rounded-[20px] bg-surface-alt`}>
+    <Link viewTransition to={`/property/${property.id}`} className="block rounded-[20px] text-ink lg:rounded-md">
+      <div className={`relative ${photoShape} overflow-hidden rounded-[20px] bg-surface-alt lg:rounded-md`}>
         {photo ? <CardPhoto key={photo.url} photo={photo} alt={property.address} compact={compact} /> : <NoPhoto />}
         <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1.5 text-[10px] font-medium leading-none text-white backdrop-blur-sm">{property.listingSource}</span>
         <span title={t(RISK_CHIP_KEY[risk])} className={`absolute bottom-3 left-3 rounded-full px-2.5 py-1.5 text-[10px] font-medium leading-none ${RISK_CHIP_STYLES[risk]}`}>{t(RISK_CHIP_KEY[risk])}</span>

@@ -7,14 +7,15 @@ interface FilterSidebarProps {
   onChange: (patch: Partial<FiltersWithSort>) => void;
 }
 
+/** Always-visible desktop filters. Location lives in the search bar above the results. */
 export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   const { t } = useI18n();
   const activeCount = countActiveFilters(filters);
 
   return (
-    <aside className="sticky top-20 flex w-[280px] shrink-0 flex-col gap-5 rounded-[22px] bg-surface-alt p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-lg font-medium tracking-tight text-ink">{t("filters.title")}</span>
+    <aside aria-label={t("filters.title")} className="grid content-start gap-7">
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <span className="text-[15px] font-semibold text-ink">{t("filters.title")}</span>
         {activeCount > 0 && (
           <button
             type="button"
@@ -38,8 +39,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
           </button>
         )}
       </div>
-
-      <FilterFields filters={filters} onChange={onChange} />
+      <FilterFields filters={filters} onChange={onChange} variant="sidebar" />
     </aside>
   );
 }
