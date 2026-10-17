@@ -22,8 +22,7 @@ import { ComparablesPanel } from "@/components/comparables-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { SchoolDistrictPanel } from "@/components/school-district-panel";
-import { SparPanel } from "@/components/spar-panel";
-import { SmartEstimate } from "@/components/estimate/smart-estimate";
+import { PriceTabs } from "@/components/price-tabs";
 import { Footer } from "@/components/footer";
 import { SectionNav } from "@/components/section-nav";
 import { useI18n } from "@/i18n/i18n";
@@ -92,7 +91,7 @@ export function PropertyDetailPage() {
   // The anchor may not exist yet when a shared section link first loads.
   useEffect(() => {
     if (!listing) return;
-    const target = window.location.hash === "#price-reference" ? priceReference.current
+    const target = ["#price-reference", "#estimate", "#spar"].includes(window.location.hash) ? priceReference.current
       : window.location.hash === "#research-details" ? researchDetails.current : null;
     if (!target) return;
     if (target instanceof HTMLDetailsElement) target.open = true;
@@ -129,7 +128,6 @@ export function PropertyDetailPage() {
     { id: "facts", label: tx("Fakta", "Facts") },
     ...(floorplan ? [{ id: "floorplan", label: t("detail.floorplan") }] : []),
     { id: "price-reference", label: tx("Prisoverblik", "Price overview") },
-    { id: "estimate", label: tx("Smart estimat", "Smart estimate") },
     { id: "map", label: tx("På kortet", "On the map") },
   ];
   const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
@@ -207,8 +205,9 @@ export function PropertyDetailPage() {
             </dl>
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
-          <div ref={priceReference} id="price-reference" tabIndex={-1} aria-labelledby="workbook-price-title" className="section-anchor rounded-2xl [&>section]:mt-0">
-            <WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />
+          <div ref={priceReference} id="price-reference" tabIndex={-1} aria-label={tx("Prisoverblik", "Price overview")} className="section-anchor rounded-2xl">
+            <PriceTabs propertyId={property.id} propertyType={property.propertyType}
+              timeOnMarket={<WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />} />
           </div>
           <div id="description" className="section-anchor"><PropertyDescription key={property.id} property={property} details={listingDetails} /></div>
           <DetailSection id="facts" title={tx("Fakta og bygningsoplysninger", "Facts and building details")} subtitle={tx("BBR, grund, materialer og offentlig vurdering", "Building records, plot, materials and public valuation")}>
@@ -233,8 +232,6 @@ export function PropertyDetailPage() {
             <p className="mb-5 mt-1 text-sm text-ink-soft">{property.address} · {[property.postalCode, property.municipality].filter(Boolean).join(" ")}</p>
             <div className="h-[280px] overflow-hidden rounded-xl sm:h-[350px]"><PropertyMap properties={[property]} /></div>
           </section>
-          <SmartEstimate propertyId={property.id} propertyType={property.propertyType} />
-          <div id="spar" className="section-anchor"><SparPanel propertyId={property.id} /></div>
           <SchoolDistrictPanel propertyId={property.id} />
           <DetailSection title={tx("Handler og sammenlignelige boliger", "Sales and comparable homes")} subtitle={tx("Tidligere salg, handler i nærheden og pris pr. m²", "Previous sales, nearby transactions and price per m²")}>
             {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" disabled={comparablesQuery.isFetching} onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 inline-flex items-center gap-2 font-semibold underline disabled:opacity-50">{comparablesQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>}
