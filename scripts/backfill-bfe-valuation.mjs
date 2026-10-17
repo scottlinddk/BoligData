@@ -4,21 +4,23 @@
  * properties, straight from Datafordeler (DAR, BBR, VUR). Replaces the DAWA
  * based path, which closed on 2026-08-17.
  *
- * Chain per property:
- *   Boligsiden addressId --DAR_Adresse--> husnummer id (properties.id_lokalid)
- *   houses:     husnummer --BBR_Bygning--> BBR_Grund --> BFE of the parcel
- *   apartments: addressId --BBR_Enhed----> BBR_Ejerlejlighed --> BFE of the unit
- *   BFE --VUR_Ejendomsvurdering--> one row per valuation year
+ * Chain per property (field names from Datafordeler's published schemas, since the services
+ * have introspection switched off):
+ *   Boligsiden addressId --DAR_Adresse.husnummer--> husnummer id (properties.id_lokalid)
+ *   houses:     husnummer --BBR_Grund.bestemtFastEjendom--> BBR_Ejendomsrelation.bfeNummer
+ *   apartments: addressId --BBR_Enhed--> BBR_EnhedEjendomsrelation.ejerlejlighed
+ *                         --> BBR_Ejendomsrelation.bfeNummer (the unit's own BFE)
+ *   BFE --VUR_BFEKrydsreference--> VUR_Ejendomsvurdering (one row per valuation year)
  *
  * Apartments take their own route on purpose. An ejerlejlighed has its own BFE,
  * and VUR keys valuations by it. The parcel BFE (what address-lookup.ts stored
  * until now) would fetch the wrong valuation.
  *
- * NOTHING HERE IS VERIFIED AGAINST THE LIVE SCHEMA. Field names are resolved
- * from the services' own introspection and every hop fails soft with a reason
- * instead of guessing. Run in this order:
+ * Two links are inferred from the schema, not proven: that bestemtFastEjendom and
+ * EnhedEjendomsrelation.ejerlejlighed hold an Ejendomsrelation id_lokalId. A --probe
+ * run on real data confirms or refutes it. Every hop fails soft with a reason.
  *
- *   node scripts/backfill-bfe-valuation.mjs --discover      # print the real field names
+ *   node scripts/backfill-bfe-valuation.mjs --discover      # smoke-test every field name used
  *   node scripts/backfill-bfe-valuation.mjs --probe         # does addressId -> id_lokalid hold?
  *   node scripts/backfill-bfe-valuation.mjs --limit 20      # dry run, writes nothing
  *   node scripts/backfill-bfe-valuation.mjs --limit 20 --write
@@ -68,37 +70,11 @@ export function redact(text) {
   return String(text).replace(/(apikey|token|key)=[^&\s"']+/gi, '$1=[redacted]');
 }
 
-export function foldFieldName(name) {
-  return name.toLowerCase().replace(/å/g, 'aa').replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/[^a-z0-9]/g, '');
-}
-
-/** Same rule as pickField in datafordeler.ts: exact fold match first, then the shortest field that starts with a term. */
-export function pickField(fields, ...terms) {
-  const names = [...fields];
-  const folded = new Map(names.map((name) => [name, foldFieldName(name)]));
-  for (const term of terms) {
-    const exact = names.find((name) => folded.get(name) === term);
-    if (exact !== undefined) return exact;
-  }
-  for (const term of terms) {
-    const prefixed = names
-      .filter((name) => folded.get(name).startsWith(term))
-      .sort((a, b) => a.length - b.length || a.localeCompare(b));
-    if (prefixed[0] !== undefined) return prefixed[0];
-  }
-  return null;
-}
-
 const ok = (value) => ({ ok: true, value });
 const fail = (reason) => ({ ok: false, reason });
 const unique = (values) => [...new Set(values)];
 const asString = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' ? String(v) : null);
 const asNodes = (v) => (Array.isArray(v) ? v.filter((n) => n && typeof n === 'object' && !Array.isArray(n)) : []);
-const summarize = (info) => {
-  const names = [...info.keys()];
-  return names.length > 14 ? `${names.slice(0, 14).join(', ')}, ... (${names.length} fields)` : names.join(', ');
-};
-
 export function positiveInt(value) {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof n !== 'number' || !Number.isFinite(n)) return null;
@@ -117,7 +93,7 @@ export function isoTimestamp(value, now = Date.now()) {
 /* ---------------------------------------------------------------- arguments */
 
 export const USAGE = `Usage: node scripts/backfill-bfe-valuation.mjs [options]
-  --discover            print field names of the DAR/BBR/VUR types used, then exit
+  --discover            smoke-test every DAR/BBR/VUR field name used (introspection is off), then exit
   --probe               classify addressId/id_lokalid (DAR_Adresse vs DAR_Husnummer), compare derived and stored ids,
                         and list which VUR valuation years exist (no writes)
   --write               persist results (default is a dry run)
@@ -164,18 +140,8 @@ export function createThrottle(rps, now = () => Date.now(), sleep = (ms) => new 
   };
 }
 
-export function namedType(type) {
-  let list = false;
-  for (let cur = type; cur; cur = cur.ofType) {
-    if (cur.kind === 'LIST') list = true;
-    if (cur.name) return { name: cur.name, kind: cur.kind, list };
-  }
-  return { name: null, kind: null, list };
-}
-
 export function createDatafordeler({ apiKey, throttle, fetchImpl = (...a) => fetch(...a), env = process.env, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   const resolved = new Map();
-  const typeCache = new Map();
   const backoff = (attempt) => 1000 * 2 ** attempt;
 
   function bases(service) {
@@ -230,25 +196,7 @@ export function createDatafordeler({ apiKey, throttle, fetchImpl = (...a) => fet
     throw new Error(`no ${service.register} endpoint answered (every version segment returned 404)`);
   }
 
-  /** Field name -> { name, kind, list } for an entity type, or null when the schema lacks it. */
-  async function fieldsOf(service, typeName) {
-    const key = `${service.register}:${typeName}`;
-    if (typeCache.has(key)) return typeCache.get(key);
-    const data = await post(
-      service,
-      `query Introspect { __type(name: ${JSON.stringify(typeName)}) { fields { name type { kind name ofType { kind name ofType { kind name ofType { kind name } } } } } } }`,
-    );
-    const fields = data?.__type?.fields;
-    let result = null;
-    if (Array.isArray(fields) && fields.length) {
-      result = new Map();
-      for (const f of fields) if (typeof f?.name === 'string') result.set(f.name, namedType(f.type));
-    }
-    typeCache.set(key, result);
-    return result;
-  }
-
-  return { post, fieldsOf };
+  return { post };
 }
 
 /**
@@ -257,10 +205,12 @@ export function createDatafordeler({ apiKey, throttle, fetchImpl = (...a) => fet
  * others, and only the error text says which. BBR needs them (bbr.ts: without
  * them it returns all-null), so BBR tries them first; the others try without.
  */
-export async function queryNodes(client, service, entity, where, selection, { temporal = 'auto' } = {}) {
+export async function queryNodes(client, service, entity, where, selection, { temporal = 'auto', first = null } = {}) {
   const tid = JSON.stringify(new Date().toISOString());
-  const build = (withTid) =>
-    `query Q { ${entity}(${withTid ? `registreringstid: ${tid} virkningstid: ${tid} ` : ''}where: { ${where} }) { nodes { ${selection} } } }`;
+  const build = (withTid) => {
+    const args = [withTid && `registreringstid: ${tid} virkningstid: ${tid}`, first && `first: ${first}`, where && `where: { ${where} }`].filter(Boolean).join(' ');
+    return `query Q { ${entity}${args ? `(${args})` : ''} { nodes { ${selection} } } }`;
+  };
   const order = temporal === 'first' ? [true, false] : [false, true];
   let firstError;
   for (const withTid of order) {
@@ -277,23 +227,22 @@ export async function queryNodes(client, service, entity, where, selection, { te
 
 /* --------------------------------------------------------------------- hops */
 
+/*
+ * Field names below come from Datafordeler's published GraphQL schemas
+ * (https://datafordeler.dk/GraphQLSchema/{DAR,BBR,VUR}.graphql). The services have introspection
+ * switched off (HC0046), so nothing can be discovered at runtime. --discover smoke-tests every
+ * name used here against the live service.
+ */
+
+const BFE_FIELD = { field: 'bfeNummer', sub: null };
+const VUR_PAGE = 50;
+
 function readBfeValues(raw, sub) {
   const items = Array.isArray(raw) ? raw : [raw];
   return items
     .map((item) => (sub ? (item && typeof item === 'object' ? item[sub] : null) : item))
     .map(asString)
     .filter((v) => v !== null && BFE_PATTERN.test(v));
-}
-
-/** How this schema spells the BFE number on an entity: a scalar, or an object with a number inside. */
-async function bfeSelection(client, service, info) {
-  const field = pickField(info.keys(), 'bfenummer', 'bestemtfastejendom', 'bfe');
-  if (!field) return null;
-  const t = info.get(field);
-  if (t.kind === 'SCALAR' || t.kind === 'ENUM') return { field, sub: null, selection: field };
-  const subInfo = t.name ? await client.fieldsOf(service, t.name) : null;
-  const sub = subInfo ? pickField(subInfo.keys(), 'bfenummer', 'bfe', 'nummer') : null;
-  return sub ? { field, sub, selection: `${field} { ${sub} }` } : null;
 }
 
 export function pickBfe(nodes, sel) {
@@ -303,16 +252,20 @@ export function pickBfe(nodes, sel) {
   return ok(values[0]);
 }
 
+/** BBR_Ejendomsrelation ids -> the one BFE number they carry. */
+async function bfeOfRelations(client, relationIds) {
+  const nodes = [];
+  for (const id of relationIds) {
+    nodes.push(...(await queryNodes(client, SERVICES.BBR, 'BBR_Ejendomsrelation', `id_lokalId: { eq: ${JSON.stringify(id)} }`, 'id_lokalId bfeNummer', { temporal: 'first' })));
+  }
+  return pickBfe(nodes, BFE_FIELD);
+}
+
 /** Boligsiden addressId (a DAR address) -> husnummer id, the value stored as properties.id_lokalid. */
 export async function resolveHusnummer(client, addressId) {
   if (!UUID.test(addressId)) return fail('addressId is not a UUID');
-  const info = await client.fieldsOf(SERVICES.DAR, 'DAR_Adresse');
-  if (!info) return fail('DAR_Adresse is not in the DAR schema');
-  const field = pickField(info.keys(), 'husnummer');
-  if (!field) return fail(`DAR_Adresse has no husnummer field; fields: ${summarize(info)}`);
-  if (info.get(field).kind === 'OBJECT') return fail(`DAR_Adresse.${field} is an object type, script expects an id`);
-  const nodes = await queryNodes(client, SERVICES.DAR, 'DAR_Adresse', `id_lokalId: { eq: ${JSON.stringify(addressId)} }`, `id_lokalId ${field}`);
-  const ids = unique(nodes.map((n) => asString(n[field])).filter(Boolean));
+  const nodes = await queryNodes(client, SERVICES.DAR, 'DAR_Adresse', `id_lokalId: { eq: ${JSON.stringify(addressId)} }`, 'id_lokalId husnummer');
+  const ids = unique(nodes.map((n) => asString(n.husnummer)).filter(Boolean));
   if (ids.length === 0) return fail('no DAR_Adresse found for this addressId');
   if (ids.length > 1) return fail(`DAR_Adresse references several husnumre (${ids.join(', ')})`);
   if (!UUID.test(ids[0])) return fail('the husnummer reference is not a UUID');
@@ -332,55 +285,28 @@ export async function classifyAddressId(client, id) {
   return ok(adresse && husnummer ? 'both' : adresse ? 'adresse' : husnummer ? 'husnummer' : 'none');
 }
 
-/** Houses: husnummer -> built building -> parcel (Grund) -> BFE of the parcel. */
+/** Houses: husnummer -> BBR_Grund -> bestemtFastEjendom (an Ejendomsrelation id) -> BFE of the parcel. */
 export async function resolveHouseBfe(client, husnummerId) {
-  const grundInfo = await client.fieldsOf(SERVICES.BBR, 'BBR_Grund');
-  if (!grundInfo) return fail('BBR_Grund is not in the BBR schema');
-  const sel = await bfeSelection(client, SERVICES.BBR, grundInfo);
-  if (!sel) return fail(`no BFE field on BBR_Grund; fields: ${summarize(grundInfo)}`);
-
-  let grundNodes;
-  if (grundInfo.has('husnummer')) {
-    grundNodes = await queryNodes(client, SERVICES.BBR, 'BBR_Grund', `husnummer: { eq: ${JSON.stringify(husnummerId)} }`, sel.selection, { temporal: 'first' });
-  } else {
-    const bygInfo = await client.fieldsOf(SERVICES.BBR, 'BBR_Bygning');
-    const grundField = bygInfo && bygInfo.has('husnummer') ? pickField(bygInfo.keys(), 'grund') : null;
-    if (!grundField) return fail('cannot link husnummer to BBR_Grund: BBR_Bygning has no husnummer and grund fields');
-    const byg = await queryNodes(client, SERVICES.BBR, 'BBR_Bygning', `husnummer: { eq: ${JSON.stringify(husnummerId)} }, status: { eq: "${BUILT_STATUS}" }`, `id_lokalId ${grundField}`, { temporal: 'first' });
-    const grundIds = unique(byg.map((n) => asString(n[grundField])).filter(Boolean));
-    if (grundIds.length === 0) return fail('no built BBR_Bygning on this husnummer');
-    grundNodes = [];
-    for (const gid of grundIds) {
-      grundNodes.push(...(await queryNodes(client, SERVICES.BBR, 'BBR_Grund', `id_lokalId: { eq: ${JSON.stringify(gid)} }`, sel.selection, { temporal: 'first' })));
-    }
-  }
-  return pickBfe(grundNodes, sel);
+  const grunde = await queryNodes(client, SERVICES.BBR, 'BBR_Grund', `husnummer: { eq: ${JSON.stringify(husnummerId)} }`, 'id_lokalId bestemtFastEjendom', { temporal: 'first' });
+  if (grunde.length === 0) return fail('no BBR_Grund on this husnummer');
+  const relationIds = unique(grunde.map((n) => asString(n.bestemtFastEjendom)).filter(Boolean));
+  if (relationIds.length === 0) return fail('BBR_Grund has no bestemtFastEjendom reference');
+  return bfeOfRelations(client, relationIds);
 }
 
-/** Apartments: addressId -> BBR_Enhed -> BBR_Ejerlejlighed -> the unit's own BFE. */
+/** Apartments: addressId -> BBR_Enhed -> BBR_EnhedEjendomsrelation -> BBR_Ejendomsrelation (the unit's own BFE). */
 export async function resolveUnitBfe(client, addressId) {
   if (!UUID.test(addressId)) return fail('addressId is not a UUID');
-  const enhedInfo = await client.fieldsOf(SERVICES.BBR, 'BBR_Enhed');
-  if (!enhedInfo) return fail('BBR_Enhed is not in the BBR schema');
-  const addressField = pickField(enhedInfo.keys(), 'adresseidentificerer', 'adresse');
-  const unitField = pickField(enhedInfo.keys(), 'ejerlejlighed');
-  if (!addressField || !unitField) return fail(`BBR_Enhed lacks an address or ejerlejlighed field; fields: ${summarize(enhedInfo)}`);
-  if (enhedInfo.get(addressField).kind === 'OBJECT' || enhedInfo.get(unitField).kind === 'OBJECT') {
-    return fail('BBR_Enhed address/ejerlejlighed fields are object types, script expects ids');
-  }
-
-  const enheder = await queryNodes(client, SERVICES.BBR, 'BBR_Enhed', `${addressField}: { eq: ${JSON.stringify(addressId)} }`, `id_lokalId ${unitField}`, { temporal: 'first' });
-  const unitIds = unique(enheder.map((n) => asString(n[unitField])).filter(Boolean));
+  const enheder = await queryNodes(client, SERVICES.BBR, 'BBR_Enhed', `adresseIdentificerer: { eq: ${JSON.stringify(addressId)} }`, 'id_lokalId', { temporal: 'first' });
   if (enheder.length === 0) return fail('no BBR_Enhed for this address');
+  const links = [];
+  for (const enhed of unique(enheder.map((n) => asString(n.id_lokalId)).filter(Boolean))) {
+    links.push(...(await queryNodes(client, SERVICES.BBR, 'BBR_EnhedEjendomsrelation', `enhed: { eq: ${JSON.stringify(enhed)} }`, 'ejerlejlighed', { temporal: 'first' })));
+  }
+  const unitIds = unique(links.map((n) => asString(n.ejerlejlighed)).filter(Boolean));
   if (unitIds.length === 0) return fail('the unit has no ejerlejlighed registration (for example an andelsbolig)');
   if (unitIds.length > 1) return fail(`several ejerlejligheder on this address (${unitIds.join(', ')})`);
-
-  const unitInfo = await client.fieldsOf(SERVICES.BBR, 'BBR_Ejerlejlighed');
-  if (!unitInfo) return fail('BBR_Ejerlejlighed is not in the BBR schema');
-  const sel = await bfeSelection(client, SERVICES.BBR, unitInfo);
-  if (!sel) return fail(`no BFE field on BBR_Ejerlejlighed; fields: ${summarize(unitInfo)}`);
-  const nodes = await queryNodes(client, SERVICES.BBR, 'BBR_Ejerlejlighed', `id_lokalId: { eq: ${JSON.stringify(unitIds[0])} }`, sel.selection, { temporal: 'first' });
-  return pickBfe(nodes, sel);
+  return bfeOfRelations(client, unitIds);
 }
 
 /** One row per valuation year; a year with two different answers is dropped and counted, never guessed. */
@@ -411,25 +337,16 @@ export function buildValuationRows(nodes, fields) {
   return { rows: rows.sort((a, b) => a.valuation_year - b.valuation_year), conflictYears };
 }
 
+/** VUR has no BFE column on the valuation. BFE -> VUR_BFEKrydsreference -> VUR_Ejendomsvurdering.id. */
+const VUR_FIELDS = { year: 'aar', assessed: 'ejendomvaerdiBeloeb', land: 'grundvaerdiBeloeb', registered: 'ajourfoeringDato' };
+
 export async function resolveValuations(client, bfe) {
   if (!BFE_PATTERN.test(bfe)) return fail('not a valid BFE number');
-  const info = await client.fieldsOf(SERVICES.VUR, 'VUR_Ejendomsvurdering');
-  if (!info) return fail('VUR_Ejendomsvurdering is not in the VUR schema');
-  const fields = {
-    bfe: pickField(info.keys(), 'bfenummer', 'bfe') ?? 'bfeNummer',
-    assessed: pickField(info.keys(), 'ejendomsvaerdi', 'vurderetejendomsvaerdi', 'ejendomsvurderingbeloeb'),
-    land: pickField(info.keys(), 'grundvaerdi', 'vurderetgrundvaerdi'),
-    year: pickField(info.keys(), 'vurderingsaar', 'vurderingaar', 'vurderingsaartal'),
-    // Optional: when the register itself registered this valuation. It is what makes a backtest
-    // honest, because a valuation must not be used for a date before it was known. Unverified
-    // against the live schema, so a miss only leaves registered_at empty (see --discover).
-    registered: pickField(info.keys(), 'registreringfra', 'registreringstid'),
-  };
-  if (!fields.assessed && !fields.land) return fail(`no assessed-value field on VUR_Ejendomsvurdering; fields: ${summarize(info)}`);
-  if (!fields.year) return fail(`no valuation-year field on VUR_Ejendomsvurdering; fields: ${summarize(info)}`);
-  const selection = unique([fields.assessed, fields.land, fields.year, fields.registered].filter(Boolean)).join(' ');
-  const nodes = await queryNodes(client, SERVICES.VUR, 'VUR_Ejendomsvurdering', `${fields.bfe}: { eq: ${JSON.stringify(bfe)} }`, selection);
-  const { rows, conflictYears } = buildValuationRows(nodes, fields);
+  const refs = await queryNodes(client, SERVICES.VUR, 'VUR_BFEKrydsreference', `BFEnummer: { eq: ${Number(bfe)} }`, 'fkEjendomsvurderingID', { first: VUR_PAGE });
+  const ids = unique(refs.map((n) => positiveInt(n.fkEjendomsvurderingID)).filter((id) => id !== null));
+  if (ids.length === 0) return fail(`no valuation registered for BFE ${bfe}`);
+  const nodes = await queryNodes(client, SERVICES.VUR, 'VUR_Ejendomsvurdering', `id: { in: [${ids.join(', ')}] }`, `id ${Object.values(VUR_FIELDS).join(' ')}`, { first: VUR_PAGE });
+  const { rows, conflictYears } = buildValuationRows(nodes, VUR_FIELDS);
   if (rows.length === 0) return fail(conflictYears > 0 ? 'every valuation year had conflicting values' : `no usable valuation for BFE ${bfe}`);
   return { ok: true, value: rows, conflictYears };
 }
@@ -564,30 +481,41 @@ async function persist(db, property, r, opts) {
 
 /* --------------------------------------------------------------------- main */
 
-async function discover(client) {
-  const targets = [
-    [SERVICES.DAR, 'DAR_Adresse', null],
-    [SERVICES.BBR, 'BBR_Enhed', /adresse|ejerlejlighed|bygning|status|id_lokal/i],
-    [SERVICES.BBR, 'BBR_Ejerlejlighed', /bfe|nummer|id_lokal/i],
-    [SERVICES.BBR, 'BBR_Bygning', /husnummer|grund|bfe|status|id_lokal/i],
-    [SERVICES.BBR, 'BBR_Grund', /husnummer|bfe|jordstykke|id_lokal/i],
-    [SERVICES.VUR, 'VUR_Ejendomsvurdering', null],
-  ];
-  for (const [service, type, filter] of targets) {
+/** Every entity and field the backfill reads, with the bitemporal rule each entity needs. */
+export const SMOKE_TARGETS = [
+  [SERVICES.DAR, 'DAR_Adresse', 'id_lokalId husnummer adressebetegnelse'],
+  [SERVICES.DAR, 'DAR_Husnummer', 'id_lokalId'],
+  [SERVICES.BBR, 'BBR_Enhed', 'id_lokalId adresseIdentificerer'],
+  [SERVICES.BBR, 'BBR_EnhedEjendomsrelation', 'enhed ejerlejlighed'],
+  [SERVICES.BBR, 'BBR_Ejendomsrelation', 'id_lokalId bfeNummer ejendomstype'],
+  [SERVICES.BBR, 'BBR_Grund', 'id_lokalId husnummer bestemtFastEjendom'],
+  [SERVICES.BBR, 'BBR_Bygning', 'id_lokalId husnummer grund'],
+  [SERVICES.VUR, 'VUR_BFEKrydsreference', 'BFEnummer fkEjendomsvurderingID'],
+  [SERVICES.VUR, 'VUR_Ejendomsvurdering', 'id aar ejendomvaerdiBeloeb grundvaerdiBeloeb ajourfoeringDato'],
+];
+
+/**
+ * Introspection is off on Datafordeler, so --discover proves the hard-coded names instead: one
+ * `first: 1` query per entity selecting every field the backfill uses. A wrong name is a GraphQL
+ * error, which makes the run fail rather than print a green log full of errors.
+ */
+export async function discover(client, log = console.log) {
+  let failed = 0;
+  for (const [service, entity, selection] of SMOKE_TARGETS) {
     try {
-      const info = await client.fieldsOf(service, type);
-      if (!info) {
-        console.log(`\n${type}: NOT IN SCHEMA`);
-        continue;
-      }
-      const names = [...info.entries()].filter(([name]) => !filter || filter.test(name));
-      console.log(`\n${type} (${info.size} fields${filter ? `, showing ${names.length} matching` : ''})`);
-      for (const [name, t] of names.slice(0, 80)) console.log(`  ${name}: ${t.list ? '[' : ''}${t.name ?? '?'}${t.list ? ']' : ''}`);
+      const nodes = await queryNodes(client, service, entity, null, selection, { temporal: service === SERVICES.VUR ? 'auto' : 'first', first: 1 });
+      log(`OK     ${entity} (${selection.split(' ').length} fields, ${nodes.length} sample row${nodes.length === 1 ? '' : 's'})`);
     } catch (err) {
       if (err instanceof FatalError) throw err;
-      console.log(`\n${type}: ERROR ${redact(err.message)}`);
+      failed++;
+      const detail = err instanceof GraphQlError ? err.messages?.join('; ') ?? err.message : err.message;
+      log(`FAILED ${entity}: ${redact(detail)}`);
     }
   }
+  if (failed > 0) {
+    process.exitCode = 1;
+    log(`\n${failed} of ${SMOKE_TARGETS.length} entities failed. Fix the field names before probing or writing.`);
+  } else log('\nAll field names accepted by the live services.');
 }
 
 function groupReasons(results) {

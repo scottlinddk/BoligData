@@ -2,19 +2,22 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   FatalError,
+  GraphQlError,
   SERVICES,
+  SMOKE_TARGETS,
   addressIdsByProperty,
   buildValuationRows,
   classifyAddressId,
   createDatafordeler,
   createThrottle,
+  discover,
   isoTimestamp,
   parseArgs,
   pickBfe,
-  pickField,
   positiveInt,
   processProperty,
   redact,
+  resolveValuations,
   selectCandidates,
 } from './backfill-bfe-valuation.mjs';
 
@@ -24,22 +27,16 @@ const GRUND = '0a3f50c2-1111-4222-8333-444455556666';
 const ENHED = '0a3f50d3-1111-4222-8333-444455556666';
 const UNIT = '0a3f50e4-1111-4222-8333-444455556666';
 
-const scalar = { kind: 'SCALAR', name: 'String', ofType: null };
-const field = (name, type = scalar) => ({ name, type });
+const REL_HOUSE = '0a3f50f5-1111-4222-8333-444455556666';
 
-/** A fake Datafordeler: schema per type name plus a handler for entity queries. */
-function fakeApi({ schema, data, failTemporalFor = new Set(), status = 200 }) {
+/** A fake Datafordeler: a handler per entity. Introspection is off on the real service, so there is no schema. */
+function fakeApi({ data, failTemporalFor = new Set(), status = 200 }) {
   const calls = [];
   const fetchImpl = async (url, init) => {
     const query = JSON.parse(init.body).query;
     calls.push({ url, query });
     if (status !== 200) return { status, ok: false, headers: new Headers(), json: async () => ({}) };
-    const typeMatch = query.match(/__type\(name: "([^"]+)"\)/);
-    if (typeMatch) {
-      const fields = schema[typeMatch[1]];
-      return { status: 200, ok: true, headers: new Headers(), json: async () => ({ data: { __type: fields ? { fields } : null } }) };
-    }
-    const entity = query.match(/query Q \{ (\w+)\(/)?.[1];
+    const entity = query.match(/query Q \{ (\w+)/)?.[1];
     const withTime = query.includes('registreringstid');
     if (failTemporalFor.has(entity) && withTime) {
       return { status: 200, ok: true, headers: new Headers(), json: async () => ({ errors: [{ message: 'Unknown argument registreringstid' }] }) };
@@ -50,25 +47,20 @@ function fakeApi({ schema, data, failTemporalFor = new Set(), status = 200 }) {
   return { fetchImpl, calls };
 }
 
-const schema = {
-  DAR_Adresse: [field('id_lokalId'), field('husnummer')],
-  BBR_Enhed: [field('id_lokalId'), field('adresseIdentificerer'), field('ejerlejlighed')],
-  BBR_Ejerlejlighed: [field('id_lokalId'), field('bfeNummer')],
-  BBR_Grund: [field('id_lokalId'), field('husnummer'), field('bfeNummer')],
-  VUR_Ejendomsvurdering: [field('bfeNummer'), field('ejendomsvaerdi'), field('grundvaerdi'), field('vurderingsaar')],
-};
+const byBfe = (query) => (query.includes('eq: 7000002') ? 'unit' : 'house');
 
 function makeClient(overrides = {}) {
   const api = fakeApi({
-    schema,
     data: {
       DAR_Adresse: () => [{ id_lokalId: ADDRESS, husnummer: HUSNUMMER }],
-      BBR_Grund: () => [{ bfeNummer: '5000001' }],
-      BBR_Enhed: () => [{ id_lokalId: ENHED, ejerlejlighed: UNIT }],
-      BBR_Ejerlejlighed: () => [{ bfeNummer: '7000002' }],
+      BBR_Grund: () => [{ id_lokalId: GRUND, bestemtFastEjendom: REL_HOUSE }],
+      BBR_Enhed: () => [{ id_lokalId: ENHED }],
+      BBR_EnhedEjendomsrelation: () => [{ ejerlejlighed: UNIT }],
+      BBR_Ejendomsrelation: (query) => [{ id_lokalId: query.includes(UNIT) ? UNIT : REL_HOUSE, bfeNummer: query.includes(UNIT) ? 7000002 : 5000001 }],
+      VUR_BFEKrydsreference: (query) => (byBfe(query) === 'unit' ? [{ fkEjendomsvurderingID: 21 }] : [{ fkEjendomsvurderingID: 11 }, { fkEjendomsvurderingID: 12 }]),
       VUR_Ejendomsvurdering: () => [
-        { bfeNummer: '5000001', ejendomsvaerdi: 2_000_000, grundvaerdi: 500_000, vurderingsaar: 2022 },
-        { bfeNummer: '5000001', ejendomsvaerdi: 2_200_000, grundvaerdi: 520_000, vurderingsaar: 2024 },
+        { id: 11, aar: 2022, ejendomvaerdiBeloeb: 2_000_000, grundvaerdiBeloeb: 500_000 },
+        { id: 12, aar: 2024, ejendomvaerdiBeloeb: 2_200_000, grundvaerdiBeloeb: 520_000 },
       ],
       ...overrides.data,
     },
@@ -82,13 +74,6 @@ function makeClient(overrides = {}) {
 test('redact hides api keys and tokens', () => {
   assert.equal(redact('GET https://x?apiKey=abc123&y=1'), 'GET https://x?apiKey=[redacted]&y=1');
   assert.equal(redact('token=zzz'), 'token=[redacted]');
-});
-
-test('pickField prefers exact matches, then the shortest prefix', () => {
-  assert.equal(pickField(['bfeNummerLong', 'bfeNummer'], 'bfenummer'), 'bfeNummer');
-  assert.equal(pickField(['ejendomsvaerdiBeloeb', 'ejendomsvaerdi2'], 'ejendomsvaerdi'), 'ejendomsvaerdi2');
-  assert.equal(pickField(['vurderingsår'], 'vurderingsaar'), 'vurderingsår');
-  assert.equal(pickField(['x'], 'bfe'), null);
 });
 
 test('positiveInt accepts numeric strings and rejects junk', () => {
@@ -213,27 +198,28 @@ test('house: addressId -> husnummer -> parcel BFE -> valuations, parcel BFE stor
 });
 
 test('apartment: ignores a stored parcel BFE and uses the unit BFE, flagging the conflict', async () => {
-  const { client } = makeClient({
+  const { client, api } = makeClient({
     data: {
-      VUR_Ejendomsvurdering: () => [{ bfeNummer: '7000002', ejendomsvaerdi: 1_500_000, grundvaerdi: 0, vurderingsaar: 2024 }],
+      VUR_Ejendomsvurdering: () => [{ id: 21, aar: 2024, ejendomvaerdiBeloeb: 1_500_000, grundvaerdiBeloeb: 0 }],
     },
   });
   const r = await processProperty(client, { id: 'p2', property_type: 'apartment', bfe_nummer: '5000001', id_lokalid: HUSNUMMER }, ADDRESS);
   assert.equal(r.outcome, 'ok');
   assert.equal(r.bfe, '7000002');
   assert.equal(r.bfeConflict, true);
+  assert.ok(api.calls.some((c) => c.query.includes('VUR_BFEKrydsreference') && c.query.includes('BFEnummer: { eq: 7000002 }')), 'VUR is keyed by the unit BFE');
   assert.deepEqual(r.valuations, [{ valuation_year: 2024, assessed_property_value_dkk: 1_500_000, assessed_land_value_dkk: null }]);
 });
 
 test('apartment without ejerlejlighed registration fails soft with a reason', async () => {
-  const { client } = makeClient({ data: { BBR_Enhed: () => [{ id_lokalId: ENHED, ejerlejlighed: null }] } });
+  const { client } = makeClient({ data: { BBR_EnhedEjendomsrelation: () => [] } });
   const r = await processProperty(client, { id: 'p3', property_type: 'apartment', bfe_nummer: null, id_lokalid: HUSNUMMER }, ADDRESS);
   assert.equal(r.outcome, 'failed');
   assert.match(r.reason, /ejerlejlighed/);
 });
 
 test('ambiguous BFE is a failure, not a guess', async () => {
-  const { client } = makeClient({ data: { BBR_Grund: () => [{ bfeNummer: '1' }, { bfeNummer: '2' }] } });
+  const { client } = makeClient({ data: { BBR_Ejendomsrelation: () => [{ bfeNummer: 1 }, { bfeNummer: 2 }] } });
   const r = await processProperty(client, { id: 'p4', property_type: 'villa', bfe_nummer: null, id_lokalid: HUSNUMMER }, ADDRESS);
   assert.equal(r.outcome, 'failed');
   assert.match(r.reason, /ambiguous/);
@@ -247,7 +233,7 @@ test('no addressId and no id_lokalid is skipped', async () => {
 });
 
 test('valuation miss after a derived BFE is partial so the BFE can still be stored', async () => {
-  const { client } = makeClient({ data: { VUR_Ejendomsvurdering: () => [] } });
+  const { client } = makeClient({ data: { VUR_BFEKrydsreference: () => [] } });
   const r = await processProperty(client, { id: 'p6', property_type: 'villa', bfe_nummer: null, id_lokalid: HUSNUMMER }, ADDRESS);
   assert.equal(r.outcome, 'partial');
   assert.equal(r.bfe, '5000001');
@@ -310,4 +296,33 @@ test('a 400 surfaces the redacted response body so the cause is visible', async 
     assert.doesNotMatch(err.message, /hunter2/);
     return true;
   });
+});
+
+test('valuations: numeric BFE, cross-reference ids, real field names and a page size', async () => {
+  const { client, api } = makeClient();
+  const r = await resolveValuations(client, '5000001');
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.value.map((v) => [v.valuation_year, v.assessed_property_value_dkk, v.assessed_land_value_dkk]), [[2022, 2_000_000, 500_000], [2024, 2_200_000, 520_000]]);
+  const ref = api.calls.find((c) => c.query.includes('VUR_BFEKrydsreference')).query;
+  assert.match(ref, /first: 50 where: \{ BFEnummer: \{ eq: 5000001 \} \}/); // Long literal, not a string
+  const val = api.calls.find((c) => c.query.includes('VUR_Ejendomsvurdering')).query;
+  assert.match(val, /id: \{ in: \[11, 12\] \}/);
+  assert.match(val, /aar ejendomvaerdiBeloeb grundvaerdiBeloeb ajourfoeringDato/);
+  assert.equal((await resolveValuations(client, 'abc')).ok, false);
+});
+
+test('discover reports every smoke target and fails the run when a name is rejected', async () => {
+  const lines = [];
+  const rejecting = { post: async (_service, query) => { if (query.includes('VUR_Ejendomsvurdering')) throw new GraphQlError(['The field `x` does not exist on the type `VUR_Ejendomsvurdering`.']); return {}; } };
+  process.exitCode = undefined;
+  await discover(rejecting, (l) => lines.push(l));
+  assert.equal(process.exitCode, 1);
+  process.exitCode = undefined;
+  assert.equal(lines.filter((l) => l.startsWith('OK ')).length, SMOKE_TARGETS.length - 1);
+  assert.ok(lines.some((l) => l.startsWith('FAILED VUR_Ejendomsvurdering') && l.includes('does not exist')));
+
+  const lines2 = [];
+  await discover({ post: async () => ({}) }, (l) => lines2.push(l));
+  assert.equal(process.exitCode, undefined);
+  assert.ok(lines2.at(-1).includes('All field names accepted'));
 });
