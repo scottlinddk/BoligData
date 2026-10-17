@@ -216,6 +216,23 @@ export interface UpdateAppSettingsBody {
   broadcastEnabled: boolean;
 }
 
+/** One run of the .github/workflows/new-listings.yml workflow. */
+export interface NewListingsRun {
+  id: number;
+  runNumber: number;
+  /** GitHub run status: queued, in_progress, completed, ... */
+  status: string;
+  /** Set once completed: success, failure, cancelled, ... */
+  conclusion: string | null;
+  trigger: "manual" | "scheduled";
+  createdAt: string;
+  url: string;
+}
+
+export interface NewListingsRunsResponse {
+  runs: NewListingsRun[];
+}
+
 export interface RegisteredAgent {
   id: string;
   organizationName: string | null;
