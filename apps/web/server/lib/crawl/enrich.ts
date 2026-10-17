@@ -71,7 +71,7 @@ export async function enrichProperty(
 
   const [bbr, valuation, soil, contamination, noise] = await Promise.all([
     read("bbr", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbr(cadastral?.idLokalid ?? null)),
-    read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null)),
+    read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null, cadastral?.idLokalid ?? null)),
     read("soil_type", mockModeEnabled("GEUS_MOCK_MODE"), () => lookupSoilType(listing.lat, listing.lon)),
     read("soil_contamination", mockModeEnabled("MILJOEPORTALEN_MOCK_MODE"), () => lookupSoilContamination(listing.lat, listing.lon)),
     read("noise", mockModeEnabled("STOEJKORT_MOCK_MODE"), () => lookupNoiseExposure(listing.lat, listing.lon)),

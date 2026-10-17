@@ -1,4 +1,5 @@
 import { asPositiveNumber } from "../crawl/map-utils.js";
+import { lookupBfeByHusnummer } from "./bfe.js";
 import { entityFields, pickField, postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
@@ -139,9 +140,10 @@ export async function lookupEjendomsvurdering(
   matrikelnr: string | null,
   ejerlav: string | null,
   bfeNummer: string | null = null,
+  husnummerId: string | null = null,
 ): Promise<SourceResult<EjendomsvurderingData>> {
-  const key: ValuationKey = { matrikelnr, ejerlav, bfeNummer };
-  const hasKey = bfeNummer !== null || (matrikelnr !== null && ejerlav !== null);
+  const canResolveBfe = bfeNummer === null && husnummerId !== null;
+  const hasKey = bfeNummer !== null || (matrikelnr !== null && ejerlav !== null) || canResolveBfe;
   if (!hasKey) return sourceFailed("no BFE number or matrikelnr/ejerlav to look up");
 
   if (mockModeEnabled(MOCK_FLAG)) {
@@ -150,6 +152,14 @@ export async function lookupEjendomsvurdering(
 
   const apiKey = process.env.DATAFORDELER_API_KEY;
   if (!apiKey) return sourceFailed("DATAFORDELER_API_KEY not configured");
+
+  // The address registers that replaced DAWA return no BFE; BBR does.
+  if (canResolveBfe) {
+    const resolved = await lookupBfeByHusnummer(husnummerId, apiKey.trim());
+    if (resolved.ok) bfeNummer = resolved.data;
+    else if (matrikelnr === null || ejerlav === null) return sourceFailed(`no BFE number: ${resolved.error}`);
+  }
+  const key: ValuationKey = { matrikelnr, ejerlav, bfeNummer };
 
   try {
     const schema = await entityFields(VUR_SERVICE, apiKey, ENTITY_TYPE);

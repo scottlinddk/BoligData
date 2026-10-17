@@ -84,6 +84,7 @@ export async function lookupProperty(
       cadastral?.matrikelnr ?? null,
       cadastral?.ejerlav ?? null,
       cadastral?.bfeNummer ?? null,
+      cadastral?.idLokalid ?? null,
     ),
     // Querying a noise WFS at 0,0 returns a confident-looking "no noise here"
     // for a point in the Atlantic, so an unresolvable address skips the call
