@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractSdlTypes, findFileRows, pickFile, summarizeListing } from './discover-datafordeler.mjs';
+import { describeSdlFields, extractSdlTypes, findFileRows, pickFile, pickFolded, summarizeListing } from './discover-datafordeler.mjs';
 
 const row = (over = {}) => ({
   Filename: 'BBR_V1_Bygning_TotalDownload_json_current_851_20261017.zip',
@@ -83,4 +83,35 @@ test('extractSdlTypes returns field lines per type and null for missing types', 
   const out = extractSdlTypes(sdl, ['BBR_Grund', 'BBR_Missing']);
   assert.deepEqual(out.BBR_Grund, ['id_lokalId: String', 'bestemtFastEjendom: BFE']);
   assert.equal(out.BBR_Missing, null);
+});
+
+const sdl = [
+  'type EJF_Handelsoplysninger implements Node {',
+  '  "Grunddatamodel info:',
+  '    type: Float',
+  '    multiplicity: 0..1',
+  '    definition (da): samlet koebesum',
+  '  "',
+  '  samletKoebesum: Float @cost(weight: "1")',
+  '    type: DateTime',
+  '  koebsaftaledato: LocalDate @cost(weight: "1")',
+  '  list(first: Int): [String!] @cost(weight: "2")',
+  '}',
+  'type Other { a: Int }',
+].join('\n');
+
+test('describeSdlFields lists every field with type and definition and ignores description lines', () => {
+  const fields = describeSdlFields(sdl, 'EJF_Handelsoplysninger');
+  assert.deepEqual(fields.map((f) => `${f.name}:${f.type}`), ['samletKoebesum:Float', 'koebsaftaledato:LocalDate', 'list:[String!]']);
+  assert.equal(fields[0].definition, 'samlet koebesum');
+  assert.equal(fields[1].definition, '');
+  assert.equal(describeSdlFields(sdl, 'Missing'), null);
+});
+
+test('pickFolded prefers an exact folded match and falls back to a prefix', () => {
+  const names = ['ejendomvaerdiBeloeb', 'grundvaerdiBeloeb', 'aar', 'aarsag'];
+  assert.equal(pickFolded(names, 'aar'), 'aar');
+  assert.equal(pickFolded(names, 'ejendomsvaerdibeloeb', 'ejendomvaerdibeloeb'), 'ejendomvaerdiBeloeb');
+  assert.equal(pickFolded(names, 'grundvaerdi'), 'grundvaerdiBeloeb');
+  assert.equal(pickFolded(names, 'findesikke'), null);
 });
