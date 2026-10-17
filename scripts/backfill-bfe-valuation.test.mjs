@@ -12,6 +12,7 @@ import {
   createThrottle,
   diagnoseVur,
   discover,
+  dumpValuations,
   isoTimestamp,
   parseArgs,
   pickBfe,
@@ -386,4 +387,23 @@ test('a full page of cross-references or valuations is refused, never silently t
   assert.match((await resolveValuations(c2, '5000001')).reason, /more than one page/);
   const { client: c3 } = makeClient({ data: { VUR_BFEKrydsreference: () => many(49) } });
   assert.equal((await resolveValuations(c3, '5000001')).ok, true);
+});
+
+test('dumpValuations prints each row oldest first and survives an error', async () => {
+  const { client } = makeClient({
+    data: {
+      VUR_BFEKrydsreference: () => [{ fkEjendomsvurderingID: 905000000000002 }, { fkEjendomsvurderingID: 905000000000001 }],
+      VUR_Ejendomsvurdering: () => [
+        { id: 905000000000002, aar: 2024, ejendomvaerdiBeloeb: 2, aendringKode: 'B' },
+        { id: 905000000000001, aar: 2022, ejendomvaerdiBeloeb: 1, aendringKode: 'A' },
+      ],
+    },
+  });
+  const lines = [];
+  await dumpValuations(client, '5000001', (l) => lines.push(l));
+  assert.match(lines[1], /^ {2}2022 id=905000000000001 value=1 .*aendringKode=A/);
+  assert.match(lines[2], /^ {2}2024 /);
+  const lines2 = [];
+  await dumpValuations({ post: async () => { throw new GraphQlError(['nope']); } }, '1', (l) => lines2.push(l));
+  assert.ok(lines2.some((l) => l.includes('ERROR')));
 });

@@ -534,6 +534,26 @@ export async function diagnoseVur(client, bfes, log = console.log) {
   }
 }
 
+/**
+ * Read-only. Prints every valuation row VUR holds for one BFE, with the fields that explain why a
+ * year can appear twice (change code and dates), oldest year first. Used to decide a revision rule.
+ */
+export async function dumpValuations(client, bfe, log = console.log) {
+  log(`\nAll VUR valuation rows for BFE ${bfe}`);
+  try {
+    const refs = await queryNodes(client, SERVICES.VUR, 'VUR_BFEKrydsreference', `BFEnummer: { eq: ${Number(bfe)} }`, 'fkEjendomsvurderingID', { first: VUR_PAGE });
+    const ids = unique(refs.map((n) => registerId(n.fkEjendomsvurderingID)).filter((id) => id !== null));
+    if (ids.length === 0) return log('  no cross-references');
+    const rows = await queryNodes(client, SERVICES.VUR, 'VUR_Ejendomsvurdering', `id: { in: [${ids.join(', ')}] }`, 'id aar ejendomvaerdiBeloeb grundvaerdiBeloeb aendringKode aendringDato ajourfoeringDato VURMark benyttelseKode', { first: VUR_PAGE });
+    for (const r of [...rows].sort((a, b) => (a.aar - b.aar) || (a.id - b.id))) {
+      log(`  ${r.aar} id=${r.id} value=${r.ejendomvaerdiBeloeb} land=${r.grundvaerdiBeloeb} aendringKode=${r.aendringKode} aendringDato=${r.aendringDato} ajourfoering=${r.ajourfoeringDato} VURMark=${r.VURMark} benyttelse=${r.benyttelseKode}`);
+    }
+  } catch (err) {
+    if (err instanceof FatalError) throw err;
+    log(`  ERROR ${redact(err.message)}`);
+  }
+}
+
 /** Every entity and field the backfill reads, with the bitemporal rule each entity needs. */
 export const SMOKE_TARGETS = [
   [SERVICES.DAR, 'DAR_Adresse', 'id_lokalId husnummer adressebetegnelse'],
@@ -633,6 +653,7 @@ export async function main(argv, env = process.env) {
     console.log(`derived vs stored id_lokalid: ${match} match, ${mismatch} mismatch, ${failed} failed, ${noStored} without stored id (of ${sample.length})`);
     console.log(`VUR: ${valued} of ${sample.length} properties have valuations; years: ${show(new Map([...years].sort((a, b) => a[0] - b[0])))}`);
     if (valued < sample.length) await diagnoseVur(client, [...bfes].slice(0, 5));
+    for (const bfe of [...bfes].slice(0, 2)) await dumpValuations(client, bfe);
     if (![...years.keys()].some((y) => y >= 2020)) console.log('GATE: VUR returned no valuation year >= 2020. Do not build on the new-system valuations (SPAR) until this is explained.');
     if (mismatch > 0 || (match === 0 && noStored < sample.length)) process.exitCode = 1;
     return;
