@@ -29,6 +29,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("GITHUB_DISPATCH_TOKEN", "ghp_test");
+  // Pin the defaults so a runner's own environment can never leak in.
+  vi.stubEnv("ADMIN_WORKFLOW_REPOSITORY", "");
+  vi.stubEnv("ADMIN_WORKFLOW_REF", "");
   vi.mocked(requireRole).mockResolvedValue({ userId: "admin-1", jwt: "t" } as never);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });

@@ -36,8 +36,8 @@ function config() {
       "GitHub Actions is not configured (missing GITHUB_DISPATCH_TOKEN)",
     );
   }
-  const repository = process.env.GITHUB_REPOSITORY || DEFAULT_REPOSITORY;
-  const ref = process.env.GITHUB_WORKFLOW_REF || DEFAULT_REF;
+  const repository = process.env.ADMIN_WORKFLOW_REPOSITORY || DEFAULT_REPOSITORY;
+  const ref = process.env.ADMIN_WORKFLOW_REF || DEFAULT_REF;
   return { token, ref, base: `https://api.github.com/repos/${repository}/actions/workflows/${WORKFLOW_FILE}` };
 }
 
