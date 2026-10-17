@@ -9,7 +9,7 @@ export interface SearchViewPrefs {
   mobileTab: "list" | "map";
 }
 
-export const DEFAULT_VIEW_PREFS: SearchViewPrefs = { pageSize: DEFAULT_PAGE_SIZE, desktopMap: true, mobileTab: "list" };
+export const DEFAULT_VIEW_PREFS: SearchViewPrefs = { pageSize: DEFAULT_PAGE_SIZE, desktopMap: false, mobileTab: "list" };
 
 function read(storage: () => Storage, key: string): string | null {
   try { return storage().getItem(key); } catch { return null; }
