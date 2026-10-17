@@ -10,6 +10,7 @@ import {
   classifyAddressId,
   createDatafordeler,
   createThrottle,
+  diagnoseVur,
   discover,
   isoTimestamp,
   parseArgs,
@@ -325,4 +326,28 @@ test('discover reports every smoke target and fails the run when a name is rejec
   await discover({ post: async () => ({}) }, (l) => lines2.push(l));
   assert.equal(process.exitCode, undefined);
   assert.ok(lines2.at(-1).includes('All field names accepted'));
+});
+
+test('diagnoseVur reports the crossref, the alternative route and survives a failing query', async () => {
+  const { client, api } = makeClient({
+    data: {
+      VUR_BFEKrydsreference: (q) => (q.includes('BFEnummer: { eq: 5000001 }') ? [] : [{ BFEKrydsreferenceID: 1, BFEnummer: 9, fkEjendomsvurderingID: 2 }]),
+      BBR_Ejendomsrelation: () => [{ id_lokalId: REL_HOUSE, ejendomstype: 'SFE', kommunekode: '0851', vurderingsejendomsnummer: 77 }],
+      VUR_Vurderingsejendom: (q) => (q.includes('ESRejendomsnummer') ? [{ vurderingsejendomID: 5, VURejendomsid: 1, ESRejendomsnummer: 77 }] : []),
+      VUR_Ejendomsvurdering: (q) => (q.includes('fkVurderingsejendomID: { eq: 5 }') ? [{ id: 1, aar: 2022, ejendomvaerdiBeloeb: 100 }] : []),
+    },
+  });
+  const lines = [];
+  await diagnoseVur(client, ['5000001'], (l) => lines.push(l));
+  const out = lines.join('\n');
+  assert.match(out, /crossref by BFEnummer: 0 row\(s\)/);
+  assert.match(out, /VUR_Vurderingsejendom ESRejendomsnummer=77: 1 row\(s\)/);
+  assert.match(out, /fkVurderingsejendomID=5: 1 row\(s\)/);
+  assert.equal(api.calls.filter((c) => c.query.includes('fkVurderingsejendomID: { eq: 5 }')).length, 1, 'each vurderingsejendom is followed once');
+
+  const broken = { post: async () => { throw new GraphQlError(['boom apiKey=SECRET']); } };
+  const lines2 = [];
+  await diagnoseVur(broken, ['1'], (l) => lines2.push(l));
+  assert.ok(lines2.some((l) => l.includes('ERROR')));
+  assert.ok(!lines2.join('\n').includes('SECRET'));
 });

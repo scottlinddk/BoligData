@@ -485,6 +485,47 @@ async function persist(db, property, r, opts) {
 
 /* --------------------------------------------------------------------- main */
 
+/**
+ * Read-only. Explains an empty VUR answer for BFE numbers the BBR chain did resolve: what the
+ * crossref holds (a few raw rows show the format and scale), what BBR says about the property's
+ * vurderingsejendomsnummer, and whether the alternative route through VUR_Vurderingsejendom
+ * reaches any valuation. Every query reports its own error and never aborts the probe.
+ */
+export async function diagnoseVur(client, bfes, log = console.log) {
+  const run = async (label, service, entity, where, selection, opts) => {
+    try {
+      const nodes = await queryNodes(client, service, entity, where, selection, opts);
+      log(`  ${label}: ${nodes.length} row(s)${nodes.length ? ` ${JSON.stringify(nodes.slice(0, 3))}` : ''}`);
+      return nodes;
+    } catch (err) {
+      if (err instanceof FatalError) throw err;
+      log(`  ${label}: ERROR ${redact(err.message)}`);
+      return [];
+    }
+  };
+  log('\nVUR diagnostics (read-only)');
+  await run('sample VUR_BFEKrydsreference', SERVICES.VUR, 'VUR_BFEKrydsreference', null, 'BFEKrydsreferenceID BFEnummer fkEjendomsvurderingID', { first: 5 });
+  await run('sample VUR_Ejendomsvurdering', SERVICES.VUR, 'VUR_Ejendomsvurdering', null, 'id aar fkVurderingsejendomID', { first: 5 });
+  for (const bfe of bfes) {
+    log(`BFE ${bfe}`);
+    await run('crossref by BFEnummer', SERVICES.VUR, 'VUR_BFEKrydsreference', `BFEnummer: { eq: ${Number(bfe)} }`, 'BFEKrydsreferenceID BFEnummer fkEjendomsvurderingID', { first: VUR_PAGE });
+    const relations = await run('BBR_Ejendomsrelation', SERVICES.BBR, 'BBR_Ejendomsrelation', `bfeNummer: { eq: ${Number(bfe)} }`, 'id_lokalId ejendomstype kommunekode ejendomsnummer vurderingsejendomsnummer', { temporal: 'first' });
+    const seen = new Set();
+    for (const nr of unique(relations.map((r) => positiveInt(r.vurderingsejendomsnummer)).filter((n) => n !== null))) {
+      const hits = [
+        ...(await run(`VUR_Vurderingsejendom VURejendomsid=${nr}`, SERVICES.VUR, 'VUR_Vurderingsejendom', `VURejendomsid: { eq: ${nr} }`, 'vurderingsejendomID VURejendomsid ESRejendomsnummer ESRkommunenummer', { first: 5 })),
+        ...(await run(`VUR_Vurderingsejendom ESRejendomsnummer=${nr}`, SERVICES.VUR, 'VUR_Vurderingsejendom', `ESRejendomsnummer: { eq: ${nr} }`, 'vurderingsejendomID VURejendomsid ESRejendomsnummer ESRkommunenummer', { first: 5 })),
+      ];
+      for (const h of hits) {
+        const id = positiveInt(h.vurderingsejendomID);
+        if (id === null || seen.has(id)) continue;
+        seen.add(id);
+        await run(`VUR_Ejendomsvurdering fkVurderingsejendomID=${id}`, SERVICES.VUR, 'VUR_Ejendomsvurdering', `fkVurderingsejendomID: { eq: ${id} }`, 'id aar ejendomvaerdiBeloeb grundvaerdiBeloeb', { first: VUR_PAGE });
+      }
+    }
+  }
+}
+
 /** Every entity and field the backfill reads, with the bitemporal rule each entity needs. */
 export const SMOKE_TARGETS = [
   [SERVICES.DAR, 'DAR_Adresse', 'id_lokalId husnummer adressebetegnelse'],
@@ -557,6 +598,7 @@ export async function main(argv, env = process.env) {
     const bump = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
     const years = new Map();
     let match = 0, mismatch = 0, failed = 0, noStored = 0, valued = 0;
+    const bfes = new Set();
     for (const p of sample) {
       const c = await classifyAddressId(client, addresses.get(p.id));
       bump(classes.addressId, c.ok ? c.value : `error: ${c.reason}`);
@@ -571,6 +613,7 @@ export async function main(argv, env = process.env) {
       else { mismatch++; console.log(`MISMATCH  ${p.id}  derived ${r.value} but stored ${p.id_lokalid}`); }
       // Read-only: resolve the BFE and list which valuation years VUR holds for it.
       const res = await processProperty(client, p, addresses.get(p.id));
+      if (res.bfe) bfes.add(res.bfe);
       if (res.valuations.length > 0) {
         valued++;
         for (const v of res.valuations) bump(years, v.valuation_year);
@@ -581,6 +624,7 @@ export async function main(argv, env = process.env) {
     console.log(`id class of stored id_lokalid:    ${show(classes.storedId)}`);
     console.log(`derived vs stored id_lokalid: ${match} match, ${mismatch} mismatch, ${failed} failed, ${noStored} without stored id (of ${sample.length})`);
     console.log(`VUR: ${valued} of ${sample.length} properties have valuations; years: ${show(new Map([...years].sort((a, b) => a[0] - b[0])))}`);
+    if (valued < sample.length) await diagnoseVur(client, [...bfes].slice(0, 5));
     if (![...years.keys()].some((y) => y >= 2020)) console.log('GATE: VUR returned no valuation year >= 2020. Do not build on the new-system valuations (SPAR) until this is explained.');
     if (mismatch > 0 || (match === 0 && noStored < sample.length)) process.exitCode = 1;
     return;
