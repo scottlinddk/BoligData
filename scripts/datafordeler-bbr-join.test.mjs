@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeBbr, createCsvParser } from './datafordeler-bbr-join.mjs';
+import { analyzeBbr, createCsvParser, findPointHeader } from './datafordeler-bbr-join.mjs';
 
 function parse(chunks, delimiter) {
   const rows = [];
@@ -70,4 +70,11 @@ test('analyzeBbr also accepts a join that goes through the BFE number instead of
   const report = analyzeBbr(t);
   assert.equal(report.houses.withBfe, 2);
   assert.equal(report.hypotheses['Grund.bestemtFastEjendom in Ejendomsrelation.bfeNummer'], '1/1 (100.0%)');
+});
+
+test('findPointHeader prefers the exact coordinate column over similarly named code columns', () => {
+  const header = ['id_lokalId', 'byg133KildeTilKoordinatsæt', 'byg404Koordinat', 'byg406Koordinatsystem'];
+  assert.equal(findPointHeader(header), 2);
+  assert.equal(findPointHeader(['id', 'position']), 1);
+  assert.equal(findPointHeader(['id', 'byg133KildeTilKoordinatsæt']), -1);
 });

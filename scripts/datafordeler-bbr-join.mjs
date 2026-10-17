@@ -53,7 +53,16 @@ export function createCsvParser(onRow, delimiter = ',') {
   };
 }
 
-const POINT_HEADER = /^byg404|koordinat|position/i;
+/** Exact column names first: a loose /koordinat/ also matches byg133KildeTilKoordinatsæt, which holds a code. */
+const POINT_HEADERS = [/^byg404Koordinat$/i, /^position$/i];
+
+export function findPointHeader(header) {
+  for (const pattern of POINT_HEADERS) {
+    const index = header.findIndex((name) => pattern.test(name));
+    if (index >= 0) return index;
+  }
+  return -1;
+}
 
 /**
  * Reads one CSV out of a zip and keeps only the requested columns (matched by folded name).
@@ -74,7 +83,7 @@ export function readCsvZip(zipPath, { columns, findPoint = false }) {
         header = cells;
         const folded = new Map(cells.map((name, i) => [foldFieldName(name), i]));
         wanted = columns.map((name) => [name, folded.get(foldFieldName(name)) ?? -1]);
-        if (findPoint) pointIndex = cells.findIndex((name) => POINT_HEADER.test(name));
+        if (findPoint) pointIndex = findPointHeader(cells);
         return;
       }
       if (findPoint && pointIndex < 0 && scanned < 500) {
