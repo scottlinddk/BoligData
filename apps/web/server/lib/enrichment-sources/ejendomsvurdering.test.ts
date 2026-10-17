@@ -121,6 +121,20 @@ describe("lookupEjendomsvurdering (live)", () => {
     expect(stub.bodies[1]).toContain("ejerlavsnavn");
   });
 
+  it("resolves the BFE number through BBR when only the husnummer is known", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const stub = stubFetch([
+      { body: { data: { BBR_Grund: { nodes: [{ id_lokalId: "g", bestemtFastEjendom: "rel-1" }] } } } },
+      { body: { data: { BBR_Ejendomsrelation: { nodes: [{ id_lokalId: "rel-1", bfeNummer: 2340871 }] } } } },
+      { body: introspection(SCHEMA_FIELDS) },
+      { body: valuationBody({ ejendomsvaerdi: 2_500_000 }) },
+    ]);
+
+    const result = await lookupEjendomsvurdering(null, null, null, "0a3f5000-0000-4000-8000-000000000001");
+    expect(result).toMatchObject({ ok: true, data: { assessedPropertyValueDkk: 2_500_000 } });
+    expect(stub.bodies[3]).toContain("2340871");
+  });
+
   it("reports a GraphQL rejection instead of falling back to a fabricated value", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     stubFetch([
