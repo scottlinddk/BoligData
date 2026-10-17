@@ -335,8 +335,13 @@ export const NEW_SYSTEM_MARK = 3;
  *   3. rows with the same value as the winner are one valuation, known from the earliest of them,
  *   4. a year whose top rows share system and date but disagree on value is dropped and counted.
  * The old and new series sit at different levels (881,000 against 480,000 in the same year), so the
- * stored series steps at the switch to the new system.
+ * stored series steps at the switch to the new system. To keep the SPAR index honest, old-system
+ * rows are only stored for years before NEW_SYSTEM_FROM_YEAR (when the system field is read): SPAR
+ * takes a property's latest year whatever its system, so an old 2020 value would be set against new
+ * 2020 values. A property without a new valuation then ends at 2019 and gets no fair price.
  */
+export const NEW_SYSTEM_FROM_YEAR = 2020;
+
 export function buildValuationRows(nodes, fields) {
   const byYear = new Map();
   for (const node of nodes) {
@@ -351,6 +356,7 @@ export function buildValuationRows(nodes, fields) {
       isNew: fields.system ? Number(node[fields.system]) === NEW_SYSTEM_MARK : false,
       effective: fields.effective && typeof node[fields.effective] === 'string' ? node[fields.effective] : '',
     };
+    if (fields.system && !candidate.isNew && year >= NEW_SYSTEM_FROM_YEAR) continue;
     if (!byYear.has(year)) byYear.set(year, []);
     byYear.get(year).push(candidate);
   }
