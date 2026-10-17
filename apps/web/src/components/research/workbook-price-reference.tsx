@@ -49,25 +49,26 @@ export function WorkbookPriceReferenceCard({ property, history, loading, failed,
         <h2 id="workbook-price-title" className="text-xl font-semibold tracking-tight text-ink">{tx("Pris efter liggetid", "Price by time on market")}</h2>
         <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-soft">{tx("Historisk scenario", "Historical scenario")}</span>
       </div>
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-        <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
-          <dt className="text-sm font-medium text-ink-soft">{active ? tx("Aktuel udbudspris", "Current asking price") : tx("Seneste udbudspris", "Last asking price")}</dt>
-          <dd data-testid="workbook-current-asking" className="mt-2 break-words text-3xl font-semibold tracking-tight text-ink"><Money value={currentAsking} /></dd>
+      {/* The three headline numbers share one strip so they can be compared at a glance. */}
+      <div data-testid="workbook-price-summary" className={`mt-5 grid divide-x divide-border overflow-hidden rounded-xl border border-border-strong bg-surface ${ready && gap !== null ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className="min-w-0 p-3 sm:p-5">
+          <p className="min-h-8 text-xs font-medium text-ink-soft sm:min-h-0 sm:text-sm">{active ? tx("Aktuel udbudspris", "Current asking price") : tx("Seneste udbudspris", "Last asking price")}</p>
+          <p data-testid="workbook-current-asking" className="mt-1 text-[15px] font-semibold tracking-tight text-ink sm:mt-2 sm:text-3xl"><Money value={currentAsking} /></p>
         </div>
-        <div className="min-w-0 rounded-xl border border-border-strong bg-surface p-4 sm:p-5">
-          <dt className="text-sm font-medium text-ink-soft">{tx("Burde koste", "Should cost")}</dt>
-          <dd data-testid={ready ? "workbook-target-price" : undefined} className="mt-2 break-words text-3xl font-semibold tracking-tight text-ink">
-            <Money value={ready ? reference.referencePrice : null} />
-            {!ready && <p className="mt-2 text-xs font-normal tracking-normal text-ink-soft">{reference.status === "missing_first_asking" ? tx("Afventer oprindelig udbudspris", "Awaiting original asking price") : tx("Datagrundlag ikke tilgængeligt", "Historical data unavailable")}</p>}
-          </dd>
+        <div className="min-w-0 p-3 sm:p-5">
+          <p className="min-h-8 text-xs font-medium text-ink-soft sm:min-h-0 sm:text-sm">{tx("Burde koste", "Should cost")}</p>
+          <p data-testid={ready ? "workbook-target-price" : undefined} className="mt-1 text-[15px] font-semibold tracking-tight text-ink sm:mt-2 sm:text-3xl"><Money value={ready ? reference.referencePrice : null} /></p>
+          {!ready && <p className="mt-2 text-xs text-ink-soft">{reference.status === "missing_first_asking" ? tx("Afventer oprindelig udbudspris", "Awaiting original asking price") : tx("Datagrundlag ikke tilgængeligt", "Historical data unavailable")}</p>}
         </div>
-      </dl>
+        {ready && gap !== null && <div data-testid="workbook-price-gap" data-comparison={gap > 0 ? "above" : gap < 0 ? "below" : "equal"} className="min-w-0 p-3 sm:p-5">
+          <p className="min-h-8 text-xs font-medium text-ink-soft sm:min-h-0 sm:text-sm">{tx("Forskel", "Difference")}</p>
+          <p className="mt-1 text-[15px] font-semibold tracking-tight text-ink sm:mt-2 sm:text-3xl"><Money value={Math.abs(gap)} /></p>
+          <p className="mt-1 text-xs font-medium text-ink sm:text-sm">{gap > 0 ? tx("over ‘Burde koste’", "above ‘Should cost’") : gap < 0 ? tx("under ‘Burde koste’", "below ‘Should cost’") : tx("på niveau med ‘Burde koste’", "in line with ‘Should cost’")}</p>
+          {reference.gapPercent !== null && <p className="mt-0.5 text-xs text-ink-soft">{percent(Math.abs(reference.gapPercent))} {tx("af udbudsprisen", "of asking price")}</p>}
+        </div>}
+      </div>
       {ready ? <>
-        {gap !== null ? <div data-testid="workbook-price-gap" data-comparison={gap > 0 ? "above" : gap < 0 ? "below" : "equal"} className="mt-3 rounded-xl border border-border-strong p-4">
-          <p className="text-sm font-medium text-ink">{gap > 0 ? tx("Udbudsprisen er over ‘Burde koste’", "Asking price is above ‘Should cost’") : gap < 0 ? tx("Udbudsprisen er under ‘Burde koste’", "Asking price is below ‘Should cost’") : tx("Udbudsprisen er på niveau med ‘Burde koste’", "Asking price is in line with ‘Should cost’")}</p>
-          <p className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-semibold tracking-tight text-ink"><Money value={Math.abs(gap)} />{reference.gapPercent !== null && <span className="text-base font-medium text-ink-soft">{percent(Math.abs(reference.gapPercent))} {tx("af udbudsprisen", "of asking price")}</span>}</p>
-          <p className="mt-1 text-xs text-ink-soft">{active ? tx("Forskel mellem aktuel udbudspris og det historiske prispejlemærke.", "Difference between the current asking price and the historical price reference.") : tx("Forskel mellem seneste udbudspris og det historiske prispejlemærke.", "Difference between the last asking price and the historical price reference.")}</p>
-        </div> : <p data-testid="workbook-comparison-unavailable" className="mt-3 text-sm text-ink-soft">{active ? tx("Sammenligningen afventer en gyldig aktuel udbudspris.", "A valid current asking price is needed for the comparison.") : tx("Sammenligningen afventer en gyldig seneste udbudspris.", "A valid last asking price is needed for the comparison.")}</p>}
+        {gap !== null ? <p className="mt-3 text-xs text-ink-soft">{active ? tx("Forskel mellem aktuel udbudspris og det historiske prispejlemærke.", "Difference between the current asking price and the historical price reference.") : tx("Forskel mellem seneste udbudspris og det historiske prispejlemærke.", "Difference between the last asking price and the historical price reference.")}</p> : <p data-testid="workbook-comparison-unavailable" className="mt-3 text-sm text-ink-soft">{active ? tx("Sammenligningen afventer en gyldig aktuel udbudspris.", "A valid current asking price is needed for the comparison.") : tx("Sammenligningen afventer en gyldig seneste udbudspris.", "A valid last asking price is needed for the comparison.")}</p>}
         <div className="mt-3">
             {reference.referencePrice === 0 && <p className="mt-2 text-xs text-ink-soft">{tx(`Beløbet afrundes til 0 kr. ved afrunding til nærmeste ${metadata.roundingDkk.toLocaleString("da-DK")} kr.`, `The amount rounds to DKK 0 when rounded to the nearest DKK ${metadata.roundingDkk.toLocaleString("en-GB")}.`)}</p>}
             <p className="mt-2 text-xs text-ink-soft">{tx("Historisk spænd", "Historical spread")}: <Money value={reference.lowerPrice} /> – <Money value={reference.upperPrice} /></p>
