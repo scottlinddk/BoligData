@@ -7,3 +7,5 @@ export * from "./statistics.js";
 export * from "./valuation.js";
 export * from "./workbook-price-reference.js";
 export * from "./spar.js";
+export * from "./boligskat.js";
+export * from "./valuation-comparison.js";
