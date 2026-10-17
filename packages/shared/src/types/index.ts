@@ -426,4 +426,4 @@ export interface Alert {
   propertyIds: string[];
   emailStatus: EmailStatus;
 }
-export type { SparListingEstimate, SparListingStatus } from "./spar.js";
+export type { SparHistoryPoint, SparListingEstimate, SparListingStatus } from "./spar.js";

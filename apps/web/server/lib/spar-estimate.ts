@@ -71,7 +71,7 @@ export function buildSparSegment(input: { asOf: string; isUnit: boolean; valuati
 export function estimateForListing(segment: SparSegment, listing: { propertyId: string; askingPrice: number | null }): SparListingEstimate {
   const base = { isUnit: segment.isUnit, asOf: segment.asOf, method: "own-spar-local-level/1" as const, askingPrice: listing.askingPrice };
   const none = (status: SparListingEstimate["status"], reason: SparListingEstimate["reason"], valuation: SparListingEstimate["valuation"] = null): SparListingEstimate =>
-    ({ ...base, status, reason, valuation, index: null, fairPrice: null, askingVsFair: null });
+    ({ ...base, status, reason, valuation, index: null, fairPrice: null, askingVsFair: null, history: [] });
 
   const own = segment.valuationByProperty.get(listing.propertyId);
   if (!own) return none("no_valuation", "no_valuation_for_property");
@@ -82,6 +82,10 @@ export function estimateForListing(segment: SparSegment, listing: { propertyId: 
   const point = segment.points[segment.points.length - 1]!;
   const fair = fairPrice(own.value, point, 0, segment.residualSd);
   if (!fair) return none("no_valuation", "no_valuation_for_property");
+  const history = segment.points.flatMap((p) => {
+    const f = fairPrice(own.value, p, 0, segment.residualSd);
+    return f ? [{ period: p.period, estimate: f.estimate, lo80: f.lo80, hi80: f.hi80, preliminary: p.preliminary }] : [];
+  });
   const asking = listing.askingPrice !== null && listing.askingPrice > 0 ? listing.askingPrice : null;
   return {
     ...base, status: "available", reason: null, valuation,
@@ -89,5 +93,6 @@ export function estimateForListing(segment: SparSegment, listing: { propertyId: 
       ageMonths: segment.ageMonths, stale: segment.ageMonths > SPAR_STALE_AFTER_MONTHS },
     fairPrice: fair,
     askingVsFair: asking === null ? null : asking / fair.estimate - 1,
+    history,
   };
 }

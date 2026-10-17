@@ -23,6 +23,7 @@ import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { SchoolDistrictPanel } from "@/components/school-district-panel";
 import { SparPanel } from "@/components/spar-panel";
+import { SmartEstimate } from "@/components/estimate/smart-estimate";
 import { Footer } from "@/components/footer";
 import { SectionNav } from "@/components/section-nav";
 import { useI18n } from "@/i18n/i18n";
@@ -128,6 +129,7 @@ export function PropertyDetailPage() {
     { id: "facts", label: tx("Fakta", "Facts") },
     ...(floorplan ? [{ id: "floorplan", label: t("detail.floorplan") }] : []),
     { id: "price-reference", label: tx("Prisoverblik", "Price overview") },
+    { id: "estimate", label: tx("Smart estimat", "Smart estimate") },
     { id: "map", label: tx("På kortet", "On the map") },
   ];
   const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
@@ -231,7 +233,8 @@ export function PropertyDetailPage() {
             <p className="mb-5 mt-1 text-sm text-ink-soft">{property.address} · {[property.postalCode, property.municipality].filter(Boolean).join(" ")}</p>
             <div className="h-[280px] overflow-hidden rounded-xl sm:h-[350px]"><PropertyMap properties={[property]} /></div>
           </section>
-          <SparPanel propertyId={property.id} />
+          <SmartEstimate propertyId={property.id} propertyType={property.propertyType} />
+          <div id="spar" className="section-anchor"><SparPanel propertyId={property.id} /></div>
           <SchoolDistrictPanel propertyId={property.id} />
           <DetailSection title={tx("Handler og sammenlignelige boliger", "Sales and comparable homes")} subtitle={tx("Tidligere salg, handler i nærheden og pris pr. m²", "Previous sales, nearby transactions and price per m²")}>
             {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" disabled={comparablesQuery.isFetching} onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 inline-flex items-center gap-2 font-semibold underline disabled:opacity-50">{comparablesQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>}

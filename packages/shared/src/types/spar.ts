@@ -4,6 +4,17 @@
  */
 export type SparListingStatus = "available" | "no_valuation" | "insufficient_data";
 
+/** The fair price this home would have had in one month: its valuation times that month's smoothed market level. */
+export interface SparHistoryPoint {
+  /** YYYY-MM */
+  period: string;
+  estimate: number;
+  lo80: number;
+  hi80: number;
+  /** The newest months are still being revised. */
+  preliminary: boolean;
+}
+
 export interface SparListingEstimate {
   status: SparListingStatus;
   /** Why the estimate is missing, for status other than "available". */
@@ -32,6 +43,11 @@ export interface SparListingEstimate {
   askingPrice: number | null;
   /** asking / fair estimate - 1, as a fraction. Positive means asking above the estimate. */
   askingVsFair: number | null;
+  /**
+   * Fair price per month, oldest first. A re-pricing of today's valuation with each month's market
+   * level, not a record of what this home was worth. Empty unless status is "available".
+   */
+  history: SparHistoryPoint[];
   asOf: string;
   method: "own-spar-local-level/1";
 }
