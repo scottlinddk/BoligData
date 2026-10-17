@@ -8,7 +8,7 @@ import { verifyCrawlData } from "./runner-verification.js";
  * environment before imports. Never print that environment or save it as an artifact. */
 async function main() {
   const verifyOnly = process.argv.includes("--verify-only");
-  const configuration = configureRunner(!verifyOnly && process.argv.includes("--full-scan"), !verifyOnly && process.argv.includes("--weekly"));
+  const configuration = configureRunner(!verifyOnly && process.argv.includes("--full-scan"), !verifyOnly && process.argv.includes("--weekly"), !verifyOnly && process.argv.includes("--recent"));
   console.log(JSON.stringify({ event: "crawl.runner_config", verifyOnly, sources: enabledSources(), ...configuration }));
   assertRunnerDatabaseConfiguration();
   // A protected optional register credential is unavailable to this runner;

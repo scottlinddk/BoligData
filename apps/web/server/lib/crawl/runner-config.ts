@@ -32,7 +32,7 @@ export function assertRunnerDatabaseConfiguration(): void {
 /** Weekly runs always observe live Boligsiden data. ZIP scope, page size,
  * delay and concurrency remain the deployment's settings. A bounded scan
  * is only successful when the requested feed was actually exhausted. */
-export function configureRunner(fullScan: boolean, weekly = false) {
+export function configureRunner(fullScan: boolean, weekly = false, recent = false) {
   const configuredCaps = Object.fromEntries(Object.keys(CAP_DEFAULTS).map((name) => {
     const raw = process.env[name]?.trim();
     // Numeric values are useful diagnostics; arbitrary environment text is not.
@@ -44,6 +44,13 @@ export function configureRunner(fullScan: boolean, weekly = false) {
     for (const flag of MOCK_FLAGS) process.env[flag] = "false";
     process.env.CRAWL_MAX_PAGES = "1000";
     process.env.CRAWL_MAX_LISTINGS = "50000";
+  } else if (recent) {
+    // Newest-first window: picks up new listings between full refreshes.
+    // Bounded by design, so a reached cap is not a failure (see runnerOutcome).
+    process.env.CRAWL_SOURCES = "boligsiden";
+    for (const flag of MOCK_FLAGS) process.env[flag] = "false";
+    process.env.CRAWL_MAX_PAGES = "50";
+    process.env.CRAWL_MAX_LISTINGS = "5000";
   } else if (fullScan) {
     process.env.CRAWL_MAX_PAGES = "100";
     process.env.CRAWL_MAX_LISTINGS = "5000";
@@ -52,7 +59,7 @@ export function configureRunner(fullScan: boolean, weekly = false) {
     [name, envInt(name, fallback, min, max)],
   ));
   return {
-    fullScan: fullScan || weekly, weekly, configuredCaps, effectiveCaps,
+    fullScan: fullScan || weekly, weekly, recent, configuredCaps, effectiveCaps,
     maximumRecordsPerSource: Math.min(effectiveCaps.CRAWL_MAX_LISTINGS!, effectiveCaps.CRAWL_PAGE_SIZE! * effectiveCaps.CRAWL_MAX_PAGES!),
     zipRanges: getZipRanges(),
     explicitZipScope: Boolean(process.env.CRAWL_ZIP_RANGES || process.env.CRAWL_ZIP_MIN || process.env.CRAWL_ZIP_MAX),
