@@ -20,7 +20,7 @@ interface ChecklistItem {
 function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistItem[] {
   if (!riskFlags) {
     return (
-      ["noise", "encumbrance", "sewer", "oilTank", "soil"] as const
+      ["noise", "encumbrance", "sewer", "buildingCases", "oilTank", "soil"] as const
     ).map((key) => ({
       label: t(`dueDiligence.${key}.label`),
       status: "unknown" as const,
@@ -73,6 +73,17 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       href: riskFlags.sewerSeparationLookupUrl,
       source: t("dueDiligence.sewer.source"),
       sourceHref: riskFlags.sewerSeparationLookupUrl,
+    },
+    {
+      label: t("dueDiligence.buildingCases.label"),
+      status: "warning",
+      // Older rows predate the field, so it can be undefined at runtime.
+      detail: riskFlags.buildingCaseArchiveUrl
+        ? t("dueDiligence.buildingCases.linkLabel")
+        : t("dueDiligence.buildingCases.warning"),
+      href: riskFlags.buildingCaseArchiveUrl ?? null,
+      source: t("dueDiligence.buildingCases.source"),
+      sourceHref: riskFlags.buildingCaseArchiveUrl ?? null,
     },
     {
       label: t("dueDiligence.oilTank.label"),

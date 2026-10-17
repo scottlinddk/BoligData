@@ -20,6 +20,12 @@ describe("stored register provenance", () => {
     expect(result.riskFlags).toMatchObject({ noiseExposureLden: null, oilTankRiskSource: "heuristic", soilContamination: { classification: "unknown", jordart: null } });
   });
 
+  it("keeps the building case link and defaults it to null for rows that predate it", () => {
+    const url = "https://weblager.dk/public/municipality/851/45/search/all";
+    expect(safeRiskFlags({ risk_flags: { ...rawRisk, buildingCaseArchiveUrl: url } })?.buildingCaseArchiveUrl).toBe(url);
+    expect(safeRiskFlags({ risk_flags: rawRisk })?.buildingCaseArchiveUrl).toBeNull();
+  });
+
   it("checks each source independently instead of trusting an overall datafordeler label", () => {
     const result = safeRiskFlags({ source: "datafordeler", risk_flags: rawRisk, source_status: {
       noise: { dataMode: "mock" }, bbr: { dataMode: "real" }, soil_contamination: { dataMode: "unavailable" }, soil_type: { dataMode: "real" },
