@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findFileRows, summarizeListing } from './discover-datafordeler.mjs';
+import { extractSdlTypes, findFileRows, pickFile, summarizeListing } from './discover-datafordeler.mjs';
 
 const row = (over = {}) => ({
   Filename: 'BBR_V1_Bygning_TotalDownload_json_current_851_20261017.zip',
@@ -46,4 +46,41 @@ test('summarizeListing falls back to all relevant rows when no municipality matc
   assert.equal(s.municipalRows, 0);
   assert.equal(s.picked.length, 1);
   assert.equal(s.picked[0].file, 'a.zip');
+});
+
+const file = (over = {}) => ({
+  fileName: 'BBR_V3_Ejendomsrelation_0851_TotalDownload_csv_Current_784.zip',
+  entityName: 'Ejendomsrelation',
+  typeOfDownload: 'TotalDownload',
+  typeOfData: 'Current',
+  municipalityCode: '0851',
+  generationNumber: 784,
+  fileSizeInBytes: 8_031_792,
+  ...over,
+});
+
+test('pickFile takes the newest matching csv for the municipality', () => {
+  const rows = [
+    file({ generationNumber: 778, fileName: 'old_csv_778.zip' }),
+    file(),
+    file({ fileName: 'x_json_784.zip', generationNumber: 999 }),
+    file({ municipalityCode: '0101', generationNumber: 999 }),
+    file({ typeOfData: 'Bitemporal', generationNumber: 999 }),
+  ];
+  assert.equal(pickFile(rows, { entity: 'Ejendomsrelation', municipality: '0851' }).generationNumber, 784);
+});
+
+test('pickFile skips files that are too big or too small and returns null without a match', () => {
+  const big = file({ fileSizeInBytes: 3_772_912_778 });
+  assert.equal(pickFile([big], { entity: 'Ejendomsrelation', municipality: '0851' }), null);
+  const empty = file({ typeOfDownload: 'DeltaDownload', typeOfData: 'Bitemporal', fileSizeInBytes: 234, fileName: 'd_csv_1.zip' });
+  assert.equal(pickFile([empty], { entity: 'Ejendomsrelation', download: 'DeltaDownload', data: 'Bitemporal', minBytes: 5000 }), null);
+  assert.equal(pickFile([], { entity: 'Grund' }), null);
+});
+
+test('extractSdlTypes returns field lines per type and null for missing types', () => {
+  const sdl = 'type BBR_Grund implements Node {\n  id_lokalId: String\n  # note\n  bestemtFastEjendom: BFE\n}\ntype Other { a: Int }';
+  const out = extractSdlTypes(sdl, ['BBR_Grund', 'BBR_Missing']);
+  assert.deepEqual(out.BBR_Grund, ['id_lokalId: String', 'bestemtFastEjendom: BFE']);
+  assert.equal(out.BBR_Missing, null);
 });

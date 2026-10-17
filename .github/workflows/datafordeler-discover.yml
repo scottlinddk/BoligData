@@ -1,8 +1,9 @@
 name: Discover Datafordeler schema and files
 
 # Read-only. Prints which GraphQL types, fields and bulk files Datafordeler exposes for
-# BBR, VUR, DAR and EJF, using the existing DATAFORDELER_API_KEY secret. Writes nothing to any
-# database and uploads no artifacts, so the log is the only output.
+# BBR, VUR, DAR and EJF, using the existing DATAFORDELER_API_KEY secret. It also downloads a few
+# small zone-0 files to print their header and first rows. Writes nothing to any database and
+# uploads no artifacts, so the log is the only output.
 on:
   workflow_dispatch:
 
@@ -12,7 +13,7 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
