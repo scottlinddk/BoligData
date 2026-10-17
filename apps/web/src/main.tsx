@@ -17,6 +17,7 @@ import { PropertyDetailPage } from "@/routes/property/[id]";
 import { ResearchPage } from "@/routes/research";
 import { DashboardPage } from "@/routes/dashboard";
 import { ComparePage } from "@/routes/compare";
+import { PropertyEstimatePage } from "@/routes/property/estimate";
 import { RecommendationsPage } from "@/routes/recommendations";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
 import { AdminInvitationsPage } from "@/routes/admin/invitations";
@@ -63,6 +64,14 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <PropertyDetailPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/property/:id/value",
+        element: (
+          <AuthGuard>
+            <PropertyEstimatePage />
           </AuthGuard>
         ),
       },

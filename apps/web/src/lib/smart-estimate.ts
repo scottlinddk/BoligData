@@ -32,6 +32,17 @@ export function levelTrend(history: SparHistoryPoint[], months = 12): { months: 
   return { months, change: last.estimate / earlier.estimate - 1 };
 }
 
+/**
+ * `compareAskingToValuation` withholds its verdict for the Danish labels below, while the app's own
+ * property types are English slugs. Map them explicitly, so a summer house or apartment does not get
+ * a verdict just because the names differ.
+ */
+export function valuationFitType(propertyType: string | null | undefined, isUnit: boolean): string | null {
+  if (isUnit || propertyType === "apartment" || propertyType === "villa_apartment") return "lejlighed";
+  if (propertyType === "summer_house" || propertyType === "holiday_plot") return "fritidshus";
+  return propertyType ?? null;
+}
+
 /** The ordered list of things the estimate rests on, with warnings last. Empty when there is no estimate. */
 export function estimateFactors(result: SparListingEstimate, propertyType?: string | null): EstimateFactor[] {
   if (result.status !== "available" || !result.valuation || !result.index || !result.fairPrice) return [];
@@ -49,7 +60,7 @@ export function estimateFactors(result: SparListingEstimate, propertyType?: stri
     // The valuation comparison is a weak reference for apartments, so the helper withholds its verdict there.
     const comparison = compareAskingToValuation({
       askingPrice: result.askingPrice, ejendomsvaerdi: result.valuation.valueDkk, kind: null, year: result.valuation.year,
-      propertyType: result.isUnit ? "lejlighed" : propertyType,
+      propertyType: valuationFitType(propertyType, result.isUnit),
     });
     if (comparison.status === "available") {
       factors.push({ kind: "asking_vs_valuation", percent: comparison.percent, band: comparison.band, tolerancePercent: Math.round(comparison.toleranceRatio * 100) });
