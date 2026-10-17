@@ -1,4 +1,4 @@
-import type { BbrData, PublicValuation, SoldPriceEntry, ZoneStatus } from "@shared/types/index";
+import type { BbrData, PublicValuation, RiskFlags, SoldPriceEntry, ZoneStatus } from "@shared/types/index";
 import type { NearbySaleEntry, PropertyLookupResult } from "@shared/types/property-lookup";
 import type { SparListingEstimate } from "@shared/types/spar";
 import { summarizeLookupSources, type SourceSummaryEntry } from "@/lib/property-facts";
@@ -34,6 +34,8 @@ export interface AddressReport {
    * is not live, since "not a house" and "no valuation" are answers worth showing.
    */
   spar: SparListingEstimate | null | undefined;
+  /** Due-diligence flags built from this lookup's registers; null when the lookup did not build any. */
+  riskFlags: RiskFlags | null;
   sources: SourceSummaryEntry[];
   mapUrl: string | null;
 }
@@ -77,6 +79,7 @@ export function buildAddressReport(lookup: PropertyLookupResult): AddressReport 
     priceHistoryMatch: salesLive ? lookup.priceHistoryMatch : null,
     nearbySales: salesLive ? lookup.nearbySales : [],
     spar: lookup.spar,
+    riskFlags: lookup.riskFlags,
     sources: summarizeLookupSources(lookup),
     mapUrl: openStreetMapUrl(lat, lon),
   };

@@ -343,6 +343,39 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.priceHistory).toEqual([]);
   });
 
+  it("builds the due-diligence flags from what the lookup found: BBR heating, the noise reading, the municipality's links", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    expect(result.riskFlags).toMatchObject({
+      noiseExposureLden: 57,
+      oilTankRisk: false,
+      oilTankRiskSource: "bbr",
+      buildingCaseArchiveUrl: "https://weblager.dk/public/municipality/851/45/search/all",
+      sewerSeparationLookupUrl: "https://www.aalborg.dk/",
+      encumbranceLookupUrl: "https://www.tinglysning.dk/",
+      soilContamination: { classification: "unknown", jordart: null },
+    });
+  });
+
+  it("leaves a due-diligence item unknown when its register did not answer, never filling it in", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "");
+    stubPipeline();
+
+    const result = await lookupProperty(byId);
+
+    expect(result.riskFlags?.oilTankRiskSource).toBe("heuristic"); // no BBR: unknown, not a guess
+    expect(result.riskFlags?.buildingCaseArchiveUrl).not.toBeNull(); // the address register still answered
+  });
+
+  it("builds no due-diligence flags for a free-text lookup, which keeps its stored enrichment", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+    expect((await lookupProperty(input)).riskFlags).toBeNull();
+  });
+
   it("finds a house's BFE and valuation from the husnummer, since the address register returns no parcel", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     stubPipeline();

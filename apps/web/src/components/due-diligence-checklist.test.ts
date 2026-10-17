@@ -51,3 +51,62 @@ describe("due-diligence checklist building cases", () => {
     expect(render(null)).toContain(translations.da["dueDiligence.buildingCases.label"]);
   });
 });
+
+const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+
+describe("due-diligence checklist without flags (nothing checked yet)", () => {
+  it("names where each answer would come from instead of repeating 'no data' as the source", () => {
+    const html = text(render(null));
+    for (const key of ["noise", "encumbrance", "sewer", "buildingCases", "soil"] as const) {
+      expect(html).toContain(translations.da[`dueDiligence.${key}.source`]);
+    }
+    expect(html).toContain(translations.da["dueDiligence.oilTank.source.bbr"]);
+    expect(html).not.toContain(`Kilde: ${translations.da["dueDiligence.noData"]}`);
+  });
+
+  it("links the sources that have a public page", () => {
+    const html = render(null);
+    expect(html).toContain('href="https://miljoegis.mim.dk/spatialmap?profile=noise"');
+    expect(html).toContain('href="https://arealinformation.miljoeportal.dk/"');
+    expect(html).toContain('href="https://bbr.dk/"');
+  });
+
+  it("does not use internal jargon in either language", () => {
+    for (const language of ["da", "en"] as const) {
+      for (const [key, value] of Object.entries(translations[language])) {
+        if (key.startsWith("dueDiligence.")) expect(value.toLowerCase(), key).not.toMatch(/berigelse|enrichment/);
+      }
+    }
+  });
+});
+
+describe("due-diligence checklist oil tank", () => {
+  const oil = (overrides: Partial<RiskFlags>) => text(render({ ...flags, ...overrides }));
+
+  it("says BBR records oil heating, not that the building's age suggests a tank, when the warning comes from BBR", () => {
+    const html = oil({ oilTankRisk: true, oilTankRiskSource: "bbr" });
+    expect(html).toContain(translations.da["dueDiligence.oilTank.warning.bbr"]);
+    expect(html).not.toContain(translations.da["dueDiligence.oilTank.warning"]);
+  });
+
+  it("keeps the age wording for the building-year heuristic", () => {
+    expect(oil({ oilTankRisk: true, oilTankRiskSource: "heuristic" })).toContain(translations.da["dueDiligence.oilTank.warning"]);
+  });
+
+  it("says why it is unknown, and labels BBR as the source rather than a heuristic that was never used", () => {
+    const html = oil({ oilTankRisk: false, oilTankRiskSource: "heuristic" });
+    expect(html).toContain(translations.da["dueDiligence.oilTank.unknown"]);
+    expect(html).toContain(translations.da["dueDiligence.oilTank.source.bbr"]);
+    expect(html).not.toContain(translations.da["dueDiligence.oilTank.source.heuristic"]);
+  });
+
+  it("reports a BBR heating that is not oil as no risk indicated", () => {
+    expect(oil({ oilTankRisk: false, oilTankRiskSource: "bbr" })).toContain(translations.da["dueDiligence.oilTank.ok"]);
+  });
+
+  it("explains a missing noise reading instead of repeating 'not checked'", () => {
+    expect(text(render(flags))).toContain(translations.da["dueDiligence.noise.none"]);
+    expect(text(render({ ...flags, noiseExposureLden: 52 }))).toContain("Lden 52 dB");
+  });
+});
+

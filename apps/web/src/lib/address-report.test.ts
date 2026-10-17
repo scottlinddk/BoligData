@@ -19,7 +19,7 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
       floors: 1, roofMaterial: null, wallMaterial: null, basementSqm: null, toiletCount: null, bathroomCount: null,
     },
     publicValuation: { assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2025 },
-    valuationHistory: [], propertyClass: null, priceHistoryMatch: null,
+    valuationHistory: [], propertyClass: null, priceHistoryMatch: null, riskFlags: null,
     priceHistory: [{ soldDate: "2018-05-01", price: 2_100_000, pricePerSqm: 14_000, saleType: "normal" }],
     nearbySales: [{ address: "Floravej 8", soldDate: "2026-03-01", price: 2_500_000, pricePerSqm: 17_000, saleType: "normal", areaSqm: 150, propertyType: "villa", distanceMeters: 40, lat: 57.0460, lon: 9.8766 }],
     renovationCategory: { category: "B", isEstimate: true, symbol: "~", reason: "", source: "ai" },
@@ -109,6 +109,12 @@ describe("buildAddressReport", () => {
     }));
     expect(report.spar).toBe(unsupported);
     expect(report.publicValuation).toBeNull();
+  });
+
+  it("passes the due-diligence flags through, for the checklist to render", () => {
+    const riskFlags = { noiseExposureLden: 52, oilTankRisk: false } as unknown as NonNullable<PropertyLookupResult["riskFlags"]>;
+    expect(buildAddressReport(lookup({ riskFlags })).riskFlags).toBe(riskFlags);
+    expect(buildAddressReport(lookup()).riskFlags).toBeNull();
   });
 
   it("never includes an asking price or any screening verdict in the report", () => {

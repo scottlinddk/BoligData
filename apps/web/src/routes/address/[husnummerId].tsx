@@ -115,7 +115,7 @@ export function AddressReportPage() {
       {t("address.report.openMap")} <span aria-hidden="true">↗</span>
     </a>}
 
-    <DueDiligenceChecklist riskFlags={null} />
+    <DueDiligenceChecklist riskFlags={report.riskFlags} />
     <RegisterSourcesPanel sources={report.sources} isLoading={lookupQuery.isFetching} isError={false} onRetry={() => { void lookupQuery.refetch(); }} />
     <p className="text-xs leading-5 text-ink-faint">{t("address.report.listingOnly")}</p>
   </>);
