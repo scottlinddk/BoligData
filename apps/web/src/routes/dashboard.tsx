@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
 import { useNotifications } from "@/hooks/use-notifications";
 import { listMyConnections } from "@/lib/api";
 import { serializeFilters } from "@/lib/url-filters";
+import { COMPARE_MAX, COMPARE_MIN, toggleCompareId } from "@/lib/compare";
 import { ConnectionList } from "@/components/connection-list";
 import { LoadingStatus, PropertyCardSkeleton, Skeleton } from "@/components/ui/loading";
 import { useToast } from "@/components/toast";
@@ -47,6 +48,9 @@ export function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const navigate = useNavigate();
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const { notifications, isLoading: notificationsLoading, isError: notificationsError, markAllRead } = useNotifications({ unreadOnly: true });
   const connectionsQuery = useQuery({ queryKey: ["connections", "mine"], queryFn: listMyConnections });
@@ -61,6 +65,13 @@ export function DashboardPage() {
   if (sort === "area-desc") visibleProperties.sort((a, b) => b.sqm - a.sqm);
   const selectedProperty = visibleProperties.find((property) => property.id === selectedId) ?? visibleProperties[0];
   const latestNotification = notifications[0];
+
+  function toggleCompare(id: string) {
+    const next = toggleCompareId(compareIds, id);
+    if (next.full) showToast(da ? `Du kan sammenligne højst ${COMPARE_MAX} boliger ad gangen.` : `You can compare at most ${COMPARE_MAX} homes at a time.`, "info");
+    setCompareIds(next.ids);
+  }
+  function stopComparing() { setCompareMode(false); setCompareIds([]); }
 
   async function handleAlertChange(searchId: string, alertFrequency: AlertFrequency) {
     setPendingId(searchId);
@@ -171,6 +182,9 @@ export function DashboardPage() {
           <h2 className="text-lg font-semibold tracking-tight text-ink">{t(view === "favorites" ? "dashboard.favoritesTitle" : "dashboard.title")}</h2>
           <p className="mt-1 text-sm text-ink-soft">{view === "favorites" ? (da ? "Hold styr på de boliger, du vil se nærmere på." : "Keep track of the properties you want to explore.") : (da ? "Dine kriterier. Nye muligheder." : "Your criteria. New opportunities.")}</p>
         </div>
+        {view === "favorites" && !favoritesLoading && !favoritesError && favoriteProperties.length >= COMPARE_MIN && <button type="button" aria-pressed={compareMode} onClick={() => compareMode ? stopComparing() : setCompareMode(true)} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${compareMode ? "bg-cta text-cta-text" : "border border-border-strong bg-surface text-ink hover:bg-surface-hover"}`}>
+          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 21V8l6-3v16M10 21V10l10 3v8M3 21h18" /></svg>{da ? "Sammenlign" : "Compare"}
+        </button>}
         {view === "favorites" && !favoritesLoading && !favoritesError && <span role="status" className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-soft">{da ? `${visibleProperties.length} af ${favoriteProperties.length} boliger` : `${visibleProperties.length} of ${favoriteProperties.length} properties`}</span>}
       </div>
 
@@ -185,7 +199,7 @@ export function DashboardPage() {
           <WorkspaceEmpty title={da ? "Ingen boliger matcher" : "No matching properties"} description={da ? "Prøv en anden adresse, by eller et andet postnummer." : "Try another address, city or postal code."} action={<button type="button" onClick={() => setFavoriteQuery("")} className={linkClass}>{da ? "Vis alle gemte boliger" : "Show all saved properties"}</button>} />
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {visibleProperties.map((property) => <WorkspacePropertyCard key={property.id} property={property} active={selectedProperty?.id === property.id} onPreview={() => setSelectedId(property.id)} />)}
+            {visibleProperties.map((property) => <WorkspacePropertyCard key={property.id} property={property} active={selectedProperty?.id === property.id} onPreview={() => setSelectedId(property.id)} selectable={compareMode} selected={compareIds.includes(property.id)} onToggleSelect={toggleCompare} selectLabel={da ? "Vælg til sammenligning" : "Select for comparison"} />)}
           </div>
         )
       ) : searchesLoading ? (
@@ -220,6 +234,14 @@ export function DashboardPage() {
           ))}
         </ul>
       )}
+      {compareMode && view === "favorites" && <div className="ui-enter fixed inset-x-0 bottom-[4.5rem] z-40 flex justify-center px-4 xl:bottom-5">
+        <div className="flex w-full max-w-md items-center gap-2 rounded-2xl border border-border bg-surface p-2 shadow-lift">
+          <button type="button" onClick={stopComparing} className="min-h-11 rounded-xl px-4 text-sm font-medium text-ink-soft hover:text-ink">{da ? "Annuller" : "Cancel"}</button>
+          <button type="button" disabled={compareIds.length < COMPARE_MIN} onClick={() => navigate(`/compare?ids=${compareIds.join(",")}`)} className="min-h-11 flex-1 rounded-xl bg-cta px-4 text-sm font-semibold text-cta-text transition hover:bg-cta-hover disabled:opacity-40">
+            {da ? `Sammenlign (${compareIds.length} af ${COMPARE_MAX})` : `Compare (${compareIds.length} of ${COMPARE_MAX})`}
+          </button>
+        </div>
+      </div>}
     </DashboardWorkspace>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import type { SparListingEstimate } from "@shared/types/spar";
 import { formatDkk } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
@@ -10,7 +11,7 @@ import { RangeBar } from "./range-bar";
 
 export function SmartEstimate({ propertyId, propertyType }: { propertyId: string; propertyType?: string | null }) {
   const query = useSparEstimate(propertyId);
-  return <SmartEstimateView result={query.data} loading={query.isPending} failed={query.isError} onRetry={() => { void query.refetch(); }} propertyType={propertyType} />;
+  return <SmartEstimateView result={query.data} loading={query.isPending} failed={query.isError} onRetry={() => { void query.refetch(); }} propertyType={propertyType} fullPageHref={`/property/${propertyId}/value`} />;
 }
 
 const icons = {
@@ -48,7 +49,7 @@ function FactorRow({ factor }: { factor: EstimateFactor }) {
   </li>;
 }
 
-export function SmartEstimateView({ result, loading, failed, onRetry, propertyType }: { result?: SparListingEstimate; loading: boolean; failed: boolean; onRetry: () => void; propertyType?: string | null }) {
+export function SmartEstimateView({ result, loading, failed, onRetry, propertyType, fullPageHref }: { result?: SparListingEstimate; loading: boolean; failed: boolean; onRetry: () => void; propertyType?: string | null; fullPageHref?: string }) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [helpOpen, setHelpOpen] = useState(false);
@@ -96,6 +97,7 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
           </div>
         </div>
       </div>
+      {fullPageHref && <Link to={fullPageHref} className="mt-4 flex min-h-11 items-center justify-center rounded-lg border border-border-strong bg-surface text-sm font-semibold transition hover:bg-surface-hover lg:hidden">{tx("Åbn estimat og prishistorik", "Open estimate and price history")}</Link>}
       <p className="mt-4 text-xs leading-5 text-ink-soft">{tx("Et estimat, ikke en vurdering. Intervallet er groft og ikke backtestet.", "An estimate, not an appraisal. The interval is rough and not backtested.")}</p>
     </>}
   </section>;

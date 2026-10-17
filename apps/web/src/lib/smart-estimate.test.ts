@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SparHistoryPoint, SparListingEstimate } from "@shared/types/spar";
-import { estimateFactors, formatMillions, formatSignedPercent, levelTrend, rangeLayout } from "./smart-estimate";
+import { estimateFactors, formatMillions, formatSignedPercent, levelTrend, rangeLayout, valuationFitType } from "./smart-estimate";
 
 const point = (period: string, estimate: number): SparHistoryPoint => ({ period, estimate, lo80: estimate * 0.9, hi80: estimate * 1.1, preliminary: false });
 const months = (from: string, count: number, start: number, step: number) => {
@@ -41,6 +41,17 @@ describe("estimateFactors", () => {
   });
   it("gives no valuation verdict for apartments", () => {
     expect(estimateFactors({ ...base, isUnit: true }, "ejerlejlighed").map(f => f.kind)).not.toContain("asking_vs_valuation");
+  });
+  it("gives no valuation verdict for summer houses either", () => {
+    expect(estimateFactors(base, "summer_house").map(f => f.kind)).not.toContain("asking_vs_valuation");
+    expect(estimateFactors(base, "villa").map(f => f.kind)).toContain("asking_vs_valuation");
+  });
+  it("maps app property types to the labels the comparison understands", () => {
+    expect(valuationFitType("apartment", false)).toBe("lejlighed");
+    expect(valuationFitType("villa", true)).toBe("lejlighed");
+    expect(valuationFitType("summer_house", false)).toBe("fritidshus");
+    expect(valuationFitType("villa", false)).toBe("villa");
+    expect(valuationFitType(null, false)).toBeNull();
   });
   it("ends with warnings for old or preliminary levels", () => {
     const kinds = estimateFactors({ ...base, index: { ...base.index!, stale: true, preliminary: true, ageMonths: 15 } }).map(f => f.kind);
