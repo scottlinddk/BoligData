@@ -249,8 +249,38 @@ input::placeholder, textarea::placeholder {
   50% { opacity: .5; }
 }
 
+@keyframes ui-sheet-up {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ui-sheet-down {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(32px); }
+}
+
+@keyframes ui-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-backdrop-out {
+  to { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
+  .ui-sheet-in { animation: ui-sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .ui-sheet-in::backdrop { animation: ui-backdrop-in 240ms ease-out; }
+  .ui-sheet-out { animation: ui-sheet-down 200ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+  .ui-sheet-out::backdrop { animation: ui-backdrop-out 200ms ease-in forwards; }
+  /* Pages crossfade instead of snapping; supported browsers only, others navigate instantly. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
+  .ui-stagger > * { animation: ui-enter 220ms ease-out backwards; }
+  .ui-stagger > *:nth-child(2) { animation-delay: 30ms; }
+  .ui-stagger > *:nth-child(3) { animation-delay: 60ms; }
+  .ui-stagger > *:nth-child(4) { animation-delay: 90ms; }
+  .ui-stagger > *:nth-child(n+5) { animation-delay: 120ms; }
   .ui-enter { animation: ui-enter 180ms ease-out; }
   .ui-fade-in { animation: ui-fade-in 180ms ease-out; }
   .ui-spinner { animation: ui-spin 800ms linear infinite; }

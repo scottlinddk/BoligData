@@ -28,6 +28,8 @@ function NumberField({
       {label}
       <input
         type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         className={inputClassName}
@@ -81,7 +83,7 @@ export function FilterFields({
             return (
               <label
                 key={type}
-                className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium normal-case tracking-normal transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand ${
+                className={`flex min-h-11 cursor-pointer active:scale-[0.97] items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium normal-case tracking-normal transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand ${
                   checked ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-ink hover:bg-surface-hover"
                 }`}
               >

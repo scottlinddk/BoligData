@@ -33,6 +33,7 @@ import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 import { canSendRecommendations } from "@/lib/roles";
+import { lastSearchPath } from "@/lib/search-session";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
 const actionClass = "flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors";
@@ -121,7 +122,7 @@ export function PropertyDetailPage() {
   return <>
     <article className="ui-enter mx-auto max-w-[1240px] px-4 pb-28 pt-6 sm:px-8 sm:pt-8 lg:pb-16">
       <nav aria-label={tx("Brødkrumme", "Breadcrumb")} className="mb-6 flex items-center gap-3 text-xs text-ink-soft">
-        <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
+        <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate(lastSearchPath()); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
       </nav>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
         <div className="min-w-0 space-y-7">
