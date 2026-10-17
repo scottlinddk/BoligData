@@ -28,6 +28,21 @@ describe("estimateForListing", () => {
     expect(r.askingVsFair).toBeCloseTo(2_420_000 / r.fairPrice!.estimate - 1, 6);
   });
 
+  it("re-prices this home's valuation with each month's market level", () => {
+    const segment = buildSparSegment({ asOf: "2025-10-01", isUnit: false, ...market(40) });
+    const r = estimateForListing(segment, { propertyId: "p0", askingPrice: null });
+    expect(r.history.length).toBeGreaterThan(1);
+    expect(r.history.map(p => p.period)).toEqual([...r.history.map(p => p.period)].sort());
+    const last = r.history[r.history.length - 1]!;
+    expect(last.estimate).toBeCloseTo(r.fairPrice!.estimate, 0);
+    for (const p of r.history) expect(p.lo80).toBeLessThan(p.hi80);
+  });
+
+  it("has no history when there is no estimate", () => {
+    const segment = buildSparSegment({ asOf: "2025-10-01", isUnit: false, ...market(SPAR_MIN_SALES - 1) });
+    expect(estimateForListing(segment, { propertyId: "p0", askingPrice: 1 }).history).toEqual([]);
+  });
+
   it("reports insufficient data instead of a number when there are too few sales", () => {
     const segment = buildSparSegment({ asOf: "2025-10-01", isUnit: false, ...market(SPAR_MIN_SALES - 1) });
     const r = estimateForListing(segment, { propertyId: "p0", askingPrice: 2_000_000 });
