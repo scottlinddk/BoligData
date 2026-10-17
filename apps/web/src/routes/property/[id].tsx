@@ -34,6 +34,7 @@ import { LimfjordNoisePanel } from "@/components/limfjord-noise-panel";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 import { canSendRecommendations } from "@/lib/roles";
+import { lastSearchPath } from "@/lib/search-session";
 
 const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
 const factIcons = {
@@ -137,14 +138,14 @@ export function PropertyDetailPage() {
   return <>
     <article className="ui-enter mx-auto max-w-[1240px] px-4 pb-28 pt-0 sm:px-8 sm:pt-8 lg:pb-16">
       <nav aria-label={tx("Brødkrumme", "Breadcrumb")} className="mb-6 hidden items-center gap-3 text-xs text-ink-soft sm:flex">
-        <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
+        <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate(lastSearchPath()); }} className="rounded py-1 hover:text-ink">← {t("detail.back")}</button><span aria-hidden="true">/</span><span className="truncate text-ink">{property.address}</span>
       </nav>
       <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_320px] xl:gap-10">
         <div className="min-w-0 space-y-7">
           <div className="relative -mx-4 sm:mx-0">
             <PropertyGallery key={property.id} images={photos} alt={property.address} />
             <div className="pointer-events-none absolute inset-x-4 top-3 flex items-center justify-between sm:hidden">
-              <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate("/"); }} aria-label={t("detail.back")} className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-ink shadow-card backdrop-blur">
+              <button type="button" onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate(lastSearchPath()); }} aria-label={t("detail.back")} className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-ink shadow-card backdrop-blur">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
               </button>
               <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/90 text-ink shadow-card backdrop-blur disabled:opacity-60">

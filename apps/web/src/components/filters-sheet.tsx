@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FiltersWithSort } from "@/lib/url-filters";
 import { defaultFilters } from "@/lib/url-filters";
 import { FilterFields } from "@/components/filter-fields";
@@ -8,14 +8,27 @@ interface FiltersSheetProps {
   filters: FiltersWithSort;
   onChange: (patch: Partial<FiltersWithSort>) => void;
   onClose: () => void;
-  /** Live result count for the confirm button. */
-  total?: number;
 }
 
-/** Native modal keeps keyboard focus inside and restores it to the opener. */
-export function FiltersSheet({ filters, onChange, onClose, total }: FiltersSheetProps) {
+const EXIT_MS = 200;
+
+/**
+ * Native modal keeps keyboard focus inside and restores it to the opener.
+ * Edits are a draft: one search runs on "Show homes", not one per keystroke. Dismissing discards the draft.
+ */
+export function FiltersSheet({ filters, onChange, onClose }: FiltersSheetProps) {
   const { t, language } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [draft, setDraft] = useState(filters);
+  const [closing, setClosing] = useState(false);
+  const reducedMotion = useRef(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function requestClose(apply: boolean) {
+    if (closing) return;
+    if (apply) onChange(draft);
+    if (reducedMotion.current) { onClose(); return; }
+    setClosing(true);
+    window.setTimeout(onClose, EXIT_MS);
+  }
   useEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement;
@@ -25,7 +38,7 @@ export function FiltersSheet({ filters, onChange, onClose, total }: FiltersSheet
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
-  return <dialog ref={dialogRef} aria-labelledby="search-filters-title" onCancel={event => { event.preventDefault(); onClose(); }}
+  return <dialog ref={dialogRef} aria-labelledby="search-filters-title" onCancel={event => { event.preventDefault(); requestClose(false); }}
     onKeyDown={event => {
       if (event.key !== "Tab") return;
       const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])')].filter(control => control.getClientRects().length > 0);
@@ -33,15 +46,15 @@ export function FiltersSheet({ filters, onChange, onClose, total }: FiltersSheet
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}
-    onClick={e => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) onClose(); } }}
-    className="ui-enter fixed inset-x-0 bottom-0 top-auto m-0 max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-[24px] border border-border bg-surface p-0 text-ink shadow-lift backdrop:bg-black/35 backdrop:backdrop-blur-sm sm:inset-0 sm:m-auto sm:max-h-[85dvh] sm:max-w-[600px] sm:rounded-[24px]">
+    onClick={e => { if (e.target === e.currentTarget) { const box = e.currentTarget.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) requestClose(false); } }}
+    className={`${closing ? "ui-sheet-out" : "ui-sheet-in"} fixed inset-x-0 bottom-0 top-auto m-0 max-h-[92dvh] overscroll-contain w-full max-w-none overflow-y-auto rounded-t-[24px] border border-border bg-surface p-0 text-ink shadow-lift backdrop:bg-black/35 backdrop:backdrop-blur-sm sm:inset-0 sm:m-auto sm:max-h-[85dvh] sm:max-w-[600px] sm:rounded-[24px]`}>
     <div className="sticky top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-surface px-5 py-4 sm:px-8">
-      <button type="button" onClick={onClose} className="justify-self-start rounded-lg py-1 text-sm text-ink-soft transition hover:text-ink">{t("common.cancel")}</button>
+      <button type="button" onClick={() => requestClose(false)} className="min-h-11 justify-self-start rounded-lg text-sm text-ink-soft transition hover:text-ink">{t("common.cancel")}</button>
       <h2 id="search-filters-title" className="text-lg font-semibold tracking-tight">{t("filters.title")}</h2>
-      <button type="button" onClick={() => onChange({ ...defaultFilters(), polygon: null })} className="justify-self-end rounded-lg py-1 text-sm text-ink-soft transition hover:text-ink">{t("filters.reset")}</button>
+      <button type="button" onClick={() => setDraft(defaultFilters())} className="min-h-11 justify-self-end rounded-lg text-sm text-ink-soft transition hover:text-ink">{t("filters.reset")}</button>
     </div>
-    <div className="grid grid-cols-2 items-start gap-x-3 gap-y-8 bg-surface p-5 sm:p-8"><FilterFields filters={filters} onChange={onChange} /></div>
-    {filters.polygon && <p className="mx-6 mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{language === "da" ? "Søgningen er afgrænset af dit markerede område på kortet." : "This search is limited to your drawn map boundary."}</p>}
-    <div className="sticky bottom-0 border-t border-border bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-8"><button type="button" onClick={onClose} className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-cta px-4 py-3 text-sm font-semibold text-cta-text transition hover:bg-cta-hover">{total === undefined ? (language === "da" ? "Vis boliger" : "Show homes") : language === "da" ? `Vis ${total.toLocaleString("da-DK")} boliger` : `Show ${total.toLocaleString("en-GB")} homes`}</button></div>
+    <div className="grid grid-cols-2 items-start gap-x-3 gap-y-8 bg-surface p-5 sm:p-8"><FilterFields filters={draft} onChange={patch => setDraft(current => ({ ...current, ...patch }))} /></div>
+    {draft.polygon && <p className="mx-6 mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{language === "da" ? "Søgningen er afgrænset af dit markerede område på kortet." : "This search is limited to your drawn map boundary."}</p>}
+    <div className="sticky bottom-0 border-t border-border bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-8"><button type="button" onClick={() => requestClose(true)} className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-cta px-4 py-3 text-sm font-semibold text-cta-text transition active:scale-[0.98] hover:bg-cta-hover">{language === "da" ? "Vis boliger" : "Show homes"}</button></div>
   </dialog>;
 }
