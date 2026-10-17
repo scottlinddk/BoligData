@@ -296,3 +296,18 @@ test('buildValuationRows keeps the earliest registration date and omits it when 
   ]);
   assert.equal(isoTimestamp(undefined), null);
 });
+
+test('a 400 surfaces the redacted response body so the cause is visible', async () => {
+  const fetchImpl = async () => ({
+    status: 400,
+    ok: false,
+    headers: new Headers(),
+    text: async () => 'Query depth limit exceeded at https://x/y?apiKey=hunter2',
+  });
+  const client = createDatafordeler({ apiKey: 'k', throttle: async () => {}, fetchImpl, env: { DATAFORDELER_DAR_VERSION: 'v3' }, sleep: async () => {} });
+  await assert.rejects(client.post(SERVICES.DAR, '{ x }'), (err) => {
+    assert.match(err.message, /HTTP 400 from Datafordeler: Query depth limit exceeded/);
+    assert.doesNotMatch(err.message, /hunter2/);
+    return true;
+  });
+});

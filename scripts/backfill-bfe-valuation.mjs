@@ -203,7 +203,11 @@ export function createDatafordeler({ apiKey, throttle, fetchImpl = (...a) => fet
         await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 60) * 1000 : backoff(attempt));
         continue;
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status} from Datafordeler`);
+      if (!res.ok) {
+        // A 400 carries the reason (query depth, unknown field, introspection off) in its body.
+        const detail = redact(await res.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 300);
+        throw new Error(`HTTP ${res.status} from Datafordeler${detail ? `: ${detail}` : ''}`);
+      }
       return { body: await res.json() };
     }
   }
