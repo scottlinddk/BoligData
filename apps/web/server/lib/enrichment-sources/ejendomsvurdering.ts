@@ -47,7 +47,7 @@ export interface EjendomsvurderingData {
   assessedPropertyValueDkk: number | null;
   /** Assessed land-only value (DKK). */
   assessedLandValueDkk: number | null;
-  /** Assessment year — ejerboliger vurderes i ulige år, andre i lige år. */
+  /** Assessment year. The ordinary cycle is 2022 then 2024 (a preliminary, indexed 2024 valuation exists). The old "odd years for homes" cycle no longer applies. */
   valuationYear: number | null;
 }
 
