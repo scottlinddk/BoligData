@@ -3,11 +3,13 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import handler from "../../../api/property-lookup.js";
 import { requireUser } from "../../middleware/auth.js";
 import { lookupProperty } from "./property-lookup.handler.js";
+import { estimateAddressSpar } from "./address-spar.js";
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("../../middleware/auth.js", () => ({ requireUser: vi.fn() }));
 vi.mock("../supabase.js", () => ({ getAnonClient: () => ({ rpc }) }));
 vi.mock("./property-lookup.handler.js", () => ({ lookupProperty: vi.fn() }));
+vi.mock("./address-spar.js", () => ({ estimateAddressSpar: vi.fn() }));
 
 function response() {
   const result = { statusCode: 0, body: undefined as unknown, headers: {} as Record<string, string> };
@@ -85,6 +87,32 @@ describe("authenticated register lookup", () => {
     expect(result.statusCode).toBe(200);
     expect(rpc).toHaveBeenCalledWith("consume_register_lookup_budget");
     expect(lookupProperty).toHaveBeenCalledWith(expect.objectContaining({ husnummerId: id, address: "", askingPrice: null }));
+  });
+
+  it("adds the fair-price estimate to a husnummer lookup", async () => {
+    const estimate = { status: "available", method: "own-spar-local-level/1" } as Awaited<ReturnType<typeof estimateAddressSpar>>;
+    vi.mocked(estimateAddressSpar).mockResolvedValue(estimate);
+    const { res, result } = response();
+    await handler(request({ husnummerId: "0a3f509c-38ed-32b8-e044-0003ba298018" }), res);
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({ source: "ai", spar: estimate });
+    expect(estimateAddressSpar).toHaveBeenCalledOnce();
+  });
+
+  it("still answers the lookup, with spar null, when the market data cannot be read", async () => {
+    vi.mocked(estimateAddressSpar).mockRejectedValue(new Error("database unavailable"));
+    const { res, result } = response();
+    await handler(request({ husnummerId: "0a3f509c-38ed-32b8-e044-0003ba298018" }), res);
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({ source: "ai", spar: null });
+  });
+
+  it("does not estimate, or add a spar field, for a free-text listing lookup", async () => {
+    const { res, result } = response();
+    await handler(request(), res);
+    expect(result.statusCode).toBe(200);
+    expect(estimateAddressSpar).not.toHaveBeenCalled();
+    expect(result.body).not.toHaveProperty("spar");
   });
 
   it("still passes a listing's asking price through", async () => {

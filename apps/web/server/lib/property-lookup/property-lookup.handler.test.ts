@@ -95,10 +95,29 @@ const VALUATION_FIELDS = ["bfeNummer", "ejendomsvaerdi", "grundvaerdi", "vurderi
  * position in the queue. Each Datafordeler register is asked for its schema
  * before its first query, which is matched on the request body.
  */
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown } = {}) {
+const RELATION_ID = "0a3f50f5-1111-4222-8333-444455556666";
+
+/** What the BBR and VUR entity queries of the by-id valuation chain answer for a house, keyed by entity. */
+const HOUSE_CHAIN: Record<string, unknown[]> = {
+  BBR_Bygning: [{ byg021BygningensAnvendelse: 120 }, { byg021BygningensAnvendelse: 910 }],
+  BBR_Grund: [{ id_lokalId: "g1", bestemtFastEjendom: RELATION_ID }],
+  BBR_Ejendomsrelation: [{ id_lokalId: RELATION_ID, bfeNummer: 5_000_001 }],
+  VUR_BFEKrydsreference: [{ fkEjendomsvurderingID: 2_024_000 }],
+  VUR_Ejendomsvurdering: [
+    { id: 2_024_000, aar: 2024, ejendomvaerdiBeloeb: 3_150_000, grundvaerdiBeloeb: 780_000, ajourfoeringDato: "2025-03-01T00:00:00Z", VURMark: 3, aendringDato: "2024-12-31" },
+  ],
+};
+
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; chain?: Record<string, unknown[]> } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
+    // The by-id valuation chain sends `query Q { Entity(...) }` documents; BBR's building facts use a named query.
+    const chainEntity = typeof init?.body === "string" ? init.body.match(/query Q \{ (\w+)/)?.[1] : undefined;
+    if (chainEntity) {
+      const nodes = (overrides.chain ?? HOUSE_CHAIN)[chainEntity] ?? [];
+      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ data: { [chainEntity]: { pageInfo: { hasNextPage: false }, nodes } } }) };
+    }
     if (href.includes("api.boligsiden.dk/search/addresses")) {
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: [] }) };
     }
@@ -274,18 +293,60 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.sources.find((s) => s.key === "noise")?.mode).toBe("live");
   });
 
-  it("says why the public valuation is missing: this register does not resolve the parcel", async () => {
+  it("finds a house's BFE and valuation from the husnummer, since the address register returns no parcel", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     stubPipeline();
 
     const result = await lookupProperty(byId);
 
+    expect(result.propertyClass).toBe("house");
     expect(result.resolved.matrikelnr).toBeNull();
-    expect(result.resolved.bfeNummer).toBeNull();
+    expect(result.resolved.bfeNummer).toBe("5000001");
+    expect(result.publicValuation).toEqual({ assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2024 });
+    expect(result.valuationHistory).toEqual([{ year: 2024, propertyValueDkk: 3_150_000, landValueDkk: 780_000, registeredAt: "2025-03-01T00:00:00.000Z" }]);
+    expect(result.sources.find((s) => s.key === "publicValuation")).toMatchObject({ mode: "live", error: null });
+  });
+
+  it("gives an apartment building no parcel valuation, because VUR keys an apartment by its own BFE", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const fetchSpy = stubPipeline({ chain: { ...HOUSE_CHAIN, BBR_Bygning: [{ byg021BygningensAnvendelse: 140 }] } });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.propertyClass).toBe("other");
     expect(result.publicValuation).toBeNull();
+    expect(result.valuationHistory).toEqual([]);
     const valuation = result.sources.find((s) => s.key === "publicValuation");
     expect(valuation?.mode).toBe("unavailable");
-    expect(valuation?.error).toBeTruthy();
+    expect(valuation?.error).toContain("not a house");
+    const queried = fetchSpy.mock.calls.map((c) => String((c[1] as { body?: string } | undefined)?.body ?? ""));
+    expect(queried.some((q) => q.includes("VUR_BFEKrydsreference"))).toBe(false);
+  });
+
+  it("names the failing hop when the chain breaks, and still resolves everything else", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: { ...HOUSE_CHAIN, VUR_BFEKrydsreference: [] } });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.propertyClass).toBe("house");
+    expect(result.publicValuation).toBeNull();
+    expect(result.sources.find((s) => s.key === "publicValuation")?.error).toBe("valuation: no valuation registered for BFE 5000001");
+    expect(result.resolved.bfeNummer).toBe("5000001");
+    expect(result.bbrData?.yearBuilt).toBe(1962);
+  });
+
+  it("leaves free-text lookups on their original valuation path", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const fetchSpy = stubPipeline();
+
+    const result = await lookupProperty(input);
+
+    expect(result.valuationHistory).toEqual([]);
+    expect(result.propertyClass).toBeNull();
+    expect(result.publicValuation?.assessedPropertyValueDkk).toBe(3_150_000);
+    const queried = fetchSpy.mock.calls.map((c) => String((c[1] as { body?: string } | undefined)?.body ?? ""));
+    expect(queried.some((q) => q.includes("VUR_BFEKrydsreference") || q.includes("BBR_Grund"))).toBe(false);
   });
 
   it("evaluates no price-based criterion without an asking price", async () => {

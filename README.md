@@ -16,7 +16,7 @@ Search now uses the supplied photo-led design reference: a white/navy/blue palet
 
 ## Property research before a viewing — 26 September 2026
 
-Signed-in users can look up **any address**, not only listings, at `/address`: building facts, registered sales and nearby sales, with no asking price. See [address lookup](docs/address-lookup.md) for how it works and its known gaps (the public valuation is not resolved for these lookups yet).
+Signed-in users can look up **any address**, not only listings, at `/address`: building facts, registered sales and nearby sales, with no asking price. For houses it also shows the public valuation, smart estimate and fair price (SPAR). See [address lookup](docs/address-lookup.md) for how it works, what is verified and its known gaps.
 
 The private **Boligprojekt / Buying project** workspace adds project requirements, total purchase-and-work budgets, source-backed decisions, selectable historical sales, XLSX/CSV import, evidence notes, broker drafts and printable viewing packs. See [implementation, coverage and deployment instructions](docs/research-implementation.md) and the [original feature plan](docs/research-feature-plan.da.md).
 

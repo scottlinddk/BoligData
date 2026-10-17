@@ -68,12 +68,19 @@ export function buildSparSegment(input: { asOf: string; isUnit: boolean; valuati
   return { isUnit: input.isUnit, asOf: input.asOf, vintage, valuationByProperty, nSales: kept.length, points, residualSd, unavailable: null, ageMonths };
 }
 
-export function estimateForListing(segment: SparSegment, listing: { propertyId: string; askingPrice: number | null }): SparListingEstimate {
-  const base = { isUnit: segment.isUnit, asOf: segment.asOf, method: "own-spar-local-level/1" as const, askingPrice: listing.askingPrice };
+/** A valuation to price: the stored one of a listing, or one read live for an address. */
+export type SparOwnValuation = SparValuation;
+
+/**
+ * Fair price from one valuation and the segment's market level. Shared by listings (valuation looked up by
+ * property id) and addresses that are not listings (valuation read from the register), so both are priced
+ * by exactly the same rule.
+ */
+export function estimateFromValuation(segment: SparSegment, own: SparOwnValuation | undefined, askingPrice: number | null): SparListingEstimate {
+  const base = { isUnit: segment.isUnit, asOf: segment.asOf, method: "own-spar-local-level/1" as const, askingPrice };
   const none = (status: SparListingEstimate["status"], reason: SparListingEstimate["reason"], valuation: SparListingEstimate["valuation"] = null): SparListingEstimate =>
     ({ ...base, status, reason, valuation, index: null, fairPrice: null, askingVsFair: null, history: [] });
 
-  const own = segment.valuationByProperty.get(listing.propertyId);
   if (!own) return none("no_valuation", "no_valuation_for_property");
   const valuation = { valueDkk: own.value, year: own.valuationYear, bfe: own.bfe };
   if (segment.unavailable) return none("insufficient_data", segment.unavailable, valuation);
@@ -86,7 +93,7 @@ export function estimateForListing(segment: SparSegment, listing: { propertyId: 
     const f = fairPrice(own.value, p, 0, segment.residualSd);
     return f ? [{ period: p.period, estimate: f.estimate, lo80: f.lo80, hi80: f.hi80, preliminary: p.preliminary }] : [];
   });
-  const asking = listing.askingPrice !== null && listing.askingPrice > 0 ? listing.askingPrice : null;
+  const asking = askingPrice !== null && askingPrice > 0 ? askingPrice : null;
   return {
     ...base, status: "available", reason: null, valuation,
     index: { period: point.period, ratio: point.estimate, lo80: point.lo80, hi80: point.hi80, nPeriod: point.n, nSales: segment.nSales, valuationVintage: segment.vintage!, preliminary: point.preliminary,
@@ -96,3 +103,18 @@ export function estimateForListing(segment: SparSegment, listing: { propertyId: 
     history,
   };
 }
+
+export function estimateForListing(segment: SparSegment, listing: { propertyId: string; askingPrice: number | null }): SparListingEstimate {
+  return estimateFromValuation(segment, segment.valuationByProperty.get(listing.propertyId), listing.askingPrice);
+}
+
+/** An estimate with no number, for a home whose valuation or type means it cannot be priced. The reason says why. */
+function emptyEstimate(asOf: string, status: SparListingEstimate["status"], reason: SparListingEstimate["reason"]): SparListingEstimate {
+  return { status, reason, isUnit: false, valuation: null, index: null, fairPrice: null, askingPrice: null, askingVsFair: null, history: [], asOf, method: "own-spar-local-level/1" };
+}
+
+/** An address the estimate does not cover (an apartment building, a summer house). */
+export const unsupportedEstimate = (asOf: string) => emptyEstimate(asOf, "no_valuation", "unsupported_property_type");
+
+/** An address with no usable public valuation, so there is nothing to re-price. */
+export const noValuationEstimate = (asOf: string) => emptyEstimate(asOf, "no_valuation", "no_valuation_for_property");

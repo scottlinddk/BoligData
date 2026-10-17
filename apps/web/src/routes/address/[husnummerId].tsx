@@ -9,6 +9,8 @@ import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
+import { SmartEstimateView } from "@/components/estimate/smart-estimate";
+import { SparContent } from "@/components/spar-panel";
 import { Footer } from "@/components/footer";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { useI18n } from "@/i18n/i18n";
@@ -75,7 +77,8 @@ export function AddressReportPage() {
     </div>);
   }
 
-  const { bbrData, publicValuation, zone } = report;
+  const { bbrData, publicValuation, zone, spar } = report;
+  const retry = () => { void lookupQuery.refetch(); };
   const hasRegisterRecords = zone !== null || publicValuation?.assessedPropertyValueDkk != null || publicValuation?.assessedLandValueDkk != null;
 
   return shell(<>
@@ -99,6 +102,11 @@ export function AddressReportPage() {
 
     <ComparablesPanel soldPriceHistory={report.priceHistory} priceHistorySource={report.priceHistory.length > 0 ? "register" : null}
       nearbySales={report.nearbySales} comparables={[]} neighborhoodAvgPricePerSqm={null} />
+
+    {spar !== undefined && <>
+      <SmartEstimateView result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} />
+      <div id="spar" className="section-anchor"><SparContent result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} /></div>
+    </>}
 
     {report.mapUrl && <a href={report.mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-strong px-5 text-sm font-semibold text-ink hover:bg-surface-hover">
       {t("address.report.openMap")} <span aria-hidden="true">↗</span>

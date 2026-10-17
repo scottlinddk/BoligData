@@ -474,9 +474,9 @@ const da = {
   "address.report.limit": "Du har slået for mange adresser op i den seneste time. Prøv igen senere.",
   "address.report.notFound": "Adressen blev ikke fundet i adresseregisteret.",
   "address.report.untitled": "Ukendt adresse",
-  "address.report.valuationMissing": "Den offentlige vurdering kunne ikke findes. Den slås op via matrikel eller BFE-nummer, som adresseopslag ikke finder endnu.",
+  "address.report.valuationMissing": "Den offentlige vurdering kunne ikke findes for denne adresse. Under Registerkilder står hvorfor.",
   "address.report.openMap": "Se adressen på kort",
-  "address.report.listingOnly": "Matrikelkort, skoledistrikt, støjkort og pris-estimat vises kun for boliger, der er eller har været til salg.",
+  "address.report.listingOnly": "Matrikelkort, skoledistrikt og støjkort vises kun for boliger, der er eller har været til salg.",
   "address.report.publicRecords": "Offentlige registeroplysninger",
 } as const;
 
@@ -948,9 +948,9 @@ const en: Translations = {
   "address.report.limit": "You have looked up too many addresses in the past hour. Please try again later.",
   "address.report.notFound": "The address was not found in the address register.",
   "address.report.untitled": "Unknown address",
-  "address.report.valuationMissing": "The public valuation could not be found. It is looked up by cadastral or BFE number, which address lookup cannot resolve yet.",
+  "address.report.valuationMissing": "The public valuation could not be found for this address. Register sources below says why.",
   "address.report.openMap": "View the address on a map",
-  "address.report.listingOnly": "Cadastral map, school district, noise map and price estimate are only shown for homes that are or have been for sale.",
+  "address.report.listingOnly": "Cadastral map, school district and noise map are only shown for homes that are or have been for sale.",
   "address.report.publicRecords": "Public register records",
 };
 

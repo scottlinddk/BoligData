@@ -18,7 +18,8 @@ async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data
   }
 }
 
-async function loadSegment(client: SupabaseClient, isUnit: boolean, asOf: string): Promise<SparSegment> {
+/** The market level for one property class, cached for 30 minutes per instance. */
+export async function loadSegment(client: SupabaseClient, isUnit: boolean, asOf: string): Promise<SparSegment> {
   const hit = segmentCache.get(isUnit);
   if (hit && Date.now() - hit.at < SEGMENT_TTL_MS && hit.segment.asOf === asOf) return hit.segment;
   const [valRows, saleRows] = await Promise.all([
