@@ -9,9 +9,9 @@ import { Skeleton } from "@/components/ui/loading";
 import { EstimateChart } from "./estimate-chart";
 import { RangeBar } from "./range-bar";
 
-export function SmartEstimate({ propertyId, propertyType }: { propertyId: string; propertyType?: string | null }) {
+export function SmartEstimate({ propertyId, propertyType, onShowCalculation }: { propertyId: string; propertyType?: string | null; onShowCalculation?: () => void }) {
   const query = useSparEstimate(propertyId);
-  return <SmartEstimateView result={query.data} loading={query.isPending} failed={query.isError} onRetry={() => { void query.refetch(); }} propertyType={propertyType} fullPageHref={`/property/${propertyId}/value`} />;
+  return <SmartEstimateView result={query.data} loading={query.isPending} failed={query.isError} onRetry={() => { void query.refetch(); }} propertyType={propertyType} fullPageHref={`/property/${propertyId}/value`} onShowCalculation={onShowCalculation} />;
 }
 
 const icons = {
@@ -49,7 +49,7 @@ function FactorRow({ factor }: { factor: EstimateFactor }) {
   </li>;
 }
 
-export function SmartEstimateView({ result, loading, failed, onRetry, propertyType, fullPageHref }: { result?: SparListingEstimate; loading: boolean; failed: boolean; onRetry: () => void; propertyType?: string | null; fullPageHref?: string }) {
+export function SmartEstimateView({ result, loading, failed, onRetry, propertyType, fullPageHref, onShowCalculation }: { result?: SparListingEstimate; loading: boolean; failed: boolean; onRetry: () => void; propertyType?: string | null; fullPageHref?: string; onShowCalculation?: () => void }) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [helpOpen, setHelpOpen] = useState(false);
@@ -94,7 +94,7 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
           <div className="mt-6 border-t border-border pt-5 md:mt-0 md:border-l md:border-t-0 md:pl-8 md:pt-0">
           <h3 className="text-sm font-semibold">{tx("Det bygger estimatet på", "What the estimate rests on")}</h3>
           <ul className="mt-3 grid gap-2.5">{estimateFactors(fair, propertyType).map(factor => <FactorRow key={factor.kind} factor={factor} />)}</ul>
-          <a href="#spar" onClick={event => { const target = document.getElementById("spar"); if (!target) return; event.preventDefault(); target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }}
+          <a href="#spar" onClick={event => { if (onShowCalculation) { event.preventDefault(); onShowCalculation(); return; } const target = document.getElementById("spar"); if (!target) return; event.preventDefault(); target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); }}
             className="mt-5 flex min-h-11 items-center justify-center rounded-lg bg-cta px-4 text-sm font-semibold text-cta-text transition hover:bg-cta-hover">{tx("Se beregningen", "See the calculation")}</a>
           </div>
         </div>
