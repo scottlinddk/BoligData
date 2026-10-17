@@ -178,7 +178,7 @@ export function PropertyDetailPage() {
           </button>
         </div>
       </div>
-      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-14 xl:gap-20">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-7 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-14 xl:gap-20">
         <div className="min-w-0 space-y-7 lg:col-start-2 lg:row-start-1">
           <div>
             <div className="mb-4 lg:hidden">

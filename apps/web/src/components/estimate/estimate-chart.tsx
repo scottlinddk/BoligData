@@ -124,7 +124,8 @@ export function EstimateChart({ history, askingPrice, height = 260 }: EstimateCh
 
   const shown = active === null ? null : history[active]!;
   const showHint = scrollable && !hintDismissed;
-  return <div className="w-full">
+  // contain: inline-size keeps the wide scrolling plot from widening any grid/flex ancestor.
+  return <div className="w-full min-w-0 max-w-full [contain:inline-size]">
     <div ref={wrapper} className="relative flex w-full" style={{ height }}>
       {geometry && <>
         <svg width={MARGIN.left} height={height} aria-hidden="true" className="shrink-0">

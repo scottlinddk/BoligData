@@ -60,7 +60,7 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
       ? tx("Boligens vurdering er fra et andet vurderingsår end resten af markedsindekset og kan ikke sammenlignes.", "This home's valuation is from a different valuation year than the rest of the market index and cannot be compared.")
       : tx("Vi har endnu ikke en offentlig vurdering for denne bolig, så vi kan ikke estimere en pris.", "We do not have a public valuation for this home yet, so we cannot estimate a price.");
 
-  return <section id="estimate" aria-labelledby="estimate-heading" className="section-anchor rounded-2xl bg-surface-alt p-5 sm:p-7">
+  return <section id="estimate" aria-labelledby="estimate-heading" className="section-anchor min-w-0 rounded-2xl bg-surface-alt p-5 sm:p-7">
     <div className="flex items-center gap-2.5">
       <h2 id="estimate-heading" className="text-xl font-medium tracking-tight">{tx("Smart estimat", "Smart estimate")}</h2>
       <button type="button" onClick={() => setHelpOpen(open => !open)} aria-expanded={helpOpen} aria-controls="estimate-help" aria-label={tx("Sådan beregnes estimatet", "How the estimate is calculated")}
@@ -80,8 +80,8 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
     {!loading && !failed && result && !fair && <p role="status" className="mt-5 rounded-xl border border-border bg-surface p-4 text-sm">{unavailable}</p>}
 
     {!loading && !failed && fair && fair.fairPrice && <>
-      <div className="mt-6 grid gap-5">
-        <div className="rounded-xl border border-border bg-surface p-4 sm:p-5">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-5">
+        <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
           <p className="mb-3 text-xs text-ink-soft">{tx("Fair pris over tid med 80 % interval. Streget linje er foreløbige måneder.", "Fair price over time with the 80% interval. Dotted line is preliminary months.")}</p>
           {fair.history.length >= 2
             ? <EstimateChart history={fair.history} askingPrice={fair.askingPrice} />
