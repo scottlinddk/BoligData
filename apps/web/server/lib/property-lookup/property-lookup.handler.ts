@@ -11,6 +11,7 @@ import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
+import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
@@ -209,6 +210,9 @@ export async function lookupProperty(
       : null,
     valuationHistory,
     propertyClass: houseLookup?.propertyClass ?? null,
+    riskFlags: byId
+      ? buildAddressRiskFlags({ municipalityCode: cadastral?.municipalityCode ?? null, bbr: bbrBuilding, noiseLden: noiseExposureLden })
+      : null,
     publicValuation: publicValuation
       ? {
           assessedPropertyValueDkk: publicValuation.assessedPropertyValueDkk,

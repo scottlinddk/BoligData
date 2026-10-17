@@ -1,4 +1,4 @@
-import type { BbrData, PublicValuation, SoldPriceEntry, ZoneStatus } from "./index.js";
+import type { BbrData, PublicValuation, RiskFlags, SoldPriceEntry, ZoneStatus } from "./index.js";
 import type { SparListingEstimate } from "./spar.js";
 
 /**
@@ -135,6 +135,11 @@ export interface PropertyLookupResult {
    * lookups by `husnummerId`. `null` means the estimate was attempted and failed, `undefined` that it was not attempted.
    */
   spar?: SparListingEstimate | null;
+  /**
+   * Due-diligence flags built from this lookup (BBR heating, noise reading, municipality links), in the shape
+   * the ingest stores for listings so one checklist renders both. Only for lookups by `husnummerId`; null otherwise.
+   */
+  riskFlags: RiskFlags | null;
   /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */
   priceHistory: SoldPriceEntry[];
   /**

@@ -19,13 +19,22 @@ interface ChecklistItem {
 
 function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistItem[] {
   if (!riskFlags) {
-    return (
-      ["noise", "encumbrance", "sewer", "buildingCases", "oilTank", "soil"] as const
-    ).map((key) => ({
+    // Nothing has been checked, but each item still names where it would come from. Repeating "no data" as the
+    // source told the reader nothing about what to look at.
+    const sources = {
+      noise: ["dueDiligence.noise.source", MILJOEGIS_NOISE_MAP_URL],
+      encumbrance: ["dueDiligence.encumbrance.source", null],
+      sewer: ["dueDiligence.sewer.source", null],
+      buildingCases: ["dueDiligence.buildingCases.source", null],
+      oilTank: ["dueDiligence.oilTank.source.bbr", BBR_URL],
+      soil: ["dueDiligence.soil.source", MILJOEPORTAL_SOIL_MAP_URL],
+    } as const;
+    return (Object.keys(sources) as Array<keyof typeof sources>).map((key) => ({
       label: t(`dueDiligence.${key}.label`),
       status: "unknown" as const,
       detail: t("dueDiligence.noData"),
-      source: t("dueDiligence.noData"),
+      source: t(sources[key][0]),
+      sourceHref: sources[key][1],
     }));
   }
 
@@ -50,7 +59,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       detail:
         states.noise !== "unknown"
           ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden! })
-          : t("dueDiligence.noData"),
+          : t("dueDiligence.noise.none"),
       source: t("dueDiligence.noise.source"),
       sourceHref: MILJOEGIS_NOISE_MAP_URL,
     },
@@ -88,12 +97,18 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     {
       label: t("dueDiligence.oilTank.label"),
       status: states.oilTank,
-      detail: states.oilTank === "unknown" ? t("dueDiligence.noData") : riskFlags.oilTankRisk ? t("dueDiligence.oilTank.warning") : t("dueDiligence.oilTank.ok"),
+      // A warning from BBR's registered heating is not "building age suggests", which is the heuristic's wording.
+      detail: states.oilTank === "unknown"
+        ? t("dueDiligence.oilTank.unknown")
+        : riskFlags.oilTankRisk
+          ? t(riskFlags.oilTankRiskSource === "bbr" ? "dueDiligence.oilTank.warning.bbr" : "dueDiligence.oilTank.warning")
+          : t("dueDiligence.oilTank.ok"),
+      // An unknown result used no heuristic, so it must not be labelled as one; BBR is where the answer would come from.
       source:
-        riskFlags.oilTankRiskSource === "bbr"
+        riskFlags.oilTankRiskSource === "bbr" || states.oilTank === "unknown"
           ? t("dueDiligence.oilTank.source.bbr")
           : t("dueDiligence.oilTank.source.heuristic"),
-      sourceHref: riskFlags.oilTankRiskSource === "bbr" ? BBR_URL : null,
+      sourceHref: riskFlags.oilTankRiskSource === "bbr" || states.oilTank === "unknown" ? BBR_URL : null,
     },
     {
       label: t("dueDiligence.soil.label"),
