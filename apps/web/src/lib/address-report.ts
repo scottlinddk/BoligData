@@ -23,6 +23,10 @@ export interface AddressReport {
   ejerlav: string | null;
   bfeNummer: string | null;
   priceHistory: SoldPriceEntry[];
+  /** Whether the sales register answered live. Without it an empty history means "unknown", not "never sold". */
+  salesAvailable: boolean;
+  /** How the history was attributed to this address, so an empty one can say why. Null when sales are unavailable. */
+  priceHistoryMatch: PropertyLookupResult["priceHistoryMatch"];
   nearbySales: NearbySaleEntry[];
   /**
    * Fair-price estimate, computed on the server from live register data only. `null` means it was attempted and
@@ -69,6 +73,8 @@ export function buildAddressReport(lookup: PropertyLookupResult): AddressReport 
     ejerlav: addressLive ? lookup.resolved.ejerlav : null,
     bfeNummer: addressLive ? lookup.resolved.bfeNummer : null,
     priceHistory: salesLive ? lookup.priceHistory : [],
+    salesAvailable: salesLive,
+    priceHistoryMatch: salesLive ? lookup.priceHistoryMatch : null,
     nearbySales: salesLive ? lookup.nearbySales : [],
     spar: lookup.spar,
     sources: summarizeLookupSources(lookup),

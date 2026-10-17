@@ -478,6 +478,21 @@ const da = {
   "address.report.openMap": "Se adressen på kort",
   "address.report.listingOnly": "Matrikelkort, skoledistrikt og støjkort vises kun for boliger, der er eller har været til salg.",
   "address.report.publicRecords": "Offentlige registeroplysninger",
+  "address.sales.title": "Salgshistorik",
+  "address.sales.latest": "Seneste salg",
+  "address.sales.soldOn": "Solgt {date}",
+  "address.sales.latestFreeTrade": "Seneste frie handel: {price}, {date}",
+  "address.sales.col.year": "År",
+  "address.sales.col.date": "Dato",
+  "address.sales.col.price": "Pris",
+  "address.sales.col.perSqm": "Pris pr. m²",
+  "address.sales.col.type": "Type",
+  "address.sales.type.normal": "fri handel",
+  "address.sales.none": "Ingen registrerede handler for denne adresse.",
+  "address.sales.notFound": "Vi kunne ikke finde handelshistorik for denne adresse hos Boligsiden.",
+  "address.sales.ambiguous": "Adressen har flere boliger, så handelshistorik kan ikke tilskrives en enkelt bolig.",
+  "address.sales.unavailable": "Handelshistorikken kunne ikke hentes. Under Registerkilder står hvorfor.",
+  "address.sales.source": "Kilde: Boligsiden (registrerede handler). Familiehandler og auktioner er ikke markedspriser.",
 } as const;
 
 export type TranslationKey = keyof typeof da;
@@ -952,6 +967,21 @@ const en: Translations = {
   "address.report.openMap": "View the address on a map",
   "address.report.listingOnly": "Cadastral map, school district and noise map are only shown for homes that are or have been for sale.",
   "address.report.publicRecords": "Public register records",
+  "address.sales.title": "Sales history",
+  "address.sales.latest": "Latest sale",
+  "address.sales.soldOn": "Sold {date}",
+  "address.sales.latestFreeTrade": "Latest arm's-length sale: {price}, {date}",
+  "address.sales.col.year": "Year",
+  "address.sales.col.date": "Date",
+  "address.sales.col.price": "Price",
+  "address.sales.col.perSqm": "Price per m²",
+  "address.sales.col.type": "Type",
+  "address.sales.type.normal": "arm's-length",
+  "address.sales.none": "No registered sales for this address.",
+  "address.sales.notFound": "We could not find sales history for this address at Boligsiden.",
+  "address.sales.ambiguous": "The address has several homes, so sales history cannot be attributed to a single one.",
+  "address.sales.unavailable": "The sales history could not be fetched. Register sources below says why.",
+  "address.sales.source": "Source: Boligsiden (registered sales). Family sales and auctions are not market prices.",
 };
 
 export const translations: Record<Language, Translations> = { da, en };

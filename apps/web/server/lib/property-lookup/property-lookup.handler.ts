@@ -84,6 +84,12 @@ export async function lookupProperty(
   // A listing's valuation is looked up by the parcel the address register returned. An address picked by id has
   // no parcel, so its valuation is found from the husnummer itself (houses only; see vur-valuations.ts).
   const byId = Boolean(input.husnummerId);
+  // Boligsiden's sale history is only attributed to an address that is identified, never by coordinates alone. For
+  // an id lookup the register's own street, number and postcode identify it (see `recordIsAddress`).
+  const subjectAddress =
+    byId && cadastral?.streetName && cadastral.houseNumber && cadastral.postalCode
+      ? { road: cadastral.streetName, houseNumber: cadastral.houseNumber, zipCode: cadastral.postalCode }
+      : undefined;
 
   const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult] = await Promise.all([
     lookupBbr(cadastral?.idLokalid ?? null),
@@ -97,7 +103,7 @@ export async function lookupProperty(
     hasCoordinates ? lookupNoiseExposure(lat, lon) : null,
     // Same reasoning: a polygon around 0,0 is a box in the Atlantic, and an
     // empty "no sales nearby" is indistinguishable from a real answer.
-    hasCoordinates ? lookupBoligsidenSales(lat, lon) : null,
+    hasCoordinates ? lookupBoligsidenSales(lat, lon, subjectAddress ? { subjectAddress } : {}) : null,
   ]);
 
   const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
@@ -211,6 +217,7 @@ export async function lookupProperty(
         }
       : null,
     priceHistory: sales?.priceHistory ?? [],
+    priceHistoryMatch: sales?.historyMatch ?? null,
     nearbySales: sales?.nearbySales ?? [],
     renovationCategory,
     screening,

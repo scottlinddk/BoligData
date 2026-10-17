@@ -44,6 +44,8 @@ describe("parseHusnummer", () => {
     expect(parsed).toMatchObject({
       idLokalid: ID,
       formattedAddress: "Floravej 6, 9000 Aalborg",
+      streetName: "Floravej",
+      houseNumber: "6",
       postalCode: "9000",
       postalName: "Aalborg",
       municipalityCode: "0851",
