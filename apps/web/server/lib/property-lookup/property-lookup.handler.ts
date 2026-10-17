@@ -1,13 +1,16 @@
+import type { PublicValuation } from "../../../../../packages/shared/src/types/index.js";
 import type {
   PropertyLookupDataMode,
   PropertyLookupInput,
   PropertyLookupResult,
   PropertyLookupSourceStatus,
+  ValuationYearEntry,
 } from "../../../../../packages/shared/src/types/property-lookup.js";
 import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
@@ -78,13 +81,16 @@ export async function lookupProperty(
   const lon = cadastral?.lon ?? input.lon ?? null;
   const hasCoordinates = lat !== null && lon !== null && isDanishCoordinate(lat, lon);
 
-  const [bbrResult, valuationResult, noiseResult, salesResult] = await Promise.all([
+  // A listing's valuation is looked up by the parcel the address register returned. An address picked by id has
+  // no parcel, so its valuation is found from the husnummer itself (houses only; see vur-valuations.ts).
+  const byId = Boolean(input.husnummerId);
+
+  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult] = await Promise.all([
     lookupBbr(cadastral?.idLokalid ?? null),
-    lookupEjendomsvurdering(
-      cadastral?.matrikelnr ?? null,
-      cadastral?.ejerlav ?? null,
-      cadastral?.bfeNummer ?? null,
-    ),
+    byId
+      ? null
+      : lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null),
+    byId ? lookupHouseValuation(cadastral?.idLokalid ?? null) : null,
     // Querying a noise WFS at 0,0 returns a confident-looking "no noise here"
     // for a point in the Atlantic, so an unresolvable address skips the call
     // rather than answering it wrongly.
@@ -95,7 +101,19 @@ export async function lookupProperty(
   ]);
 
   const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
-  const publicValuation = valuationResult.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE") ? valuationResult.data : null;
+
+  // For an id lookup the valuation chain has no mock mode: it reads the register or reports why it could not.
+  const valuationMockFlag = byId ? null : "EJENDOMSVURDERING_MOCK_MODE";
+  const valuationResult: SourceResult<unknown> = houseLookup ? houseLookup.valuation : listingValuationResult!;
+  const valuationHistory: ValuationYearEntry[] = houseLookup?.valuation.ok ? houseLookup.valuation.data : [];
+  const latestYear = [...valuationHistory].reverse().find((entry) => entry.propertyValueDkk !== null) ?? null;
+  const publicValuation: PublicValuation | null = byId
+    ? latestYear
+      ? { assessedPropertyValueDkk: latestYear.propertyValueDkk, assessedLandValueDkk: latestYear.landValueDkk, valuationYear: latestYear.year }
+      : null
+    : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
+      ? listingValuationResult.data
+      : null;
   const noiseExposureLden = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data.ldenDb : null;
   const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
 
@@ -108,7 +126,7 @@ export async function lookupProperty(
   const sources: PropertyLookupSourceStatus[] = [
     status("address", addressRegisterLabel, addressMockFlag, cadastralResult),
     status("bbr", "BBR via Datafordeler GraphQL", "BBR_MOCK_MODE", bbrResult),
-    status("publicValuation", "VUR via Datafordeler GraphQL", "EJENDOMSVURDERING_MOCK_MODE", valuationResult),
+    status("publicValuation", "VUR via Datafordeler GraphQL", valuationMockFlag, valuationResult),
     noiseResult === null
       ? {
           key: "noise" as const,
@@ -159,7 +177,7 @@ export async function lookupProperty(
       matrikelnr: cadastral?.matrikelnr ?? null,
       ejerlav: cadastral?.ejerlav ?? null,
       ejerlavskode: cadastral?.ejerlavskode ?? null,
-      bfeNummer: cadastral?.bfeNummer ?? null,
+      bfeNummer: cadastral?.bfeNummer ?? houseLookup?.bfeNummer ?? null,
       zone: cadastral?.zone ?? null,
       formattedAddress: cadastral?.formattedAddress ?? null,
       postalCode: cadastral?.postalCode ?? input.postalCode ?? null,
@@ -183,6 +201,8 @@ export async function lookupProperty(
           bathroomCount: bbrBuilding.bathroomCount,
         }
       : null,
+    valuationHistory,
+    propertyClass: houseLookup?.propertyClass ?? null,
     publicValuation: publicValuation
       ? {
           assessedPropertyValueDkk: publicValuation.assessedPropertyValueDkk,

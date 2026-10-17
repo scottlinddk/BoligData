@@ -3,6 +3,8 @@ import type { PropertyLookupInput, RoomCountDefinition } from "../../../packages
 import { applyCors } from "../server/middleware/cors.js";
 import { sendError } from "../server/lib/http-helpers.js";
 import { lookupProperty } from "../server/lib/property-lookup/property-lookup.handler.js";
+import { estimateAddressSpar } from "../server/lib/property-lookup/address-spar.js";
+import { logError } from "../server/lib/crawl/log.js";
 import { isHusnummerId } from "../server/lib/enrichment-sources/adressevaelger.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
@@ -78,6 +80,10 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
  * resolution depends on DAWA, which is closed, so `husnummerId` is the path
  * that works without a Datafordeler fallback.
  *
+ * A `husnummerId` lookup also finds a house's public valuation from the id
+ * alone and returns a `spar` fair-price estimate built from it (see
+ * `address-spar.ts`). Free-text lookups are unchanged.
+ *
  * Requires a signed-in account and an atomic database-backed lookup budget
  * (30 requests/hour/account), shared by all serverless instances. Upstream
  * credentials must never be exposed through an unmetered public proxy.
@@ -110,7 +116,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     const result = await lookupProperty(input);
-    res.status(200).json(result);
+    if (!input.husnummerId) {
+      res.status(200).json(result);
+      return;
+    }
+    // The fair price is an extra on top of the register facts. If the market data cannot be read, the lookup
+    // still answers, with `spar: null` so the page can say the estimate is unavailable instead of failing.
+    let spar = null;
+    try {
+      spar = await estimateAddressSpar(getAnonClient(auth.jwt), result);
+    } catch (err) {
+      logError("property_lookup.spar_failed", err);
+    }
+    res.status(200).json({ ...result, spar });
   } catch (err) {
     sendError(res, 500, "Failed to look up property", err);
   }

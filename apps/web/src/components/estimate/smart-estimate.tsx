@@ -54,7 +54,9 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [helpOpen, setHelpOpen] = useState(false);
   const fair = result?.status === "available" && result.fairPrice && result.index ? result : null;
-  const unavailable = result?.reason === "too_few_sales"
+  const unavailable = result?.reason === "unsupported_property_type"
+    ? tx("Estimatet findes kun for huse. Lejligheder og andre boligtyper kan ikke prissættes ud fra en bygnings vurdering.", "The estimate only covers houses. Apartments and other property types cannot be priced from a building's valuation.")
+    : result?.reason === "too_few_sales"
     ? tx("Der er for få handler til et pålideligt estimat for denne boligtype endnu.", "There are too few sales for a reliable estimate for this property type yet.")
     : result?.reason === "valuation_vintage_mismatch"
       ? tx("Boligens vurdering er fra et andet vurderingsår end resten af markedsindekset og kan ikke sammenlignes.", "This home's valuation is from a different valuation year than the rest of the market index and cannot be compared.")

@@ -1,4 +1,5 @@
 import type { BbrData, PublicValuation, SoldPriceEntry, ZoneStatus } from "./index.js";
+import type { SparListingEstimate } from "./spar.js";
 
 /**
  * `/api/property-lookup` output. Every symbol/value here is an automated
@@ -104,11 +105,36 @@ export interface NearbySaleEntry {
   lon: number;
 }
 
+/** One valuation year read from the public valuation register (VUR). */
+export interface ValuationYearEntry {
+  year: number;
+  propertyValueDkk: number | null;
+  landValueDkk: number | null;
+  /** When the register registered it. Null when it gave no usable date. */
+  registeredAt: string | null;
+}
+
 export interface PropertyLookupResult {
   address: string;
   resolved: PropertyLookupResolved;
   bbrData: BbrData | null;
   publicValuation: PublicValuation | null;
+  /**
+   * Every valuation year found for the property, oldest first. Only filled for lookups by `husnummerId`,
+   * where the valuation is found from the address itself; empty otherwise.
+   */
+  valuationHistory: ValuationYearEntry[];
+  /**
+   * What the building use says the property is. `house` is the only class that gets a valuation and a fair
+   * price from an address alone; `other` is an apartment building or any other use. Null when it could not
+   * be determined, and for lookups that do not classify.
+   */
+  propertyClass: "house" | "other" | null;
+  /**
+   * Fair-price estimate for the address, computed from its valuation and the market level. Present only on
+   * lookups by `husnummerId`. `null` means the estimate was attempted and failed, `undefined` that it was not attempted.
+   */
+  spar?: SparListingEstimate | null;
   /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */
   priceHistory: SoldPriceEntry[];
   /** Recent registered sales around this address, nearest first. */

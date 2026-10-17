@@ -31,7 +31,7 @@ const MOCK_FLAG = "EJENDOMSVURDERING_MOCK_MODE";
  * generator, because a plausible-looking fabricated assessed value is worse
  * than no value at all.
  */
-const VUR_SERVICE: DatafordelerService = {
+export const VUR_SERVICE: DatafordelerService = {
   // v2 is the version answering today; the others are only tried if it starts
   // returning 404, which is how a withdrawn version presents.
   register: "VUR",
