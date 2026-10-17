@@ -21,6 +21,7 @@ export function Header() {
   const links = [
     { to: lastSearchPath(), label: t("nav.search") },
     ...(user ? [
+      { to: "/address", label: t("nav.address") },
       { to: "/research", label: language === "da" ? "Boligprojekt" : "Buying project" },
       { to: "/dashboard", label: t("nav.dashboard") },
       { to: "/recommendations", label: t("nav.recommendations") },

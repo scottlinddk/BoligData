@@ -18,6 +18,8 @@ import { ResearchPage } from "@/routes/research";
 import { DashboardPage } from "@/routes/dashboard";
 import { ComparePage } from "@/routes/compare";
 import { PropertyEstimatePage } from "@/routes/property/estimate";
+import { AddressLookupPage } from "@/routes/address/index";
+import { AddressReportPage } from "@/routes/address/[husnummerId]";
 import { RecommendationsPage } from "@/routes/recommendations";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
 import { AdminInvitationsPage } from "@/routes/admin/invitations";
@@ -72,6 +74,22 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <PropertyEstimatePage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/address",
+        element: (
+          <AuthGuard>
+            <AddressLookupPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/address/:husnummerId",
+        element: (
+          <AuthGuard>
+            <AddressReportPage />
           </AuthGuard>
         ),
       },

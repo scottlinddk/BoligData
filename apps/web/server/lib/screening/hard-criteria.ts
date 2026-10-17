@@ -37,6 +37,16 @@ function monthlyMortgagePayment(principalDkk: number, annualRate: number, years 
   return (principalDkk * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -totalMonths));
 }
 
+/**
+ * A criterion that is defined against a listing price, for an address that has
+ * none (a home that is not for sale). Reported as unavailable ("~") rather than
+ * passed or failed: evaluating it against a made-up price would be a verdict
+ * on nothing.
+ */
+export function noAskingPriceResult(key: "priceCeiling" | "monthlyCost" | "encumbranceRatio"): ScreeningCriterionResult {
+  return { key, passed: false, symbol: "~", reason: "No asking price: this address is not a listing", source: "ai" };
+}
+
 export function checkPriceCeiling(
   askingPrice: number,
   renovationCategory: RenovationCategory,

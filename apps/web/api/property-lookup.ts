@@ -3,6 +3,7 @@ import type { PropertyLookupInput, RoomCountDefinition } from "../../../packages
 import { applyCors } from "../server/middleware/cors.js";
 import { sendError } from "../server/lib/http-helpers.js";
 import { lookupProperty } from "../server/lib/property-lookup/property-lookup.handler.js";
+import { isHusnummerId } from "../server/lib/enrichment-sources/adressevaelger.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 
@@ -20,9 +21,22 @@ function num(v: unknown): number | undefined {
 const ROOM_COUNT_DEFINITIONS: readonly RoomCountDefinition[] = ["A", "B", "C"];
 
 function parseInput(req: VercelRequest): PropertyLookupInput | null {
-  const address = str(req.query.address)?.trim();
-  const askingPrice = num(req.query.askingPrice);
-  if (!address || address.length > 300 || askingPrice === undefined || askingPrice <= 0 || askingPrice > 1_000_000_000) return null;
+  const husnummerIdRaw = str(req.query.husnummerId)?.trim();
+  if (husnummerIdRaw && !isHusnummerId(husnummerIdRaw)) return null;
+  const husnummerId = husnummerIdRaw || null;
+
+  // A husnummer id identifies the address on its own; free text is then only a display hint.
+  const address = str(req.query.address)?.trim() ?? "";
+  if (address.length > 300 || (!address && !husnummerId)) return null;
+
+  // Omitted entirely for an address that is not a listing, but never silently dropped when malformed.
+  const askingPriceRaw = str(req.query.askingPrice);
+  let askingPrice: number | null = null;
+  if (askingPriceRaw !== undefined && askingPriceRaw !== "") {
+    const parsed = num(askingPriceRaw);
+    if (parsed === undefined || parsed <= 0 || parsed > 1_000_000_000) return null;
+    askingPrice = parsed;
+  }
   const lat = num(req.query.lat);
   const lon = num(req.query.lon);
   if ((lat === undefined) !== (lon === undefined)) return null;
@@ -35,6 +49,7 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
 
   return {
     address,
+    husnummerId,
     askingPrice,
     postalCode: str(req.query.postalCode) ?? null,
     lat: lat ?? null,
@@ -56,6 +71,13 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
  * that's a human call. `sources` reports, per register, whether each group of
  * values came back live, mock or unavailable, and why.
  *
+ * Two ways in. A listing passes free-text `address` plus `askingPrice`. An
+ * address lookup for a home that is not for sale passes `husnummerId` (the DAR
+ * id picked in the Adressevælger autocomplete) and no price; the three
+ * price-based screening criteria then report "no asking price". Free-text
+ * resolution depends on DAWA, which is closed, so `husnummerId` is the path
+ * that works without a Datafordeler fallback.
+ *
  * Requires a signed-in account and an atomic database-backed lookup budget
  * (30 requests/hour/account), shared by all serverless instances. Upstream
  * credentials must never be exposed through an unmetered public proxy.
@@ -72,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const input = parseInput(req);
   if (!input) {
-    sendError(res, 400, "address and askingPrice query parameters are required");
+    sendError(res, 400, "address (or husnummerId) is required, and askingPrice must be a positive number when given");
     return;
   }
 

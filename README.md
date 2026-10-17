@@ -16,6 +16,8 @@ Search now uses the supplied photo-led design reference: a white/navy/blue palet
 
 ## Property research before a viewing — 26 September 2026
 
+Signed-in users can look up **any address**, not only listings, at `/address`: building facts, registered sales and nearby sales, with no asking price. See [address lookup](docs/address-lookup.md) for how it works and its known gaps (the public valuation is not resolved for these lookups yet).
+
 The private **Boligprojekt / Buying project** workspace adds project requirements, total purchase-and-work budgets, source-backed decisions, selectable historical sales, XLSX/CSV import, evidence notes, broker drafts and printable viewing packs. See [implementation, coverage and deployment instructions](docs/research-implementation.md) and the [original feature plan](docs/research-feature-plan.da.md).
 
 **Apply migration 023 before deploying this change.** Legacy provenance remains unknown until real source observations establish it. Register lookup now requires sign-in, uses an atomic 30-per-hour/account quota and returns private, uncached responses. This supersedes the earlier anonymous-lookup and public-cache descriptions below. New sales refresh independently of asking-price changes; missing listing dates and missing sale-area values remain unknown. No user workbook or production database was imported/modified during implementation.

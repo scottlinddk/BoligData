@@ -49,4 +49,24 @@ describe("evaluateScreening", () => {
     const roomsResult = results.find((r) => r.key === "rooms");
     expect(roomsResult?.reason).toMatch(/definition B/);
   });
+
+  it("reports the three price-based criteria as unavailable when there is no asking price", () => {
+    const results = evaluateScreening({
+      input: { address: "Skomagergyden 4, 9000 Aalborg", askingPrice: null, totalEncumbrancesDkk: 100_000 },
+      areaSqm: 140,
+      roomCount: 5,
+      energyLabel: "B",
+      renovationCategory,
+    });
+
+    const byKey = Object.fromEntries(results.map((r) => [r.key, r]));
+    for (const key of ["priceCeiling", "monthlyCost", "encumbranceRatio"]) {
+      expect(byKey[key]).toMatchObject({ symbol: "~", passed: false, source: "ai" });
+      expect(byKey[key]?.reason).toMatch(/No asking price/);
+    }
+    // Criteria that don't depend on a price are still evaluated.
+    expect(byKey.area?.symbol).toBe("✅");
+    expect(byKey.rooms?.symbol).not.toBe("~");
+    expect(results).toHaveLength(6);
+  });
 });

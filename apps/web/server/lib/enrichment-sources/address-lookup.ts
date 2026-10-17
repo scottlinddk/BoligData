@@ -52,9 +52,11 @@ export interface AddressCadastral {
    * fallback (`address-lookup-dar-fallback.ts`) answered instead — in that
    * case `matrikelnr`/`ejerlav`/`ejerlavskode`/`bfeNummer`/`zone` stay `null`,
    * since resolving those from DAR alone needs a spatial join this repo
-   * doesn't do yet.
+   * doesn't do yet. `"adressevaelger"` is the same narrower scope, resolved
+   * from an id the user picked in the Adressevælger autocomplete
+   * (`adressevaelger.ts`) rather than from free text.
    */
-  resolvedVia: "dawa" | "dar_fallback";
+  resolvedVia: "dawa" | "dar_fallback" | "adressevaelger";
 }
 
 function apiBase(): string {

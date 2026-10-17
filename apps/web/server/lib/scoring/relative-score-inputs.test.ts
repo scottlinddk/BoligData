@@ -29,7 +29,7 @@ describe("extractScoringInputs", () => {
     expect(result.source).toBe("ai");
     expect(result.conditionProxy).toBe(3); // category B
     expect(result.priceHeadroomDkk).toBe(
-      DEFAULT_FINANCING_ASSUMPTIONS.priceCeilingByRenovationCategory.B - input.askingPrice,
+      DEFAULT_FINANCING_ASSUMPTIONS.priceCeilingByRenovationCategory.B - 2_000_000,
     );
     expect(result.areaMarginSqm).toBe(150 - DEFAULT_FINANCING_ASSUMPTIONS.minAreaSqm);
     expect(result.legalRiskProxy).toBeCloseTo(1 - 100_000 / 2_000_000);
@@ -46,5 +46,18 @@ describe("extractScoringInputs", () => {
       noiseExposureLden: null,
     });
     expect(result.legalRiskProxy).toBeNull();
+  });
+
+  it("leaves price headroom and legal risk null when there is no asking price", () => {
+    const result = extractScoringInputs({
+      input: { address: "Skomagergyden 4, 9000 Aalborg", askingPrice: null, totalEncumbrancesDkk: 100_000 },
+      areaSqm: 150,
+      renovationCategory,
+      noiseExposureLden: null,
+    });
+    expect(result.priceHeadroomDkk).toBeNull();
+    expect(result.legalRiskProxy).toBeNull();
+    expect(result.areaMarginSqm).toBe(150 - DEFAULT_FINANCING_ASSUMPTIONS.minAreaSqm);
+    expect(result.conditionProxy).toBe(3);
   });
 });
