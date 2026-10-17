@@ -16,6 +16,7 @@ import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
 import { ResearchPage } from "@/routes/research";
 import { DashboardPage } from "@/routes/dashboard";
+import { ComparePage } from "@/routes/compare";
 import { RecommendationsPage } from "@/routes/recommendations";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
 import { AdminInvitationsPage } from "@/routes/admin/invitations";
@@ -70,6 +71,14 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <DashboardPage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/compare",
+        element: (
+          <AuthGuard>
+            <ComparePage />
           </AuthGuard>
         ),
       },

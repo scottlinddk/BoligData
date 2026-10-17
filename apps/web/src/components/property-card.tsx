@@ -26,6 +26,8 @@ interface PropertyCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  /** Accessible name of the select checkbox. Defaults to the recommendation wording. */
+  selectLabel?: string;
   /** Two-up phone tile: square photo, price and address only. */
   compact?: boolean;
 }
@@ -51,7 +53,7 @@ function CardPhoto({ photo, alt, compact }: { photo: ListingImage; alt: string; 
   </>;
 }
 
-export function PropertyCard({ property, selectable, selected, onToggleSelect, compact = false }: PropertyCardProps) {
+export function PropertyCard({ property, selectable, selected, onToggleSelect, selectLabel, compact = false }: PropertyCardProps) {
   const { t, language } = useI18n();
   const { isSaved, toggle } = useSavedProperties();
   const { showToast } = useToast();
@@ -112,6 +114,6 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect, c
     <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} aria-pressed={saved} className={`absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full shadow-card transition-colors disabled:opacity-60 sm:right-3 sm:top-3 ${saved ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-surface text-ink-soft hover:bg-surface-hover"}`}>
       {saving ? <Spinner /> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>}
     </button>
-    {selectable && <button type="button" onClick={() => onToggleSelect?.(property.id)} aria-label={t("recommend.selectListing")} title={t("recommend.selectListing")} aria-pressed={selected} className={`absolute left-3 top-12 flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-bold transition-colors ${selected ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-transparent hover:border-cta"}`}>✓</button>}
+    {selectable && <button type="button" onClick={() => onToggleSelect?.(property.id)} aria-label={selectLabel ?? t("recommend.selectListing")} title={selectLabel ?? t("recommend.selectListing")} aria-pressed={selected} className={`absolute left-3 top-12 flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-bold transition-colors ${selected ? "border-cta bg-cta text-cta-text" : "border-border bg-surface text-transparent hover:border-cta"}`}>✓</button>}
   </article>;
 }

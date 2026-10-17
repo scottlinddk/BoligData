@@ -79,7 +79,10 @@ export function WorkspaceStat({ label, value }: { label: string; value: ReactNod
   return <div className="min-w-0 rounded-xl border border-border bg-surface p-3"><dt className="text-[10px] leading-4 text-ink-soft">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tracking-tight text-ink">{value}</dd></div>;
 }
 
-export function WorkspacePropertyCard({ property, active, onPreview, children }: { property: Property; active?: boolean; onPreview?: () => void; children?: ReactNode }) {
+export function WorkspacePropertyCard({ property, active, onPreview, children, selectable, selected, onToggleSelect, selectLabel }: {
+  property: Property; active?: boolean; onPreview?: () => void; children?: ReactNode;
+  selectable?: boolean; selected?: boolean; onToggleSelect?: (id: string) => void; selectLabel?: string;
+}) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   function preview() {
@@ -93,7 +96,7 @@ export function WorkspacePropertyCard({ property, active, onPreview, children }:
     }
   }
   return <div className={`workspace-property-card ${active ? "workspace-property-card-active" : ""}`}>
-    <PropertyCard property={property} />
+    <PropertyCard property={property} selectable={selectable} selected={selected} onToggleSelect={onToggleSelect} selectLabel={selectLabel} />
     {children && <div className="mt-3 border-t border-border pt-3">{children}</div>}
     {onPreview && <button type="button" aria-pressed={!!active} aria-controls="workspace-detail" aria-label={`${tx("Vis detaljer for", "View details for")} ${property.address}`} onClick={preview} className={`mt-3 flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition-colors ${active ? "bg-brand-soft text-brand-text" : "bg-surface-alt text-ink-soft hover:bg-brand-soft hover:text-brand-text"}`}>
       {active ? tx("Valgt bolig", "Selected property") : tx("Vis detaljer", "View details")}<WorkspaceIcon kind="arrow" />
