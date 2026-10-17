@@ -20,6 +20,10 @@ The private **Boligprojekt / Buying project** workspace adds project requirement
 
 **Apply migration 023 before deploying this change.** Legacy provenance remains unknown until real source observations establish it. Register lookup now requires sign-in, uses an atomic 30-per-hour/account quota and returns private, uncached responses. This supersedes the earlier anonymous-lookup and public-cache descriptions below. New sales refresh independently of asking-price changes; missing listing dates and missing sale-area values remain unknown. No user workbook or production database was imported/modified during implementation.
 
+## Building case link (WebLager)
+
+The due-diligence checklist links Aalborg properties to the municipality's public building case archive on weblager.dk. It is an advisory search link, the user types the address in WebLager's search box, and no request is made to weblager.dk. Other municipalities show neutral text until they are verified. See [WebLager integration](docs/weblager.md). No migration is needed. Existing rows get the link after the next crawl re-enriches them.
+
 ## Stack
 
 - Frontend: React 19 + TypeScript + Vite, React Router v7 (data router mode), TanStack Query v5, MapLibre GL + OpenFreeMap tiles, Tailwind CSS.
@@ -162,3 +166,4 @@ Page size is caller-configurable (`limit`/`offset` query params, exposed in the 
 12. Verify Boligsiden's listing-URL field against the live API.
 13. Apply migration `packages/supabase/migrations/021_bfe_number.sql` (adds `properties.bfe_nummer`) to the Supabase project before the next deploy that ships it — same ordering lesson as item 11 above, since the crawl writes to that column as soon as the code deploys.
 14. Confirm DAWA's actual live status (this sandbox has no network egress to `dataforsyningen.dk`) and verify the new DAR fallback's field-name guesses (`address-lookup-dar-fallback.ts`) against a live Datafordeler DAR schema fetch, same as items 4 and 6 above for BBR/VUR/Matriklen. See `docs/chatgpt-plan-reconciliation.md`. `mapListingUrl` in `boligsiden.ts` tries `url`, `case.url`, `slug` and `address.slug` in order because this sandbox has never been able to reach `api.boligsiden.dk` to confirm which one exists; a miss leaves `listing_url` null and hides the button rather than linking to a guessed 404. Boliga needs no such check — its records are keyed by the estate id that `boliga.dk/bolig/<id>` routes on. Existing rows backfill on the next crawl without a forced re-enrich, since `listing_url` is deliberately not part of `content_hash`.
+15. Open the WebLager Aalborg link in a browser and confirm it lands on the search page (this sandbox cannot reach weblager.dk). Then work through #113 (is segment `45` constant?), #114 (terms, robots.txt, API request) and #118 (how `addressId` is resolved). See `docs/weblager.md`.

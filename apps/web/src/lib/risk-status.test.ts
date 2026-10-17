@@ -4,7 +4,7 @@ import type { RiskFlags } from "@shared/types/index";
 
 const flags: RiskFlags = {
   noiseExposureLden: 45, encumbranceCheckRequired: true, encumbranceLookupUrl: null,
-  sewerSeparationCheckRequired: true, sewerSeparationLookupUrl: null, oilTankRisk: false,
+  sewerSeparationCheckRequired: true, sewerSeparationLookupUrl: null, buildingCaseArchiveUrl: null, oilTankRisk: false,
   oilTankRiskSource: "bbr", soilContamination: { classification: "none", jordart: null },
   soilContaminationAttestUrl: null,
 };

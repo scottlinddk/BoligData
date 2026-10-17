@@ -11,6 +11,7 @@ import { buildJordforureningsattestUrl } from "../enrichment-sources/jordforuren
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { buildTinglysningUrl } from "../enrichment-sources/tinglysning-link.js";
+import { buildWeblagerUrl } from "../enrichment-sources/weblager-link.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import type { RawListing } from "./types.js";
 
@@ -107,6 +108,7 @@ export async function enrichProperty(
       encumbranceLookupUrl: buildTinglysningUrl(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null),
       sewerSeparationCheckRequired: true,
       sewerSeparationLookupUrl: buildSpildevandsplanUrl(listing.municipality),
+      buildingCaseArchiveUrl: buildWeblagerUrl(listing.municipality),
       oilTankRisk: heatingKnown ? bbr!.heatingInstallation === "oliefyr" : (listing.building_year ?? 2000) < 1970,
       oilTankRiskSource: heatingKnown ? "bbr" : "heuristic",
       soilContamination: { classification: contamination?.classification ?? "unknown", jordart: soil?.jordart ?? null },

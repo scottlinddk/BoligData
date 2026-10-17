@@ -146,6 +146,8 @@ export interface RiskFlags {
   sewerSeparationCheckRequired: boolean;
   /** Deep link to the property's municipality spildevandsplan info, null when the municipality isn't in the lookup table. */
   sewerSeparationLookupUrl: string | null;
+  /** Advisory deep link to the municipality's WebLager building case search page, null when the municipality is not verified. Older rows lack it. */
+  buildingCaseArchiveUrl: string | null;
   oilTankRisk: boolean;
   /** Whether oilTankRisk came from BBR's real heating-installation data or the building-year heuristic fallback. */
   oilTankRiskSource: OilTankRiskSource;

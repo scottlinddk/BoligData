@@ -261,7 +261,7 @@ any screening output as a real six-of-six pass.
 Unchanged — still accurate:
 
 - Does not fetch or parse tilstandsrapport/elinstallationsrapport PDFs.
-- Does not resolve weblager.dk building-case history.
+- Does not resolve weblager.dk building-case history. Only an advisory municipality search link is shown, see [weblager.md](weblager.md).
 - Does not make a final buy/no-buy recommendation.
 - Does not persist results — it's a stateless GET, no
   `screening_results`/`property_lookup_results` table exists or is

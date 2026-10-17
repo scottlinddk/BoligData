@@ -8,6 +8,7 @@ const baseFlags: RiskFlags = {
   encumbranceLookupUrl: null,
   sewerSeparationCheckRequired: true,
   sewerSeparationLookupUrl: null,
+  buildingCaseArchiveUrl: null,
   oilTankRisk: false,
   oilTankRiskSource: "heuristic",
   soilContamination: { classification: "none", jordart: null },

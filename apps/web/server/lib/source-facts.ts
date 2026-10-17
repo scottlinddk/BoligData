@@ -24,6 +24,7 @@ export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
     encumbranceLookupUrl: raw.encumbranceLookupUrl ?? null,
     sewerSeparationCheckRequired: true,
     sewerSeparationLookupUrl: raw.sewerSeparationLookupUrl ?? null,
+    buildingCaseArchiveUrl: raw.buildingCaseArchiveUrl ?? null,
     oilTankRisk: (bbrHeatingKnown || genuineListingHeuristic) && raw.oilTankRisk === true,
     oilTankRiskSource: bbrHeatingKnown ? "bbr" : "heuristic",
     soilContamination: {
@@ -37,7 +38,8 @@ export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
 /** For callers whose shape requires a risk object even without a source row. */
 export const unknownRiskFlags = (): Enrichment["riskFlags"] => ({
   noiseExposureLden: null, encumbranceCheckRequired: true, encumbranceLookupUrl: null,
-  sewerSeparationCheckRequired: true, sewerSeparationLookupUrl: null, oilTankRisk: false,
+  sewerSeparationCheckRequired: true, sewerSeparationLookupUrl: null,
+  buildingCaseArchiveUrl: null, oilTankRisk: false,
   oilTankRiskSource: "heuristic", soilContamination: { classification: "unknown", jordart: null },
   soilContaminationAttestUrl: null,
 });
