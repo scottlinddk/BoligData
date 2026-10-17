@@ -70,6 +70,10 @@ export function redact(text) {
   return String(text).replace(/(apikey|token|key)=[^&\s"']+/gi, '$1=[redacted]');
 }
 
+export function foldFieldName(name) {
+  return name.toLowerCase().replace(/å/g, 'aa').replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/[^a-z0-9]/g, '');
+}
+
 const ok = (value) => ({ ok: true, value });
 const fail = (reason) => ({ ok: false, reason });
 const unique = (values) => [...new Set(values)];
