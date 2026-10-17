@@ -6,7 +6,8 @@
  * Prints, for DATAFORDELER_API_KEY:
  *   1. GraphQL entity types and the fields of the BBR/VUR types the BFE chain needs.
  *   2. The file-download listing (api.datafordeler.dk/FileDownloads) per register, summarised.
- *   3. The HTTP status for EJF, to show whether an API key is enough there.
+ *   3. EJF: GraphQL types (v1 accepts an API key) and the file-listing status (file downloads need OAuth).
+ *      Only Ejerskifte and Handelsoplysninger are inspected. Person entities are never queried.
  *
  *   node scripts/discover-datafordeler.mjs
  *
@@ -111,10 +112,15 @@ async function printFileListings(apiKey) {
   }
 }
 
+/** EJF GraphQL is v1 and takes an API key (file downloads do not). */
+const EJF_SERVICE = { register: 'EJF', versions: ['v1'], versionEnv: 'DATAFORDELER_EJF_VERSION', baseEnv: 'DATAFORDELER_EJF_API_BASE' };
+
 const TYPE_TARGETS = [
   [SERVICES.BBR, ['Ejendomsrelation', 'BygningEjendomsrelation', 'EnhedEjendomsrelation', 'Enhed', 'Bygning', 'Grund', 'GrundJordstykke', 'Ejerlejlighed']],
   [SERVICES.VUR, ['Ejendomsvurdering', 'Vurderingsejendom', 'Fordeling']],
+  [EJF_SERVICE, ['Ejerskifte', 'Handelsoplysninger']],
 ];
+const ALL_FIELDS_FOR = new Set(['EJF_Ejerskifte', 'EJF_Handelsoplysninger']);
 const FIELD_FILTER = /bfe|ejendom|type|areal|opfoerel|bygge|boligareal|bebygget|koordinat|husnummer|kommune|grund|status|vurder|aar|registrering|virkning|id_lokal|nummer|beloeb|vaerdi/i;
 
 async function printGraphQl(client) {
@@ -123,7 +129,7 @@ async function printGraphQl(client) {
     try {
       const data = await client.post(service, '{ __schema { types { name kind } } }');
       const types = asList(data?.__schema?.types).filter((t) => t.kind === 'OBJECT' && new RegExp(`^${service.register}_`).test(t.name));
-      console.log(`\n[${service.register}] object types: ${types.map((t) => t.name).join(', ') || '(none found)'}`);
+      console.log(`\n[${service.register}] GraphQL reachable with the API key. Object types: ${types.map((t) => t.name).join(', ') || '(none found)'}`);
     } catch (err) {
       if (err instanceof FatalError) throw err;
       console.log(`\n[${service.register}] type list failed: ${redact(err.message)}`);
@@ -133,7 +139,7 @@ async function printGraphQl(client) {
       try {
         const info = await client.fieldsOf(service, typeName);
         if (!info) { console.log(`\n${typeName}: NOT IN SCHEMA`); continue; }
-        const shown = [...info.entries()].filter(([field]) => FIELD_FILTER.test(field));
+        const shown = [...info.entries()].filter(([field]) => ALL_FIELDS_FOR.has(typeName) || FIELD_FILTER.test(field));
         console.log(`\n${typeName} (${info.size} fields, ${shown.length} shown)`);
         for (const [field, t] of shown.slice(0, 60)) console.log(`  ${field}: ${t.list ? '[' : ''}${t.name ?? '?'}${t.list ? ']' : ''}`);
       } catch (err) {
