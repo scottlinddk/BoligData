@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   FatalError,
+  NEW_SYSTEM_FROM_YEAR,
   NEW_SYSTEM_MARK,
   GraphQlError,
   SERVICES,
@@ -63,8 +64,8 @@ function makeClient(overrides = {}) {
       BBR_Ejendomsrelation: (query) => [{ id_lokalId: query.includes(UNIT) ? UNIT : REL_HOUSE, bfeNummer: query.includes(UNIT) ? 7000002 : 5000001 }],
       VUR_BFEKrydsreference: (query) => (byBfe(query) === 'unit' ? [{ fkEjendomsvurderingID: 21 }] : [{ fkEjendomsvurderingID: 11 }, { fkEjendomsvurderingID: 12 }]),
       VUR_Ejendomsvurdering: () => [
-        { id: 11, aar: 2022, ejendomvaerdiBeloeb: 2_000_000, grundvaerdiBeloeb: 500_000 },
-        { id: 12, aar: 2024, ejendomvaerdiBeloeb: 2_200_000, grundvaerdiBeloeb: 520_000 },
+        { id: 11, aar: 2022, ejendomvaerdiBeloeb: 2_000_000, grundvaerdiBeloeb: 500_000, VURMark: 3 },
+        { id: 12, aar: 2024, ejendomvaerdiBeloeb: 2_200_000, grundvaerdiBeloeb: 520_000, VURMark: 3 },
       ],
       ...overrides.data,
     },
@@ -204,7 +205,7 @@ test('house: addressId -> husnummer -> parcel BFE -> valuations, parcel BFE stor
 test('apartment: ignores a stored parcel BFE and uses the unit BFE, flagging the conflict', async () => {
   const { client, api } = makeClient({
     data: {
-      VUR_Ejendomsvurdering: () => [{ id: 21, aar: 2024, ejendomvaerdiBeloeb: 1_500_000, grundvaerdiBeloeb: 0 }],
+      VUR_Ejendomsvurdering: () => [{ id: 21, aar: 2024, ejendomvaerdiBeloeb: 1_500_000, grundvaerdiBeloeb: 0, VURMark: 3 }],
     },
   });
   const r = await processProperty(client, { id: 'p2', property_type: 'apartment', bfe_nummer: '5000001', id_lokalid: HUSNUMMER }, ADDRESS);
@@ -368,7 +369,7 @@ test('register ids beyond positiveInt\'s cap are accepted, unsafe or fractional 
   const { client, api } = makeClient({
     data: {
       VUR_BFEKrydsreference: () => [{ fkEjendomsvurderingID: 905183228372334 }, { fkEjendomsvurderingID: 905005860341679 }],
-      VUR_Ejendomsvurdering: () => [{ id: 905183228372334, aar: 2022, ejendomvaerdiBeloeb: 3_000_000, grundvaerdiBeloeb: 900_000 }],
+      VUR_Ejendomsvurdering: () => [{ id: 905183228372334, aar: 2022, ejendomvaerdiBeloeb: 3_000_000, grundvaerdiBeloeb: 900_000, VURMark: 3 }],
     },
   });
   const r = await resolveValuations(client, '399255');
@@ -379,7 +380,7 @@ test('register ids beyond positiveInt\'s cap are accepted, unsafe or fractional 
 });
 
 test('a full page of cross-references or valuations is refused, never silently truncated', async () => {
-  const many = (n) => Array.from({ length: n }, (_, i) => ({ fkEjendomsvurderingID: 900000000000 + i, id: 900000000000 + i, aar: 2000 + (i % 30), ejendomvaerdiBeloeb: 1 + i }));
+  const many = (n) => Array.from({ length: n }, (_, i) => ({ fkEjendomsvurderingID: 900000000000 + i, id: 900000000000 + i, aar: 2000 + (i % 30), ejendomvaerdiBeloeb: 1 + i, VURMark: 3 }));
   const { client: c1 } = makeClient({ data: { VUR_BFEKrydsreference: () => many(50) } });
   const r1 = await resolveValuations(c1, '5000001');
   assert.equal(r1.ok, false);
@@ -435,4 +436,22 @@ test('one row per year: new system first, then latest aendringDato, identical ro
     { valuation_year: 2008, assessed_property_value_dkk: 38_000_000, assessed_land_value_dkk: 3, registered_at: '2013-09-13T19:05:02.000Z' },
     { valuation_year: 2020, assessed_property_value_dkk: 881_000, assessed_land_value_dkk: 480_000, registered_at: '2025-03-18T01:13:56.000Z' },
   ]);
+});
+
+test('old-system values are only kept before the new system starts, so SPAR never mixes the two levels', () => {
+  const fields = { year: 'y', assessed: 'a', land: 'l', registered: 'r', system: 'm', effective: 'e' };
+  assert.equal(NEW_SYSTEM_FROM_YEAR, 2020);
+  const { rows } = buildValuationRows(
+    [
+      { y: 2019, a: 480_000, l: 95_900, r: '2020-03-01T23:43:19Z', m: 1, e: '2019-10-01' },
+      { y: 2020, a: 480_000, l: 95_900, r: '2021-02-13T12:44:44Z', m: 1, e: '2020-10-01' }, // old system, no new row: dropped
+      { y: 2021, a: 490_000, l: 96_000, r: '2022-02-13T12:44:44Z', m: 1, e: '2021-10-01' }, // old system after the switch: dropped
+      { y: 2022, a: 900_000, l: 500_000, r: '2025-03-18T01:13:56Z', m: NEW_SYSTEM_MARK, e: '2022-01-01' },
+    ],
+    fields,
+  );
+  assert.deepEqual(rows.map((r) => [r.valuation_year, r.assessed_property_value_dkk]), [[2019, 480_000], [2022, 900_000]]);
+  // Without the system field nothing is filtered, as before.
+  const plain = buildValuationRows([{ y: 2021, a: 1, l: 1 }], { year: 'y', assessed: 'a', land: 'l' });
+  assert.equal(plain.rows.length, 1);
 });
