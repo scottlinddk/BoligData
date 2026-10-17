@@ -91,3 +91,17 @@ describe("weekly runner", () => {
     expect(runnerOutcome({ ok: true, reports: [] }, true).ok).toBe(false);
   });
 });
+
+describe("recent runner", () => {
+  it("scans the newest 5000 listings from live Boligsiden without requiring a full feed", () => {
+    vi.stubEnv("CRAWL_SOURCES", "boliga");
+    vi.stubEnv("CRAWL_MOCK_MODE", "true");
+    vi.stubEnv("CRAWL_DELAY_MS", "500");
+    const result = configureRunner(false, false, true);
+    expect(process.env.CRAWL_SOURCES).toBe("boligsiden");
+    expect(result.mockFlags.CRAWL_MOCK_MODE).toBe(false);
+    expect(result.effectiveCaps).toMatchObject({ CRAWL_MAX_PAGES: 50, CRAWL_MAX_LISTINGS: 5000, CRAWL_DELAY_MS: 500 });
+    expect(result.fullScan).toBe(false);
+    expect(result.recent).toBe(true);
+  });
+});
