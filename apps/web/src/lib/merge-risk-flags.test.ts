@@ -39,4 +39,16 @@ describe("mergeRiskFlags", () => {
     expect(mergeRiskFlags(unknown, null)).toBe(unknown);
     expect(mergeRiskFlags(null, null)).toBeNull();
   });
+
+  it("carries the land, tank and valuation answers from whichever side has them", () => {
+    const land = { totalAreaSqm: 812, parcelCount: 1, forestReserve: null, beachProtection: null, duneProtection: null, entailedForest: false, agriculturalNote: null, commonLot: false, condominiumParent: false };
+    const valuation = { year: 2024, propertyValueDkk: 3_150_000, landValueDkk: 780_000, previousYear: 2022, previousPropertyValueDkk: 2_900_000 };
+    const oilTanks = { tanks: [] };
+    const stored: RiskFlags = { ...unknown, landRegistration: land, valuation, oilTanks };
+    expect(mergeRiskFlags(unknown, stored)).toMatchObject({ landRegistration: land, valuation, oilTanks });
+    expect(mergeRiskFlags(stored, unknown)).toMatchObject({ landRegistration: land, valuation, oilTanks });
+    // A live answer replaces the stored one.
+    const live: RiskFlags = { ...unknown, landRegistration: { ...land, totalAreaSqm: 900 } };
+    expect(mergeRiskFlags(live, stored)?.landRegistration?.totalAreaSqm).toBe(900);
+  });
 });

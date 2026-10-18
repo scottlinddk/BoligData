@@ -64,35 +64,68 @@ const resolvedBase = new Map<string, string>();
 /** Introspected field names per `<register>:<type>`; `null` = the type is not in that schema. */
 const fieldCache = new Map<string, Set<string> | null>();
 
+/** Lookups other sources share (a husnummer's BFE number, its building class), by key. */
+const memo = new Map<string, { expires: number; value: Promise<unknown> }>();
+const MEMO_TTL_MS = 10 * 60 * 1000;
+
 /** Test seam — module-level caches would otherwise leak between cases. */
 export function resetDatafordelerCache(): void {
   resolvedBase.clear();
   fieldCache.clear();
+  memo.clear();
 }
 
 /**
- * Whether a `*_API_BASE` override can be a GraphQL endpoint at all: an absolute https URL on the
- * Datafordeler GraphQL host (or a custom host with a path, for a proxy). A value that is not
- * (a legacy `services.datafordeler.dk/.../rest/...` address without a scheme sat in production and made
- * every BBR request fail with "Failed to parse URL") is ignored, so the default version walk applies.
+ * Runs `load` once per key for ten minutes, concurrent callers included, and
+ * remembers only answers: a failed result or a throw is dropped so the next
+ * caller asks again. Several sources need the same BFE number for one property
+ * (valuation, cadastre), and without this each would walk the same three BBR
+ * hops to find it.
  */
-export function isGraphQlBase(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !/\/rest\//i.test(url.pathname) && !/(^|\.)services\.datafordeler\.dk$/i.test(url.hostname);
-  } catch {
-    return false;
-  }
+export function memoizeAnswer<T extends { ok: boolean }>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = memo.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value as Promise<T>;
+  const value = load().then(
+    (result) => {
+      if (!result.ok && memo.get(key)?.value === value) memo.delete(key);
+      return result;
+    },
+    (error) => {
+      if (memo.get(key)?.value === value) memo.delete(key);
+      throw error;
+    },
+  );
+  memo.set(key, { expires: Date.now() + MEMO_TTL_MS, value });
+  return value;
 }
 
 /**
- * Endpoints to try, in order. An explicit, usable `*_API_BASE` or `*_VERSION` is taken
+ * Cleans an `*_API_BASE` override. A value pasted without a scheme
+ * (`services.datafordeler.dk/...`) makes `fetch` throw "Failed to parse URL",
+ * so `https://` is assumed. The retired REST host (`services.datafordeler.dk`,
+ * e.g. `/BBR/BBRPublic/1/rest/GetInstance`) cannot answer GraphQL at all, so
+ * it is treated as unset and the GraphQL default is used instead.
+ */
+export function normalizeBase(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    if (new URL(withScheme).hostname.toLowerCase() === "services.datafordeler.dk") return null;
+  } catch {
+    return null;
+  }
+  return withScheme.replace(/\/+$/, "");
+}
+
+/**
+ * Endpoints to try, in order. An explicit `*_API_BASE` or `*_VERSION` is taken
  * as deliberate and never probed around: an operator pinning a version wants
  * the failure, not a silent fallback to a different one.
  */
 export function candidateBases(service: DatafordelerService): string[] {
-  const base = process.env[service.baseEnv]?.trim();
-  if (base && isGraphQlBase(base)) return [base.replace(/\/+$/, "")];
+  const base = normalizeBase(process.env[service.baseEnv]);
+  if (base) return [base];
 
   const pinned = process.env[service.versionEnv]?.trim();
   const versions = pinned ? [pinned] : service.versions;

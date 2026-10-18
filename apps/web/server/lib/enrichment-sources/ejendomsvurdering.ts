@@ -1,122 +1,51 @@
-import { asPositiveNumber } from "../crawl/map-utils.js";
-import { entityFields, pickField, postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
+import { lookupHouseValuation, lookupValuationYears, type ValuationYear } from "./vur-valuations.js";
 
 const MOCK_FLAG = "EJENDOMSVURDERING_MOCK_MODE";
 
 /**
- * VUR (offentlig ejendomsvurdering) via Datafordeler's entity-based GraphQL
- * service — same `graphql.datafordeler.dk/<register>/<version>` pattern and
- * `apiKey` query-param auth as the BBR traversal, reusing
- * DATAFORDELER_API_KEY rather than a separate credential.
+ * The public property valuation (offentlig ejendomsvurdering) in the shape the
+ * listing enrichment and the lookup endpoint store: the latest valuation year,
+ * and the one before it for the due-diligence comparison.
  *
- * Keying: VUR indexes valuations by BFE-nummer (Bestemt Fast Ejendom), not by
- * matrikelnr/ejerlav, so `lookupAddressCadastral` now carries the parcel's BFE
- * number through from DAWA and this queries by it when present. The
- * matrikelnr/ejerlav query is kept as the fallback for addresses whose BFE
- * number the address register doesn't return.
+ * The register is VUR, `VUR/v2` on Datafordeler's GraphQL service (see
+ * `VUR_SERVICE` in vur-valuations.ts, which also holds the entity chain and
+ * the rules for choosing a year's value). This file used to find VUR's field
+ * names by introspection and key by matrikelnr/ejerlav. Datafordeler has since
+ * switched introspection off (HC0046) and the address register no longer
+ * returns a parcel, so that path could not answer. The names are now fixed
+ * from the published schema and the key is the BFE number, found from the
+ * husnummer when the caller has no BFE.
  *
- * Field names are read off the live schema rather than guessed. The guessed
- * spellings (`ejendomsvaerdi`, `grundvaerdi`, `vurderingsaar`, plus the
- * bitemporal `registreringstid`/`virkningstid` arguments carried over from the
- * BBR traversal) were all rejected by the register — VUR is not bitemporal in
- * the way DAR/BBR are, and it spells its value fields its own way — and one
- * unknown name costs the whole document. `entityFields` asks the service what
- * `VUR_Ejendomsvurdering` actually has and `pickField` maps this repo's intent
- * onto it, so a rename upstream degrades to a named error instead of an
- * all-null payload.
- *
- * When a value can't be located this reports a failed source and
- * `publicValuation` comes back null; it never falls back to the mock
- * generator, because a plausible-looking fabricated assessed value is worse
- * than no value at all.
+ * When a value can't be located this reports a failed source and the caller
+ * stores null. It never falls back to the mock generator outside mock mode,
+ * because a plausible-looking fabricated assessed value is worse than none.
  */
-export const VUR_SERVICE: DatafordelerService = {
-  // v2 is the version answering today; the others are only tried if it starts
-  // returning 404, which is how a withdrawn version presents.
-  register: "VUR",
-  versionEnv: "DATAFORDELER_VUR_VERSION",
-  baseEnv: "DATAFORDELER_VUR_API_BASE",
-  versions: ["v2", "v3", "v1"],
-};
-
-const ENTITY_TYPE = "VUR_Ejendomsvurdering";
-
 export interface EjendomsvurderingData {
   /** Assessed total property value (DKK). */
   assessedPropertyValueDkk: number | null;
   /** Assessed land-only value (DKK). */
   assessedLandValueDkk: number | null;
-  /** Assessment year. The ordinary cycle is 2022 then 2024 (a preliminary, indexed 2024 valuation exists). The old "odd years for homes" cycle no longer applies. */
+  /** Assessment year of the latest valuation. */
   valuationYear: number | null;
+  /** The valuation year before the latest one, for the change since. Null when the register has only one. */
+  previousYear: number | null;
+  previousPropertyValueDkk: number | null;
 }
 
-export interface ValuationKey {
-  matrikelnr: string | null;
-  ejerlav: string | null;
-  bfeNummer: string | null;
-}
-
-/**
- * The three values this repo needs, resolved to whatever the live schema calls
- * them. Null means the schema has nothing plausibly matching, which is
- * reported rather than papered over.
- */
-export interface ValuationFields {
-  assessedValue: string | null;
-  landValue: string | null;
-  year: string | null;
-}
-
-/**
- * Spellings tried, in preference order, per value. `pickField` accepts an
- * exact match or a longer field that *starts with* one of these, so
- * `ejendomsvaerdiBeloeb` resolves while an unrelated field merely mentioning
- * "grundvaerdi" does not.
- */
-export function selectValuationFields(schema: Set<string>): ValuationFields {
+/** The latest year with a property value, and the year before it. Null when no year has one. */
+export function valuationFromYears(years: readonly ValuationYear[]): EjendomsvurderingData | null {
+  const withValue = years.filter((entry) => entry.propertyValueDkk !== null).sort((a, b) => a.year - b.year);
+  const latest = withValue.at(-1);
+  if (!latest) return null;
+  const previous = withValue.at(-2) ?? null;
   return {
-    assessedValue: pickField(schema, "ejendomsvaerdi", "vurderetejendomsvaerdi", "ejendomsvurderingbeloeb"),
-    landValue: pickField(schema, "grundvaerdi", "vurderetgrundvaerdi"),
-    year: pickField(schema, "vurderingsaar", "vurderingaar", "vurderingsaartal"),
+    assessedPropertyValueDkk: latest.propertyValueDkk,
+    assessedLandValueDkk: latest.landValueDkk,
+    valuationYear: latest.year,
+    previousYear: previous?.year ?? null,
+    previousPropertyValueDkk: previous?.propertyValueDkk ?? null,
   };
-}
-
-export function buildQuery(key: ValuationKey, fields: ValuationFields): string {
-  const where =
-    key.bfeNummer !== null
-      ? `{ bfeNummer: { eq: ${JSON.stringify(key.bfeNummer)} } }`
-      : `{ matrikelnummer: { eq: ${JSON.stringify(key.matrikelnr)} }, ejerlavsnavn: { eq: ${JSON.stringify(key.ejerlav)} } }`;
-
-  const selection = [fields.assessedValue, fields.landValue, fields.year].filter(
-    (field): field is string => field !== null,
-  );
-
-  return `query Ejendomsvurdering {
-  ${ENTITY_TYPE}(where: ${where}) {
-    nodes {
-      ${selection.join("\n      ")}
-    }
-  }
-}`;
-}
-
-interface ValuationData {
-  VUR_Ejendomsvurdering?: {
-    nodes?: Array<Record<string, unknown>>;
-  } | null;
-}
-
-/** Reads a resolved field off a node; a value this schema doesn't carry stays null rather than guessed. */
-function readField(node: Record<string, unknown>, field: string | null): number | null {
-  return field === null ? null : asPositiveNumber(node[field]);
-}
-
-/** Keeps the "which fields exist?" diagnostic short enough for the register panel. */
-function summarizeSchema(schema: Set<string>): string {
-  const names = [...schema];
-  const head = names.slice(0, 12).join(", ");
-  return names.length > 12 ? `${head}, ... (${names.length} fields)` : head;
 }
 
 function mockValuation(seedInput: string): EjendomsvurderingData {
@@ -126,55 +55,38 @@ function mockValuation(seedInput: string): EjendomsvurderingData {
     assessedPropertyValueDkk: landValue + 500_000 + (seed % 4_000_000),
     assessedLandValueDkk: landValue,
     valuationYear: 2024 + (seed % 2),
+    previousYear: null,
+    previousPropertyValueDkk: null,
   };
 }
 
+export interface ValuationLookupKey {
+  /** DAR husnummer UUID. A house's valuation is found from it, through its BFE, when there is no BFE. */
+  husnummerId?: string | null;
+  /** BFE number: resolved by the address register, or stored by an earlier crawl. */
+  bfeNummer?: string | null;
+  matrikelnr?: string | null;
+  ejerlav?: string | null;
+}
+
 /**
- * Looks up the official public property valuation (ejendomsvurdering) for a
- * parcel, preferring its BFE number and falling back to matrikelnr/ejerlav.
- * A real assessed value is a strong due-diligence signal directly comparable
- * to the listing price — see the caveats above before trusting the live path.
+ * Looks up the public valuation for a property: from a known BFE when the
+ * caller has one, else from its husnummer (houses only, see
+ * `lookupHouseValuation`). A matrikelnr/ejerlav pair alone cannot be keyed
+ * into VUR and is a failed source with that reason.
  */
-export async function lookupEjendomsvurdering(
-  matrikelnr: string | null,
-  ejerlav: string | null,
-  bfeNummer: string | null = null,
-): Promise<SourceResult<EjendomsvurderingData>> {
-  const key: ValuationKey = { matrikelnr, ejerlav, bfeNummer };
-  const hasKey = bfeNummer !== null || (matrikelnr !== null && ejerlav !== null);
-  if (!hasKey) return sourceFailed("no BFE number or matrikelnr/ejerlav to look up");
-
-  if (mockModeEnabled(MOCK_FLAG)) {
-    return sourceOk(mockValuation(bfeNummer ?? `${matrikelnr}|${ejerlav}`));
+export async function lookupEjendomsvurdering(key: ValuationLookupKey): Promise<SourceResult<EjendomsvurderingData>> {
+  const husnummerId = key.husnummerId ?? null;
+  const bfeNummer = key.bfeNummer ?? null;
+  if (husnummerId === null && bfeNummer === null) {
+    return sourceFailed(key.matrikelnr && key.ejerlav ? "VUR is keyed by BFE number, and this property has neither a BFE nor a husnummer to find one from" : "no husnummer or BFE number to look up");
   }
 
-  const apiKey = process.env.DATAFORDELER_API_KEY;
-  if (!apiKey) return sourceFailed("DATAFORDELER_API_KEY not configured");
+  if (mockModeEnabled(MOCK_FLAG)) return sourceOk(mockValuation(bfeNummer ?? husnummerId!));
 
-  try {
-    const schema = await entityFields(VUR_SERVICE, apiKey, ENTITY_TYPE);
-    if (schema === null) {
-      return sourceFailed(`${ENTITY_TYPE} is not in the VUR schema (introspection returned no such type)`);
-    }
-
-    const fields = selectValuationFields(schema);
-    if (fields.assessedValue === null && fields.landValue === null) {
-      return sourceFailed(
-        `no assessed-value field on ${ENTITY_TYPE}; schema has: ${summarizeSchema(schema)}`,
-      );
-    }
-
-    const data = await postGraphQl<ValuationData>(VUR_SERVICE, apiKey, buildQuery(key, fields));
-
-    const node = data?.VUR_Ejendomsvurdering?.nodes?.[0];
-    if (!node) return sourceFailed(`no valuation found for ${bfeNummer ?? `${matrikelnr}/${ejerlav}`}`);
-
-    return sourceOk({
-      assessedPropertyValueDkk: readField(node, fields.assessedValue),
-      assessedLandValueDkk: readField(node, fields.landValue),
-      valuationYear: readField(node, fields.year),
-    });
-  } catch (err) {
-    return sourceFailed(err);
-  }
+  // A BFE the caller already holds is used as it is, as before. Without one, a house's BFE is found from the husnummer.
+  const years = bfeNummer !== null ? await lookupValuationYears(bfeNummer) : (await lookupHouseValuation(husnummerId)).valuation;
+  if (!years.ok) return years;
+  const valuation = valuationFromYears(years.data);
+  return valuation ? sourceOk(valuation) : sourceFailed("no valuation year with a property value");
 }

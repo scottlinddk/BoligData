@@ -173,6 +173,72 @@ export interface RiskFlags {
   soilContaminationSiteName?: string | null;
   /** Whether oil heating is registered in BBR, as opposed to the heating being unknown. Older rows lack it. */
   heatingInstallation?: string | null;
+  /** Tanks BBR registers on the property (`BBR_TekniskAnlaeg`). Null or absent: the tank register was not asked. */
+  oilTanks?: OilTankRegistry | null;
+  /** What Matriklen (MAT) registers on the land that a buyer should know about. Null or absent: not asked. */
+  landRegistration?: LandRegistration | null;
+  /** The public valuation (VUR), for comparison with the price. Null or absent: not asked, or none registered. */
+  valuation?: ValuationCheck | null;
+}
+
+/** One tank BBR registers as a technical installation (classification 1110, "tank"). */
+export interface OilTankRecord {
+  /** Capacity in litres. */
+  sizeLiters: number | null;
+  /** Year the tank was made (tek067), the year its decommissioning deadline counts from. */
+  manufacturedYear: number | null;
+  /** Year the installation was established (tek024). */
+  installedYear: number | null;
+  /** Deadline for decommissioning (tek035), ISO date. Past means the tank is overdue. */
+  decommissionDeadline: string | null;
+  /** Year it was decommissioned (tek072). Set, or a decommissioning code (tek028), means the tank is gone. */
+  decommissionedYear: number | null;
+  /** True when BBR records it as decommissioned: a decommissioning year or code, or a status other than built. */
+  decommissioned: boolean;
+  /** BBR's drift code: true "Drift", false "Ikke i drift", null when not stated. */
+  inOperation: boolean | null;
+  /** Raw BBR codes the checklist cannot decode without the code list: placement (tek027), content (tek034). */
+  placementCode: string | null;
+  contentCode: string | null;
+}
+
+export interface OilTankRegistry {
+  tanks: OilTankRecord[];
+}
+
+/** Matriklen facts that bear on what the buyer can do with the land. Areas in m2. */
+export interface LandRegistration {
+  /** Sum of the registered area of the parcels, when the parcel list is complete. */
+  totalAreaSqm: number | null;
+  parcelCount: number;
+  /** Fredskov (forest reserve): a duty to keep forest, and building is restricted. Null when no parcel carries it. */
+  forestReserve: LandRestriction | null;
+  /** Strandbeskyttelse (beach protection line). Null when no parcel carries it. */
+  beachProtection: LandRestriction | null;
+  /** Klitfredning (dune protection). Null when no parcel carries it. */
+  duneProtection: LandRestriction | null;
+  /** A parcel is entailed forest (majoratsskov). */
+  entailedForest: boolean;
+  /** Landbrugsnotering ("Familiebrug", "Landbrug", "Landbrug uden bygning"): a duty to farm. Null when not noted. */
+  agriculturalNote: string | null;
+  /** The land is a shared lot (fælleslod) serving several properties. */
+  commonLot: boolean | null;
+  /** The estate is a main property split into condominiums, so its land is not one owner's. */
+  condominiumParent: boolean | null;
+}
+
+/** A land restriction Matriklen registers on parcels. The area is the sum over the parcels that state one. */
+export interface LandRestriction {
+  areaSqm: number;
+}
+
+/** The latest public valuation, and the one before it, in whole kroner. */
+export interface ValuationCheck {
+  year: number;
+  propertyValueDkk: number | null;
+  landValueDkk: number | null;
+  previousYear: number | null;
+  previousPropertyValueDkk: number | null;
 }
 
 export interface SchoolTransportInfo {

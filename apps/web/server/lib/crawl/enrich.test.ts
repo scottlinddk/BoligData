@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { enrichProperty } from "./enrich.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
+import { lookupBbrTanks } from "../enrichment-sources/bbr-tanks.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupLand } from "../enrichment-sources/matrikel.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { riskStatuses } from "../../../../../packages/shared/src/utils/risk-status.js";
 import type { RawListing } from "./types.js";
 
 vi.mock("../enrichment-sources/bbr.js", () => ({ lookupBbr: vi.fn() }));
+vi.mock("../enrichment-sources/bbr-tanks.js", () => ({ lookupBbrTanks: vi.fn() }));
 vi.mock("../enrichment-sources/ejendomsvurdering.js", () => ({ lookupEjendomsvurdering: vi.fn() }));
+vi.mock("../enrichment-sources/matrikel.js", () => ({ lookupLand: vi.fn() }));
 vi.mock("../enrichment-sources/stoejkort.js", () => ({ lookupNoiseExposure: vi.fn() }));
 vi.mock("../enrichment-sources/geus-jordart.js", () => ({ lookupSoilType: vi.fn().mockResolvedValue({ ok: false, error: "source unavailable" }) }));
 vi.mock("../enrichment-sources/miljoeportalen-v1v2.js", () => ({ lookupSoilContamination: vi.fn().mockResolvedValue({ ok: false, error: "source unavailable" }) }));
@@ -29,6 +33,8 @@ beforeEach(() => {
   vi.stubEnv("STOEJKORT_MOCK_MODE", "false");
   vi.mocked(lookupBbr).mockResolvedValue({ ok: false, error: "missing credential" });
   vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: false, error: "missing credential" });
+  vi.mocked(lookupLand).mockResolvedValue({ ok: false, error: "missing credential" });
+  vi.mocked(lookupBbrTanks).mockResolvedValue({ ok: false, error: "missing credential" });
   vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: false, error: "not configured" });
   vi.mocked(lookupSoilContamination).mockResolvedValue({ ok: false, error: "source unavailable" });
 });
@@ -54,7 +60,7 @@ describe("register provenance in crawl enrichment", () => {
 
   it("omits synthetic register data even when a different register is live", async () => {
     vi.stubEnv("BBR_MOCK_MODE", "true");
-    vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: true, data: { assessedPropertyValueDkk: 2_000_000, assessedLandValueDkk: 500_000, valuationYear: 2024 } });
+    vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: true, data: { assessedPropertyValueDkk: 2_000_000, assessedLandValueDkk: 500_000, valuationYear: 2024, previousYear: null, previousPropertyValueDkk: null } });
     const result = await enrichProperty(listing);
     expect(result.source).toBe("datafordeler");
     expect(result.source_status.bbr?.dataMode).toBe("mock");
@@ -71,6 +77,8 @@ describe("register provenance in crawl enrichment", () => {
     expect(result.risk_flags.noiseExposureLden).toBeNull();
     expect(lookupBbr).not.toHaveBeenCalled();
     expect(lookupEjendomsvurdering).not.toHaveBeenCalled();
+    expect(lookupLand).not.toHaveBeenCalled();
+    expect(lookupBbrTanks).not.toHaveBeenCalled();
   });
 
   it("preserves advisory risk checks without calling a heuristic verified BBR", async () => {
@@ -127,5 +135,63 @@ describe("due-diligence flags from live registers", () => {
       roofMaterial: null, wallMaterial: null, heatingInstallation: "centralvarme", basementSqm: null, toiletCount: null, bathroomCount: null,
     } });
     expect((await enrichProperty(listing, cadastral)).risk_flags).toMatchObject({ oilTankRisk: true, oilTankRiskSource: "heuristic" });
+  });
+  const land = {
+    totalAreaSqm: 812, parcelCount: 1, forestReserve: { areaSqm: 300 }, beachProtection: null, duneProtection: null,
+    entailedForest: false, agriculturalNote: null, commonLot: false, condominiumParent: false,
+  };
+  const tank = {
+    sizeLiters: 1500, manufacturedYear: 1978, installedYear: 1978, decommissionDeadline: "2028-12-31", decommissionedYear: null,
+    decommissioned: false, inOperation: true, placementCode: null, contentCode: null,
+  };
+
+  it("asks MAT, the tank register and VUR by the address's husnummer and BFE, and keeps their answers in the flags", async () => {
+    vi.mocked(lookupLand).mockResolvedValue({ ok: true, data: land });
+    vi.mocked(lookupBbrTanks).mockResolvedValue({ ok: true, data: { tanks: [tank] } });
+    vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: true, data: {
+      assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2024, previousYear: 2022, previousPropertyValueDkk: 2_900_000,
+    } });
+
+    const result = await enrichProperty(listing, { ...cadastral, bfeNummer: "2340871", ejerlavskode: "610452", matrikelnr: "42q" });
+
+    expect(lookupLand).toHaveBeenCalledWith({ husnummerId: cadastral.idLokalid, bfeNummer: "2340871", matrikelnr: "42q", ejerlavskode: "610452" });
+    expect(lookupBbrTanks).toHaveBeenCalledWith(cadastral.idLokalid);
+    expect(lookupEjendomsvurdering).toHaveBeenCalledWith({ husnummerId: cadastral.idLokalid, bfeNummer: "2340871", matrikelnr: "42q", ejerlav: null });
+    expect(result.risk_flags).toMatchObject({
+      landRegistration: land,
+      oilTanks: { tanks: [tank] },
+      valuation: { year: 2024, propertyValueDkk: 3_150_000, previousYear: 2022, previousPropertyValueDkk: 2_900_000 },
+    });
+    expect(result.source_status.land?.dataMode).toBe("real");
+    expect(result.source_status.oil_tanks?.dataMode).toBe("real");
+    // The stored valuation keeps its three-field shape.
+    expect(result.public_valuation).toEqual({ assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2024 });
+  });
+
+  it("treats a tank BBR still registers as a finding even when the heating is not oil", async () => {
+    vi.mocked(lookupBbr).mockResolvedValue({ ok: true, data: {
+      yearBuilt: 1930, renovationYear: null, areaSqm: 140, buildingType: null, floors: 2,
+      roofMaterial: null, wallMaterial: null, heatingInstallation: "fjernvarme", basementSqm: null, toiletCount: null, bathroomCount: null,
+    } });
+    vi.mocked(lookupBbrTanks).mockResolvedValue({ ok: true, data: { tanks: [tank] } });
+    const flags = (await enrichProperty(listing, cadastral)).risk_flags;
+    expect(flags).toMatchObject({ oilTankRisk: true, oilTankRiskSource: "bbr" });
+    expect(riskStatuses(flags).oilTank).toBe("warning");
+  });
+
+  it("does not let a decommissioned tank override what the heating says", async () => {
+    vi.mocked(lookupBbr).mockResolvedValue({ ok: true, data: {
+      yearBuilt: 1930, renovationYear: null, areaSqm: 140, buildingType: null, floors: 2,
+      roofMaterial: null, wallMaterial: null, heatingInstallation: "fjernvarme", basementSqm: null, toiletCount: null, bathroomCount: null,
+    } });
+    vi.mocked(lookupBbrTanks).mockResolvedValue({ ok: true, data: { tanks: [{ ...tank, decommissioned: true, decommissionedYear: 2014 }] } });
+    const flags = (await enrichProperty(listing, cadastral)).risk_flags;
+    expect(riskStatuses(flags).oilTank).toBe("ok");
+    expect(flags.oilTanks?.tanks).toHaveLength(1);
+  });
+
+  it("leaves the land, tank and valuation flags null when their registers did not answer", async () => {
+    const flags = (await enrichProperty(listing, cadastral)).risk_flags;
+    expect(flags).toMatchObject({ landRegistration: null, oilTanks: null, valuation: null });
   });
 });

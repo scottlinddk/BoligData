@@ -78,7 +78,7 @@ export interface PropertyLookupResolved {
 export type PropertyLookupDataMode = "live" | "mock" | "unavailable";
 
 export interface PropertyLookupSourceStatus {
-  key: "address" | "bbr" | "publicValuation" | "noise" | "sales" | "soil";
+  key: "address" | "bbr" | "oilTanks" | "land" | "publicValuation" | "noise" | "sales" | "soil";
   /** The register behind this field group, e.g. "DAR/DAWA", "BBR", "VUR". */
   register: string;
   mode: PropertyLookupDataMode;

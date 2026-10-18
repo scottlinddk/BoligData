@@ -96,4 +96,23 @@ describe("calculateDueDiligenceScore", () => {
     expect(worst.score).toBe(3); // 10 - 1.5 (noise) - 1.5 (oil tank, bbr) - 2 (soil v2) - 2 (price +50%)
     expect(worst.score).toBeGreaterThanOrEqual(0);
   });
+
+  it("deducts for a registered tank past its decommissioning deadline, on top of the tank itself", () => {
+    const tank = { sizeLiters: 1500, manufacturedYear: 1970, installedYear: 1970, decommissionDeadline: "2020-01-01", decommissionedYear: null, decommissioned: false, inOperation: true, placementCode: null, contentCode: null };
+    const result = calculateDueDiligenceScore({ ...baseFlags, oilTankRisk: true, oilTankRiskSource: "bbr", oilTanks: { tanks: [tank] } }, 20000, 20000);
+    expect(result.deductions.map((d) => d.label)).toEqual(["oilTank", "oilTankOverdue"]);
+    expect(result.score).toBe(7.5);
+  });
+
+  it("deducts for land protections and a farmland note, once each", () => {
+    const land = { totalAreaSqm: 5000, parcelCount: 1, forestReserve: { areaSqm: 300 }, beachProtection: { areaSqm: 20 }, duneProtection: null, entailedForest: false, agriculturalNote: "Landbrug", commonLot: false, condominiumParent: false };
+    const result = calculateDueDiligenceScore({ ...baseFlags, landRegistration: land }, 20000, 20000);
+    expect(result.deductions).toEqual([{ label: "landProtection", points: 1 }, { label: "farmland", points: 0.5 }]);
+  });
+
+  it("does not deduct for land that nothing restricts, or that was not asked", () => {
+    const land = { totalAreaSqm: 812, parcelCount: 1, forestReserve: null, beachProtection: null, duneProtection: null, entailedForest: false, agriculturalNote: null, commonLot: false, condominiumParent: false };
+    expect(calculateDueDiligenceScore({ ...baseFlags, landRegistration: land }, 20000, 20000).score).toBe(10);
+    expect(calculateDueDiligenceScore({ ...baseFlags, landRegistration: null }, 20000, 20000).score).toBe(10);
+  });
 });

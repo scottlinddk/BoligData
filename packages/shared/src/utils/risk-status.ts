@@ -27,7 +27,25 @@ export function riskStatuses(flags: RiskFlags | null): { noise: RiskStatus; oilT
   };
 }
 
+/**
+ * Matriklen's findings. A warning is anything that limits what the owner may do with the land: forest reserve,
+ * beach or dune protection, entailed forest, or a farmland note (a duty to farm). Not asked is unknown, since an
+ * older row or a failed register says nothing about the land.
+ */
+export function landStatus(flags: RiskFlags | null): RiskStatus {
+  const land = flags?.landRegistration;
+  if (!land) return "unknown";
+  return land.forestReserve || land.beachProtection || land.duneProtection || land.entailedForest || land.agriculturalNote ? "warning" : "ok";
+}
+
+/** Whether the tank register registers a tank still standing, and whether one is past its decommissioning deadline. */
+export function standingTanks(flags: RiskFlags | null, today = new Date().toISOString().slice(0, 10)): { count: number; overdue: number } {
+  const standing = (flags?.oilTanks?.tanks ?? []).filter((tank) => !tank.decommissioned);
+  return { count: standing.length, overdue: standing.filter((tank) => tank.decommissionDeadline !== null && tank.decommissionDeadline < today).length };
+}
+
 export function overallRisk(flags: RiskFlags | null): RiskStatus {
-  const statuses = Object.values(riskStatuses(flags));
+  // Land is part of the picture only once it was asked, so a row written before it existed keeps its old answer.
+  const statuses = [...Object.values(riskStatuses(flags)), ...(flags?.landRegistration ? [landStatus(flags)] : [])];
   return statuses.includes("warning") ? "warning" : statuses.includes("unknown") ? "unknown" : "ok";
 }

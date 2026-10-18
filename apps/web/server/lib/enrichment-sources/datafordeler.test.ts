@@ -43,16 +43,14 @@ describe("candidateBases", () => {
     vi.stubEnv("DATAFORDELER_VUR_API_BASE", "https://mirror.example/VUR/v2/");
     expect(candidateBases(SERVICE)).toEqual(["https://mirror.example/VUR/v2"]);
   });
-});
 
-describe("a *_API_BASE that cannot be a GraphQL endpoint", () => {
-  it.each([
-    "services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance",
-    "https://services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance",
-    "http://graphql.datafordeler.dk/VUR/v2",
-    "not a url",
-  ])("is ignored in favour of the default version walk: %s", (value) => {
-    vi.stubEnv("DATAFORDELER_VUR_API_BASE", value);
+  it("assumes https for an override pasted without a scheme", () => {
+    vi.stubEnv("DATAFORDELER_VUR_API_BASE", "graphql.datafordeler.dk/VUR/v2/");
+    expect(candidateBases(SERVICE)).toEqual(["https://graphql.datafordeler.dk/VUR/v2"]);
+  });
+
+  it("ignores an override that points at the retired REST host", () => {
+    vi.stubEnv("DATAFORDELER_VUR_API_BASE", "services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance");
     expect(candidateBases(SERVICE)[0]).toBe("https://graphql.datafordeler.dk/VUR/v2");
   });
 });

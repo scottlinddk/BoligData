@@ -1,8 +1,11 @@
 import { asNonEmptyString } from "../crawl/map-utils.js";
 import { BBR_SERVICE } from "./bbr.js";
-import { postGraphQl, type DatafordelerService } from "./datafordeler.js";
-import { VUR_SERVICE } from "./ejendomsvurdering.js";
+import { memoizeAnswer, type DatafordelerService } from "./datafordeler.js";
+import { apiKeyOrFailure, asCode, isoTimestamp, positiveInt, query, registerId, unique } from "./register-query.js";
 import { sourceFailed, sourceOk, type SourceResult } from "./types.js";
+
+// Still exported from here for the callers and tests that import them from this module.
+export { isoTimestamp, positiveInt, registerId };
 
 /**
  * Public valuations (VUR) for a *house*, found from its DAR husnummer id alone.
@@ -28,6 +31,17 @@ import { sourceFailed, sourceOk, type SourceResult } from "./types.js";
  * `BBR_Grund.bestemtFastEjendom` holds a `BBR_Ejendomsrelation.id_lokalId`. Every hop fails soft
  * with a reason, so a wrong guess shows up as an unavailable source, never as a wrong number.
  */
+
+/**
+ * VUR via Datafordeler's entity-based GraphQL service: `VUR/v2` per Datafordeler's "GraphQL (VUR)" page.
+ * The other versions are only tried if v2 starts returning 404, which is how a withdrawn version presents.
+ */
+export const VUR_SERVICE: DatafordelerService = {
+  register: "VUR",
+  versionEnv: "DATAFORDELER_VUR_VERSION",
+  baseEnv: "DATAFORDELER_VUR_API_BASE",
+  versions: ["v2", "v3", "v1"],
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BFE_PATTERN = /^\d{1,10}$/;
@@ -60,81 +74,6 @@ export interface ValuationYear {
   registeredAt: string | null;
 }
 
-/* ------------------------------------------------------------------ helpers */
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function asNodes(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value) ? value.flatMap((node) => (asRecord(node) ? [asRecord(node)!] : [])) : [];
-}
-
-const unique = <T>(values: T[]): T[] => [...new Set(values)];
-
-/** Codes and numbers come back as either strings or numbers depending on the field. */
-function asCode(value: unknown): string | null {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return asNonEmptyString(value);
-}
-
-/** Register row ids run to about 9e14, past `positiveInt`'s cap for amounts and years. Exact integers only. */
-export function registerId(value: unknown): number | null {
-  const n = typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value) : value;
-  return typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : null;
-}
-
-export function positiveInt(value: unknown): number | null {
-  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-  if (typeof n !== "number" || !Number.isFinite(n)) return null;
-  const rounded = Math.round(n);
-  return rounded > 0 && rounded <= 1e12 ? rounded : null;
-}
-
-/** ISO timestamp for a parseable date between 1990 and now, else null (a future date is never "known"). */
-export function isoTimestamp(value: unknown, now = Date.now()): string | null {
-  if (typeof value !== "string" || value.trim() === "") return null;
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms) || ms < Date.UTC(1990, 0, 1) || ms > now) return null;
-  return new Date(ms).toISOString();
-}
-
-interface QueryOptions {
-  /** BBR needs registreringstid/virkningstid, VUR rejects them. Both facts are in the published schemas. */
-  temporal?: boolean;
-  first?: number;
-  pageInfo?: boolean;
-}
-
-interface Connection {
-  nodes: Record<string, unknown>[];
-  hasNextPage: boolean | null;
-}
-
-async function query(
-  service: DatafordelerService,
-  apiKey: string,
-  entity: string,
-  where: string,
-  selection: string,
-  { temporal = false, first, pageInfo = false }: QueryOptions = {},
-): Promise<Connection> {
-  const tid = JSON.stringify(new Date().toISOString());
-  const args = [temporal && `registreringstid: ${tid} virkningstid: ${tid}`, first !== undefined && `first: ${first}`, `where: { ${where} }`]
-    .filter(Boolean)
-    .join(" ");
-  const document = `query Q { ${entity}(${args}) { ${pageInfo ? "pageInfo { hasNextPage } " : ""}nodes { ${selection} } } }`;
-  const data = await postGraphQl<Record<string, unknown>>(service, apiKey, document);
-  const connection = asRecord(data?.[entity]);
-  const hasNextPage = asRecord(connection?.pageInfo)?.hasNextPage;
-  return { nodes: asNodes(connection?.nodes), hasNextPage: typeof hasNextPage === "boolean" ? hasNextPage : null };
-}
-
-function apiKeyOrFailure(): SourceResult<string> {
-  const apiKey = process.env.DATAFORDELER_API_KEY;
-  return apiKey ? sourceOk(apiKey) : sourceFailed("DATAFORDELER_API_KEY not configured");
-}
-
 /* ----------------------------------------------------- house or something else */
 
 /**
@@ -145,7 +84,11 @@ function apiKeyOrFailure(): SourceResult<string> {
  * `"other"` covers apartment buildings and anything that is not a plain house (summer house,
  * farm, commercial): none of those get a parcel-level valuation here.
  */
-export async function classifyHusnummer(husnummerId: string): Promise<SourceResult<"house" | "other">> {
+export function classifyHusnummer(husnummerId: string): Promise<SourceResult<"house" | "other">> {
+  return memoizeAnswer(`class:${husnummerId.toLowerCase()}`, () => classifyHusnummerUncached(husnummerId));
+}
+
+async function classifyHusnummerUncached(husnummerId: string): Promise<SourceResult<"house" | "other">> {
   if (!UUID.test(husnummerId)) return sourceFailed("invalid DAR husnummer UUID");
   const key = apiKeyOrFailure();
   if (!key.ok) return key;
@@ -177,7 +120,11 @@ function pickBfe(nodes: Record<string, unknown>[]): SourceResult<string> {
 }
 
 /** House: husnummer -> BBR_Grund -> bestemtFastEjendom (an Ejendomsrelation id) -> the parcel's BFE. */
-export async function lookupHouseBfe(husnummerId: string): Promise<SourceResult<string>> {
+export function lookupHouseBfe(husnummerId: string): Promise<SourceResult<string>> {
+  return memoizeAnswer(`bfe:${husnummerId.toLowerCase()}`, () => lookupHouseBfeUncached(husnummerId));
+}
+
+async function lookupHouseBfeUncached(husnummerId: string): Promise<SourceResult<string>> {
   if (!UUID.test(husnummerId)) return sourceFailed("invalid DAR husnummer UUID");
   const key = apiKeyOrFailure();
   if (!key.ok) return key;

@@ -4,7 +4,9 @@ import type {
 } from "../../../../../packages/shared/src/types/index.js";
 import type { AddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
+import { lookupBbrTanks } from "../enrichment-sources/bbr-tanks.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupLand } from "../enrichment-sources/matrikel.js";
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildJordforureningsattestUrl } from "../enrichment-sources/jordforureningsattest-link.js";
@@ -68,12 +70,21 @@ export async function enrichProperty(
     }
   }
 
-  const [bbr, valuation, soil, contamination, noise] = await Promise.all([
-    read("bbr", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbr(cadastral?.idLokalid ?? null)),
-    read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null)),
+  const husnummerId = cadastral?.idLokalid ?? null;
+  const [bbr, valuation, soil, contamination, noise, land, tanks] = await Promise.all([
+    read("bbr", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbr(husnummerId)),
+    read("valuation", mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE"), () => lookupEjendomsvurdering({
+      husnummerId, bfeNummer: cadastral?.bfeNummer ?? null, matrikelnr: cadastral?.matrikelnr ?? null, ejerlav: cadastral?.ejerlav ?? null,
+    })),
     read("soil_type", mockModeEnabled("GEUS_MOCK_MODE"), () => lookupSoilType(listing.lat, listing.lon)),
     read("soil_contamination", mockModeEnabled("MILJOEPORTALEN_MOCK_MODE"), () => lookupSoilContamination(listing.lat, listing.lon)),
     read("noise", mockModeEnabled("STOEJKORT_MOCK_MODE"), () => lookupNoiseExposure(listing.lat, listing.lon)),
+    // Recorded in source_status for transparency but not in enrichment-refresh's register list: an apartment
+    // never has land or a parcel valuation of its own, and a source that can never answer would re-enrich every crawl.
+    read("land", mockModeEnabled("MATRIKEL_MOCK_MODE"), () => lookupLand({
+      husnummerId, bfeNummer: cadastral?.bfeNummer ?? null, matrikelnr: cadastral?.matrikelnr ?? null, ejerlavskode: cadastral?.ejerlavskode ?? null,
+    })),
+    read("oil_tanks", mockModeEnabled("BBR_MOCK_MODE"), () => lookupBbrTanks(husnummerId)),
   ]);
   return {
     bbr_data: {
@@ -106,13 +117,18 @@ export async function enrichProperty(
       heating: bbr?.heatingInstallation ?? null,
       noise,
       soil: contamination,
+      tanks,
+      land,
+      valuation,
       jordart: soil?.jordart ?? null,
       parcelAttestUrl: buildJordforureningsattestUrl(cadastral?.ejerlavskode ?? null, cadastral?.matrikelnr ?? null),
       // BBR not settling the heating leaves the listing's long-standing building-year heuristic, labelled as such.
       oilTankFallback: { oilTankRisk: (listing.building_year ?? 2000) < 1970, oilTankRiskSource: "heuristic" },
     }),
     school_transport: null,
-    public_valuation: valuation,
+    public_valuation: valuation
+      ? { assessedPropertyValueDkk: valuation.assessedPropertyValueDkk, assessedLandValueDkk: valuation.assessedLandValueDkk, valuationYear: valuation.valuationYear }
+      : null,
     source: bbr || valuation ? "datafordeler" : "mock",
     source_status: sourceStatus,
     enriched_at: observedAt,
