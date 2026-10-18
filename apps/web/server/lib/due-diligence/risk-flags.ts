@@ -1,4 +1,5 @@
-import type { OilTankRiskSource, RiskFlags } from "../../../../../packages/shared/src/types/index.js";
+import type { LandRegistration, OilTankRegistry, OilTankRiskSource, RiskFlags, ValuationCheck } from "../../../../../packages/shared/src/types/index.js";
+import type { EjendomsvurderingData } from "../enrichment-sources/ejendomsvurdering.js";
 import type { SoilContaminationResult } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
 import type { NoiseExposure } from "../enrichment-sources/stoejkort.js";
@@ -17,6 +18,21 @@ export function oilTankFromHeating(heating: string | null | undefined): { oilTan
   return null;
 }
 
+/**
+ * The latest public valuation and the year before it, as the checklist shows them. Null when VUR gave no
+ * valuation with a property value.
+ */
+export function toValuationCheck(valuation: EjendomsvurderingData | null | undefined): ValuationCheck | null {
+  if (!valuation || valuation.valuationYear === null || valuation.assessedPropertyValueDkk === null) return null;
+  return {
+    year: valuation.valuationYear,
+    propertyValueDkk: valuation.assessedPropertyValueDkk,
+    landValueDkk: valuation.assessedLandValueDkk,
+    previousYear: valuation.previousYear,
+    previousPropertyValueDkk: valuation.previousPropertyValueDkk,
+  };
+}
+
 export interface RiskFlagInput {
   /** Municipality name as the link tables key it ("Aalborg"), or null. */
   municipality: string | null;
@@ -30,6 +46,12 @@ export interface RiskFlagInput {
   jordart?: string | null;
   /** Attest link built from the parcel, when the parcel is known. */
   parcelAttestUrl?: string | null;
+  /** The tanks BBR registers, only when the register answered for real. Null means "not asked", which is not "no tank". */
+  tanks?: OilTankRegistry | null;
+  /** What Matriklen registers on the land, only when it answered for real. */
+  land?: LandRegistration | null;
+  /** The public valuation (VUR), only when it answered for real. */
+  valuation?: EjendomsvurderingData | null;
   /** The oil tank answer when BBR settles nothing. Listings keep their building-year heuristic; addresses pass null. */
   oilTankFallback?: { oilTankRisk: boolean; oilTankRiskSource: OilTankRiskSource } | null;
 }
@@ -40,7 +62,11 @@ export interface RiskFlagInput {
  * link the reader follows; what has one is only ever filled from a real answer.
  */
 export function buildRiskFlags(input: RiskFlagInput): RiskFlags {
-  const oil = oilTankFromHeating(input.heating) ?? input.oilTankFallback ?? { oilTankRisk: false, oilTankRiskSource: "heuristic" as const };
+  // A tank BBR still registers as standing is a finding whatever the heating is: a tank outlives the boiler it fed.
+  const standingTank = input.tanks?.tanks.some((tank) => !tank.decommissioned) === true;
+  const oil = standingTank
+    ? { oilTankRisk: true, oilTankRiskSource: "bbr" as const }
+    : oilTankFromHeating(input.heating) ?? input.oilTankFallback ?? { oilTankRisk: false, oilTankRiskSource: "heuristic" as const };
   return {
     noiseExposureLden: null,
     noiseBand: input.noise?.band ?? null,
@@ -54,6 +80,9 @@ export function buildRiskFlags(input: RiskFlagInput): RiskFlags {
     oilTankRisk: oil.oilTankRisk,
     oilTankRiskSource: oil.oilTankRiskSource,
     heatingInstallation: input.heating ?? null,
+    oilTanks: input.tanks ?? null,
+    landRegistration: input.land ?? null,
+    valuation: toValuationCheck(input.valuation),
     soilContamination: { classification: input.soil?.classification ?? "unknown", jordart: input.jordart ?? null },
     soilContaminationAttestUrl: input.soil?.attestUrl ?? input.parcelAttestUrl ?? null,
     soilContaminationSiteName: input.soil?.locationName ?? null,

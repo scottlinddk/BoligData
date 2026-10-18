@@ -9,7 +9,9 @@ import type {
 import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
-import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupBbrTanks } from "../enrichment-sources/bbr-tanks.js";
+import { lookupEjendomsvurdering, valuationFromYears } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupLand } from "../enrichment-sources/matrikel.js";
 import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
 import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
@@ -96,11 +98,17 @@ export async function lookupProperty(
       ? { road: cadastral.streetName, houseNumber: cadastral.houseNumber, zipCode: cadastral.postalCode }
       : undefined;
 
-  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult, soilResult] = await Promise.all([
-    lookupBbr(cadastral?.idLokalid ?? null),
+  const husnummerId = cadastral?.idLokalid ?? null;
+  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult, soilResult, landResult, tanksResult] = await Promise.all([
+    lookupBbr(husnummerId),
     byId
       ? null
-      : lookupEjendomsvurdering(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null, cadastral?.bfeNummer ?? null),
+      : lookupEjendomsvurdering({
+          husnummerId,
+          bfeNummer: cadastral?.bfeNummer ?? null,
+          matrikelnr: cadastral?.matrikelnr ?? null,
+          ejerlav: cadastral?.ejerlav ?? null,
+        }),
     byId ? lookupHouseValuation(cadastral?.idLokalid ?? null) : null,
     // Querying a noise WFS at 0,0 returns a confident-looking "no noise here"
     // for a point in the Atlantic, so an unresolvable address skips the call
@@ -110,6 +118,14 @@ export async function lookupProperty(
     // empty "no sales nearby" is indistinguishable from a real answer.
     hasCoordinates ? lookupBoligsidenSales(lat, lon, subjectAddress ? { subjectAddress } : {}) : null,
     hasCoordinates ? lookupSoilContamination(lat, lon) : null,
+    // MAT and the BBR tank register are keyed by the husnummer (through its BFE for MAT), not by coordinates.
+    lookupLand({
+      husnummerId,
+      bfeNummer: cadastral?.bfeNummer ?? null,
+      matrikelnr: cadastral?.matrikelnr ?? null,
+      ejerlavskode: cadastral?.ejerlavskode ?? null,
+    }),
+    lookupBbrTanks(husnummerId),
   ]);
 
   const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
@@ -123,6 +139,14 @@ export async function lookupProperty(
     ? latestYear
       ? { assessedPropertyValueDkk: latestYear.propertyValueDkk, assessedLandValueDkk: latestYear.landValueDkk, valuationYear: latestYear.year }
       : null
+    : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
+      ? listingValuationResult.data
+      : null;
+  const land = landResult.ok && !mockModeEnabled("MATRIKEL_MOCK_MODE") ? landResult.data : null;
+  const tanks = tanksResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? tanksResult.data : null;
+  // The valuation behind the checklist: the latest year and the one before it, whichever path found it.
+  const valuationForFlags = byId
+    ? valuationFromYears(valuationHistory)
     : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
       ? listingValuationResult.data
       : null;
@@ -142,6 +166,8 @@ export async function lookupProperty(
   const sources: PropertyLookupSourceStatus[] = [
     status("address", addressRegisterLabel, addressMockFlag, cadastralResult),
     status("bbr", "BBR via Datafordeler GraphQL", "BBR_MOCK_MODE", bbrResult),
+    status("oilTanks", "BBR tekniske anlæg via Datafordeler GraphQL", "BBR_MOCK_MODE", tanksResult),
+    status("land", "MAT via Datafordeler GraphQL", "MATRIKEL_MOCK_MODE", landResult),
     status("publicValuation", "VUR via Datafordeler GraphQL", valuationMockFlag, valuationResult),
     noiseResult === null
       ? {
@@ -224,7 +250,7 @@ export async function lookupProperty(
     propertyClass: houseLookup?.propertyClass ?? null,
     // Null only when the address itself could not be resolved: then there is nothing to check against.
     riskFlags: cadastral
-      ? buildAddressRiskFlags({ municipalityCode: cadastral.municipalityCode ?? null, bbr: bbrBuilding, noise, soil })
+      ? buildAddressRiskFlags({ municipalityCode: cadastral.municipalityCode ?? null, bbr: bbrBuilding, noise, soil, tanks, land, valuation: valuationForFlags })
       : null,
     publicValuation: publicValuation
       ? {

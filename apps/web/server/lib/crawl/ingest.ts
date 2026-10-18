@@ -6,7 +6,7 @@ import { enrichProperty } from "./enrich.js";
 import { dedupeByExternalId, listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
-import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
+import { lookupMatrikel } from "../enrichment-sources/matrikel.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
 import { buildHistoryRows, persistHistoryRows, type PreviousListingObservation } from "./history.js";
 import { enrichmentNeedsRefresh } from "./enrichment-refresh.js";
@@ -275,9 +275,12 @@ async function ingestSource(
     cadastralByExternalId.set(listing.external_id, merged);
   }
 
-  // Matriklen parcel-area lookup is keyed off matrikelnr/ejerlav (not
-  // id_lokalid — parcels aren't addresses), so it can only run for listings
-  // whose cadastral lookup above already succeeded.
+  // Matriklen (MAT) parcel-area lookup is keyed off the BFE number, or a
+  // matrikelnr + ejerlavskode (not id_lokalid — parcels aren't addresses), so
+  // it can only run for listings whose cadastral lookup above, or a stored
+  // identifier, already supplied one. It deliberately does not walk BBR to find
+  // a BFE: that is enrichment's job (enrich.ts) and runs only for listings
+  // being re-enriched, where this runs for every listing on every crawl.
   const registeredAreaByExternalId = new Map<string, number | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const results = await mapConcurrent(
@@ -286,7 +289,7 @@ async function ingestSource(
         if (!cadastral || mockModeEnabled("MATRIKEL_MOCK_MODE")) {
           return Promise.resolve({ ok: false as const, error: "Non-live or unavailable cadastral source omitted" });
         }
-        return lookupMatrikelParcel(cadastral.matrikelnr, cadastral.ejerlav);
+        return lookupMatrikel({ bfeNummer: cadastral.bfeNummer, matrikelnr: cadastral.matrikelnr, ejerlavskode: cadastral.ejerlavskode });
       },
     );
     results.forEach((result, i) => {
@@ -296,7 +299,7 @@ async function ingestSource(
         report.matrikelLookupFailed += 1;
         return;
       }
-      registeredAreaByExternalId.set(listing.external_id, result.data.registeredAreaSqm);
+      registeredAreaByExternalId.set(listing.external_id, result.data.totalAreaSqm);
     });
   }
 

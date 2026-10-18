@@ -64,10 +64,39 @@ const resolvedBase = new Map<string, string>();
 /** Introspected field names per `<register>:<type>`; `null` = the type is not in that schema. */
 const fieldCache = new Map<string, Set<string> | null>();
 
+/** Lookups other sources share (a husnummer's BFE number, its building class), by key. */
+const memo = new Map<string, { expires: number; value: Promise<unknown> }>();
+const MEMO_TTL_MS = 10 * 60 * 1000;
+
 /** Test seam — module-level caches would otherwise leak between cases. */
 export function resetDatafordelerCache(): void {
   resolvedBase.clear();
   fieldCache.clear();
+  memo.clear();
+}
+
+/**
+ * Runs `load` once per key for ten minutes, concurrent callers included, and
+ * remembers only answers: a failed result or a throw is dropped so the next
+ * caller asks again. Several sources need the same BFE number for one property
+ * (valuation, cadastre), and without this each would walk the same three BBR
+ * hops to find it.
+ */
+export function memoizeAnswer<T extends { ok: boolean }>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = memo.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value as Promise<T>;
+  const value = load().then(
+    (result) => {
+      if (!result.ok && memo.get(key)?.value === value) memo.delete(key);
+      return result;
+    },
+    (error) => {
+      if (memo.get(key)?.value === value) memo.delete(key);
+      throw error;
+    },
+  );
+  memo.set(key, { expires: Date.now() + MEMO_TTL_MS, value });
+  return value;
 }
 
 /**

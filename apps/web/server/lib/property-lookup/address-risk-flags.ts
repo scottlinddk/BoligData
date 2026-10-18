@@ -1,4 +1,5 @@
-import type { RiskFlags } from "../../../../../packages/shared/src/types/index.js";
+import type { LandRegistration, OilTankRegistry, RiskFlags } from "../../../../../packages/shared/src/types/index.js";
+import type { EjendomsvurderingData } from "../enrichment-sources/ejendomsvurdering.js";
 import type { BbrBuildingData } from "../enrichment-sources/bbr.js";
 import type { SoilContaminationResult } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import type { NoiseExposure } from "../enrichment-sources/stoejkort.js";
@@ -14,6 +15,12 @@ export interface AddressRiskInput {
   noise: NoiseExposure | null;
   /** The soil contamination register's answer, only when it answered for real. */
   soil: SoilContaminationResult | null;
+  /** The tanks BBR registers, only when the register answered for real. */
+  tanks?: OilTankRegistry | null;
+  /** What Matriklen registers on the land, only when it answered for real. */
+  land?: LandRegistration | null;
+  /** The public valuation, only when VUR answered for real. */
+  valuation?: EjendomsvurderingData | null;
 }
 
 /**
@@ -23,12 +30,15 @@ export interface AddressRiskInput {
  * old building is not evidence of a tank and a young one is not evidence of none. Without a parcel there is
  * no attest link of our own, only the contamination register's link for a mapped site.
  */
-export function buildAddressRiskFlags({ municipalityCode, bbr, noise, soil }: AddressRiskInput): RiskFlags {
+export function buildAddressRiskFlags({ municipalityCode, bbr, noise, soil, tanks = null, land = null, valuation = null }: AddressRiskInput): RiskFlags {
   return buildRiskFlags({
     municipality: municipalityNameFromCode(municipalityCode),
     heating: bbr?.heatingInstallation ?? null,
     noise,
     soil,
+    tanks,
+    land,
+    valuation,
     oilTankFallback: null,
   });
 }
