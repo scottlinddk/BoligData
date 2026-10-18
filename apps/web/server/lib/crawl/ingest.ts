@@ -6,7 +6,7 @@ import { enrichProperty } from "./enrich.js";
 import { dedupeByExternalId, listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
-import { lookupMatrikelParcel } from "../enrichment-sources/matrikel.js";
+import { lookupMatrikel } from "../enrichment-sources/matrikel.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
 import { buildHistoryRows, persistHistoryRows, type PreviousListingObservation } from "./history.js";
 import { enrichmentNeedsRefresh } from "./enrichment-refresh.js";
@@ -209,10 +209,13 @@ async function ingestSource(
   // basis for deciding which listings actually need (re-)enrichment.
   const existing = new Map<string, PreviousListingObservation & { id: string; content_hash: string | null; listing_date: string | null; first_seen_at: string | null }>();
   const blockedExternalIds = new Set<string>();
+  // Register identifiers already on the row. A lookup that fails this run (or answers without a parcel, as
+  // Adressevælger does) must not wipe identifiers an earlier run or backfill resolved.
+  const storedIdentifiers = new Map<string, StoredIdentifiers>();
   for (const ids of chunk([...hashByExternalId.keys()], CHUNK_SIZE)) {
     const { data, error } = await client
       .from("properties")
-      .select("id, external_id, content_hash, listing_date, listing_date_definition, price, status, last_seen_at, first_seen_at, current_episode_key")
+      .select("id, external_id, content_hash, listing_date, listing_date_definition, price, status, last_seen_at, first_seen_at, current_episode_key, id_lokalid, matrikelnr, ejerlav, zone, bfe_nummer")
       .eq("listing_source", source)
       .in("external_id", ids);
     if (error) {
@@ -225,6 +228,10 @@ async function ingestSource(
       continue;
     }
     for (const row of data ?? []) {
+      storedIdentifiers.set(row.external_id as string, {
+        idLokalid: textOrNull(row.id_lokalid), matrikelnr: textOrNull(row.matrikelnr), ejerlav: textOrNull(row.ejerlav),
+        zone: zoneOrNull(row.zone), bfeNummer: textOrNull(row.bfe_nummer),
+      });
       existing.set(row.external_id as string, {
         id: row.id as string,
         content_hash: (row.content_hash as string | null) ?? null,
@@ -263,10 +270,17 @@ async function ingestSource(
       cadastralByExternalId.set(listing.external_id, result.data);
     });
   }
+  for (const listing of listings) {
+    const merged = withStoredIdentifiers(cadastralByExternalId.get(listing.external_id) ?? null, storedIdentifiers.get(listing.external_id) ?? null);
+    cadastralByExternalId.set(listing.external_id, merged);
+  }
 
-  // Matriklen parcel-area lookup is keyed off matrikelnr/ejerlav (not
-  // id_lokalid — parcels aren't addresses), so it can only run for listings
-  // whose cadastral lookup above already succeeded.
+  // Matriklen (MAT) parcel-area lookup is keyed off the BFE number, or a
+  // matrikelnr + ejerlavskode (not id_lokalid — parcels aren't addresses), so
+  // it can only run for listings whose cadastral lookup above, or a stored
+  // identifier, already supplied one. It deliberately does not walk BBR to find
+  // a BFE: that is enrichment's job (enrich.ts) and runs only for listings
+  // being re-enriched, where this runs for every listing on every crawl.
   const registeredAreaByExternalId = new Map<string, number | null>();
   for (const listingChunk of chunk(listings, CHUNK_SIZE)) {
     const results = await mapConcurrent(
@@ -275,7 +289,7 @@ async function ingestSource(
         if (!cadastral || mockModeEnabled("MATRIKEL_MOCK_MODE")) {
           return Promise.resolve({ ok: false as const, error: "Non-live or unavailable cadastral source omitted" });
         }
-        return lookupMatrikelParcel(cadastral.matrikelnr, cadastral.ejerlav);
+        return lookupMatrikel({ bfeNummer: cadastral.bfeNummer, matrikelnr: cadastral.matrikelnr, ejerlavskode: cadastral.ejerlavskode });
       },
     );
     results.forEach((result, i) => {
@@ -285,7 +299,7 @@ async function ingestSource(
         report.matrikelLookupFailed += 1;
         return;
       }
-      registeredAreaByExternalId.set(listing.external_id, result.data.registeredAreaSqm);
+      registeredAreaByExternalId.set(listing.external_id, result.data.totalAreaSqm);
     });
   }
 
@@ -494,4 +508,43 @@ export async function runIngest(client: SupabaseClient, options?: IngestBatchOpt
     nextOffset: !ok ? options.offset : options.offset + options.batchSize < total ? options.offset + options.batchSize : null,
   } : undefined;
   return { ok, reports, ...(batch ? { batch } : {}) };
+}
+
+interface StoredIdentifiers {
+  idLokalid: string | null;
+  matrikelnr: string | null;
+  ejerlav: string | null;
+  zone: AddressCadastral["zone"];
+  bfeNummer: string | null;
+}
+
+const ZONES = new Set(["byzone", "landzone", "sommerhusomraade"]);
+const zoneOrNull = (value: unknown): AddressCadastral["zone"] => (typeof value === "string" && ZONES.has(value) ? value as AddressCadastral["zone"] : null);
+
+function textOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : typeof value === "number" ? String(value) : null;
+}
+
+/**
+ * This run's lookup, with any identifier it lacks taken from the stored row. A fresh value always wins; a
+ * stored one only fills a gap. With no lookup and no stored husnummer there is nothing to key registers off.
+ */
+export function withStoredIdentifiers(cadastral: AddressCadastral | null, stored: StoredIdentifiers | null): AddressCadastral | null {
+  if (!stored) return cadastral;
+  if (!cadastral) {
+    if (!stored.idLokalid && !stored.bfeNummer && !stored.matrikelnr) return null;
+    return {
+      idLokalid: stored.idLokalid, matrikelnr: stored.matrikelnr, ejerlav: stored.ejerlav, ejerlavskode: null,
+      bfeNummer: stored.bfeNummer, zone: stored.zone, lat: null, lon: null, postalCode: null, postalName: null,
+      municipalityCode: null, formattedAddress: null, resolvedVia: "stored",
+    };
+  }
+  return {
+    ...cadastral,
+    idLokalid: cadastral.idLokalid ?? stored.idLokalid,
+    matrikelnr: cadastral.matrikelnr ?? stored.matrikelnr,
+    ejerlav: cadastral.ejerlav ?? stored.ejerlav,
+    zone: cadastral.zone ?? stored.zone,
+    bfeNummer: cadastral.bfeNummer ?? stored.bfeNummer,
+  };
 }

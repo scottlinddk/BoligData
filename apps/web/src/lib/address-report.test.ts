@@ -19,6 +19,7 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
       floors: 1, roofMaterial: null, wallMaterial: null, basementSqm: null, toiletCount: null, bathroomCount: null,
     },
     publicValuation: { assessedPropertyValueDkk: 3_150_000, assessedLandValueDkk: 780_000, valuationYear: 2025 },
+    valuationHistory: [], propertyClass: null, priceHistoryMatch: null, riskFlags: null,
     priceHistory: [{ soldDate: "2018-05-01", price: 2_100_000, pricePerSqm: 14_000, saleType: "normal" }],
     nearbySales: [{ address: "Floravej 8", soldDate: "2026-03-01", price: 2_500_000, pricePerSqm: 17_000, saleType: "normal", areaSqm: 150, propertyType: "villa", distanceMeters: 40, lat: 57.0460, lon: 9.8766 }],
     renovationCategory: { category: "B", isEstimate: true, symbol: "~", reason: "", source: "ai" },
@@ -58,6 +59,20 @@ describe("buildAddressReport", () => {
     expect(report.sources.find((s) => s.key === "publicValuation")?.error).toBe("no BFE");
   });
 
+  it("says whether the sales register answered, and how the history was attributed", () => {
+    const live = buildAddressReport(lookup({ priceHistoryMatch: "matched" }));
+    expect(live).toMatchObject({ salesAvailable: true, priceHistoryMatch: "matched" });
+    expect(buildAddressReport(lookup({ priceHistoryMatch: "ambiguous" })).priceHistoryMatch).toBe("ambiguous");
+  });
+
+  it("makes an empty history 'unknown' rather than 'never sold' when the sales register did not answer", () => {
+    const report = buildAddressReport(lookup({
+      priceHistoryMatch: "matched",
+      sources: [live("address"), live("bbr"), live("publicValuation"), live("noise"), unavailable("sales", "HTTP 503")],
+    }));
+    expect(report).toMatchObject({ salesAvailable: false, priceHistoryMatch: null, priceHistory: [] });
+  });
+
   it("treats an all-null BBR or valuation record as no data", () => {
     const report = buildAddressReport(lookup({
       bbrData: { yearBuilt: null, renovationYear: null, energyLabel: null, areaSqm: null, buildingType: null, heatingInstallation: null, floors: null, roofMaterial: null, wallMaterial: null, basementSqm: null, toiletCount: null, bathroomCount: null },
@@ -77,6 +92,29 @@ describe("buildAddressReport", () => {
     expect(report.mapUrl).toBeNull();
     expect(report.address).toBe("");
     expect(report.postalCode).toBeNull();
+  });
+
+  it("passes the server's fair-price estimate through, keeping 'failed' and 'not asked for' apart", () => {
+    const estimate = { status: "available", askingPrice: null } as unknown as NonNullable<PropertyLookupResult["spar"]>;
+    expect(buildAddressReport(lookup({ spar: estimate })).spar).toBe(estimate);
+    expect(buildAddressReport(lookup({ spar: null })).spar).toBeNull();
+    expect(buildAddressReport(lookup()).spar).toBeUndefined();
+  });
+
+  it("keeps the estimate even when the valuation source is not live, since 'not a house' is an answer", () => {
+    const unsupported = { status: "no_valuation", reason: "unsupported_property_type" } as unknown as NonNullable<PropertyLookupResult["spar"]>;
+    const report = buildAddressReport(lookup({
+      spar: unsupported,
+      sources: [live("address"), live("bbr"), unavailable("publicValuation", "not a house"), live("noise"), live("sales")],
+    }));
+    expect(report.spar).toBe(unsupported);
+    expect(report.publicValuation).toBeNull();
+  });
+
+  it("passes the due-diligence flags through, for the checklist to render", () => {
+    const riskFlags = { noiseExposureLden: 52, oilTankRisk: false } as unknown as NonNullable<PropertyLookupResult["riskFlags"]>;
+    expect(buildAddressReport(lookup({ riskFlags })).riskFlags).toBe(riskFlags);
+    expect(buildAddressReport(lookup()).riskFlags).toBeNull();
   });
 
   it("never includes an asking price or any screening verdict in the report", () => {

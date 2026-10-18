@@ -16,10 +16,13 @@ export function safeBbrData(row: EnrichmentRow): BbrData | null {
 export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
   const raw: RiskFlags | undefined = row.risk_flags;
   if (!raw) return null;
-  const bbrHeatingKnown = sourceIsReal(row, "bbr") && raw.oilTankRiskSource === "bbr";
+  // A "bbr" oil tank answer comes from the heating or from the tank register, so either being real stands behind it.
+  const bbrHeatingKnown = (sourceIsReal(row, "bbr") || sourceIsReal(row, "oil_tanks")) && raw.oilTankRiskSource === "bbr";
   const genuineListingHeuristic = sourceIsReal(row, "sales") && raw.oilTankRiskSource === "heuristic";
   return {
     noiseExposureLden: sourceIsReal(row, "noise") && typeof raw.noiseExposureLden === "number" && Number.isFinite(raw.noiseExposureLden) ? raw.noiseExposureLden : null,
+    noiseBand: sourceIsReal(row, "noise") ? raw.noiseBand ?? null : null,
+    noiseChecked: sourceIsReal(row, "noise") && raw.noiseChecked === true,
     encumbranceCheckRequired: true,
     encumbranceLookupUrl: raw.encumbranceLookupUrl ?? null,
     sewerSeparationCheckRequired: true,
@@ -32,6 +35,12 @@ export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
       jordart: sourceIsReal(row, "soil_type") ? raw.soilContamination?.jordart ?? null : null,
     },
     soilContaminationAttestUrl: raw.soilContaminationAttestUrl ?? null,
+    soilContaminationSiteName: sourceIsReal(row, "soil_contamination") ? raw.soilContaminationSiteName ?? null : null,
+    heatingInstallation: sourceIsReal(row, "bbr") ? raw.heatingInstallation ?? null : null,
+    // Each register's findings only stand when that register's own observation was real, like the fields above.
+    oilTanks: sourceIsReal(row, "oil_tanks") ? raw.oilTanks ?? null : null,
+    landRegistration: sourceIsReal(row, "land") ? raw.landRegistration ?? null : null,
+    valuation: sourceIsReal(row, "valuation") ? raw.valuation ?? null : null,
   };
 }
 

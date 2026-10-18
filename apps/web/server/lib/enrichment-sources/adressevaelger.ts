@@ -75,6 +75,8 @@ export function parseHusnummer(raw: unknown): AddressCadastral | null {
     postalName: asNonEmptyString(postnummer?.navn),
     municipalityCode: asNonEmptyString(asRecord(husnummer.navngivenvejkommunedel)?.kommune),
     formattedAddress: asNonEmptyString(husnummer.adgangsadressebetegnelse),
+    streetName: asNonEmptyString(husnummer.vejnavn),
+    houseNumber: asNonEmptyString(husnummer.husnummertekst),
     resolvedVia: "adressevaelger",
   };
 }
@@ -87,6 +89,53 @@ export async function lookupHusnummerById(id: string): Promise<SourceResult<Addr
     );
     const parsed = parseHusnummer(body);
     return parsed === null ? sourceFailed("Adressevælger returned no husnummer for this id") : sourceOk(parsed);
+  } catch (error) {
+    return sourceFailed(error);
+  }
+}
+
+const normalize = (value: string): string => value.normalize("NFC").toLocaleLowerCase("da-DK").replace(/\s+/g, " ").trim();
+
+/**
+ * The one husnummer id a search answered for exactly this street, house number and (when known) postcode,
+ * or null. A hit on another number, another street or another town is never taken, and two equally exact
+ * hits (the same street name in two towns, with no postcode to tell them apart) are refused as ambiguous.
+ */
+export function pickExactHusnummer(
+  body: unknown,
+  wanted: { streetName: string; houseNumber: string; postalCode: string | null },
+): string | null {
+  const hits = asRecord(body)?.fund;
+  if (!Array.isArray(hits)) return null;
+  const ids = new Set<string>();
+  for (const hit of hits) {
+    const record = asRecord(hit);
+    if (!record || record.type !== "husnummer" || !isHusnummerId(record.id)) continue;
+    if (typeof record.vejnavn !== "string" || typeof record.husnummer !== "string") continue;
+    if (normalize(record.vejnavn) !== normalize(wanted.streetName) || normalize(record.husnummer) !== normalize(wanted.houseNumber)) continue;
+    // The title reads "Vej 1, 9000 By"; the postcode is the token after the first comma.
+    const titlePostcode = typeof record.titel === "string" ? /,\s*(\d{4})\b/.exec(record.titel)?.[1] ?? null : null;
+    if (wanted.postalCode !== null && titlePostcode !== wanted.postalCode) continue;
+    ids.add(record.id);
+  }
+  return ids.size === 1 ? [...ids][0]! : null;
+}
+
+/**
+ * Free-text address ("Vej 12B, 9000 Aalborg") -> the husnummer, through Adressevælger's search and then its
+ * `/husnumre/{id}` record. This is what listings use now that DAWA is gone: the search is the one open,
+ * keyless register search left, and only an exact match is accepted (see `pickExactHusnummer`).
+ */
+export async function searchHusnummerByAddress(
+  wanted: { streetName: string; houseNumber: string; postalCode: string | null },
+): Promise<SourceResult<AddressCadastral>> {
+  const text = `${wanted.streetName} ${wanted.houseNumber}${wanted.postalCode ? `, ${wanted.postalCode}` : ""}`;
+  const params = new URLSearchParams({ tekst: text.slice(0, 73), maksimum: "10", token: token() });
+  try {
+    const body = await fetchJson<unknown>(`${apiBase()}/husnumre/soeg?${params}`);
+    const id = pickExactHusnummer(body, wanted);
+    if (id === null) return sourceFailed(`Adressevælger: no single exact match for "${text}"`);
+    return await lookupHusnummerById(id);
   } catch (error) {
     return sourceFailed(error);
   }

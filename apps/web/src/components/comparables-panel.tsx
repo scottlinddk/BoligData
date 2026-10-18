@@ -15,6 +15,8 @@ interface ComparablesPanelProps {
   nearbySales?: NearbySaleEntry[];
   comparables: ComparableEntry[];
   neighborhoodAvgPricePerSqm: number | null;
+  /** Set to false where the subject's own history is shown elsewhere, so it is not listed twice. */
+  showHistory?: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export function ComparablesPanel({
   nearbySales = [],
   comparables,
   neighborhoodAvgPricePerSqm,
+  showHistory = true,
 }: ComparablesPanelProps) {
   const { t } = useI18n();
   const formatSquareMetrePrice = (value: number | null) => value !== null && Number.isFinite(value) && value > 0 ? formatDkk(value) : t("riskChip.unknown");
@@ -53,6 +56,7 @@ export function ComparablesPanel({
 
   return (
     <div className="rounded-[20px] border border-border bg-surface p-4 shadow-card">
+      {showHistory && <>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h3 className="text-[15px] font-extrabold text-ink">{t("comparables.soldHistory")}</h3>
         {priceHistorySource !== null && (
@@ -86,8 +90,9 @@ export function ComparablesPanel({
           </ul>
         </>
       )}
+      </>}
 
-      <h3 className="mb-2 mt-4 text-xs font-extrabold uppercase tracking-[0.02em] text-ink">
+      <h3 className={`mb-2 ${showHistory ? "mt-4" : ""} text-xs font-extrabold uppercase tracking-[0.02em] text-ink`}>
         {t("comparables.nearbySales")}
       </h3>
       {nearbyAvgPricePerSqm !== null && (

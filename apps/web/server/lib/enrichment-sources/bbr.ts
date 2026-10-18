@@ -12,7 +12,7 @@ export const DAR_SERVICE: DatafordelerService = {
   versions: ["v3", "v2", "v1"],
 };
 
-const BBR_SERVICE: DatafordelerService = {
+export const BBR_SERVICE: DatafordelerService = {
   register: "BBR",
   versionEnv: "DATAFORDELER_BBR_VERSION",
   baseEnv: "DATAFORDELER_BBR_API_BASE",

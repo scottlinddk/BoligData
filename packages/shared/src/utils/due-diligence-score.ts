@@ -1,4 +1,5 @@
 import type { RiskFlags } from "../types/index.js";
+import { landStatus, noiseStatus, standingTanks } from "./risk-status.js";
 
 export interface DueDiligenceDeduction {
   label: string;
@@ -10,8 +11,6 @@ export interface DueDiligenceScoreBreakdown {
   score: number | null;
   deductions: DueDiligenceDeduction[];
 }
-
-const NOISE_WARNING_LDEN = 58; // matches due-diligence-checklist.tsx's own warning threshold
 
 /**
  * Quick 0-10 buy/inspect-further indicator combining the due-diligence risk
@@ -30,7 +29,7 @@ export function calculateDueDiligenceScore(
 
   const deductions: DueDiligenceDeduction[] = [];
 
-  if (riskFlags.noiseExposureLden !== null && riskFlags.noiseExposureLden > NOISE_WARNING_LDEN) {
+  if (noiseStatus(riskFlags) === "warning") {
     deductions.push({ label: "noise", points: 1.5 });
   }
 
@@ -44,6 +43,14 @@ export function calculateDueDiligenceScore(
       label: "oilTank",
       points: riskFlags.oilTankRiskSource === "bbr" ? 1.5 : 1,
     });
+  }
+  // A registered tank past its decommissioning deadline is a cost and a liability on top of the tank itself.
+  if (standingTanks(riskFlags).overdue > 0) deductions.push({ label: "oilTankOverdue", points: 1 });
+
+  if (landStatus(riskFlags) === "warning") {
+    const land = riskFlags.landRegistration!;
+    if (land.forestReserve || land.beachProtection || land.duneProtection || land.entailedForest) deductions.push({ label: "landProtection", points: 1 });
+    if (land.agriculturalNote) deductions.push({ label: "farmland", points: 0.5 });
   }
 
   if (neighborhoodAvgPricePerSqm !== null && neighborhoodAvgPricePerSqm > 0) {

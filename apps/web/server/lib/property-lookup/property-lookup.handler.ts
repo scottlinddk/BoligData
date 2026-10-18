@@ -1,14 +1,21 @@
+import type { PublicValuation } from "../../../../../packages/shared/src/types/index.js";
 import type {
   PropertyLookupDataMode,
   PropertyLookupInput,
   PropertyLookupResult,
   PropertyLookupSourceStatus,
+  ValuationYearEntry,
 } from "../../../../../packages/shared/src/types/property-lookup.js";
 import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js";
 import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
-import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupBbrTanks } from "../enrichment-sources/bbr-tanks.js";
+import { lookupEjendomsvurdering, valuationFromYears } from "../enrichment-sources/ejendomsvurdering.js";
+import { lookupLand } from "../enrichment-sources/matrikel.js";
+import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
+import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
+import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import { isDanishCoordinate } from "../crawl/map-utils.js";
@@ -30,6 +37,9 @@ function status(
   if (!result.ok) return { key, register, mode: "unavailable", error: result.error };
   return { key, register, mode: mockFlag !== null && mockModeEnabled(mockFlag) ? "mock" : "live", error: null };
 }
+
+const NOISE_REGISTER = "Miljøstyrelsens støjkortlægning (WFS, wfs2-miljoegis.mim.dk)";
+const SOIL_REGISTER = "Danmarks Miljøportal, jordforurening V1/V2 (WFS, jord.miljoeportal.dk)";
 
 const MODE_SEVERITY: Record<PropertyLookupDataMode, number> = { live: 0, mock: 1, unavailable: 2 };
 
@@ -78,46 +88,95 @@ export async function lookupProperty(
   const lon = cadastral?.lon ?? input.lon ?? null;
   const hasCoordinates = lat !== null && lon !== null && isDanishCoordinate(lat, lon);
 
-  const [bbrResult, valuationResult, noiseResult, salesResult] = await Promise.all([
-    lookupBbr(cadastral?.idLokalid ?? null),
-    lookupEjendomsvurdering(
-      cadastral?.matrikelnr ?? null,
-      cadastral?.ejerlav ?? null,
-      cadastral?.bfeNummer ?? null,
-      cadastral?.idLokalid ?? null,
-    ),
+  // A listing's valuation is looked up by the parcel the address register returned. An address picked by id has
+  // no parcel, so its valuation is found from the husnummer itself (houses only; see vur-valuations.ts).
+  const byId = Boolean(input.husnummerId);
+  // Boligsiden's sale history is only attributed to an address that is identified, never by coordinates alone. For
+  // an id lookup the register's own street, number and postcode identify it (see `recordIsAddress`).
+  const subjectAddress =
+    byId && cadastral?.streetName && cadastral.houseNumber && cadastral.postalCode
+      ? { road: cadastral.streetName, houseNumber: cadastral.houseNumber, zipCode: cadastral.postalCode }
+      : undefined;
+
+  const husnummerId = cadastral?.idLokalid ?? null;
+  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult, soilResult, landResult, tanksResult] = await Promise.all([
+    lookupBbr(husnummerId),
+    byId
+      ? null
+      : lookupEjendomsvurdering({
+          husnummerId,
+          bfeNummer: cadastral?.bfeNummer ?? null,
+          matrikelnr: cadastral?.matrikelnr ?? null,
+          ejerlav: cadastral?.ejerlav ?? null,
+        }),
+    byId ? lookupHouseValuation(cadastral?.idLokalid ?? null) : null,
     // Querying a noise WFS at 0,0 returns a confident-looking "no noise here"
     // for a point in the Atlantic, so an unresolvable address skips the call
     // rather than answering it wrongly.
     hasCoordinates ? lookupNoiseExposure(lat, lon) : null,
     // Same reasoning: a polygon around 0,0 is a box in the Atlantic, and an
     // empty "no sales nearby" is indistinguishable from a real answer.
-    hasCoordinates ? lookupBoligsidenSales(lat, lon) : null,
+    hasCoordinates ? lookupBoligsidenSales(lat, lon, subjectAddress ? { subjectAddress } : {}) : null,
+    hasCoordinates ? lookupSoilContamination(lat, lon) : null,
+    // MAT and the BBR tank register are keyed by the husnummer (through its BFE for MAT), not by coordinates.
+    lookupLand({
+      husnummerId,
+      bfeNummer: cadastral?.bfeNummer ?? null,
+      matrikelnr: cadastral?.matrikelnr ?? null,
+      ejerlavskode: cadastral?.ejerlavskode ?? null,
+    }),
+    lookupBbrTanks(husnummerId),
   ]);
 
   const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
-  const publicValuation = valuationResult.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE") ? valuationResult.data : null;
-  const noiseExposureLden = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data.ldenDb : null;
+
+  // For an id lookup the valuation chain has no mock mode: it reads the register or reports why it could not.
+  const valuationMockFlag = byId ? null : "EJENDOMSVURDERING_MOCK_MODE";
+  const valuationResult: SourceResult<unknown> = houseLookup ? houseLookup.valuation : listingValuationResult!;
+  const valuationHistory: ValuationYearEntry[] = houseLookup?.valuation.ok ? houseLookup.valuation.data : [];
+  const latestYear = [...valuationHistory].reverse().find((entry) => entry.propertyValueDkk !== null) ?? null;
+  const publicValuation: PublicValuation | null = byId
+    ? latestYear
+      ? { assessedPropertyValueDkk: latestYear.propertyValueDkk, assessedLandValueDkk: latestYear.landValueDkk, valuationYear: latestYear.year }
+      : null
+    : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
+      ? listingValuationResult.data
+      : null;
+  const land = landResult.ok && !mockModeEnabled("MATRIKEL_MOCK_MODE") ? landResult.data : null;
+  const tanks = tanksResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? tanksResult.data : null;
+  // The valuation behind the checklist: the latest year and the one before it, whichever path found it.
+  const valuationForFlags = byId
+    ? valuationFromYears(valuationHistory)
+    : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
+      ? listingValuationResult.data
+      : null;
+  const noise = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data : null;
+  const noiseExposureLden = noise?.ldenDb ?? null;
+  const soil = soilResult?.ok && !mockModeEnabled("MILJOEPORTALEN_MOCK_MODE") ? soilResult.data : null;
   const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
 
   const addressRegisterLabel = input.husnummerId
     ? "DAR via Adressevælger (adressevaelger.dk)"
     : cadastral?.resolvedVia === "dar_fallback"
       ? "DAR via Datafordeler GraphQL (DAWA fallback)"
-      : "DAR via DAWA (api.dataforsyningen.dk)";
+      : cadastral?.resolvedVia === "adressevaelger"
+        ? "DAR via Adressevælger (adressevaelger.dk)"
+        : "DAR via DAWA (api.dataforsyningen.dk)";
 
   const sources: PropertyLookupSourceStatus[] = [
     status("address", addressRegisterLabel, addressMockFlag, cadastralResult),
     status("bbr", "BBR via Datafordeler GraphQL", "BBR_MOCK_MODE", bbrResult),
-    status("publicValuation", "VUR via Datafordeler GraphQL", "EJENDOMSVURDERING_MOCK_MODE", valuationResult),
+    status("oilTanks", "BBR tekniske anlæg via Datafordeler GraphQL", "BBR_MOCK_MODE", tanksResult),
+    status("land", "MAT via Datafordeler GraphQL", "MATRIKEL_MOCK_MODE", landResult),
+    status("publicValuation", "VUR via Datafordeler GraphQL", valuationMockFlag, valuationResult),
     noiseResult === null
       ? {
           key: "noise" as const,
-          register: "Miljøstyrelsens støjkort (WFS)",
+          register: NOISE_REGISTER,
           mode: "unavailable" as const,
           error: "no usable coordinates for the address",
         }
-      : status("noise", "Miljøstyrelsens støjkort (WFS)", "STOEJKORT_MOCK_MODE", noiseResult),
+      : status("noise", NOISE_REGISTER, "STOEJKORT_MOCK_MODE", noiseResult),
     salesResult === null
       ? {
           key: "sales" as const,
@@ -126,6 +185,9 @@ export async function lookupProperty(
           error: "no usable coordinates for the address",
         }
       : status("sales", "Boligsiden (registrerede handler)", "BOLIGSIDEN_SALES_MOCK_MODE", salesResult),
+    soilResult === null
+      ? { key: "soil" as const, register: SOIL_REGISTER, mode: "unavailable" as const, error: "no usable coordinates for the address" }
+      : status("soil", SOIL_REGISTER, "MILJOEPORTALEN_MOCK_MODE", soilResult),
   ];
 
   const renovationCategory = classifyRenovationCategory({
@@ -160,7 +222,7 @@ export async function lookupProperty(
       matrikelnr: cadastral?.matrikelnr ?? null,
       ejerlav: cadastral?.ejerlav ?? null,
       ejerlavskode: cadastral?.ejerlavskode ?? null,
-      bfeNummer: cadastral?.bfeNummer ?? null,
+      bfeNummer: cadastral?.bfeNummer ?? houseLookup?.bfeNummer ?? null,
       zone: cadastral?.zone ?? null,
       formattedAddress: cadastral?.formattedAddress ?? null,
       postalCode: cadastral?.postalCode ?? input.postalCode ?? null,
@@ -184,6 +246,12 @@ export async function lookupProperty(
           bathroomCount: bbrBuilding.bathroomCount,
         }
       : null,
+    valuationHistory,
+    propertyClass: houseLookup?.propertyClass ?? null,
+    // Null only when the address itself could not be resolved: then there is nothing to check against.
+    riskFlags: cadastral
+      ? buildAddressRiskFlags({ municipalityCode: cadastral.municipalityCode ?? null, bbr: bbrBuilding, noise, soil, tanks, land, valuation: valuationForFlags })
+      : null,
     publicValuation: publicValuation
       ? {
           assessedPropertyValueDkk: publicValuation.assessedPropertyValueDkk,
@@ -192,6 +260,7 @@ export async function lookupProperty(
         }
       : null,
     priceHistory: sales?.priceHistory ?? [],
+    priceHistoryMatch: sales?.historyMatch ?? null,
     nearbySales: sales?.nearbySales ?? [],
     renovationCategory,
     screening,

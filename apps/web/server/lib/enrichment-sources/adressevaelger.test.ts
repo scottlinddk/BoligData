@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isHusnummerId, lookupHusnummerById, parseHusnummer } from "./adressevaelger.js";
+import { isHusnummerId, lookupHusnummerById, parseHusnummer, pickExactHusnummer } from "./adressevaelger.js";
 import { stubFetch } from "../test-support/stub-fetch.js";
 
 const ID = "0a3f509c-38ed-32b8-e044-0003ba298018";
@@ -44,6 +44,8 @@ describe("parseHusnummer", () => {
     expect(parsed).toMatchObject({
       idLokalid: ID,
       formattedAddress: "Floravej 6, 9000 Aalborg",
+      streetName: "Floravej",
+      houseNumber: "6",
       postalCode: "9000",
       postalName: "Aalborg",
       municipalityCode: "0851",
@@ -113,5 +115,30 @@ describe("lookupHusnummerById", () => {
     stubFetch([{ body: { status: "ok" } }]);
     const result = await lookupHusnummerById(ID);
     expect(result).toEqual({ ok: false, error: "Adressevælger returned no husnummer for this id" });
+  });
+});
+
+describe("pickExactHusnummer", () => {
+  const A = "0a3f509c-4f33-32b8-e044-0003ba298018";
+  const B = "0a3f509c-6551-32b8-e044-0003ba298018";
+  const hit = (id: string, vejnavn: string, husnummer: string, postnr: string) => ({ type: "husnummer", id, vejnavn, husnummer, titel: `${vejnavn} ${husnummer}, ${postnr} By` });
+  const wanted = { streetName: "Hasserisgade", houseNumber: "3", postalCode: "9000" };
+
+  it("takes the one hit on this street, number and postcode, ignoring case", () => {
+    expect(pickExactHusnummer({ fund: [hit(B, "Hasserisgade", "3A", "9000"), hit(A, "hasserisgade", "3", "9000")] }, wanted)).toBe(A);
+  });
+  it("never takes another number, street or postcode", () => {
+    expect(pickExactHusnummer({ fund: [hit(A, "Hasserisgade", "3A", "9000")] }, wanted)).toBeNull();
+    expect(pickExactHusnummer({ fund: [hit(A, "Hasserisvej", "3", "9000")] }, wanted)).toBeNull();
+    expect(pickExactHusnummer({ fund: [hit(A, "Hasserisgade", "3", "9200")] }, wanted)).toBeNull();
+  });
+  it("refuses two equally exact hits when no postcode tells them apart", () => {
+    const body = { fund: [hit(A, "Hasserisgade", "3", "9000"), hit(B, "Hasserisgade", "3", "9200")] };
+    expect(pickExactHusnummer(body, { ...wanted, postalCode: null })).toBeNull();
+    expect(pickExactHusnummer(body, wanted)).toBe(A);
+  });
+  it("ignores street-level hits and malformed bodies", () => {
+    expect(pickExactHusnummer({ fund: [{ type: "navngivenvej", titel: "Hasserisgade" }] }, wanted)).toBeNull();
+    expect(pickExactHusnummer(null, wanted)).toBeNull();
   });
 });

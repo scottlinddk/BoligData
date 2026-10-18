@@ -10,6 +10,10 @@
  *      only, no person fields) and one VUR lookup (BFE to valuation) for the same BFE.
  *   3. A join test on the BBR files for municipality 0851: which keys link Bygning and Enhed to a BFE,
  *      and how many houses and apartments end up with BFE, living area, build year and coordinate.
+ *   4. The two lookups the due-diligence checklist depends on and that could not be checked without a key:
+ *      BBR tanks (is BBR_TekniskAnlaeg filterable without its id, which classification code is a tank, the
+ *      code values of placement, content, decommissioning and operation, and which of husnummer, bygning
+ *      and grund a tank carries) and MAT (BFE to estate to parcels, with the restriction fields).
  *
  *   node scripts/discover-datafordeler.mjs
  *
@@ -194,7 +198,8 @@ async function loadListings(apiKey) {
 /* ------------------------------------------------------------------ GraphQL */
 
 const GRAPHQL_TARGETS = [
-  { register: 'BBR', version: 'v3', types: [['BBR_Ejendomsrelation', null], ['BBR_Grund', null], ['BBR_Bygning', /grund|husnummer|koordinat|position|geo|bfe|ejendom|status|anvendelse|areal|opfoerel|bygge/i], ['BBR_Enhed', /areal|vaerelse|anvendelse|boligtype|status|bfe|ejendom/i]] },
+  { register: 'BBR', version: 'v3', types: [['BBR_Ejendomsrelation', null], ['BBR_Grund', null], ['BBR_Bygning', /grund|husnummer|koordinat|position|geo|bfe|ejendom|status|anvendelse|areal|opfoerel|bygge/i], ['BBR_Enhed', /areal|vaerelse|anvendelse|boligtype|status|bfe|ejendom/i], ['BBR_TekniskAnlaeg', /^(id_lokalId|status|husnummer|bygning|grund|jordstykke|tek0(20|24|27|28|32|33|34|35|67|68|72)|tek110)/]] },
+  { register: 'MAT', version: 'v3', types: [['MAT_SamletFastEjendom', /^(id_lokalId|status|BFEnummer|landbrugsnotering|erFaelleslod|hovedejendom)/], ['MAT_Jordstykke', /^(id_lokalId|status|samletFastEjendomLokalId|ejerlavLokalId|matrikelnummer|registreretAreal|faelleslod|fredskov|klitfredning|strandbeskyttelse|jordrente|majoratsskov)/]] },
   { register: 'VUR', version: 'v2', types: [['VUR_Ejendomsvurdering', null], ['VUR_BFEKrydsreference', null]] },
   { register: 'EJF', version: 'v1', types: [['EJF_Ejerskifte', null], ['EJF_Handelsoplysninger', null]] },
 ];
@@ -276,6 +281,68 @@ async function printProbes(apiKey, schemas) {
   }
 }
 
+/* ------------------------------------------------ oil tanks and the cadastre */
+
+const tally = (rows, field) => {
+  const counts = new Map();
+  for (const row of rows) counts.set(str(row[field]) || '(null)', (counts.get(str(row[field]) || '(null)') ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([value, n]) => `${value}=${n}`).join(', ');
+};
+
+const nodesOf = (text, entity) => {
+  try { return JSON.parse(text)?.data?.[entity]?.nodes ?? []; } catch { return []; }
+};
+
+/**
+ * Checks what server/lib/enrichment-sources/bbr-tanks.ts assumes and could not verify without a key:
+ * that BBR_TekniskAnlaeg can be filtered without its own id (by kommunekode, husnummer, bygning and grund),
+ * which classification code a tank has, and the code values of placement, content, decommissioning and
+ * operation. Prints codes and counts only: no addresses and no names.
+ */
+async function printTankProbe(apiKey) {
+  console.log(`\n=== BBR tanks (BBR_TekniskAnlaeg, kommune ${MUNICIPALITY}) ===`);
+  const base = `${GRAPHQL_HOST}/BBR/v3`;
+  const now = JSON.stringify(new Date().toISOString());
+  const temporal = `registreringstid: ${now} virkningstid: ${now}`;
+  const fields = 'id_lokalId status husnummer bygning grund tek020Klassifikation tek027Placering tek028SloejfningOlietank tek034IndholdOlietank tek110Driftstatus tek072Sloejfningsaar tek032Stoerrelse tek035SloejfningsfristOlietank';
+  const all = await rawGraphQl(base, apiKey, `{ BBR_TekniskAnlaeg(first: 200 ${temporal} where: { kommunekode: { eq: ${JSON.stringify(MUNICIPALITY)} } }) { nodes { ${fields} } } }`, 600);
+  console.log(`[any anlaeg in the municipality] HTTP ${all.status}${all.text ? '' : `: ${all.body}`}`);
+  const rows = nodesOf(all.text, 'BBR_TekniskAnlaeg');
+  if (rows.length === 0) { console.log(`  no rows. ${all.body}`); return; }
+  console.log(`  ${rows.length} rows. tek020Klassifikation: ${tally(rows, 'tek020Klassifikation')}`);
+
+  const tanks = await rawGraphQl(base, apiKey, `{ BBR_TekniskAnlaeg(first: 200 ${temporal} where: { kommunekode: { eq: ${JSON.stringify(MUNICIPALITY)} }, tek020Klassifikation: { eq: "1110" } }) { pageInfo { hasNextPage } nodes { ${fields} } } }`, 600);
+  const tankRows = nodesOf(tanks.text, 'BBR_TekniskAnlaeg');
+  console.log(`[classification 1110] HTTP ${tanks.status}: ${tankRows.length} rows`);
+  if (tankRows.length === 0) { console.log(`  ${tanks.body}`); return; }
+  for (const field of ['status', 'tek027Placering', 'tek028SloejfningOlietank', 'tek034IndholdOlietank', 'tek110Driftstatus']) {
+    console.log(`  ${field}: ${tally(tankRows, field)}`);
+  }
+  const have = (field) => tankRows.filter((row) => row[field] !== null && row[field] !== undefined).length;
+  console.log(`  links set: husnummer=${have('husnummer')}, bygning=${have('bygning')}, grund=${have('grund')} of ${tankRows.length}; sloejfningsaar set=${have('tek072Sloejfningsaar')}`);
+
+  for (const link of ['husnummer', 'bygning', 'grund']) {
+    const value = tankRows.map((row) => row[link]).find((v) => typeof v === 'string' && v);
+    if (!value) continue;
+    const r = await rawGraphQl(base, apiKey, `{ BBR_TekniskAnlaeg(first: 50 ${temporal} where: { ${link}: { eq: ${JSON.stringify(value)} }, tek020Klassifikation: { eq: "1110" } }) { nodes { id_lokalId } } }`, 300);
+    console.log(`  filter by ${link}: HTTP ${r.status}, ${nodesOf(r.text, 'BBR_TekniskAnlaeg').length} rows${nodesOf(r.text, 'BBR_TekniskAnlaeg').length ? '' : ` (${r.body})`}`);
+  }
+}
+
+/** Checks server/lib/enrichment-sources/matrikel.ts: BFE -> estate -> parcels on MAT/v3, and the restriction fields. */
+async function printMatProbe(apiKey) {
+  console.log(`\n=== MAT probe (BFE ${PROBE_BFE}) ===`);
+  const base = `${GRAPHQL_HOST}/MAT/v3`;
+  const now = JSON.stringify(new Date().toISOString());
+  const temporal = `registreringstid: ${now} virkningstid: ${now}`;
+  const estate = await rawGraphQl(base, apiKey, `{ MAT_SamletFastEjendom(first: 2 ${temporal} where: { BFEnummer: { eq: ${PROBE_BFE} }, status: { eq: "Gældende" } }) { nodes { id_lokalId BFEnummer landbrugsnotering erFaelleslod hovedejendomOpdeltIEjerlejligh } } }`, 700);
+  console.log(`[MAT_SamletFastEjendom] HTTP ${estate.status}: ${estate.body}`);
+  const id = nodesOf(estate.text, 'MAT_SamletFastEjendom')[0]?.id_lokalId;
+  if (!id) return;
+  const parcels = await rawGraphQl(base, apiKey, `{ MAT_Jordstykke(first: 20 ${temporal} where: { samletFastEjendomLokalId: { eq: ${JSON.stringify(id)} }, status: { eq: "Gældende" } }) { pageInfo { hasNextPage } nodes { registreretAreal fredskov_areal fredskov_omfang strandbeskyttelse_areal strandbeskyttelse_omfang klitfredning_areal klitfredning_omfang jordrente_omfang majoratsskov_nummer majoratsskov_omfang faelleslod ejerlavLokalId matrikelnummer } } }`, 900);
+  console.log(`[MAT_Jordstykke] HTTP ${parcels.status}: ${parcels.body}`);
+}
+
 /* ------------------------------------------------------------ BBR join test */
 
 async function downloadZip(apiKey, filename, dir) {
@@ -330,6 +397,8 @@ export async function main(env = process.env) {
   if (!apiKey) throw new FatalError('DATAFORDELER_API_KEY is not set');
   const schemas = await printSchemas(apiKey);
   await printProbes(apiKey, schemas);
+  await printTankProbe(apiKey);
+  await printMatProbe(apiKey);
   const listings = await loadListings(apiKey);
   await printBbrJoin(apiKey, listings);
 }

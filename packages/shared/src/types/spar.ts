@@ -18,7 +18,7 @@ export interface SparHistoryPoint {
 export interface SparListingEstimate {
   status: SparListingStatus;
   /** Why the estimate is missing, for status other than "available". */
-  reason: "no_valuation_for_property" | "valuation_vintage_mismatch" | "too_few_sales" | null;
+  reason: "no_valuation_for_property" | "valuation_vintage_mismatch" | "too_few_sales" | "unsupported_property_type" | null;
   isUnit: boolean;
   /** Public valuation the estimate is based on. */
   valuation: { valueDkk: number; year: number; bfe: string } | null;

@@ -1,5 +1,6 @@
-import type { BbrData, PublicValuation, SoldPriceEntry, ZoneStatus } from "@shared/types/index";
+import type { BbrData, PublicValuation, RiskFlags, SoldPriceEntry, ZoneStatus } from "@shared/types/index";
 import type { NearbySaleEntry, PropertyLookupResult } from "@shared/types/property-lookup";
+import type { SparListingEstimate } from "@shared/types/spar";
 import { summarizeLookupSources, type SourceSummaryEntry } from "@/lib/property-facts";
 
 /**
@@ -22,7 +23,19 @@ export interface AddressReport {
   ejerlav: string | null;
   bfeNummer: string | null;
   priceHistory: SoldPriceEntry[];
+  /** Whether the sales register answered live. Without it an empty history means "unknown", not "never sold". */
+  salesAvailable: boolean;
+  /** How the history was attributed to this address, so an empty one can say why. Null when sales are unavailable. */
+  priceHistoryMatch: PropertyLookupResult["priceHistoryMatch"];
   nearbySales: NearbySaleEntry[];
+  /**
+   * Fair-price estimate, computed on the server from live register data only. `null` means it was attempted and
+   * failed, `undefined` that this lookup did not ask for one. It is passed through even when the valuation source
+   * is not live, since "not a house" and "no valuation" are answers worth showing.
+   */
+  spar: SparListingEstimate | null | undefined;
+  /** Due-diligence flags built from this lookup's registers; null when the lookup did not build any. */
+  riskFlags: RiskFlags | null;
   sources: SourceSummaryEntry[];
   mapUrl: string | null;
 }
@@ -62,7 +75,11 @@ export function buildAddressReport(lookup: PropertyLookupResult): AddressReport 
     ejerlav: addressLive ? lookup.resolved.ejerlav : null,
     bfeNummer: addressLive ? lookup.resolved.bfeNummer : null,
     priceHistory: salesLive ? lookup.priceHistory : [],
+    salesAvailable: salesLive,
+    priceHistoryMatch: salesLive ? lookup.priceHistoryMatch : null,
     nearbySales: salesLive ? lookup.nearbySales : [],
+    spar: lookup.spar,
+    riskFlags: lookup.riskFlags,
     sources: summarizeLookupSources(lookup),
     mapUrl: openStreetMapUrl(lat, lon),
   };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { SparHistoryPoint } from "@shared/types/spar";
 import { formatDkk } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
@@ -10,12 +10,12 @@ interface EstimateChartProps {
   height?: number;
 }
 
-const MARGIN = { top: 14, right: 14, bottom: 30, left: 58 };
-/** Horizontal room per month. Wide enough that every January label stays legible; long series scroll. */
+const MARGIN = { top: 14, right: 14, bottom: 14, left: 58 };
+/** Horizontal room per month. The ruler ticks sit this far apart. */
 const PX_PER_MONTH = 7;
-/** The y-axis lives in its own fixed column, so the scrolling plot only needs a small inset on the left. */
-const PLOT_INSET = 10;
-const EDGE_TOLERANCE = 2;
+const RULER_HEIGHT = 56;
+const SETTLE_DELAY_MS = 140;
+const DRAG_THRESHOLD_PX = 4;
 
 function useElementWidth() {
   const ref = useRef<HTMLDivElement>(null);
@@ -42,136 +42,228 @@ function niceTicks(min: number, max: number, target = 6): number[] {
   return ticks;
 }
 
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 /**
- * Fair-price level over time with its 80 % band. The line is today's valuation re-priced with each
- * month's market level, so it shows market movement, not this home's own history. Months that are
- * still being revised are dashed.
+ * Fair-price level over time with its 80 % band, read like a dial: a fixed cursor sits in the middle
+ * and the month under it drives the readout. Scroll, drag or use the arrows to go back in time. The
+ * line is today's valuation re-priced with each month's market level, so it shows market movement,
+ * not this home's own history. Months that are still being revised are dashed.
  */
 export function EstimateChart({ history, askingPrice, height = 260 }: EstimateChartProps) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [wrapper, width] = useElementWidth();
   const scroller = useRef<HTMLDivElement>(null);
-  const initialScroll = useRef(false);
-  const [active, setActive] = useState<number | null>(null);
-  const [edges, setEdges] = useState({ start: true, end: true });
+  const ruler = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(history.length - 1);
   const [hintDismissed, setHintDismissed] = useState(false);
+  const lastIndex = history.length - 1;
 
+  // Half a viewport of padding on each side lets the first and last month reach the cursor.
   const viewportW = Math.max(width - MARGIN.left, 0);
-  const plotW = Math.max(viewportW, history.length * PX_PER_MONTH + PLOT_INSET + MARGIN.right);
-  const scrollable = plotW > viewportW + EDGE_TOLERANCE;
+  const pad = viewportW / 2;
+  const plotW = viewportW + lastIndex * PX_PER_MONTH;
 
   const geometry = useMemo(() => {
     if (history.length < 2 || width < 120) return null;
     const lows = history.map(p => p.lo80), highs = history.map(p => p.hi80);
     let min = Math.min(...lows), max = Math.max(...highs);
     if (askingPrice !== null) { min = Math.min(min, askingPrice); max = Math.max(max, askingPrice); }
-    const pad = (max - min) * 0.06;
-    min -= pad; max += pad;
+    const margin = (max - min) * 0.06;
+    min -= margin; max += margin;
     const ticks = niceTicks(min, max);
-    const innerW = plotW - PLOT_INSET - MARGIN.right, innerH = height - MARGIN.top - MARGIN.bottom;
-    const x = (i: number) => PLOT_INSET + (i / (history.length - 1)) * innerW;
+    const innerH = height - MARGIN.top - MARGIN.bottom;
+    const x = (i: number) => pad + i * PX_PER_MONTH;
     const y = (v: number) => MARGIN.top + (1 - (v - min) / (max - min)) * innerH;
     const firstPreliminary = history.findIndex(p => p.preliminary);
     const solidEnd = firstPreliminary === -1 ? history.length - 1 : Math.max(firstPreliminary - 1, 0);
     const path = (from: number, to: number) => history.slice(from, to + 1).map((p, k) => `${k === 0 ? "M" : "L"}${x(from + k).toFixed(1)},${y(p.estimate).toFixed(1)}`).join(" ");
     const band = `${history.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.hi80).toFixed(1)}`).join(" ")} ${history.map((_, i) => { const j = history.length - 1 - i; return `L${x(j).toFixed(1)},${y(history[j]!.lo80).toFixed(1)}`; }).join(" ")} Z`;
-    // One label per January, plus the first month when the series starts mid-year and is short.
-    const xTicks = history.flatMap((p, i) => p.period.endsWith("-01") ? [{ i, label: p.period.slice(0, 4) }] : []);
-    if (xTicks.length === 0) xTicks.push({ i: 0, label: formatPeriod(history[0]!.period, language) });
-    return { ticks, x, y, innerW, innerH, band, solid: path(0, solidEnd), tail: solidEnd < history.length - 1 ? path(solidEnd, history.length - 1) : null, xTicks };
-  }, [history, askingPrice, width, plotW, height, language]);
+    return { ticks, x, y, band, solid: path(0, solidEnd), tail: solidEnd < history.length - 1 ? path(solidEnd, history.length - 1) : null };
+  }, [history, askingPrice, width, pad, height]);
 
-  const last = history[history.length - 1];
+  const moveTo = useCallback((index: number, behavior: ScrollBehavior = prefersReducedMotion() ? "auto" : "smooth") => {
+    scroller.current?.scrollTo({ left: Math.min(lastIndex, Math.max(0, index)) * PX_PER_MONTH, behavior });
+  }, [lastIndex]);
+
+  const ready = geometry !== null;
+
+  // Open on the most recent month: that is what the reader came for, older years sit one swipe away.
+  const positioned = useRef(false);
+  useLayoutEffect(() => {
+    if (!ready || positioned.current) return;
+    positioned.current = true;
+    moveTo(lastIndex, "instant");
+  }, [ready, lastIndex, moveTo]);
+
+  // The scroller position is the single source of truth; everything else follows it.
+  useEffect(() => {
+    const element = scroller.current, ticks = ruler.current;
+    if (!element || !ticks || !ready) return;
+    let frame: number | undefined, settleTimer: number | undefined;
+    let touching = false, pointerId: number | null = null, moved = false, startX = 0, startLeft = 0;
+
+    const report = () => {
+      frame = undefined;
+      const exact = Math.min(lastIndex, Math.max(0, element.scrollLeft / PX_PER_MONTH));
+      ticks.style.setProperty("--cursor", String(exact));
+      setActive(Math.round(exact));
+    };
+    const settle = () => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        if (touching || pointerId !== null) return;
+        const target = Math.round(element.scrollLeft / PX_PER_MONTH) * PX_PER_MONTH;
+        if (Math.abs(element.scrollLeft - target) > 0.5) element.scrollTo({ left: target, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      }, SETTLE_DELAY_MS);
+    };
+    const onScroll = () => {
+      if (frame === undefined) frame = requestAnimationFrame(report);
+      settle();
+    };
+    const onTouchStart = () => { touching = true; };
+    const onTouchEnd = () => { touching = false; settle(); };
+    // Touch pans natively. A mouse needs an explicit drag, with the same grab feel as the family tree.
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      pointerId = event.pointerId; moved = false; startX = event.clientX; startLeft = element.scrollLeft;
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      const delta = event.clientX - startX;
+      if (!moved && Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+      if (!moved) { moved = true; element.classList.add("cursor-grabbing", "select-none"); element.setPointerCapture(event.pointerId); }
+      element.scrollLeft = startLeft - delta;
+    };
+    const endDrag = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      pointerId = null;
+      element.classList.remove("cursor-grabbing", "select-none");
+      if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
+      settle();
+    };
+    // A vertical wheel over the ruler scrubs through time instead of scrolling the page.
+    const onRulerWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      event.preventDefault();
+      element.scrollLeft += event.deltaY;
+    };
+
+    report();
+    element.addEventListener("scroll", onScroll, { passive: true });
+    element.addEventListener("touchstart", onTouchStart, { passive: true });
+    element.addEventListener("touchend", onTouchEnd, { passive: true });
+    element.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    element.addEventListener("pointerdown", onPointerDown);
+    element.addEventListener("pointermove", onPointerMove);
+    element.addEventListener("pointerup", endDrag);
+    element.addEventListener("pointercancel", endDrag);
+    ticks.addEventListener("wheel", onRulerWheel, { passive: false });
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      window.clearTimeout(settleTimer);
+      element.removeEventListener("scroll", onScroll);
+      element.removeEventListener("touchstart", onTouchStart);
+      element.removeEventListener("touchend", onTouchEnd);
+      element.removeEventListener("touchcancel", onTouchEnd);
+      element.removeEventListener("pointerdown", onPointerDown);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", endDrag);
+      element.removeEventListener("pointercancel", endDrag);
+      ticks.removeEventListener("wheel", onRulerWheel);
+    };
+  }, [ready, lastIndex]);
+
+  function onRulerKeyDown(event: KeyboardEvent) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, PageUp: -12, PageDown: 12 };
+    if (event.key in steps) moveTo(active + steps[event.key]!);
+    else if (event.key === "Home") moveTo(0);
+    else if (event.key === "End") moveTo(lastIndex);
+    else return;
+    event.preventDefault();
+  }
+
+  const shown = history[Math.min(active, lastIndex)]!;
+  const last = history[lastIndex];
   const summary = last ? tx(
     `Fair pris over tid: ${formatDkk(Math.round(history[0]!.estimate))} i ${formatPeriod(history[0]!.period, language)} til ${formatDkk(Math.round(last.estimate))} i ${formatPeriod(last.period, language)}.`,
     `Fair price over time: ${formatDkk(Math.round(history[0]!.estimate))} in ${formatPeriod(history[0]!.period, language)} to ${formatDkk(Math.round(last.estimate))} in ${formatPeriod(last.period, language)}.`) : "";
+  const valueText = `${formatPeriod(shown.period, language)}: ${formatDkk(Math.round(shown.estimate))}`;
 
-  function pick(clientX: number, rect: DOMRect) {
-    if (!geometry) return;
-    const ratio = (clientX - rect.left - PLOT_INSET) / geometry.innerW;
-    setActive(Math.min(history.length - 1, Math.max(0, Math.round(ratio * (history.length - 1)))));
-  }
-
-  function syncEdges() {
-    const element = scroller.current;
-    if (!element) return;
-    setEdges({
-      start: element.scrollLeft <= EDGE_TOLERANCE,
-      end: element.scrollLeft + element.clientWidth >= element.scrollWidth - EDGE_TOLERANCE,
-    });
-  }
-
-  // Open on the most recent months: that is what the reader came for, older years sit one swipe away.
-  useEffect(() => {
-    const element = scroller.current;
-    if (!element || !geometry) return;
-    if (!initialScroll.current && scrollable) {
-      element.scrollLeft = element.scrollWidth;
-      initialScroll.current = true;
-    }
-    syncEdges();
-  }, [geometry, scrollable]);
-
-  // Keyboard navigation can move the cursor off-screen; bring it back into view.
-  useEffect(() => {
-    const element = scroller.current;
-    if (!element || !geometry || active === null) return;
-    const cursor = geometry.x(active), pad = 24;
-    if (cursor < element.scrollLeft + pad) element.scrollLeft = cursor - pad;
-    else if (cursor > element.scrollLeft + element.clientWidth - pad) element.scrollLeft = cursor - element.clientWidth + pad;
-  }, [active, geometry]);
-
-  const shown = active === null ? null : history[active]!;
-  const showHint = scrollable && !hintDismissed;
-  // contain: inline-size keeps the wide scrolling plot from widening any grid/flex ancestor.
   return <div className="w-full min-w-0 max-w-full [contain:inline-size]">
-    <div ref={wrapper} className="relative flex w-full" style={{ height }}>
-      {geometry && <>
-        <svg width={MARGIN.left} height={height} aria-hidden="true" className="shrink-0">
-          {geometry.ticks.map(tick => <text key={tick} x={MARGIN.left - 8} y={geometry.y(tick)} textAnchor="end" dominantBaseline="middle" fontSize="11" fill="var(--color-text-secondary)">{formatMillions(tick, language)}</text>)}
-        </svg>
-        <div ref={scroller} onScroll={syncEdges} onPointerDown={() => setHintDismissed(true)} onWheel={() => setHintDismissed(true)} className="relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="relative" style={{ width: plotW, height }}>
-            <svg width={plotW} height={height} role="img" aria-label={summary} tabIndex={0}
-              onPointerMove={event => pick(event.clientX, event.currentTarget.getBoundingClientRect())}
-              onPointerDown={event => pick(event.clientX, event.currentTarget.getBoundingClientRect())}
-              onPointerLeave={() => setActive(null)} onBlur={() => setActive(null)}
-              onKeyDown={event => {
-                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-                event.preventDefault();
-                setActive(current => Math.min(history.length - 1, Math.max(0, (current ?? history.length - 1) + (event.key === "ArrowRight" ? 1 : -1))));
-              }}
-              className="touch-pan-x touch-pan-y rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
-              {geometry.ticks.map(tick => <line key={tick} x1={0} x2={plotW - MARGIN.right} y1={geometry.y(tick)} y2={geometry.y(tick)} stroke="var(--color-border)" strokeDasharray="3 4" />)}
-              {geometry.xTicks.map(tick => <text key={tick.i} x={geometry.x(tick.i)} y={height - 9} textAnchor="middle" fontSize="11" fill="var(--color-text-secondary)">{tick.label}</text>)}
-              <path d={geometry.band} fill="var(--color-brand)" opacity="0.14" />
-              {askingPrice !== null && <g>
-                <line x1={0} x2={plotW - MARGIN.right} y1={geometry.y(askingPrice)} y2={geometry.y(askingPrice)} stroke="var(--color-brand)" strokeWidth="1.5" strokeDasharray="6 4" />
-                <text x={PLOT_INSET + 6} y={geometry.y(askingPrice) - 6} textAnchor="start" fontSize="11" fontWeight="600" fill="var(--color-brand-text)" stroke="var(--color-surface)" strokeWidth="3" paintOrder="stroke">{tx("Udbudspris", "Asking price")}</text>
-              </g>}
-              <path d={geometry.solid} fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-              {geometry.tail && <path d={geometry.tail} fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeDasharray="2 4" strokeLinecap="round" />}
-              {last && <circle cx={geometry.x(history.length - 1)} cy={geometry.y(last.estimate)} r="4.5" fill="var(--color-text-primary)" stroke="var(--color-surface)" strokeWidth="2" />}
-              {active !== null && shown && <g pointerEvents="none">
-                <line x1={geometry.x(active)} x2={geometry.x(active)} y1={MARGIN.top} y2={height - MARGIN.bottom} stroke="var(--color-border-strong)" />
-                <circle cx={geometry.x(active)} cy={geometry.y(shown.estimate)} r="5" fill="var(--color-surface)" stroke="var(--color-text-primary)" strokeWidth="2" />
-              </g>}
-            </svg>
-            {active !== null && shown && <div role="status" className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-cta px-3 py-2 text-xs text-cta-text shadow-lift"
-              style={{ left: Math.min(Math.max(geometry.x(active), 40), plotW - 40) }}>
-              <span className="block font-semibold">{formatDkk(Math.round(shown.estimate))}</span>
-              <span className="block opacity-70">{formatPeriod(shown.period, language)}{shown.preliminary ? ` · ${tx("foreløbig", "preliminary")}` : ""}</span>
-            </div>}
-          </div>
+    <div className="overflow-hidden rounded-2xl border border-[var(--color-footer-border)] bg-[var(--color-footer-bg)] shadow-card">
+      <div className="flex flex-col-reverse gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:block">
+          <p className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-footer-muted)]">{formatPeriod(shown.period, language)}{shown.preliminary ? ` · ${tx("foreløbig", "preliminary")}` : ""}</p>
+          <p className="w-fit whitespace-nowrap rounded-full sm:mt-1.5 bg-white/10 px-3 py-1 text-xs font-semibold tabular-nums text-accent">
+            {tx("80 % interval", "80% interval")} {formatMillions(shown.lo80, language)} – {formatMillions(shown.hi80, language)}
+          </p>
         </div>
-        {/* Edge fades show there is more to see on that side; they vanish once the end is reached. */}
-        <div aria-hidden="true" style={{ left: MARGIN.left }} className={`pointer-events-none absolute inset-y-0 w-10 bg-gradient-to-r from-surface to-transparent transition-opacity ${scrollable && !edges.start ? "opacity-100" : "opacity-0"}`} />
-        <div aria-hidden="true" className={`pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent transition-opacity ${scrollable && !edges.end ? "opacity-100" : "opacity-0"}`} />
-      </>}
+        <div className="flex shrink-0 items-center justify-between gap-1.5 sm:justify-start">
+          <button type="button" disabled={active <= 0} onClick={() => moveTo(active - 1)} aria-label={tx("Forrige måned", "Previous month")}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-accent transition hover:bg-white/20 disabled:cursor-default disabled:opacity-30">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+          </button>
+          <output aria-live="polite" aria-label={tx("Valgt fair pris", "Selected fair price")} className="min-w-[8.5ch] text-center text-2xl font-light leading-none tracking-tight tabular-nums text-accent sm:text-[34px]">
+            {formatDkk(Math.round(shown.estimate))}
+          </output>
+          <button type="button" disabled={active >= lastIndex} onClick={() => moveTo(active + 1)} aria-label={tx("Næste måned", "Next month")}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-accent transition hover:bg-white/20 disabled:cursor-default disabled:opacity-30">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div ref={wrapper} className="relative flex w-full bg-surface" style={{ height: height + RULER_HEIGHT }}>
+        {geometry && <>
+          <div className="shrink-0 bg-[var(--color-footer-bg)]" style={{ width: MARGIN.left }}>
+            <svg width={MARGIN.left} height={height + RULER_HEIGHT} aria-hidden="true" className="block" style={{ background: `linear-gradient(var(--color-footer-bg) ${RULER_HEIGHT}px, var(--color-surface) ${RULER_HEIGHT}px)` }}>
+              {geometry.ticks.map(tick => <text key={tick} x={MARGIN.left - 8} y={RULER_HEIGHT + geometry.y(tick)} textAnchor="end" dominantBaseline="middle" fontSize="11" fill="var(--color-text-secondary)">{formatMillions(tick, language)}</text>)}
+            </svg>
+          </div>
+          <div ref={scroller} onPointerDown={() => setHintDismissed(true)} onWheel={() => setHintDismissed(true)}
+            className="relative min-w-0 flex-1 cursor-grab overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="relative" style={{ width: plotW, height: height + RULER_HEIGHT }}>
+              <div ref={ruler} role="slider" tabIndex={0} aria-label={tx("Måned på kurven", "Month on the curve")} aria-valuemin={0} aria-valuemax={lastIndex} aria-valuenow={active} aria-valuetext={valueText}
+                aria-keyshortcuts="ArrowLeft ArrowRight PageUp PageDown Home End" onKeyDown={onRulerKeyDown}
+                className="sticky top-0 z-[1] bg-[var(--color-footer-bg)] [--cursor:0] focus-visible:outline focus-visible:outline-[3px] focus-visible:-outline-offset-[3px] focus-visible:outline-accent"
+                style={{ height: RULER_HEIGHT, width: plotW, touchAction: "pan-x pan-y" }}>
+                {history.map((p, i) => {
+                  const month = p.period.slice(5, 7);
+                  const January = month === "01";
+                  return <span key={p.period} aria-hidden="true" className="absolute -ml-px w-0.5 rounded-sm bg-accent"
+                    style={{ left: geometry.x(i), bottom: 10, height: January ? 22 : month === "07" ? 18 : 12, opacity: "clamp(0.26, calc(1 + (var(--cursor) - var(--y)) * 0.12), 1)", "--y": i } as CSSProperties}>
+                    {January && <span className="absolute bottom-[27px] left-1/2 -translate-x-1/2 text-[11px] font-semibold tabular-nums text-accent">{p.period.slice(0, 4)}</span>}
+                  </span>;
+                })}
+              </div>
+              <svg width={plotW} height={height} role="img" aria-label={summary} className="absolute left-0" style={{ top: RULER_HEIGHT }}>
+                {geometry.ticks.map(tick => <line key={tick} x1={0} x2={plotW} y1={geometry.y(tick)} y2={geometry.y(tick)} stroke="var(--color-border)" strokeDasharray="3 4" />)}
+                <path d={geometry.band} fill="var(--color-brand)" opacity="0.14" />
+                {askingPrice !== null && <g>
+                  <line x1={0} x2={plotW} y1={geometry.y(askingPrice)} y2={geometry.y(askingPrice)} stroke="var(--color-brand)" strokeWidth="1.5" strokeDasharray="6 4" />
+                  <text x={pad + 6} y={geometry.y(askingPrice) - 6} textAnchor="start" fontSize="11" fontWeight="600" fill="var(--color-brand-text)" stroke="var(--color-surface)" strokeWidth="3" paintOrder="stroke">{tx("Udbudspris", "Asking price")}</text>
+                </g>}
+                <path d={geometry.solid} fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                {geometry.tail && <path d={geometry.tail} fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeDasharray="2 4" strokeLinecap="round" />}
+                <circle cx={geometry.x(Math.min(active, lastIndex))} cy={geometry.y(shown.estimate)} r="5" fill="var(--color-surface)" stroke="var(--color-text-primary)" strokeWidth="2" />
+              </svg>
+            </div>
+          </div>
+          {/* The cursor stays put; the data moves under it. */}
+          <div aria-hidden="true" className="pointer-events-none absolute z-[2] w-0.5 -translate-x-1/2"
+            style={{ left: MARGIN.left + pad, top: 18, bottom: 0, background: `linear-gradient(var(--color-accent) ${RULER_HEIGHT - 18}px, var(--color-border-strong) ${RULER_HEIGHT - 18}px)` }}>
+            <span className="absolute left-1/2 -translate-x-1/2 border-x-[6px] border-b-8 border-x-transparent border-b-accent" style={{ top: RULER_HEIGHT - 26 }} />
+          </div>
+          <div aria-hidden="true" className="pointer-events-none absolute top-0 z-[2] h-14 w-[72px] bg-gradient-to-r from-[var(--color-footer-bg)] to-transparent" style={{ left: MARGIN.left }} />
+          <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 z-[2] h-14 w-[72px] bg-gradient-to-l from-[var(--color-footer-bg)] to-transparent" />
+        </>}
+      </div>
     </div>
-    {showHint && <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-ink-soft">
-      <span aria-hidden="true">←</span>{tx("Stryg sidelæns for at se tidligere år", "Swipe sideways to see earlier years")}
+    {!hintDismissed && geometry && <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-ink-soft">
+      <span aria-hidden="true">←</span>{tx("Træk i linealen for at gå tilbage i tiden", "Drag the ruler to go back in time")}
     </p>}
   </div>;
 }

@@ -9,6 +9,9 @@ import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ComparablesPanel } from "@/components/comparables-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { RegisterSourcesPanel } from "@/components/register-sources-panel";
+import { SalesHistoryCard } from "@/components/sales-history-card";
+import { SmartEstimateView } from "@/components/estimate/smart-estimate";
+import { SparContent } from "@/components/spar-panel";
 import { Footer } from "@/components/footer";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { useI18n } from "@/i18n/i18n";
@@ -75,7 +78,8 @@ export function AddressReportPage() {
     </div>);
   }
 
-  const { bbrData, publicValuation, zone } = report;
+  const { bbrData, publicValuation, zone, spar } = report;
+  const retry = () => { void lookupQuery.refetch(); };
   const hasRegisterRecords = zone !== null || publicValuation?.assessedPropertyValueDkk != null || publicValuation?.assessedLandValueDkk != null;
 
   return shell(<>
@@ -84,6 +88,8 @@ export function AddressReportPage() {
       {report.postalCode && <p className="mt-2 text-sm text-ink-soft">{report.postalCode}</p>}
       <p className="mt-4 rounded-xl bg-surface-alt px-4 py-3 text-sm leading-6 text-ink-soft">{t("address.report.notListing")}</p>
     </header>
+
+    <SalesHistoryCard history={report.priceHistory} available={report.salesAvailable} match={report.priceHistoryMatch} />
 
     <BbrFactsPanel bbrData={bbrData} plotSqm={null} source={bbrData ? "register" : null} matrikelnr={report.matrikelnr} ejerlav={report.ejerlav} bfeNummer={report.bfeNummer}
       loading={lookupQuery.isFetching} failed={false} onRetry={() => { void lookupQuery.refetch(); }} />
@@ -97,14 +103,19 @@ export function AddressReportPage() {
       </dl> : <p className="mt-2 text-[12.5px] text-ink-soft">{t("address.report.valuationMissing")}</p>}
     </section>
 
-    <ComparablesPanel soldPriceHistory={report.priceHistory} priceHistorySource={report.priceHistory.length > 0 ? "register" : null}
+    <ComparablesPanel soldPriceHistory={[]} showHistory={false}
       nearbySales={report.nearbySales} comparables={[]} neighborhoodAvgPricePerSqm={null} />
+
+    {spar !== undefined && <>
+      <SmartEstimateView result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} />
+      <div id="spar" className="section-anchor"><SparContent result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} /></div>
+    </>}
 
     {report.mapUrl && <a href={report.mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-strong px-5 text-sm font-semibold text-ink hover:bg-surface-hover">
       {t("address.report.openMap")} <span aria-hidden="true">↗</span>
     </a>}
 
-    <DueDiligenceChecklist riskFlags={null} />
+    <DueDiligenceChecklist riskFlags={report.riskFlags} />
     <RegisterSourcesPanel sources={report.sources} isLoading={lookupQuery.isFetching} isError={false} onRetry={() => { void lookupQuery.refetch(); }} />
     <p className="text-xs leading-5 text-ink-faint">{t("address.report.listingOnly")}</p>
   </>);
