@@ -100,13 +100,32 @@ export function memoizeAnswer<T extends { ok: boolean }>(key: string, load: () =
 }
 
 /**
+ * Cleans an `*_API_BASE` override. A value pasted without a scheme
+ * (`services.datafordeler.dk/...`) makes `fetch` throw "Failed to parse URL",
+ * so `https://` is assumed. The retired REST host (`services.datafordeler.dk`,
+ * e.g. `/BBR/BBRPublic/1/rest/GetInstance`) cannot answer GraphQL at all, so
+ * it is treated as unset and the GraphQL default is used instead.
+ */
+export function normalizeBase(raw: string | undefined): string | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    if (new URL(withScheme).hostname.toLowerCase() === "services.datafordeler.dk") return null;
+  } catch {
+    return null;
+  }
+  return withScheme.replace(/\/+$/, "");
+}
+
+/**
  * Endpoints to try, in order. An explicit `*_API_BASE` or `*_VERSION` is taken
  * as deliberate and never probed around: an operator pinning a version wants
  * the failure, not a silent fallback to a different one.
  */
 export function candidateBases(service: DatafordelerService): string[] {
-  const base = process.env[service.baseEnv]?.trim();
-  if (base) return [base.replace(/\/+$/, "")];
+  const base = normalizeBase(process.env[service.baseEnv]);
+  if (base) return [base];
 
   const pinned = process.env[service.versionEnv]?.trim();
   const versions = pinned ? [pinned] : service.versions;
