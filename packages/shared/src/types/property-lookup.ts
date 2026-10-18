@@ -78,7 +78,7 @@ export interface PropertyLookupResolved {
 export type PropertyLookupDataMode = "live" | "mock" | "unavailable";
 
 export interface PropertyLookupSourceStatus {
-  key: "address" | "bbr" | "publicValuation" | "noise" | "sales";
+  key: "address" | "bbr" | "publicValuation" | "noise" | "sales" | "soil";
   /** The register behind this field group, e.g. "DAR/DAWA", "BBR", "VUR". */
   register: string;
   mode: PropertyLookupDataMode;
@@ -137,7 +137,7 @@ export interface PropertyLookupResult {
   spar?: SparListingEstimate | null;
   /**
    * Due-diligence flags built from this lookup (BBR heating, noise reading, municipality links), in the shape
-   * the ingest stores for listings so one checklist renders both. Only for lookups by `husnummerId`; null otherwise.
+   * the ingest stores for listings so one checklist renders both. Null when the address could not be resolved.
    */
   riskFlags: RiskFlags | null;
   /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */

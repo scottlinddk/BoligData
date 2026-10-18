@@ -3,6 +3,8 @@ import { enrichProperty } from "./enrich.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
+import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
+import { riskStatuses } from "../../../../../packages/shared/src/utils/risk-status.js";
 import type { RawListing } from "./types.js";
 
 vi.mock("../enrichment-sources/bbr.js", () => ({ lookupBbr: vi.fn() }));
@@ -28,6 +30,7 @@ beforeEach(() => {
   vi.mocked(lookupBbr).mockResolvedValue({ ok: false, error: "missing credential" });
   vi.mocked(lookupEjendomsvurdering).mockResolvedValue({ ok: false, error: "missing credential" });
   vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: false, error: "not configured" });
+  vi.mocked(lookupSoilContamination).mockResolvedValue({ ok: false, error: "source unavailable" });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -83,5 +86,46 @@ describe("register provenance in crawl enrichment", () => {
     const result = await enrichProperty({ ...listing, sold_price_history: [{ soldDate: "2999-01-01", price: 3_000_000, pricePerSqm: null }] });
     expect(result.source_status.bbr?.dataMode).toBe("unavailable");
     expect(result.sold_price_history).toEqual([]);
+  });
+});
+
+describe("due-diligence flags from live registers", () => {
+  const cadastral = {
+    idLokalid: "0a3f509c-4f33-32b8-e044-0003ba298018", matrikelnr: null, ejerlav: null, ejerlavskode: null, bfeNummer: null,
+    zone: null, lat: 57.046, lon: 9.913, postalCode: "9000", postalName: "Aalborg", municipalityCode: "0851",
+    formattedAddress: "Hasserisgade 3, 9000 Aalborg", resolvedVia: "adressevaelger" as const,
+  };
+
+  it("answers noise, oil tank and soil from the registers instead of leaving them unknown", async () => {
+    vi.mocked(lookupBbr).mockResolvedValue({ ok: true, data: {
+      yearBuilt: 1930, renovationYear: null, areaSqm: 140, buildingType: "Fritliggende enfamilieshus", floors: 2,
+      roofMaterial: null, wallMaterial: null, heatingInstallation: "fjernvarme", basementSqm: null, toiletCount: null, bathroomCount: null,
+    } });
+    vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: true, data: { ldenDb: 60, band: { lowerDb: 60, upperDb: 64, source: "roads_in_towns" } } });
+    vi.mocked(lookupSoilContamination).mockResolvedValue({ ok: true, data: { classification: "v1", attestUrl: "https://jord.miljoeportal.dk/report/?elav=2005051&matrnr=327b", locationName: "Tidligere autoværksted" } });
+
+    const flags = (await enrichProperty(listing, cadastral)).risk_flags;
+
+    expect(riskStatuses(flags)).toEqual({ noise: "warning", oilTank: "ok", soil: "warning" });
+    expect(flags).toMatchObject({
+      oilTankRiskSource: "bbr", heatingInstallation: "fjernvarme",
+      soilContaminationAttestUrl: "https://jord.miljoeportal.dk/report/?elav=2005051&matrnr=327b",
+      encumbranceLookupUrl: "https://www.tinglysning.dk/", sewerSeparationLookupUrl: "https://www.aalborg.dk/",
+    });
+  });
+
+  it("reads 'no mapped noise zone' as ok, but a failed noise lookup as unknown", async () => {
+    vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: true, data: { ldenDb: null, band: null } });
+    expect(riskStatuses((await enrichProperty(listing, cadastral)).risk_flags).noise).toBe("ok");
+    vi.mocked(lookupNoiseExposure).mockResolvedValue({ ok: false, error: "HTTP 503" });
+    expect(riskStatuses((await enrichProperty(listing, cadastral)).risk_flags).noise).toBe("unknown");
+  });
+
+  it("keeps the labelled building-year heuristic when BBR records central heating of unknown fuel", async () => {
+    vi.mocked(lookupBbr).mockResolvedValue({ ok: true, data: {
+      yearBuilt: 1960, renovationYear: null, areaSqm: 140, buildingType: null, floors: null,
+      roofMaterial: null, wallMaterial: null, heatingInstallation: "centralvarme", basementSqm: null, toiletCount: null, bathroomCount: null,
+    } });
+    expect((await enrichProperty(listing, cadastral)).risk_flags).toMatchObject({ oilTankRisk: true, oilTankRiskSource: "heuristic" });
   });
 });

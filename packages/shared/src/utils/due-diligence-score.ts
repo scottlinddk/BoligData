@@ -1,4 +1,5 @@
 import type { RiskFlags } from "../types/index.js";
+import { noiseStatus } from "./risk-status.js";
 
 export interface DueDiligenceDeduction {
   label: string;
@@ -10,8 +11,6 @@ export interface DueDiligenceScoreBreakdown {
   score: number | null;
   deductions: DueDiligenceDeduction[];
 }
-
-const NOISE_WARNING_LDEN = 58; // matches due-diligence-checklist.tsx's own warning threshold
 
 /**
  * Quick 0-10 buy/inspect-further indicator combining the due-diligence risk
@@ -30,7 +29,7 @@ export function calculateDueDiligenceScore(
 
   const deductions: DueDiligenceDeduction[] = [];
 
-  if (riskFlags.noiseExposureLden !== null && riskFlags.noiseExposureLden > NOISE_WARNING_LDEN) {
+  if (noiseStatus(riskFlags) === "warning") {
     deductions.push({ label: "noise", points: 1.5 });
   }
 

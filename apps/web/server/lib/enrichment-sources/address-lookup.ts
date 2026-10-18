@@ -1,6 +1,7 @@
 import { fetchJson } from "../crawl/http.js";
 import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../crawl/map-utils.js";
-import { lookupAddressCadastralViaDar } from "./address-lookup-dar-fallback.js";
+import { lookupAddressCadastralViaDar, parseStructuredAddress } from "./address-lookup-dar-fallback.js";
+import { searchHusnummerByAddress } from "./adressevaelger.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 const MOCK_FLAG = "ADDRESS_LOOKUP_MOCK_MODE";
@@ -57,9 +58,10 @@ export interface AddressCadastral {
    * since resolving those from DAR alone needs a spatial join this repo
    * doesn't do yet. `"adressevaelger"` is the same narrower scope, resolved
    * from an id the user picked in the Adressevælger autocomplete
-   * (`adressevaelger.ts`) rather than from free text.
+   * (`adressevaelger.ts`) or found by its exact search. `"stored"` is the identifiers an earlier run saved
+   * on the property row, used when this run's lookup failed.
    */
-  resolvedVia: "dawa" | "dar_fallback" | "adressevaelger";
+  resolvedVia: "dawa" | "dar_fallback" | "adressevaelger" | "stored";
 }
 
 function apiBase(): string {
@@ -264,13 +266,24 @@ export async function lookupAddressCadastral(
   const dawaResult = await lookupViaDawa(address, postalCode, fallbackLat, fallbackLon);
   if (dawaResult.ok) return dawaResult;
 
+  // DAWA answers 410 Gone since it closed. Adressevælger (open, keyless) is its replacement for an exact
+  // street + number + postcode; it carries no parcel, so matrikelnr/ejerlav/BFE stay null on this path.
+  const structured = parseStructuredAddress(address, postalCode);
+  const adressevaelgerResult = structured
+    ? await searchHusnummerByAddress(structured)
+    : sourceFailed<AddressCadastral>(`could not parse "${address}" into street + house number`);
+  if (adressevaelgerResult.ok) {
+    const found = adressevaelgerResult.data;
+    return sourceOk({ ...found, lat: found.lat ?? fallbackLat, lon: found.lon ?? fallbackLon, postalCode: found.postalCode ?? postalCode });
+  }
+
   const apiKey = process.env.DATAFORDELER_API_KEY?.trim();
-  if (!apiKey) return dawaResult;
+  if (!apiKey) return sourceFailed(`DAWA: ${dawaResult.error}; Adressevælger: ${adressevaelgerResult.error}`);
 
   const fallbackResult = await lookupAddressCadastralViaDar(address, postalCode, apiKey);
   if (fallbackResult.ok) return fallbackResult;
 
-  return sourceFailed(`DAWA: ${dawaResult.error}; DAR fallback: ${fallbackResult.error}`);
+  return sourceFailed(`DAWA: ${dawaResult.error}; Adressevælger: ${adressevaelgerResult.error}; DAR fallback: ${fallbackResult.error}`);
 }
 
 async function lookupViaDawa(

@@ -8,10 +8,9 @@ import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering
 import { lookupSoilType } from "../enrichment-sources/geus-jordart.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { buildJordforureningsattestUrl } from "../enrichment-sources/jordforureningsattest-link.js";
-import { buildSpildevandsplanUrl } from "../enrichment-sources/spildevandsplan.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
-import { buildTinglysningUrl } from "../enrichment-sources/tinglysning-link.js";
-import { buildWeblagerUrl } from "../enrichment-sources/weblager-link.js";
+import { buildRiskFlags } from "../due-diligence/risk-flags.js";
+import { municipalityNameFromCode } from "../municipalities.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import type { RawListing } from "./types.js";
 
@@ -76,7 +75,6 @@ export async function enrichProperty(
     read("soil_contamination", mockModeEnabled("MILJOEPORTALEN_MOCK_MODE"), () => lookupSoilContamination(listing.lat, listing.lon)),
     read("noise", mockModeEnabled("STOEJKORT_MOCK_MODE"), () => lookupNoiseExposure(listing.lat, listing.lon)),
   ]);
-  const heatingKnown = bbr?.heatingInstallation != null;
   return {
     bbr_data: {
       yearBuilt: bbr?.yearBuilt ?? null,
@@ -102,18 +100,17 @@ export async function enrichProperty(
       estimatedYieldPercent: null,
       daysOnMarket: null,
     },
-    risk_flags: {
-      noiseExposureLden: noise?.ldenDb ?? null,
-      encumbranceCheckRequired: true,
-      encumbranceLookupUrl: buildTinglysningUrl(cadastral?.matrikelnr ?? null, cadastral?.ejerlav ?? null),
-      sewerSeparationCheckRequired: true,
-      sewerSeparationLookupUrl: buildSpildevandsplanUrl(listing.municipality),
-      buildingCaseArchiveUrl: buildWeblagerUrl(listing.municipality),
-      oilTankRisk: heatingKnown ? bbr!.heatingInstallation === "oliefyr" : (listing.building_year ?? 2000) < 1970,
-      oilTankRiskSource: heatingKnown ? "bbr" : "heuristic",
-      soilContamination: { classification: contamination?.classification ?? "unknown", jordart: soil?.jordart ?? null },
-      soilContaminationAttestUrl: buildJordforureningsattestUrl(cadastral?.ejerlavskode ?? null, cadastral?.matrikelnr ?? null),
-    },
+    risk_flags: buildRiskFlags({
+      // The address register's municipality code when it answered, else the listing's own municipality name.
+      municipality: municipalityNameFromCode(cadastral?.municipalityCode ?? null) ?? listing.municipality,
+      heating: bbr?.heatingInstallation ?? null,
+      noise,
+      soil: contamination,
+      jordart: soil?.jordart ?? null,
+      parcelAttestUrl: buildJordforureningsattestUrl(cadastral?.ejerlavskode ?? null, cadastral?.matrikelnr ?? null),
+      // BBR not settling the heating leaves the listing's long-standing building-year heuristic, labelled as such.
+      oilTankFallback: { oilTankRisk: (listing.building_year ?? 2000) < 1970, oilTankRiskSource: "heuristic" },
+    }),
     school_transport: null,
     public_valuation: valuation,
     source: bbr || valuation ? "datafordeler" : "mock",

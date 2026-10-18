@@ -110,3 +110,31 @@ describe("due-diligence checklist oil tank", () => {
   });
 });
 
+
+describe("due-diligence checklist with live register answers", () => {
+  it("shows a mapped noise band with its source, and no mapped zone as a clear answer", () => {
+    const loud = text(render({ ...flags, noiseChecked: true, noiseBand: { lowerDb: 60, upperDb: 64, source: "roads_in_towns" } }));
+    expect(loud).toContain("Kortlagt støj 60–64 dB (Lden) fra veje i byen.");
+    const top = text(render({ ...flags, noiseChecked: true, noiseBand: { lowerDb: 75, upperDb: null, source: "major_rail" } }, "en"));
+    expect(top).toContain("Mapped noise above 75 dB (Lden) from major railways.");
+    const quiet = render({ ...flags, noiseChecked: true });
+    expect(text(quiet)).toContain(translations.da["dueDiligence.noise.clear"]);
+    expect(quiet).toContain("✓");
+  });
+
+  it("names BBR's heating behind an oil tank answer, and says when the fuel is not recorded", () => {
+    expect(text(render({ ...flags, oilTankRiskSource: "bbr", heatingInstallation: "fjernvarme" }))).toContain("BBR registrerer fjernvarme som opvarmning, ikke oliefyr.");
+    expect(text(render({ ...flags, heatingInstallation: "centralvarme" }))).toContain("BBR registrerer centralvarme, men ikke brændslet");
+  });
+
+  it("names the contamination register's site and links its attest", () => {
+    const attest = "https://jord.miljoeportal.dk/report/?elav=2005051&matrnr=327b";
+    const html = render({ ...flags, soilContamination: { classification: "v1", jordart: null }, soilContaminationAttestUrl: attest, soilContaminationSiteName: "Tidligere autoværksted" });
+    expect(text(html)).toContain("(V1). Lokalitet: Tidligere autoværksted.");
+    expect(html).toContain(`href="${attest.replace(/&/g, "&amp;")}"`);
+  });
+
+  it("always links the land register, since no source answers the tingbogsattest", () => {
+    expect(render(flags)).toContain('href="https://www.tinglysning.dk/"');
+  });
+});

@@ -194,6 +194,7 @@ describe("lookupAddressCadastral (DAR fallback)", () => {
     const stub = stubFetch([
       { body: [] }, // DAWA exact search: no match
       { body: [] }, // DAWA fuzzy retry: no match
+      { body: { status: "ok", fund: [] } }, // Adressevælger search: no match
       { body: introspection(HUSNUMMER_FIELDS) }, // DAR schema introspection
       {
         body: husnummerResponse([
@@ -221,7 +222,8 @@ describe("lookupAddressCadastral (DAR fallback)", () => {
     // Cadastral fields need a spatial join this fallback deliberately doesn't do.
     expect(result.data.matrikelnr).toBeNull();
     expect(result.data.bfeNummer).toBeNull();
-    expect(stub.urls[3]).toContain("graphql.datafordeler.dk/DAR");
+    expect(stub.urls[2]).toContain("adressevaelger.dk/husnumre/soeg");
+    expect(stub.urls[4]).toContain("graphql.datafordeler.dk/DAR");
   });
 
   it("reports both failures when DAWA and the DAR fallback both come up empty", async () => {
@@ -242,6 +244,31 @@ describe("lookupAddressCadastral (DAR fallback)", () => {
 
     expect(result.ok).toBe(false);
     expect(stub.urls.every((url) => !url.includes("datafordeler.dk"))).toBe(true);
+  });
+});
+
+describe("lookupAddressCadastral (Adressevælger, now that DAWA is gone)", () => {
+  const husnummer = {
+    husnummer: {
+      id_lokalid: "0a3f509c-4f33-32b8-e044-0003ba298018", husnummertekst: "3", vejnavn: "Hasserisgade",
+      adgangsadressebetegnelse: "Hasserisgade 3, 9000 Aalborg",
+      adgangspunkt: { koordinater: { x: 555784.21, y: 6322850.06 } },
+      postnummer: { postnr: "9000", navn: "Aalborg" }, navngivenvejkommunedel: { kommune: "0851" },
+    },
+  };
+
+  it("resolves an exact street, number and postcode through the search and then the husnummer record", async () => {
+    const stub = stubFetch([
+      { status: 410 }, // DAWA closed
+      { body: { status: "ok", fund: [{ type: "husnummer", id: "0a3f509c-4f33-32b8-e044-0003ba298018", titel: "Hasserisgade 3, 9000 Aalborg", vejnavn: "Hasserisgade", husnummer: "3" }] } },
+      { body: husnummer },
+    ]);
+    const result = await lookupAddressCadastral("Hasserisgade 3", "9000");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toMatchObject({ idLokalid: "0a3f509c-4f33-32b8-e044-0003ba298018", municipalityCode: "0851", postalCode: "9000", resolvedVia: "adressevaelger", matrikelnr: null });
+    expect(result.data.lat).toBeCloseTo(57.046, 2);
+    expect(stub.urls.some((url) => url.includes("/husnumre/soeg?") && url.includes("tekst=Hasserisgade+3%2C+9000"))).toBe(true);
   });
 });
 
