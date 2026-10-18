@@ -3,6 +3,7 @@ import type { Property } from "@shared/types/index";
 import type { ResearchHistoryResponse } from "@shared/types/research-api";
 import { useI18n } from "@/i18n/i18n";
 import { workbookListingReference } from "@/lib/workbook-listing-reference";
+import { TimeOnMarketInfo } from "@/components/estimate/price-explainers";
 import { buttonClass, Money, useResearchText } from "./fields";
 
 interface Props {
@@ -46,7 +47,10 @@ export function WorkbookPriceReferenceCard({ property, history, loading, failed,
   return <section aria-labelledby="workbook-price-title" aria-busy={loading} data-testid="workbook-price-reference" data-state={ready ? "available" : reference.status} className="overflow-hidden rounded-2xl border border-border bg-surface-alt">
     <div className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="workbook-price-title" className="text-xl font-semibold tracking-tight text-ink">{tx("Pris efter liggetid", "Price by time on market")}</h2>
+        <div className="flex items-center gap-2.5">
+          <h2 id="workbook-price-title" className="text-xl font-semibold tracking-tight text-ink">{tx("Pris efter liggetid", "Price by time on market")}</h2>
+          <TimeOnMarketInfo />
+        </div>
         <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink-soft">{tx("Historisk scenario", "Historical scenario")}</span>
       </div>
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">

@@ -9,6 +9,7 @@ import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts
 import { researchListingTime } from "@/lib/research-listing-time";
 import { originalAskingPrice } from "@/lib/original-asking-price";
 import { reportedMarketingPeriod } from "@/lib/reported-listing-duration";
+import { workbookListingReference } from "@/lib/workbook-listing-reference";
 import { ListingDurationSummary } from "@/components/listing-duration-summary";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ListingFactsPanel, PropertyDescription } from "@/components/listing-details";
@@ -132,6 +133,7 @@ export function PropertyDetailPage() {
     { id: "map", label: tx("På kortet", "On the map") },
   ];
   const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
+  const timeOnMarketReference = workbookListingReference(property, listingHistory.data).reference;
   // Only exact, source-reported original asking prices count; nothing is inferred.
   const original = originalAskingPrice(property, listingHistory.data);
   const priceCut = original.status === "available" && original.evidence && original.evidence.price > property.price ? original.evidence.price - property.price : null;
@@ -207,7 +209,7 @@ export function PropertyDetailPage() {
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
           <div ref={priceReference} id="price-reference" tabIndex={-1} aria-label={tx("Prisoverblik", "Price overview")} className="section-anchor rounded-2xl">
-            <PriceTabs propertyId={property.id} propertyType={property.propertyType}
+            <PriceTabs propertyId={property.id} propertyType={property.propertyType} askingPriceDkk={property.price} timeOnMarketPriceDkk={timeOnMarketReference.status === "available" ? timeOnMarketReference.referencePrice : null}
               timeOnMarket={<WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />} />
           </div>
           <div id="description" className="section-anchor"><PropertyDescription key={property.id} property={property} details={listingDetails} /></div>

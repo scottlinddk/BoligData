@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useI18n } from "@/i18n/i18n";
 import { SmartEstimate } from "@/components/estimate/smart-estimate";
 import { SparPanel } from "@/components/spar-panel";
+import { BoligDataIndicatorCard } from "@/components/estimate/boligdata-indicator-card";
+import { useSparEstimate } from "@/hooks/use-spar";
+import { boligdataIndicator } from "@/lib/boligdata-indicator";
 
 type PriceTab = "price" | "estimate" | "spar";
 
@@ -15,8 +18,15 @@ const scrollBehavior = (): ScrollBehavior => window.matchMedia("(prefers-reduced
  * estimate and the SPAR fair price. Panels stay mounted (only hidden) so their data loads once and
  * switching tabs is instant.
  */
-export function PriceTabs({ propertyId, propertyType, timeOnMarket }: { propertyId: string; propertyType?: string | null; timeOnMarket: ReactNode }) {
+export function PriceTabs({ propertyId, propertyType, timeOnMarket, timeOnMarketPriceDkk = null, askingPriceDkk = null }: {
+  propertyId: string; propertyType?: string | null; timeOnMarket: ReactNode;
+  /** The "should cost" reference of the time-on-market tab, or null when it cannot be computed. */
+  timeOnMarketPriceDkk?: number | null; askingPriceDkk?: number | null;
+}) {
   const { language } = useI18n();
+  const spar = useSparEstimate(propertyId).data;
+  // Smart estimate and SPAR fair price are one number, so it enters the indicator once.
+  const indicator = boligdataIndicator({ sparPriceDkk: spar?.status === "available" ? spar.fairPrice?.estimate : null, timeOnMarketPriceDkk, askingPriceDkk });
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const [active, setActive] = useState<PriceTab>(() => TAB_BY_HASH[window.location.hash] ?? "price");
   const root = useRef<HTMLDivElement>(null);
@@ -58,6 +68,7 @@ export function PriceTabs({ propertyId, propertyType, timeOnMarket }: { property
   const panel = (id: PriceTab, children: ReactNode) => <div role="tabpanel" id={`price-panel-${id}`} aria-labelledby={`price-tab-${id}`} hidden={active !== id} tabIndex={-1} className="min-w-0 [&>section]:mt-0">{children}</div>;
 
   return <div ref={root} className="section-anchor min-w-0">
+    {indicator && <BoligDataIndicatorCard indicator={indicator} />}
     <div role="tablist" aria-label={tx("Prisindikatorer", "Price indicators")} onKeyDown={onKeyDown}
       className="mb-3 flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface-alt p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {tabs.map(tab => <button key={tab.id} type="button" role="tab" id={`price-tab-${tab.id}`} aria-selected={active === tab.id} aria-controls={`price-panel-${tab.id}`} tabIndex={active === tab.id ? 0 : -1}
