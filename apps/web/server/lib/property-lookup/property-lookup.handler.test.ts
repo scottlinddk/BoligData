@@ -127,7 +127,11 @@ const BOLIGSIDEN_FLORAVEJ_6 = {
   ],
 };
 
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[] } = {}) {
+/** What MAT answers for the estate behind BFE 2340871: one ordinary parcel, nothing registered on it. */
+const MAT_ESTATE = { id_lokalId: "e1", BFEnummer: 2_340_871, landbrugsnotering: null, erFaelleslod: false, hovedejendomOpdeltIEjerlejligh: false };
+const MAT_PARCEL = { id_lokalId: "p1", registreretAreal: 812, fredskov_areal: null, strandbeskyttelse_areal: null, klitfredning_areal: null, majoratsskov_nummer: null, faelleslod: false };
+
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[]; matParcels?: unknown[] } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
@@ -136,6 +140,12 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
     if (chainEntity) {
       const nodes = (overrides.chain ?? HOUSE_CHAIN)[chainEntity] ?? [];
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ data: { [chainEntity]: { pageInfo: { hasNextPage: false }, nodes } } }) };
+    }
+    // MAT's documents are named queries, so they never match the chain pattern above.
+    if (href.includes("/MAT/") && typeof init?.body === "string") {
+      const entity = JSON.parse(init.body).query.match(/\{\s+(\w+)\(/)?.[1] as string;
+      const nodes = entity === "MAT_SamletFastEjendom" ? [MAT_ESTATE] : (overrides.matParcels ?? [MAT_PARCEL]);
+      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ data: { [entity]: { pageInfo: { hasNextPage: false }, nodes } } }) };
     }
     if (href.includes("api.boligsiden.dk/search/addresses")) {
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: overrides.boligsiden ?? [] }) };
@@ -435,7 +445,7 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.bbrData?.yearBuilt).toBe(1962);
   });
 
-  it("leaves free-text lookups on their original valuation path", async () => {
+  it("keys free-text lookups by the address register's BFE, without walking BBR to find one", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     const fetchSpy = stubPipeline();
 
@@ -445,7 +455,8 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.propertyClass).toBeNull();
     expect(result.publicValuation?.assessedPropertyValueDkk).toBe(3_150_000);
     const queried = fetchSpy.mock.calls.map((c) => String((c[1] as { body?: string } | undefined)?.body ?? ""));
-    expect(queried.some((q) => q.includes("VUR_BFEKrydsreference") || q.includes("BBR_Grund"))).toBe(false);
+    expect(queried.some((q) => q.includes("VUR_BFEKrydsreference") && q.includes("eq: 2340871"))).toBe(true);
+    expect(queried.some((q) => q.includes("BBR_Ejendomsrelation"))).toBe(false);
   });
 
   it("evaluates no price-based criterion without an asking price", async () => {
@@ -477,5 +488,41 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(address?.mode).toBe("unavailable");
     expect(address?.error).toContain("404");
     expect(result.dataMode).toBe("unavailable");
+  });
+});
+
+describe("lookupProperty: land, tanks and valuation in the due-diligence flags", () => {
+  const byId: PropertyLookupInput = { address: "", husnummerId: dawaRecord.id };
+
+  it("reports MAT and the BBR tank register as sources and fills the flags from them", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({
+      matParcels: [{ ...MAT_PARCEL, fredskov_areal: 300 }],
+      chain: {
+        ...HOUSE_CHAIN,
+        BBR_TekniskAnlaeg: [{ id_lokalId: "t1", status: "6", tek020Klassifikation: "1110", tek032Stoerrelse: 1500, tek067Fabrikationsaar: 1978, tek110Driftstatus: "1" }],
+      },
+    });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.sources.find((s) => s.key === "land")).toMatchObject({ mode: "live", error: null });
+    expect(result.sources.find((s) => s.key === "oilTanks")).toMatchObject({ mode: "live", error: null });
+    expect(result.riskFlags?.landRegistration).toMatchObject({ totalAreaSqm: 812, forestReserve: { areaSqm: 300 } });
+    expect(result.riskFlags?.oilTanks?.tanks).toHaveLength(1);
+    // A standing tank is a finding even though the building's heating is district heating.
+    expect(result.riskFlags).toMatchObject({ oilTankRisk: true, oilTankRiskSource: "bbr" });
+    expect(result.riskFlags?.valuation).toMatchObject({ year: 2024, propertyValueDkk: 3_150_000, landValueDkk: 780_000 });
+  });
+
+  it("leaves the flags answered by nothing when the registers cannot answer, never 'no tank'", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: { ...HOUSE_CHAIN, BBR_Grund: [] } });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.sources.find((s) => s.key === "land")?.mode).toBe("unavailable");
+    expect(result.riskFlags?.landRegistration).toBeNull();
+    expect(result.riskFlags?.valuation).toBeNull();
   });
 });

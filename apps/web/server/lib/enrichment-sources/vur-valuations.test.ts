@@ -250,8 +250,11 @@ describe("lookupHouseValuation", () => {
     fakeDatafordeler({ ...house, BBR_Grund: () => ({ nodes: [] }) });
     expect(await lookupHouseValuation(HUSNUMMER)).toEqual({ propertyClass: "house", bfeNummer: null, valuation: { ok: false, error: "bfe: no BBR_Grund on this husnummer" } });
     // The BFE was found, so it is kept even though the valuation hop after it failed.
+    // A found BFE or building class is remembered for ten minutes, so each scenario starts from an empty cache.
+    resetDatafordelerCache();
     fakeDatafordeler({ ...house, VUR_BFEKrydsreference: () => ({ nodes: [] }) });
     expect(await lookupHouseValuation(HUSNUMMER)).toEqual({ propertyClass: "house", bfeNummer: "5000001", valuation: { ok: false, error: "valuation: no valuation registered for BFE 5000001" } });
+    resetDatafordelerCache();
     fakeDatafordeler({ ...house, BBR_Bygning: () => ({ nodes: [], hasNextPage: false }) });
     expect(await lookupHouseValuation(HUSNUMMER)).toMatchObject({ propertyClass: null, bfeNummer: null, valuation: { ok: false, error: expect.stringContaining("building use:") } });
   });
@@ -260,5 +263,29 @@ describe("lookupHouseValuation", () => {
     const { queries } = fakeDatafordeler(house);
     expect(await lookupHouseValuation(null)).toEqual({ propertyClass: null, bfeNummer: null, valuation: { ok: false, error: "no husnummer id to look up" } });
     expect(queries).toHaveLength(0);
+  });
+});
+
+describe("shared lookups", () => {
+  it("finds a husnummer's BFE once for the valuation and the cadastre asking at the same time", async () => {
+    const { queries } = fakeDatafordeler({
+      BBR_Grund: () => ({ nodes: [{ id_lokalId: "g1", bestemtFastEjendom: RELATION }] }),
+      BBR_Ejendomsrelation: () => ({ nodes: [{ bfeNummer: 5_000_001 }] }),
+    });
+    const [first, second] = await Promise.all([lookupHouseBfe(HUSNUMMER), lookupHouseBfe(HUSNUMMER)]);
+    expect(first).toEqual({ ok: true, data: "5000001" });
+    expect(second).toEqual(first);
+    expect(queries.filter((q) => q.includes("BBR_Grund"))).toHaveLength(1);
+  });
+
+  it("does not remember a failure, so the next caller asks again", async () => {
+    fakeDatafordeler({ BBR_Grund: () => ({ nodes: [] }) });
+    expect((await lookupHouseBfe(HUSNUMMER)).ok).toBe(false);
+    const { queries } = fakeDatafordeler({
+      BBR_Grund: () => ({ nodes: [{ id_lokalId: "g1", bestemtFastEjendom: RELATION }] }),
+      BBR_Ejendomsrelation: () => ({ nodes: [{ bfeNummer: 5_000_001 }] }),
+    });
+    expect(await lookupHouseBfe(HUSNUMMER)).toEqual({ ok: true, data: "5000001" });
+    expect(queries.length).toBeGreaterThan(0);
   });
 });

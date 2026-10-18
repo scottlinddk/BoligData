@@ -242,7 +242,7 @@ export function PropertyDetailPage() {
           <MiljoegisNoisePanel propertyId={property.id} />
           <LimfjordNoisePanel propertyId={property.id} />
           <DetailSection title={tx("Dokumentation og opmærksomhedspunkter", "Documents and things to check")} subtitle={tx("Tjekliste og status for de offentlige kilder", "Checklist and public data source status")}>
-            <div className="space-y-4"><DueDiligenceChecklist riskFlags={mergeRiskFlags(lookupQuery.data?.riskFlags ?? null, enrichment?.riskFlags ?? null)} /><RegisterSourcesPanel sources={registerSources} isLoading={lookupQuery.isLoading} isError={lookupQuery.isError} onRetry={() => lookupQuery.refetch()} /></div>
+            <div className="space-y-4"><DueDiligenceChecklist riskFlags={mergeRiskFlags(lookupQuery.data?.riskFlags ?? null, enrichment?.riskFlags ?? null)} askingPriceDkk={listing?.price ?? null} /><RegisterSourcesPanel sources={registerSources} isLoading={lookupQuery.isLoading} isError={lookupQuery.isError} onRetry={() => lookupQuery.refetch()} /></div>
           </DetailSection>
         </div>
         <aside aria-label={tx("Pris og næste skridt", "Price and next steps")} className="row-start-2 space-y-5 lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1 lg:space-y-9">
