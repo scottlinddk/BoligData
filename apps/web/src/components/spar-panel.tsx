@@ -2,6 +2,7 @@ import type { SparListingEstimate } from "@shared/types/spar";
 import { formatDkk } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
 import { useSparEstimate } from "@/hooks/use-spar";
+import { SparInfo } from "@/components/estimate/price-explainers";
 
 export function SparPanel({ propertyId }: { propertyId: string }) {
   const query = useSparEstimate(propertyId);
@@ -22,7 +23,10 @@ export function SparContent({ result, loading, failed, onRetry }: { result?: Spa
       ? tx("Boligens vurdering er fra et andet vurderingsår end resten af markedsindekset og kan ikke sammenlignes.", "This home's valuation is from a different valuation year than the rest of the market index and cannot be compared.")
       : tx("Vi har endnu ikke en offentlig vurdering for denne bolig.", "We do not have a public valuation for this home yet.");
   return <section className="rounded-2xl bg-surface-alt p-5 sm:p-7" aria-labelledby="spar-heading">
-    <h2 id="spar-heading" className="text-xl font-medium tracking-tight">{tx("SPAR og fair pris (estimat)", "SPAR and fair price (estimate)")}</h2>
+    <div className="flex items-center gap-2.5">
+      <h2 id="spar-heading" className="text-xl font-medium tracking-tight">{tx("SPAR og fair pris (estimat)", "SPAR and fair price (estimate)")}</h2>
+      <SparInfo />
+    </div>
     <p className="mt-1 text-sm text-ink-soft">{tx("Salgspris i forhold til offentlig vurdering, beregnet ud fra vores egne handler", "Sale price relative to the public valuation, calculated from our own sales")}</p>
     {loading && <p role="status" className="mt-4 text-sm text-ink-soft">{tx("Beregner…", "Calculating…")}</p>}
     {!loading && failed && <div role="status" className="mt-4 rounded-xl border border-border p-4 text-sm">

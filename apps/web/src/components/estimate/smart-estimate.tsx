@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { SparListingEstimate } from "@shared/types/spar";
 import { formatDkk } from "@shared/utils/price";
@@ -8,6 +8,7 @@ import { estimateFactors, formatPeriod, formatSignedPercent, type EstimateFactor
 import { Skeleton } from "@/components/ui/loading";
 import { EstimateChart } from "./estimate-chart";
 import { RangeBar } from "./range-bar";
+import { SmartEstimateInfo } from "./price-explainers";
 
 export function SmartEstimate({ propertyId, propertyType, onShowCalculation }: { propertyId: string; propertyType?: string | null; onShowCalculation?: () => void }) {
   const query = useSparEstimate(propertyId);
@@ -52,7 +53,6 @@ function FactorRow({ factor }: { factor: EstimateFactor }) {
 export function SmartEstimateView({ result, loading, failed, onRetry, propertyType, fullPageHref, onShowCalculation }: { result?: SparListingEstimate; loading: boolean; failed: boolean; onRetry: () => void; propertyType?: string | null; fullPageHref?: string; onShowCalculation?: () => void }) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
-  const [helpOpen, setHelpOpen] = useState(false);
   const fair = result?.status === "available" && result.fairPrice && result.index ? result : null;
   const unavailable = result?.reason === "unsupported_property_type"
     ? tx("Estimatet findes kun for huse. Lejligheder og andre boligtyper kan ikke prissættes ud fra en bygnings vurdering.", "The estimate only covers houses. Apartments and other property types cannot be priced from a building's valuation.")
@@ -65,14 +65,9 @@ export function SmartEstimateView({ result, loading, failed, onRetry, propertyTy
   return <section id="estimate" aria-labelledby="estimate-heading" className="section-anchor min-w-0 rounded-2xl bg-surface-alt p-5 sm:p-7">
     <div className="flex items-center gap-2.5">
       <h2 id="estimate-heading" className="text-xl font-medium tracking-tight">{tx("Smart estimat", "Smart estimate")}</h2>
-      <button type="button" onClick={() => setHelpOpen(open => !open)} aria-expanded={helpOpen} aria-controls="estimate-help" aria-label={tx("Sådan beregnes estimatet", "How the estimate is calculated")}
-        className="flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-surface text-xs font-semibold text-ink-soft transition hover:bg-surface-hover">?</button>
+      <SmartEstimateInfo />
     </div>
     <p className="mt-1 text-sm text-ink-soft">{tx("Boligens offentlige vurdering omregnet med markedets niveau, ikke en vurdering af netop denne bolig", "The public valuation re-priced at the market level, not an appraisal of this particular home")}</p>
-    {helpOpen && <p id="estimate-help" className="ui-enter mt-3 rounded-xl border border-border bg-surface p-4 text-sm leading-6">
-      {tx("Estimatet er boligens offentlige ejendomsværdi gange det niveau, som lignende boliger faktisk sælges til i forhold til deres vurdering (vores eget SPAR-niveau, udjævnet over tid). Intervallet viser, hvor meget enkelte handler plejer at afvige. Det siger intet om stand, beliggenhed, udsigt eller renovering, og det er ikke en mæglervurdering.",
-        "The estimate is the home's public property valuation times the level at which similar homes actually sell relative to their valuation (our own SPAR level, smoothed over time). The interval shows how far single sales usually deviate. It says nothing about condition, location, view or renovation, and it is not a broker's appraisal.")}
-    </p>}
 
     {loading && <div role="status" aria-label={tx("Beregner estimat", "Calculating estimate")} className="mt-6 grid gap-5"><Skeleton className="h-[300px] rounded-xl" /><Skeleton className="h-[220px] rounded-xl" /></div>}
     {!loading && failed && <div role="status" className="mt-5 rounded-xl border border-border bg-surface p-4 text-sm">
