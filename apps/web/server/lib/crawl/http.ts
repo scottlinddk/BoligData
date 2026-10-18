@@ -139,9 +139,12 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOptions
       // deterministic — retrying won't help.
       if (err instanceof HttpError && !err.retryable) throw err;
       if (err instanceof Error && err.message.startsWith("Invalid JSON from")) throw err;
+      // fetch's own errors (e.g. "Failed to parse URL from <url>") quote the URL, key included.
       lastError = err instanceof Error && err.name === "AbortError"
         ? new Error(`Timeout after ${timeoutMs}ms fetching ${redactUrl(url)}`)
-        : err;
+        : err instanceof Error && !(err instanceof HttpError) && err.message.includes(url)
+          ? new Error(err.message.split(url).join(redactUrl(url)))
+          : err;
     } finally {
       clearTimeout(timer);
     }

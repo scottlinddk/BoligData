@@ -40,6 +40,16 @@ describe("fetchJson error messages", () => {
     expect((error as Error).message).not.toContain("osy65dzsecret");
   });
 
+  it("does not put the API key in the error fetch itself throws for a URL it cannot parse", async () => {
+    const url = "services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance?apiKey=osy65dzsecret";
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError(`Failed to parse URL from ${url}`));
+
+    const error = await fetchJson(url, { attempts: 1 }).catch((err: unknown) => err);
+
+    expect((error as Error).message).toContain("Failed to parse URL");
+    expect((error as Error).message).not.toContain("osy65dzsecret");
+  });
+
   it.each([429, 503])("does not wait for Retry-After on its final attempt after HTTP %s", async status => {
     vi.useFakeTimers();
     const started = Date.now();
