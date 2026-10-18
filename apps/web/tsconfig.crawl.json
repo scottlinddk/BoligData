@@ -5,5 +5,5 @@
     "rootDir": "../..",
     "outDir": "./.crawl-build"
   },
-  "include": ["server/lib/crawl/run-cli.ts"]
+  "include": ["server/lib/crawl/run-cli.ts", "server/lib/crawl/backfill-risk-flags-cli.ts"]
 }

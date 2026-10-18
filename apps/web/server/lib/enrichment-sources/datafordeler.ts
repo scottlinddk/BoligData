@@ -71,13 +71,28 @@ export function resetDatafordelerCache(): void {
 }
 
 /**
- * Endpoints to try, in order. An explicit `*_API_BASE` or `*_VERSION` is taken
+ * Whether a `*_API_BASE` override can be a GraphQL endpoint at all: an absolute https URL on the
+ * Datafordeler GraphQL host (or a custom host with a path, for a proxy). A value that is not
+ * (a legacy `services.datafordeler.dk/.../rest/...` address without a scheme sat in production and made
+ * every BBR request fail with "Failed to parse URL") is ignored, so the default version walk applies.
+ */
+export function isGraphQlBase(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !/\/rest\//i.test(url.pathname) && !/(^|\.)services\.datafordeler\.dk$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Endpoints to try, in order. An explicit, usable `*_API_BASE` or `*_VERSION` is taken
  * as deliberate and never probed around: an operator pinning a version wants
  * the failure, not a silent fallback to a different one.
  */
 export function candidateBases(service: DatafordelerService): string[] {
   const base = process.env[service.baseEnv]?.trim();
-  if (base) return [base.replace(/\/+$/, "")];
+  if (base && isGraphQlBase(base)) return [base.replace(/\/+$/, "")];
 
   const pinned = process.env[service.versionEnv]?.trim();
   const versions = pinned ? [pinned] : service.versions;

@@ -45,6 +45,18 @@ describe("candidateBases", () => {
   });
 });
 
+describe("a *_API_BASE that cannot be a GraphQL endpoint", () => {
+  it.each([
+    "services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance",
+    "https://services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance",
+    "http://graphql.datafordeler.dk/VUR/v2",
+    "not a url",
+  ])("is ignored in favour of the default version walk: %s", (value) => {
+    vi.stubEnv("DATAFORDELER_VUR_API_BASE", value);
+    expect(candidateBases(SERVICE)[0]).toBe("https://graphql.datafordeler.dk/VUR/v2");
+  });
+});
+
 describe("postGraphQl", () => {
   it("moves past a withdrawn version and stays on the one that answered", async () => {
     const stub = stubFetch([{ status: 404 }, { body: { data: { ok: true } } }]);

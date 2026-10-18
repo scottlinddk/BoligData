@@ -19,3 +19,16 @@ Checked live on 18 October 2026. Before this change every item on a listing came
 - **The oil tank answer is the heating, not the tank register.** BBR's technical installations (`BBR_TekniskAnlaeg`, which records oil tanks and their decommissioning) can only be filtered by its own id, so it cannot be reached from an address in one query.
 - **Listing pages show live answers.** The page's register lookup now builds the flags for listings too, and each item takes the live answer when there is one and the crawl's stored answer otherwise (`mergeRiskFlags`).
 - **Stored rows heal on the next crawl.** `enrichmentNeedsRefresh` already re-enriches a listing whose register status is not `real`, so every listing the crawl sees gets the new answers. The crawl also no longer overwrites a stored husnummer, matrikel or BFE with null when this run's lookup fails.
+
+## Refreshing stored listings
+
+The crawl only enriches listings the feed returns, a few at a time, so rows that have left the feed would keep their old "?" answers. The **Backfill due-diligence checklist** workflow (`.github/workflows/backfill-risk-flags.yml`, `server/lib/crawl/backfill-risk-flags.ts`) re-answers every stored property from the registers:
+
+- It is a dry run unless `write` is ticked. A dry run queries the registers and prints counts of what answered for real (`noiseReal`, `soilReal`, `bbrReal`), and writes nothing.
+- It writes only `risk_flags`, `bbr_data`, `public_valuation` (when a register answered), the register keys of `source_status` and `enriched_at`. Sold-price history and the other enrichment columns are kept. On `properties` it only fills empty `id_lokalid`, `matrikelnr`, `ejerlav`, `zone` and `bfe_nummer`, never replaces one.
+- A property without live provenance (`data_mode` other than `real`) is never searched by address. Its stored husnummer id is used.
+- `only_stale` (default on) skips properties whose noise, soil and BBR already answered for real, so it can be re-run.
+
+## BBR in production
+
+Stored enrichment rows show BBR failing with `Failed to parse URL from services.datafordeler.dk/BBR/BBRPublic/1/rest/GetInstance?apiKey=...`. No such address exists in this repo, so it comes from the `DATAFORDELER_BBR_API_BASE` environment variable, set to a legacy REST address without a scheme. The client treats an explicit base as deliberate and never probes around it, so every BBR lookup failed. Now a base that is not an https GraphQL endpoint is ignored and the default version walk applies. Errors from `fetch` itself also no longer quote the request URL, which carried the API key into `enrichments.source_status`.
