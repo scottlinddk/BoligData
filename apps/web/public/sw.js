@@ -1,7 +1,7 @@
 // Minimal service worker: makes the app installable and keeps the shell usable
 // offline. API traffic and cross-origin requests are never cached, so listing
 // data and auth state always come from the network.
-const CACHE = "boligdata-shell-v1";
+const CACHE = "boligdata-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
