@@ -136,8 +136,23 @@ export interface SoilContamination {
 
 export type OilTankRiskSource = "bbr" | "heuristic";
 
+/** Which kind of mapped noise a band came from (Miljøstyrelsen's EU noise mapping layers). */
+export type NoiseBandSource = "roads_in_towns" | "major_roads" | "rail_in_towns" | "major_rail";
+
+/** A mapped Lden band at the address point, e.g. 60–64 dB. `upperDb` null is the open top band (75+). */
+export interface NoiseBand {
+  lowerDb: number;
+  upperDb: number | null;
+  source: NoiseBandSource;
+}
+
 export interface RiskFlags {
+  /** Legacy point value. Newer rows leave it null and use `noiseBand`, since the maps give bands, not a dB reading. */
   noiseExposureLden: number | null;
+  /** The loudest mapped noise band at the address point; null with `noiseChecked` means no mapped zone covers it. */
+  noiseBand?: NoiseBand | null;
+  /** True when the noise maps were actually queried for this address. Older rows lack it. */
+  noiseChecked?: boolean;
   /** Always true in real (non-mock) mode: tinglysning.dk has no open API, so this stays advisory — see encumbranceLookupUrl. */
   encumbranceCheckRequired: boolean;
   /** Deep link to tinglysning.dk built from the property's matrikelnr/ejerlav, null when cadastral data is unavailable. */
@@ -154,6 +169,10 @@ export interface RiskFlags {
   soilContamination: SoilContamination;
   /** Deep link to the jordforureningsattest report on jord.miljoeportal.dk, built from the property's ejerlavskode/matrikelnr — null when cadastral data is unavailable. */
   soilContaminationAttestUrl: string | null;
+  /** The contamination register's own name for the mapped site, when V1/V2 hit. Older rows lack it. */
+  soilContaminationSiteName?: string | null;
+  /** Whether oil heating is registered in BBR, as opposed to the heating being unknown. Older rows lack it. */
+  heatingInstallation?: string | null;
 }
 
 export interface SchoolTransportInfo {

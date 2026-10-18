@@ -20,6 +20,8 @@ export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
   const genuineListingHeuristic = sourceIsReal(row, "sales") && raw.oilTankRiskSource === "heuristic";
   return {
     noiseExposureLden: sourceIsReal(row, "noise") && typeof raw.noiseExposureLden === "number" && Number.isFinite(raw.noiseExposureLden) ? raw.noiseExposureLden : null,
+    noiseBand: sourceIsReal(row, "noise") ? raw.noiseBand ?? null : null,
+    noiseChecked: sourceIsReal(row, "noise") && raw.noiseChecked === true,
     encumbranceCheckRequired: true,
     encumbranceLookupUrl: raw.encumbranceLookupUrl ?? null,
     sewerSeparationCheckRequired: true,
@@ -32,6 +34,8 @@ export function safeRiskFlags(row: EnrichmentRow): RiskFlags | null {
       jordart: sourceIsReal(row, "soil_type") ? raw.soilContamination?.jordart ?? null : null,
     },
     soilContaminationAttestUrl: raw.soilContaminationAttestUrl ?? null,
+    soilContaminationSiteName: sourceIsReal(row, "soil_contamination") ? raw.soilContaminationSiteName ?? null : null,
+    heatingInstallation: sourceIsReal(row, "bbr") ? raw.heatingInstallation ?? null : null,
   };
 }
 

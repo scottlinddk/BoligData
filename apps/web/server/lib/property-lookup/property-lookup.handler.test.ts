@@ -67,7 +67,9 @@ const valuationBody = {
   data: { VUR_Ejendomsvurdering: { nodes: [{ ejendomsvaerdi: 3_150_000, grundvaerdi: 780_000, vurderingsaar: 2025 }] } },
 };
 
-const noiseBody = { features: [{ properties: { lden: 57 } }] };
+/** Miljøstyrelsen's "Veje i by" layer answering one 60–64 dB band; every other noise layer answers none. */
+const noiseBody = { features: [{ properties: { db_low: 60, db_high: 64 } }] };
+const NOISE_LAYER_WITH_BAND = "stoej:b1_dk_aggroad_lden1_5_test";
 
 /** What the Datafordeler registers answer when asked which fields a type has. */
 function introspectionBody(fields: string[]) {
@@ -125,7 +127,7 @@ const BOLIGSIDEN_FLORAVEJ_6 = {
   ],
 };
 
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[] } = {}) {
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[] } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
@@ -137,6 +139,14 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
     }
     if (href.includes("api.boligsiden.dk/search/addresses")) {
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: overrides.boligsiden ?? [] }) };
+    }
+    if (href.includes("wfs2-miljoegis.mim.dk")) {
+      const layer = new URL(href).searchParams.get("typeNames");
+      const noise = layer === NOISE_LAYER_WITH_BAND ? (overrides.noise ?? noiseBody) : { features: [] };
+      return { ok: true, status: 200, headers: new Headers(), json: async () => noise };
+    }
+    if (href.includes("jord.miljoeportal.dk")) {
+      return { ok: true, status: 200, headers: new Headers(), json: async () => overrides.soil ?? { features: [] } };
     }
     const body = href.includes("adressevaelger.dk")
       ? husnummerBody
@@ -152,16 +162,13 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
             ? introspecting
               ? introspectionBody(VALUATION_FIELDS)
               : (overrides.valuation ?? valuationBody)
-            : (overrides.noise ?? noiseBody);
+            : { error: `unexpected request ${href}` };
     return { ok: true, status: 200, headers: new Headers(), json: async () => body };
   }) as unknown as typeof fetch);
 }
 
 beforeEach(() => {
   resetDatafordelerCache();
-  // The noise layer is deployment configuration — without it the source is
-  // reported unconfigured rather than queried.
-  vi.stubEnv("STOEJKORT_TYPENAME", "stoej:lden_vej_bane");
 });
 
 afterEach(() => {
@@ -185,7 +192,7 @@ describe("lookupProperty (live)", () => {
     expect(result.bbrData?.areaSqm).toBeNull(); // Entrance/building identity does not identify the housing unit.
     expect(result.bbrData?.heatingInstallation).toBe("fjernvarme");
     expect(result.publicValuation?.assessedPropertyValueDkk).toBe(3_150_000);
-    expect(result.scoringInputs.noiseZoneEstimate).toBe(57);
+    expect(result.scoringInputs.noiseZoneEstimate).toBe(60);
     expect(result.source).toBe("ai");
   });
 
@@ -305,7 +312,7 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     const result = await lookupProperty(byId);
 
     expect(result.bbrData?.yearBuilt).toBe(1962);
-    expect(result.scoringInputs.noiseZoneEstimate).toBe(57);
+    expect(result.scoringInputs.noiseZoneEstimate).toBe(60);
     expect(result.sources.find((s) => s.key === "bbr")?.mode).toBe("live");
     expect(result.sources.find((s) => s.key === "noise")?.mode).toBe("live");
   });
@@ -350,13 +357,15 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     const result = await lookupProperty(byId);
 
     expect(result.riskFlags).toMatchObject({
-      noiseExposureLden: 57,
+      noiseExposureLden: null,
+      noiseBand: { lowerDb: 60, upperDb: 64, source: "roads_in_towns" },
+      noiseChecked: true,
       oilTankRisk: false,
       oilTankRiskSource: "bbr",
       buildingCaseArchiveUrl: "https://weblager.dk/public/municipality/851/45/search/all",
       sewerSeparationLookupUrl: "https://www.aalborg.dk/",
       encumbranceLookupUrl: "https://www.tinglysning.dk/",
-      soilContamination: { classification: "unknown", jordart: null },
+      soilContamination: { classification: "none", jordart: null },
     });
   });
 
@@ -370,10 +379,17 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.riskFlags?.buildingCaseArchiveUrl).not.toBeNull(); // the address register still answered
   });
 
-  it("builds no due-diligence flags for a free-text lookup, which keeps its stored enrichment", async () => {
+  it("builds the same flags for a listing's free-text lookup, so its page shows live answers", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubPipeline();
-    expect((await lookupProperty(input)).riskFlags).toBeNull();
+    stubPipeline({ soil: { features: [{ properties: { Lokalitetsnavn: "Tidligere autoværksted", Jordforureningsattester: "https://jord.miljoeportal.dk/report/?elav=1&matrnr=2a" } }] } });
+    const flags = (await lookupProperty(input)).riskFlags;
+    expect(flags).toMatchObject({
+      oilTankRiskSource: "bbr",
+      noiseBand: { lowerDb: 60 },
+      soilContamination: { classification: "v2" },
+      soilContaminationAttestUrl: "https://jord.miljoeportal.dk/report/?elav=1&matrnr=2a",
+      soilContaminationSiteName: "Tidligere autoværksted",
+    });
   });
 
   it("finds a house's BFE and valuation from the husnummer, since the address register returns no parcel", async () => {

@@ -5,6 +5,7 @@ import { useI18n, type TranslateFn } from "@/i18n/i18n";
 const MILJOEGIS_NOISE_MAP_URL = "https://miljoegis.mim.dk/spatialmap?profile=noise";
 const MILJOEPORTAL_SOIL_MAP_URL = "https://arealinformation.miljoeportal.dk/";
 const BBR_URL = "https://bbr.dk/";
+const TINGLYSNING_URL = "https://www.tinglysning.dk/";
 
 interface ChecklistItem {
   label: string;
@@ -23,7 +24,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     // source told the reader nothing about what to look at.
     const sources = {
       noise: ["dueDiligence.noise.source", MILJOEGIS_NOISE_MAP_URL],
-      encumbrance: ["dueDiligence.encumbrance.source", null],
+      encumbrance: ["dueDiligence.encumbrance.source", TINGLYSNING_URL],
       sewer: ["dueDiligence.sewer.source", null],
       buildingCases: ["dueDiligence.buildingCases.source", null],
       oilTank: ["dueDiligence.oilTank.source.bbr", BBR_URL],
@@ -52,26 +53,39 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
           ? "dueDiligence.soil.unknown"
           : "dueDiligence.soil.none";
 
+  const band = riskFlags.noiseBand ?? null;
+  const noiseDetail = band
+    ? t(band.upperDb === null ? "dueDiligence.noise.bandTop" : "dueDiligence.noise.band", {
+        lower: band.lowerDb, upper: band.upperDb ?? "", source: t(`dueDiligence.noise.from.${band.source}`),
+      })
+    : riskFlags.noiseChecked
+      ? t("dueDiligence.noise.clear")
+      : states.noise !== "unknown"
+        ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden! })
+        : t("dueDiligence.noise.none");
+  const heating = riskFlags.heatingInstallation ?? null;
+  const oilDetail = states.oilTank === "unknown"
+    ? heating ? t("dueDiligence.oilTank.unknownFuel", { heating }) : t("dueDiligence.oilTank.unknown")
+    : riskFlags.oilTankRisk
+      ? t(riskFlags.oilTankRiskSource === "bbr" ? "dueDiligence.oilTank.warning.bbr" : "dueDiligence.oilTank.warning")
+      : heating ? t("dueDiligence.oilTank.ok.bbr", { heating }) : t("dueDiligence.oilTank.ok");
+  const siteName = riskFlags.soilContaminationSiteName ?? null;
+
   return [
     {
       label: t("dueDiligence.noise.label"),
       status: states.noise,
-      detail:
-        states.noise !== "unknown"
-          ? t("dueDiligence.noise.value", { value: riskFlags.noiseExposureLden! })
-          : t("dueDiligence.noise.none"),
-      source: t("dueDiligence.noise.source"),
+      detail: noiseDetail,
+      source: t(riskFlags.noiseChecked || band ? "dueDiligence.noise.source.mapped" : "dueDiligence.noise.source"),
       sourceHref: MILJOEGIS_NOISE_MAP_URL,
     },
     {
       label: t("dueDiligence.encumbrance.label"),
       status: "warning",
-      detail: riskFlags.encumbranceLookupUrl
-        ? t("dueDiligence.encumbrance.linkLabel")
-        : t("dueDiligence.encumbrance.warning"),
-      href: riskFlags.encumbranceLookupUrl,
+      // No register answers this automatically: the tingbogsattest is always the reader's own step.
+      detail: t("dueDiligence.encumbrance.warning"),
       source: t("dueDiligence.encumbrance.source"),
-      sourceHref: riskFlags.encumbranceLookupUrl,
+      sourceHref: riskFlags.encumbranceLookupUrl ?? TINGLYSNING_URL,
     },
     {
       label: t("dueDiligence.sewer.label"),
@@ -98,11 +112,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
       label: t("dueDiligence.oilTank.label"),
       status: states.oilTank,
       // A warning from BBR's registered heating is not "building age suggests", which is the heuristic's wording.
-      detail: states.oilTank === "unknown"
-        ? t("dueDiligence.oilTank.unknown")
-        : riskFlags.oilTankRisk
-          ? t(riskFlags.oilTankRiskSource === "bbr" ? "dueDiligence.oilTank.warning.bbr" : "dueDiligence.oilTank.warning")
-          : t("dueDiligence.oilTank.ok"),
+      detail: oilDetail,
       // An unknown result used no heuristic, so it must not be labelled as one; BBR is where the answer would come from.
       source:
         riskFlags.oilTankRiskSource === "bbr" || states.oilTank === "unknown"
@@ -113,7 +123,7 @@ function buildChecklist(riskFlags: RiskFlags | null, t: TranslateFn): ChecklistI
     {
       label: t("dueDiligence.soil.label"),
       status: states.soil,
-      detail: t(soilDetailKey),
+      detail: siteName && states.soil === "warning" ? `${t(soilDetailKey)} ${t("dueDiligence.soil.site", { name: siteName })}` : t(soilDetailKey),
       // Deep link to the parcel's jordforureningsattest (jord.miljoeportal.dk)
       // when cadastral data allowed building one; the source line keeps the
       // general map as fallback either way.

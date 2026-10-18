@@ -22,6 +22,10 @@ The private **Boligprojekt / Buying project** workspace adds project requirement
 
 **Apply migration 023 before deploying this change.** Legacy provenance remains unknown until real source observations establish it. Register lookup now requires sign-in, uses an atomic 30-per-hour/account quota and returns private, uncached responses. This supersedes the earlier anonymous-lookup and public-cache descriptions below. New sales refresh independently of asking-price changes; missing listing dates and missing sale-area values remain unknown. No user workbook or production database was imported/modified during implementation.
 
+## Due-diligence checklist from live registers
+
+Noise, oil tank and soil contamination are now answered from Miljøstyrelsen's noise maps, BBR and Danmarks Miljøportal's V1/V2 register, and listing addresses resolve through Adressevælger now that DAWA is closed. Listing pages show live answers; stored rows heal on the next crawl. No migration is needed. See [checklist sources and what was verified](docs/due-diligence-checklist.md).
+
 ## Building case link (WebLager)
 
 The due-diligence checklist links Aalborg properties to the municipality's public building case archive on weblager.dk. It is an advisory search link, the user types the address in WebLager's search box, and no request is made to weblager.dk. Other municipalities show neutral text until they are verified. See [WebLager integration](docs/weblager.md). No migration is needed. Existing rows get the link after the next crawl re-enriches them.

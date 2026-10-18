@@ -44,16 +44,7 @@ Free-text listing lookups are unchanged: they get no history from this source, a
 
 ## Due-diligence checklist
 
-The checklist on an address page is built from the lookup itself (`address-risk-flags.ts`), in the shape the ingest stores for listings, so one component renders both:
-
-| Item | Source for an address | When it is unknown |
-|---|---|---|
-| Noise | the noise source's Lden reading | no reading (outside a mapped area or the source failed). "Not measured" is never shown as quiet |
-| Encumbrances | link to tinglysning.dk (searched by address by hand) | always an advisory warning |
-| Sewer separation | the municipality's page, found from the register's municipality code | municipality not in the table |
-| Building cases | WebLager, Aalborg only | any other municipality: neutral text, no link |
-| Oil tank | BBR's registered heating (`oliefyr`) | BBR gave no heating or no single building. **No age heuristic**: the ingest falls back to one, an address lookup does not |
-| Soil contamination | not looked up | always unknown, with the general map linked |
+Addresses and listings share one flag builder (`server/lib/due-diligence/risk-flags.ts`) and one checklist component. See [due-diligence checklist sources](due-diligence-checklist.md) for every item's source, what was verified live and what each answer means. For an address the oil tank has **no age heuristic**: when BBR does not settle the heating it stays unknown.
 
 `municipalities.ts` maps the register's municipality code to the name the link builders are keyed by. Its 11 codes were checked against the address register on 2026-10-17 by reading the code it reports for real addresses in each. Other municipalities get no links rather than guessed ones.
 
@@ -61,6 +52,6 @@ An item with no answer now names where an answer would come from, instead of rep
 
 ## Known gaps
 
-- **Cadastral map, school district, noise panels and the price-by-time-on-market card** need a stored listing row and are not shown. Soil contamination is not looked up for addresses (the Miljøportalen endpoint shapes are unverified), and without a parcel there is no jordforureningsattest link.
+- **Cadastral map, school district, noise panels and the price-by-time-on-market card** need a stored listing row and are not shown. Without a parcel there is no attest link of our own; a V1/V2 hit links the contamination register's attest for that site.
 - **Free-text lookups for listings** (`address=`) still use the introspection-based valuation source, which Datafordeler's switched-off introspection likely breaks. Out of scope here; listings get their valuation from the stored backfill.
 - Every report spends one of the account's 30 register lookups per hour, including failed ones, so the page never retries automatically. Loading the market level is cached for 30 minutes per instance.

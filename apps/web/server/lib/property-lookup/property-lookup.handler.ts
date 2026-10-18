@@ -13,6 +13,7 @@ import { lookupEjendomsvurdering } from "../enrichment-sources/ejendomsvurdering
 import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
 import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
+import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
 import { isDanishCoordinate } from "../crawl/map-utils.js";
@@ -34,6 +35,9 @@ function status(
   if (!result.ok) return { key, register, mode: "unavailable", error: result.error };
   return { key, register, mode: mockFlag !== null && mockModeEnabled(mockFlag) ? "mock" : "live", error: null };
 }
+
+const NOISE_REGISTER = "Miljøstyrelsens støjkortlægning (WFS, wfs2-miljoegis.mim.dk)";
+const SOIL_REGISTER = "Danmarks Miljøportal, jordforurening V1/V2 (WFS, jord.miljoeportal.dk)";
 
 const MODE_SEVERITY: Record<PropertyLookupDataMode, number> = { live: 0, mock: 1, unavailable: 2 };
 
@@ -92,7 +96,7 @@ export async function lookupProperty(
       ? { road: cadastral.streetName, houseNumber: cadastral.houseNumber, zipCode: cadastral.postalCode }
       : undefined;
 
-  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult] = await Promise.all([
+  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult, soilResult] = await Promise.all([
     lookupBbr(cadastral?.idLokalid ?? null),
     byId
       ? null
@@ -105,6 +109,7 @@ export async function lookupProperty(
     // Same reasoning: a polygon around 0,0 is a box in the Atlantic, and an
     // empty "no sales nearby" is indistinguishable from a real answer.
     hasCoordinates ? lookupBoligsidenSales(lat, lon, subjectAddress ? { subjectAddress } : {}) : null,
+    hasCoordinates ? lookupSoilContamination(lat, lon) : null,
   ]);
 
   const bbrBuilding = bbrResult.ok && !mockModeEnabled("BBR_MOCK_MODE") ? bbrResult.data : null;
@@ -121,14 +126,18 @@ export async function lookupProperty(
     : listingValuationResult?.ok && !mockModeEnabled("EJENDOMSVURDERING_MOCK_MODE")
       ? listingValuationResult.data
       : null;
-  const noiseExposureLden = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data.ldenDb : null;
+  const noise = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data : null;
+  const noiseExposureLden = noise?.ldenDb ?? null;
+  const soil = soilResult?.ok && !mockModeEnabled("MILJOEPORTALEN_MOCK_MODE") ? soilResult.data : null;
   const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
 
   const addressRegisterLabel = input.husnummerId
     ? "DAR via Adressevælger (adressevaelger.dk)"
     : cadastral?.resolvedVia === "dar_fallback"
       ? "DAR via Datafordeler GraphQL (DAWA fallback)"
-      : "DAR via DAWA (api.dataforsyningen.dk)";
+      : cadastral?.resolvedVia === "adressevaelger"
+        ? "DAR via Adressevælger (adressevaelger.dk)"
+        : "DAR via DAWA (api.dataforsyningen.dk)";
 
   const sources: PropertyLookupSourceStatus[] = [
     status("address", addressRegisterLabel, addressMockFlag, cadastralResult),
@@ -137,11 +146,11 @@ export async function lookupProperty(
     noiseResult === null
       ? {
           key: "noise" as const,
-          register: "Miljøstyrelsens støjkort (WFS)",
+          register: NOISE_REGISTER,
           mode: "unavailable" as const,
           error: "no usable coordinates for the address",
         }
-      : status("noise", "Miljøstyrelsens støjkort (WFS)", "STOEJKORT_MOCK_MODE", noiseResult),
+      : status("noise", NOISE_REGISTER, "STOEJKORT_MOCK_MODE", noiseResult),
     salesResult === null
       ? {
           key: "sales" as const,
@@ -150,6 +159,9 @@ export async function lookupProperty(
           error: "no usable coordinates for the address",
         }
       : status("sales", "Boligsiden (registrerede handler)", "BOLIGSIDEN_SALES_MOCK_MODE", salesResult),
+    soilResult === null
+      ? { key: "soil" as const, register: SOIL_REGISTER, mode: "unavailable" as const, error: "no usable coordinates for the address" }
+      : status("soil", SOIL_REGISTER, "MILJOEPORTALEN_MOCK_MODE", soilResult),
   ];
 
   const renovationCategory = classifyRenovationCategory({
@@ -210,8 +222,9 @@ export async function lookupProperty(
       : null,
     valuationHistory,
     propertyClass: houseLookup?.propertyClass ?? null,
-    riskFlags: byId
-      ? buildAddressRiskFlags({ municipalityCode: cadastral?.municipalityCode ?? null, bbr: bbrBuilding, noiseLden: noiseExposureLden })
+    // Null only when the address itself could not be resolved: then there is nothing to check against.
+    riskFlags: cadastral
+      ? buildAddressRiskFlags({ municipalityCode: cadastral.municipalityCode ?? null, bbr: bbrBuilding, noise, soil })
       : null,
     publicValuation: publicValuation
       ? {
