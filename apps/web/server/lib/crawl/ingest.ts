@@ -14,6 +14,9 @@ import { mapConcurrent } from "./concurrency.js";
 import { envInt } from "./http.js";
 
 const CHUNK_SIZE = 500;
+// `.in()` filters travel in the GET query string. 500 UUIDs is ~20 KB, past what
+// PostgREST and its proxy accept, and surfaces as a bare "fetch failed".
+const LOOKUP_CHUNK_SIZE = 100;
 // Fetch-stage errors (e.g. "skipped unmappable record") are capped separately
 // from DB errors so a flood of the former can never crowd out the latter —
 // the DB error is usually the one that actually explains a 502.
@@ -212,7 +215,7 @@ async function ingestSource(
   // Register identifiers already on the row. A lookup that fails this run (or answers without a parcel, as
   // Adressevælger does) must not wipe identifiers an earlier run or backfill resolved.
   const storedIdentifiers = new Map<string, StoredIdentifiers>();
-  for (const ids of chunk([...hashByExternalId.keys()], CHUNK_SIZE)) {
+  for (const ids of chunk([...hashByExternalId.keys()], LOOKUP_CHUNK_SIZE)) {
     const { data, error } = await client
       .from("properties")
       .select("id, external_id, content_hash, listing_date, listing_date_definition, price, status, last_seen_at, first_seen_at, current_episode_key, id_lokalid, matrikelnr, ejerlav, zone, bfe_nummer")
@@ -389,7 +392,7 @@ async function ingestSource(
   }
 
   const existingEnrichments = new Map<string, Record<string, unknown>>();
-  for (const unchangedChunk of chunk(unchanged, CHUNK_SIZE)) {
+  for (const unchangedChunk of chunk(unchanged, LOOKUP_CHUNK_SIZE)) {
     const ids = unchangedChunk.map((l) => propertyIdByExternalId.get(l.external_id)!);
     const { data, error } = await client.from("enrichments").select("property_id, source_status, enriched_at").in("property_id", ids);
     if (error) {

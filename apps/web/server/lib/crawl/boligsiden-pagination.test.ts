@@ -46,13 +46,43 @@ describe("Boligsiden weekly coverage", () => {
     expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
-  it("retains the whole configured postcode scope instead of sending only its first 300 codes", async () => {
-    vi.stubEnv("CRAWL_ZIP_RANGES", "9000-9900");
-    vi.mocked(fetchJson).mockResolvedValue({ totalHits: 3, cases: [record(1, 9000), record(2, 9900), record(3, 1000)] });
+  it("splits a postcode scope above 300 codes into batches instead of sending an unfiltered national feed", async () => {
+    vi.stubEnv("CRAWL_ZIP_RANGES", "9000-9400");
+    vi.mocked(fetchJson).mockImplementation(async (url) => {
+      const codes = new URL(url).searchParams.getAll("zipCodes");
+      return codes[0] === "9000" ? { totalHits: 1, cases: [record(1, 9000)] } : { totalHits: 1, cases: [record(2, 9400)] };
+    });
     const { listings, stats } = await fetchBoligsidenListings();
-    expect(new URL(vi.mocked(fetchJson).mock.calls[0]![0]).searchParams.getAll("zipCodes")).toEqual([]);
-    expect(listings.map((listing) => listing.postal_code)).toEqual(["9000", "9900"]);
-    expect(stats).toMatchObject({ complete: true, recordsOutOfArea: 1 });
+    const sent = vi.mocked(fetchJson).mock.calls.map(([url]) => new URL(url).searchParams.getAll("zipCodes"));
+    expect(sent.map((codes) => codes.length)).toEqual([300, 101]);
+    expect(sent.flat()).toHaveLength(401);
+    expect(sent[1]!.at(-1)).toBe("9400");
+    expect(listings.map((listing) => listing.postal_code)).toEqual(["9000", "9400"]);
+    expect(stats).toMatchObject({ complete: true, recordsSeen: 2 });
+  });
+
+  it("halves a batch whose hits exceed the 10,000-record result window", async () => {
+    vi.stubEnv("CRAWL_ZIP_RANGES", "9000-9003");
+    vi.mocked(fetchJson).mockImplementation(async (url) => {
+      const codes = new URL(url).searchParams.getAll("zipCodes");
+      if (codes.length > 2) return { totalHits: 10_001, cases: [record(0)] };
+      return { totalHits: 1, cases: [record(Number(codes[0]), Number(codes[0]))] };
+    });
+    const { listings, stats } = await fetchBoligsidenListings();
+    expect(listings.map((listing) => listing.postal_code)).toEqual(["9000", "9002"]);
+    expect(stats.complete).toBe(true);
+  });
+
+  it("reports incomplete coverage instead of requesting a page past the result window", async () => {
+    vi.stubEnv("CRAWL_PAGE_SIZE", "100");
+    vi.mocked(fetchJson).mockImplementation(async (url) => {
+      const page = Number(new URL(url).searchParams.get("page"));
+      return { totalHits: 12_000, cases: Array.from({ length: 100 }, (_, index) => record(page * 100 + index)) };
+    });
+    const { stats } = await fetchBoligsidenListings();
+    expect(stats.complete).toBe(false);
+    expect(stats.pagesFetched).toBe(100);
+    expect(stats.errors).toEqual(["postcodes 9000-9000: more than 10000 results"]);
   });
 
   it("narrows a small postcode scope without dropping its final code", async () => {
@@ -66,11 +96,13 @@ describe("Boligsiden weekly coverage", () => {
 
   it("ignores unmappable out-of-area plots before validating the in-scope listing feed", async () => {
     vi.stubEnv("CRAWL_ZIP_RANGES", "9000-9900");
-    vi.mocked(fetchJson).mockResolvedValue({ totalHits: 3, cases: [
-      { ...record(1, 1000), housingArea: 0 },
-      { caseID: "out-of-area", address: { zip: { zipCode: 8000 } } },
-      record(3, 9900),
-    ] });
+    vi.mocked(fetchJson).mockImplementation(async (url) => new URL(url).searchParams.getAll("zipCodes")[0] === "9000"
+      ? { totalHits: 3, cases: [
+        { ...record(1, 1000), housingArea: 0 },
+        { caseID: "out-of-area", address: { zip: { zipCode: 8000 } } },
+        record(3, 9900),
+      ] }
+      : { cases: [] });
     const { listings, stats } = await fetchBoligsidenListings();
     expect(listings.map((listing) => listing.external_id)).toEqual(["case-3"]);
     expect(stats).toMatchObject({ complete: true, recordsSeen: 3, recordsOutOfArea: 2, recordsSkipped: 0 });
