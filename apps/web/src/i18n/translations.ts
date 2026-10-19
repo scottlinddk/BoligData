@@ -132,6 +132,11 @@ const da = {
   "comparables.none": "Ingen sammenlignelige salg fundet i nærheden.",
   "comparables.soldEntry": "Solgt {date} · {price} · {pricePerSqm}/m² · {distance} m væk",
   "comparables.historyEntry": "{date}: {price} ({pricePerSqm}/m²)",
+  "marketStats.title": "Markedsindeks – {municipality} (Boligsiden)",
+  "marketStats.pricePerSqm": "Salgspris pr. m²",
+  "marketStats.daysOnMarket": "Salgstid (dage)",
+  "marketStats.yoy": "{pct} % ift. sidste år",
+  "marketStats.none": "Ingen markedsstatistik for området endnu.",
 
   "dashboard.heading": "Overblik",
   "dashboard.title": "Gemte søgninger",
@@ -379,6 +384,11 @@ const en: Translations = {
   "comparables.none": "No comparable sales found nearby.",
   "comparables.soldEntry": "Sold {date} · {price} · {pricePerSqm}/m² · {distance}m away",
   "comparables.historyEntry": "{date}: {price} ({pricePerSqm}/m²)",
+  "marketStats.title": "Market index – {municipality} (Boligsiden)",
+  "marketStats.pricePerSqm": "Sold price per m²",
+  "marketStats.daysOnMarket": "Days on market (sold)",
+  "marketStats.yoy": "{pct}% vs. last year",
+  "marketStats.none": "No market statistics for this area yet.",
 
   "dashboard.heading": "Overview",
   "dashboard.title": "Saved searches",

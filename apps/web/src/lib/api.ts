@@ -5,6 +5,7 @@ import type {
   AgentListingsResponse,
   ApproveListingBody,
   ComparablesResponse,
+  MarketStatsResponse,
   CreateAdvisorConnectionBody,
   CreateFavoriteBody,
   CreateInvitationBody,
@@ -64,6 +65,10 @@ export function getProperty(id: string): Promise<PropertyDetailResponse> {
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
   return request(`/properties?id=${id}&comparables=true`);
+}
+
+export function getMarketStats(id: string): Promise<MarketStatsResponse> {
+  return request(`/properties?id=${id}&marketStats=true`);
 }
 
 export function listSearches(): Promise<SavedSearch[]> {

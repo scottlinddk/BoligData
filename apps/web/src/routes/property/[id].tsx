@@ -1,10 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ApiError, getComparables, getProperty } from "@/lib/api";
+import { ApiError, getComparables, getMarketStats, getProperty } from "@/lib/api";
 import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { ComparablesPanel } from "@/components/comparables-panel";
+import { MarketStatsPanel } from "@/components/market-stats-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { useI18n } from "@/i18n/i18n";
@@ -28,6 +29,12 @@ export function PropertyDetailPage() {
   const comparablesQuery = useQuery({
     queryKey: ["comparables", id],
     queryFn: () => getComparables(id!),
+    enabled: !!id,
+  });
+
+  const marketStatsQuery = useQuery({
+    queryKey: ["market-stats", id],
+    queryFn: () => getMarketStats(id!),
     enabled: !!id,
   });
 
@@ -165,6 +172,7 @@ export function PropertyDetailPage() {
             neighborhoodAvgPricePerSqm={comparablesQuery.data.neighborhoodAvgPricePerSqm}
           />
         )}
+        {marketStatsQuery.data && <MarketStatsPanel stats={marketStatsQuery.data} />}
       </div>
 
       {property.agentName && (

@@ -5,6 +5,7 @@ import { fetchBoligaListings } from "./boliga.js";
 import { enrichProperty } from "./enrich.js";
 import { listingContentHash } from "./map-utils.js";
 import { logError, logEvent } from "./log.js";
+import { fetchMarketStats } from "./boligsiden-stats.js";
 import { lookupAddressCadastral, type AddressCadastral } from "../enrichment-sources/address-lookup.js";
 
 const CHUNK_SIZE = 500;
@@ -50,9 +51,17 @@ export interface IngestSourceReport {
   durationMs: number;
 }
 
+export interface MarketStatsReport {
+  pairs: number;
+  upserted: number;
+  errors: string[];
+}
+
 export interface IngestResult {
   ok: boolean;
   reports: IngestSourceReport[];
+  /** Informational: Markedsindeks stats never flip `ok` — listings are the critical path. */
+  marketStats: MarketStatsReport;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -276,6 +285,43 @@ const FETCHERS: Record<ListingSource, () => Promise<SourceCrawlResult>> = {
 };
 
 /**
+ * Refreshes Boligsiden Markedsindeks stats for every (municipality,
+ * property_type) present in `properties`. Failures are reported, never thrown.
+ */
+async function ingestMarketStats(client: SupabaseClient): Promise<MarketStatsReport> {
+  const report: MarketStatsReport = { pairs: 0, upserted: 0, errors: [] };
+  try {
+    const { data, error } = await client.from("properties").select("municipality, property_type");
+    if (error) throw error;
+    const unique = new Map<string, { municipality: string; propertyType: string }>();
+    for (const row of data ?? []) {
+      const municipality = row.municipality as string;
+      const propertyType = row.property_type as string;
+      unique.set(`${municipality}|${propertyType}`, { municipality, propertyType });
+    }
+    const pairs = [...unique.values()];
+    report.pairs = pairs.length;
+
+    const { rows, errors } = await fetchMarketStats(pairs);
+    report.errors.push(...errors.slice(0, MAX_DB_ERRORS_REPORTED));
+    for (const rowChunk of chunk(rows, CHUNK_SIZE)) {
+      const { error: upsertError } = await client
+        .from("market_stats")
+        .upsert(rowChunk, { onConflict: "location_type,location_name,property_type,stat_type,period_start" });
+      if (upsertError) {
+        report.errors.push(`market_stats upsert: ${upsertError.message}`);
+        continue;
+      }
+      report.upserted += rowChunk.length;
+    }
+  } catch (err) {
+    report.errors.push(err instanceof Error ? err.message : String(err));
+    logError("crawl.market_stats_failed", err);
+  }
+  return report;
+}
+
+/**
  * Runs the full ingest: fetch the enabled sources (isolated — one failing
  * doesn't abort the other), batch-upsert properties, and enrich only
  * new/changed listings (see properties.content_hash, migration 005).
@@ -293,6 +339,9 @@ export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
 
   for (const report of reports) logEvent("crawl.source.done", { ...report });
 
+  const marketStats = await ingestMarketStats(client);
+  logEvent("crawl.market_stats.done", { ...marketStats });
+
   const ok = reports.every((r) => r.ok && r.dbErrors === 0);
   logEvent("crawl.done", {
     ok,
@@ -302,5 +351,5 @@ export async function runIngest(client: SupabaseClient): Promise<IngestResult> {
     enriched: reports.reduce((sum, r) => sum + r.enriched, 0),
     skippedUnchanged: reports.reduce((sum, r) => sum + r.enrichSkippedUnchanged, 0),
   });
-  return { ok, reports };
+  return { ok, reports, marketStats };
 }
