@@ -8,6 +8,7 @@ import type {
   ApproveListingBody,
   ComparablesResponse,
   ConversationsResponse,
+  MarketStatsResponse,
   CreateAdvisorConnectionBody,
   CreateConversationBody,
   CreateFavoriteBody,
@@ -106,6 +107,10 @@ export function getMiljoegisNoise(id: string, source: NoiseSource, metric: Noise
 
 export function getComparables(id: string): Promise<ComparablesResponse> {
   return request(`/properties?id=${id}&comparables=true`);
+}
+
+export function getMarketStats(id: string): Promise<MarketStatsResponse> {
+  return request(`/properties?id=${id}&marketStats=true`);
 }
 
 export interface PropertyLookupQuery {

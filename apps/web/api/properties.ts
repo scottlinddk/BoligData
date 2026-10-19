@@ -13,6 +13,7 @@ import { isUuid, sendError, setPublicCache } from "../server/lib/http-helpers.js
 import { rowToEnrichment, rowToProperty } from "../server/lib/row-mappers.js";
 import { InvalidSearchBoundaryError, searchProperties } from "../server/lib/search.js";
 import { getComparables } from "../server/lib/comparables.js";
+import { getMarketStats } from "../server/lib/market-stats.js";
 import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
 import { handleSpar } from "../server/lib/spar.handler.js";
 import { handleLimfjordNoise } from "../server/lib/limfjord-noise-handler.js";
@@ -105,6 +106,11 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
   }
 
   try {
+    if (str(req.query.marketStats) === "true") {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(200).json(await getMarketStats(client, id));
+      return;
+    }
     if (req.query.resource === "miljoegis-noise") {
       await handleMiljoegisNoise(client, id, req, res);
       return;

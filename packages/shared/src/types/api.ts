@@ -72,6 +72,20 @@ export interface ComparablesResponse {
   neighborhoodAvgPricePerSqm: number | null;
 }
 
+export interface MarketStatPoint {
+  periodStart: string;
+  value: number;
+  prevYearValue: number | null;
+}
+
+/** Boligsiden Markedsindeks series for a property's municipality + type, oldest first. */
+export interface MarketStatsResponse {
+  municipality: string;
+  pricePerSqm: MarketStatPoint[];
+  daysOnMarket: MarketStatPoint[];
+  priceChangePerSqm: MarketStatPoint[];
+}
+
 export interface CreateSearchBody {
   name: string;
   filters: PropertyFilters;

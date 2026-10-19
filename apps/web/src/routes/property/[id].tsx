@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ListingSource } from "@shared/types/index";
-import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
+import { ApiError, getComparables, getMarketStats, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
@@ -21,6 +21,7 @@ import { ResearchWorkbench } from "@/components/research/workbench";
 import { WorkbookPriceReferenceCard } from "@/components/research/workbook-price-reference";
 import { useListingHistory } from "@/hooks/use-listing-history";
 import { ComparablesPanel } from "@/components/comparables-panel";
+import { MarketStatsPanel } from "@/components/market-stats-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { SchoolDistrictPanel } from "@/components/school-district-panel";
@@ -100,6 +101,12 @@ export function PropertyDetailPage() {
     target.scrollIntoView({ block: "start" });
     (target instanceof HTMLDetailsElement ? target.querySelector("summary") : target)?.focus({ preventScroll: true });
   }, [listing?.id]);
+
+  const marketStatsQuery = useQuery({
+    queryKey: ["market-stats", id],
+    queryFn: () => getMarketStats(id!),
+    enabled: !!id,
+  });
 
   if (detailQuery.isLoading) return <PropertyDetailSkeleton />;
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) return <p className="p-6 text-danger">{t("search.signInForDetails")} <Link to="/auth/signin" className="underline">{t("nav.signIn")}</Link></p>;
@@ -240,6 +247,7 @@ export function PropertyDetailPage() {
             {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" disabled={comparablesQuery.isFetching} onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 inline-flex items-center gap-2 font-semibold underline disabled:opacity-50">{comparablesQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>}
             {comparablesQuery.isLoading ? <div className="space-y-4"><LoadingStatus>{tx("Henter sammenlignelige boliger…", "Loading comparable homes…")}</LoadingStatus><Skeleton className="h-24 w-full rounded-xl" /></div>
               : <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />}
+            {marketStatsQuery.data && <div className="mt-4"><MarketStatsPanel stats={marketStatsQuery.data} /></div>}
           </DetailSection>
           <MiljoegisNoisePanel propertyId={property.id} />
           <LimfjordNoisePanel propertyId={property.id} />
