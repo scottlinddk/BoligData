@@ -1,0 +1,321 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { boxPolygon, lookupBoligsidenSales, recordIsAddress } from "./boligsiden-sales.js";
+import { stubFetch } from "../test-support/stub-fetch.js";
+
+/** Floravej 6, 9000 Aalborg — the address the register lookups are pinned to elsewhere. */
+const LAT = 57.04591973;
+const LON = 9.87640126;
+
+/**
+ * One /search/addresses record, shaped as the live API answers it
+ * (2026-08-01): coordinates as {lat, lon}, road/houseNumber/zipCode/cityName
+ * separately, and the address's registered sales under `registrations`.
+ */
+function addressRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    addressID: "a1",
+    addressType: "villa",
+    coordinates: { lat: 57.046623, lon: 9.876311, type: "EPSG4326" },
+    road: { name: "Floravej" },
+    houseNumber: "13",
+    zipCode: 9000,
+    cityName: "Aalborg",
+    boligsidenInfo: { latestSoldArea: 186 },
+    registrations: [
+      { amount: 4_100_000, date: "2024-05-02", livingArea: 180, perAreaPrice: 22778, type: "normal" },
+      { amount: 2_450_000, date: "2013-09-11", area: 180, type: "normal" },
+    ],
+    ...overrides,
+  };
+}
+
+function body(addresses: unknown[]) {
+  return { addresses, totalHits: addresses.length };
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+describe("boxPolygon", () => {
+  it("emits lon,lat corner pairs — the opposite order to the rest of this repo", () => {
+    const polygon = boxPolygon(57, 10, 500);
+    const corners = polygon.split("|").map((c) => c.split(",").map(Number));
+    expect(corners).toHaveLength(4);
+    for (const [lon, lat] of corners) {
+      expect(lat).toBeCloseTo(57, 1);
+      expect(lon).toBeCloseTo(10, 1);
+    }
+  });
+
+  it("widens the longitude span with latitude, so the box stays roughly square on the ground", () => {
+    const [wideLon] = boxPolygon(57, 10, 500).split("|")[0]!.split(",").map(Number);
+    const [equatorLon] = boxPolygon(0, 10, 500).split("|")[0]!.split(",").map(Number);
+    expect(10 - wideLon!).toBeGreaterThan(10 - equatorLon!);
+  });
+});
+
+describe("lookupBoligsidenSales (live)", () => {
+  it("asks for the subject address and the neighbourhood separately", async () => {
+    const stub = stubFetch([{ body: body([addressRecord()]) }]);
+    await lookupBoligsidenSales(LAT, LON);
+
+    expect(stub.urls).toHaveLength(2);
+    for (const url of stub.urls) {
+      expect(url).toContain("api.boligsiden.dk/search/addresses");
+      expect(decodeURIComponent(url)).toContain("polygon=9.8");
+    }
+    // Only the neighbourhood query is sorted by sale date — sorting the
+    // subject query would let ranking hide the address being looked up.
+    const [subjectUrl, neighbourhoodUrl] = stub.urls;
+    expect(subjectUrl).not.toContain("sortBy");
+    expect(neighbourhoodUrl).toContain("sortBy=soldDate");
+    expect(neighbourhoodUrl).toContain("sortAscending=false");
+  });
+
+  it("finds the subject history even when its own sale is too old to rank nearby", async () => {
+    const subject = addressRecord({
+      coordinates: { lat: LAT, lon: LON },
+      houseNumber: "6",
+      registrations: [{ amount: 1_495_000, date: "2004-08-23", area: 201, type: "normal" }],
+    });
+    // First response answers the subject query; second answers the
+    // neighbourhood query, which the old sale would never have ranked into.
+    stubFetch([{ body: body([subject]) }, { body: body([addressRecord()]) }]);
+
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddressId: "a1" });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.priceHistory[0]?.soldDate).toBe("2004-08-23");
+    expect(result.data.nearbySales.map((s) => s.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
+  });
+
+  it("uses the explicit source identity for subject history", async () => {
+    const subject = addressRecord({
+      coordinates: { lat: LAT, lon: LON },
+      houseNumber: "6",
+      addressID: "subject-1",
+      registrations: [{ amount: 3_000_000, date: "2019-02-01", livingArea: 150, type: "normal" }],
+    });
+    stubFetch([{ body: body([subject, addressRecord()]) }]);
+    // Both queries see the subject; it must be the history, never a neighbour.
+
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddressId: "subject-1" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data.priceHistory).toHaveLength(1);
+    expect(result.data.priceHistory[0]?.price).toBe(3_000_000);
+    // The subject must not also show up as one of its own neighbours.
+    expect(result.data.nearbySales.map((s) => s.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
+  });
+
+  it("does not attach a same-coordinate property's sale history without verified identity", async () => {
+    stubFetch([{ body: body([addressRecord({ coordinates: { lat: LAT, lon: LON } })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.priceHistory).toEqual([]);
+  });
+
+  it("reports the neighbour's most recent sale, with distance and sale type", async () => {
+    stubFetch([{ body: body([addressRecord()]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+
+    const sale = result.data.nearbySales[0]!;
+    expect(sale.soldDate).toBe("2024-05-02");
+    expect(sale.price).toBe(4_100_000);
+    expect(sale.pricePerSqm).toBe(22778);
+    expect(sale.saleType).toBe("normal");
+    expect(sale.areaSqm).toBe(180); // area documented on the transaction, not current/latestSoldArea
+    expect(sale.propertyType).toBe("villa");
+    expect(sale.distanceMeters).toBeGreaterThan(0);
+    expect(sale.distanceMeters).toBeLessThan(500);
+  });
+
+  it("carries a family transfer through as such rather than dropping or normalising it", async () => {
+    stubFetch([
+      {
+        body: body([
+          addressRecord({ registrations: [{ amount: 900_000, date: "2023-01-05", livingArea: 150, type: "family" }] }),
+        ]),
+      },
+    ]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales[0]?.saleType).toBe("family");
+  });
+
+  it("skips addresses that have never been sold instead of listing them at price zero", async () => {
+    stubFetch([{ body: body([addressRecord({ registrations: [] }), addressRecord({ registrations: undefined })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales).toEqual([]);
+  });
+  it("keeps a real sale price/date when no documented at-sale residential area exists", async () => {
+    stubFetch([{ body: body([addressRecord({ registrations: [{ amount: 3_100_000, date: "2025-02-01", type: "normal" }] })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales[0]).toMatchObject({ price: 3_100_000, soldDate: "2025-02-01", areaSqm: null, pricePerSqm: null });
+  });
+  it("does not treat a weighted or unspecified source denominator as residential area", async () => {
+    stubFetch([{ body: body([addressRecord({ registrations: [{ amount: 3_100_000, date: "2025-02-01", area: 175, perAreaPrice: 17714, type: "normal" }] })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales[0]).toMatchObject({ price: 3_100_000, areaSqm: null, pricePerSqm: null });
+  });
+  it("reports malformed JSON responses as unavailable, not an empty sales market", async () => {
+    stubFetch([{ body: { error: "temporarily unavailable" } }]);
+    expect((await lookupBoligsidenSales(LAT, LON)).ok).toBe(false);
+  });
+
+  it("orders neighbours by distance, nearest first", async () => {
+    stubFetch([
+      {
+        body: body([
+          addressRecord({ coordinates: { lat: LAT + 0.004, lon: LON }, houseNumber: "99" }),
+          addressRecord({ coordinates: { lat: LAT + 0.0005, lon: LON }, houseNumber: "8" }),
+        ]),
+      },
+    ]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales.map((s) => s.address)).toEqual([
+      "Floravej 8, 9000 Aalborg",
+      "Floravej 99, 9000 Aalborg",
+    ]);
+  });
+
+  it("honours the requested limit", async () => {
+    const many = Array.from({ length: 12 }, (_, i) =>
+      addressRecord({ coordinates: { lat: LAT + (i + 1) * 0.0003, lon: LON }, houseNumber: String(i + 1) }),
+    );
+    stubFetch([{ body: body(many) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { limit: 3 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales).toHaveLength(3);
+  });
+
+  it("refuses a point outside Denmark rather than searching the Atlantic", async () => {
+    const stub = stubFetch([{ body: body([]) }]);
+    const result = await lookupBoligsidenSales(0, 0);
+    expect(result.ok).toBe(false);
+    expect(stub.urls).toHaveLength(0);
+    if (result.ok) return;
+    expect(result.error).toContain("no usable coordinates");
+  });
+
+  it("reports an upstream failure instead of an empty 'no sales nearby'", async () => {
+    stubFetch([{ status: 400 }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    expect(result.ok).toBe(false);
+  });
+});
+
+const FLORAVEJ_6 = { road: "Floravej", houseNumber: "6", zipCode: "9000" };
+const subjectRecord = (overrides: Record<string, unknown> = {}) =>
+  addressRecord({
+    addressID: "unknown-to-us",
+    coordinates: { lat: LAT, lon: LON },
+    houseNumber: "6",
+    registrations: [
+      { amount: 3_000_000, date: "2019-02-01", livingArea: 150, type: "normal" },
+      { amount: 1_495_000, date: "2004-08-23", area: 201, type: "normal" },
+    ],
+    ...overrides,
+  });
+
+describe("recordIsAddress", () => {
+  it("needs street, house number and postcode to all be equal, ignoring case and spacing", () => {
+    expect(recordIsAddress(subjectRecord(), FLORAVEJ_6)).toBe(true);
+    expect(recordIsAddress(subjectRecord({ road: { name: "FLORA vej" } }), FLORAVEJ_6)).toBe(true);
+    expect(recordIsAddress(subjectRecord({ road: undefined, roadName: "Floravej" }), FLORAVEJ_6)).toBe(true);
+    expect(recordIsAddress(subjectRecord({ houseNumber: "6A" }), FLORAVEJ_6)).toBe(false);
+    expect(recordIsAddress(subjectRecord({ houseNumber: "60" }), FLORAVEJ_6)).toBe(false);
+    expect(recordIsAddress(subjectRecord({ zipCode: 9200 }), FLORAVEJ_6)).toBe(false);
+    expect(recordIsAddress(subjectRecord({ road: { name: "Florasvej" } }), FLORAVEJ_6)).toBe(false);
+  });
+
+  it("is false for a record that lacks any of the three", () => {
+    for (const missing of [{ road: undefined }, { houseNumber: undefined }, { zipCode: undefined }]) {
+      expect(recordIsAddress(subjectRecord(missing), FLORAVEJ_6)).toBe(false);
+    }
+  });
+});
+
+describe("lookupBoligsidenSales by address text", () => {
+  it("attributes the history when exactly one record is this address, newest sale first", async () => {
+    stubFetch([{ body: body([subjectRecord()]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.historyMatch).toBe("matched");
+    expect(result.data.priceHistory.map((entry) => entry.soldDate)).toEqual(["2019-02-01", "2004-08-23"]);
+  });
+
+  it("picks the subject out of its neighbours by text, not by who is nearest", async () => {
+    const neighbour = addressRecord({ addressID: "n1", coordinates: { lat: LAT, lon: LON }, houseNumber: "8" });
+    stubFetch([{ body: body([neighbour, subjectRecord()]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.historyMatch).toBe("matched");
+    expect(result.data.priceHistory[0]?.price).toBe(3_000_000);
+  });
+
+  it("refuses to attribute a history when several records carry the address (units in one building)", async () => {
+    const flat = (floor: string, amount: number) => subjectRecord({ addressID: `flat-${floor}`, floor, registrations: [{ amount, date: "2020-01-01", type: "normal" }] });
+    stubFetch([{ body: body([flat("1", 1_000_000), flat("2", 2_000_000)]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.historyMatch).toBe("ambiguous");
+    expect(result.data.priceHistory).toEqual([]);
+  });
+
+  it("says not_found, with no history, when nothing in the box has this address", async () => {
+    stubFetch([{ body: body([addressRecord({ coordinates: { lat: LAT, lon: LON } })]) }]); // Floravej 13: same place, different address
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.historyMatch).toBe("not_found");
+    expect(result.data.priceHistory).toEqual([]);
+  });
+
+  it("reports a matched address that was never sold as matched with an empty history", async () => {
+    stubFetch([{ body: body([subjectRecord({ registrations: [] })]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data).toMatchObject({ historyMatch: "matched", priceHistory: [] });
+  });
+
+  it("keeps the subject out of its own neighbours", async () => {
+    stubFetch([{ body: body([subjectRecord(), addressRecord()]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.nearbySales.map((sale) => sale.address)).toEqual(["Floravej 13, 9000 Aalborg"]);
+  });
+
+  it("prefers an explicit source id over text when both are given", async () => {
+    const other = subjectRecord({ addressID: "wanted", houseNumber: "7", registrations: [{ amount: 9_000_000, date: "2021-01-01", type: "normal" }] });
+    stubFetch([{ body: body([subjectRecord(), other]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON, { subjectAddressId: "wanted", subjectAddress: FLORAVEJ_6 });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data.priceHistory[0]?.price).toBe(9_000_000);
+  });
+
+  it("still attempts no attribution, and says so, when no identity is supplied", async () => {
+    stubFetch([{ body: body([subjectRecord()]) }]);
+    const result = await lookupBoligsidenSales(LAT, LON);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.data).toMatchObject({ historyMatch: null, priceHistory: [] });
+  });
+});
+
+describe("lookupBoligsidenSales (mock mode)", () => {
+  it("only mocks when the flag is explicitly enabled", async () => {
+    vi.stubEnv("BOLIGSIDEN_SALES_MOCK_MODE", "true");
+    const first = await lookupBoligsidenSales(LAT, LON);
+    const second = await lookupBoligsidenSales(LAT, LON);
+    expect(first).toEqual(second);
+    if (!first.ok) throw new Error("expected ok");
+    expect(first.data.priceHistory.length).toBeGreaterThan(0);
+    expect(first.data.nearbySales.length).toBeGreaterThan(0);
+  });
+});

@@ -32,11 +32,50 @@ export function asNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
+/**
+ * Absolute http(s) URL, or null. Stricter than asNonEmptyString on purpose:
+ * the result is stored in `properties.listing_url` and rendered as an `href`,
+ * so a `javascript:`/`data:` string from an undocumented upstream API would
+ * be stored XSS. Relative paths are rejected too — callers that know the
+ * source's origin should join it themselves (see `absoluteUrl`).
+ */
+export function asHttpUrl(value: unknown): string | null {
+  const raw = asNonEmptyString(value);
+  if (raw === null) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+}
+
+/**
+ * Joins a source-relative path (a slug, say) onto that source's origin and
+ * validates the result. Returns null for an empty path or one that resolves
+ * off-origin, so an upstream `//evil.example` can't redirect the link out.
+ */
+export function absoluteUrl(origin: string, path: unknown): string | null {
+  const raw = asNonEmptyString(path);
+  if (raw === null) return null;
+  let resolved: URL;
+  try {
+    resolved = new URL(raw, origin);
+  } catch {
+    return null;
+  }
+  if (resolved.origin !== new URL(origin).origin) return null;
+  return asHttpUrl(resolved.toString());
+}
+
 /** Accepts "YYYY-MM-DD..." (ISO datetime included); returns the date part. */
 export function asIsoDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const date = value.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : null;
 }
 
 /** Denmark (incl. Bornholm) plausibility bounds. */
@@ -70,6 +109,15 @@ export function listingContentHash(l: RawListing): string {
         l.rooms,
         l.description,
         l.agent_name,
+        // Registrations change independently of the current asking price.
+        // Sorting prevents an upstream reorder from causing needless writes.
+        [...(l.sold_price_history ?? [])].sort((a, b) =>
+          `${a.soldDate}|${a.price}|${a.saleType}`.localeCompare(`${b.soldDate}|${b.price}|${b.saleType}`)),
+        l.data_mode ?? "unknown",
+        // Preserve provider-reported duration independently of asking price,
+        // while leaving older hashes unchanged for sources without it.
+        ...(l.reported_time_on_market ? [[l.reported_time_on_market.latestEpisodeDays, l.reported_time_on_market.totalDays]] : []),
+        ...(l.reported_price_change ? [["price_change", l.reported_price_change.currentAsking, l.reported_price_change.changePercent]] : []),
       ]),
     )
     .digest("hex");
@@ -87,29 +135,88 @@ export interface ZipRange {
   max: number;
 }
 
+function clampZip(value: number): number {
+  return Math.min(9999, Math.max(1000, value));
+}
+
+/**
+ * Parses "9000-9900, 6000-6600" into ranges, clamping each bound to the
+ * valid Danish postal-code span and swapping reversed pairs. Malformed
+ * tokens (not "<digits>-<digits>") are skipped rather than failing the
+ * whole crawl on a typo'd env var.
+ */
+export function parseZipRanges(input: string): ZipRange[] {
+  const ranges: ZipRange[] = [];
+  for (const token of input.split(",")) {
+    const match = token.trim().match(/^(\d{1,4})\s*-\s*(\d{1,4})$/);
+    if (!match) continue;
+    const a = clampZip(Number(match[1]));
+    const b = clampZip(Number(match[2]));
+    ranges.push(a <= b ? { min: a, max: b } : { min: b, max: a });
+  }
+  return ranges;
+}
+
 /**
  * Which Danish postal codes to scrape, read fresh on every call so it can be
- * changed via env var without a code change. Defaults to 9000-9900 (North
- * Jutland) per the initial rollout; widen/narrow later by setting
- * CRAWL_ZIP_MIN / CRAWL_ZIP_MAX.
+ * changed via env var without a code change. CRAWL_ZIP_RANGES holds a
+ * comma-separated list of "min-max" intervals, e.g. "9000-9900,6000-6600",
+ * so crawling isn't limited to one contiguous span. Falls back to the
+ * legacy single-range CRAWL_ZIP_MIN / CRAWL_ZIP_MAX (default 9000-9900,
+ * North Jutland) when CRAWL_ZIP_RANGES isn't set.
  */
-export function getZipRange(): ZipRange {
+export function getZipRanges(): ZipRange[] {
+  const rangesEnv = process.env.CRAWL_ZIP_RANGES?.trim();
+  if (rangesEnv) {
+    const parsed = parseZipRanges(rangesEnv);
+    if (parsed.length > 0) return parsed;
+  }
   const min = envInt("CRAWL_ZIP_MIN", 9000, 1000, 9999);
   const max = envInt("CRAWL_ZIP_MAX", 9900, 1000, 9999);
-  return min <= max ? { min, max } : { min: max, max: min };
+  return [min <= max ? { min, max } : { min: max, max: min }];
 }
 
-export function isInZipRange(postalCode: string | null, range: ZipRange): boolean {
+export function isInZipRange(postalCode: string | null, ranges: ZipRange[]): boolean {
   if (postalCode === null) return false;
   const zip = Number(postalCode);
-  return Number.isInteger(zip) && zip >= range.min && zip <= range.max;
+  if (!Number.isInteger(zip)) return false;
+  return ranges.some((range) => zip >= range.min && zip <= range.max);
 }
 
-/** Applies the configured zip range to a batch of already-mapped listings. */
-export function filterByZipRange(
+/** Applies the configured zip ranges to a batch of already-mapped listings. */
+export function filterByZipRanges(
   listings: RawListing[],
-  range: ZipRange = getZipRange(),
+  ranges: ZipRange[] = getZipRanges(),
 ): { kept: RawListing[]; excluded: number } {
-  const kept = listings.filter((l) => isInZipRange(l.postal_code, range));
+  const kept = listings.filter((l) => isInZipRange(l.postal_code, ranges));
   return { kept, excluded: listings.length - kept.length };
+}
+
+/** Overall min/max spanning all configured ranges — for best-effort upstream API params only. */
+export function overallZipBounds(ranges: ZipRange[]): ZipRange {
+  return {
+    min: Math.min(...ranges.map((r) => r.min)),
+    max: Math.max(...ranges.map((r) => r.max)),
+  };
+}
+
+/**
+ * Every postal code across the configured ranges, ascending — for a
+ * best-effort exact-match upstream filter param, unlike overallZipBounds()'s
+ * single from/to span. Boligsiden's response shape (confirmed live) carries
+ * zip as a discrete `{ name, slug, zipCode }` area object rather than a bare
+ * numeric field, suggesting its search likely filters by exact codes rather
+ * than a contiguous range. Capped at `cap` (deterministically, ascending —
+ * truncation still narrows correctly even if a huge span is configured)
+ * since an uncapped list could balloon the request URL past what a server or
+ * intermediary will accept for a wide-enough range.
+ */
+export function enumerateZipCodes(ranges: ZipRange[], cap = 300): number[] {
+  const codes = new Set<number>();
+  for (const range of ranges) {
+    for (let zip = range.min; zip <= range.max && codes.size < cap; zip++) {
+      codes.add(zip);
+    }
+  }
+  return [...codes].sort((a, b) => a - b);
 }

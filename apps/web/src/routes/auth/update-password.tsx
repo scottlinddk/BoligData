@@ -31,7 +31,7 @@ export function UpdatePasswordPage() {
   if (submitted) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-center">
-        <h1 className="mb-2 font-serif text-3xl italic text-ink">{t("auth.updatePassword.title")}</h1>
+        <h1 className="mb-2 text-3xl font-bold tracking-tight text-ink">{t("auth.updatePassword.title")}</h1>
         <p className="mb-4 font-medium text-ink-soft">{t("auth.updatePassword.success")}</p>
         <Link to="/auth/signin" className="font-semibold text-brand-text hover:underline">
           {t("auth.updatePassword.backToSignIn")}
@@ -43,7 +43,7 @@ export function UpdatePasswordPage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-center">
-        <h1 className="mb-2 font-serif text-3xl italic text-ink">{t("auth.updatePassword.title")}</h1>
+        <h1 className="mb-2 text-3xl font-bold tracking-tight text-ink">{t("auth.updatePassword.title")}</h1>
         <p className="mb-4 font-medium text-ink-soft">{t("auth.updatePassword.invalidLink")}</p>
         <Link to="/auth/reset-password" className="font-semibold text-brand-text hover:underline">
           {t("auth.updatePassword.requestNewLink")}
@@ -54,7 +54,7 @@ export function UpdatePasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="mb-6 font-serif text-3xl italic text-ink">{t("auth.updatePassword.title")}</h1>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.updatePassword.title")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="password"
@@ -69,7 +69,7 @@ export function UpdatePasswordPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+          className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
         >
           {submitting ? t("auth.updatePassword.submitting") : t("auth.updatePassword.submit")}
         </button>

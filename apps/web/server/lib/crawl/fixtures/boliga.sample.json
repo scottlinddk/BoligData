@@ -16,7 +16,8 @@
     "rooms": 3,
     "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "EDC Aalborg"
+    "agent_name": "EDC Aalborg",
+    "listing_url": "https://www.boliga.dk/bolig/bl-mock-7001"
   },
   {
     "address": "Klostergade 3",
@@ -35,7 +36,8 @@
     "rooms": 2,
     "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "Nybolig Aarhus"
+    "agent_name": "Nybolig Aarhus",
+    "listing_url": "https://www.boliga.dk/bolig/bl-mock-7002"
   },
   {
     "address": "Bagsværd Hovedgade 90",
@@ -54,6 +56,7 @@
     "rooms": 6,
     "images": [],
     "description": "Mock listing used while CRAWL_MOCK_MODE is enabled.",
-    "agent_name": "Home Bagsværd"
+    "agent_name": "Home Bagsværd",
+    "listing_url": "https://www.boliga.dk/bolig/bl-mock-7003"
   }
 ]

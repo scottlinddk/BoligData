@@ -3,14 +3,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserRole } from "../../../packages/shared/src/types/index.js";
 import type {
   AdminDashboardResponse,
+  NewListingsRunsResponse,
   CreateAdvisorConnectionBody,
   CreateInvitationBody,
+  RegisteredAgent,
   UpdateAdminUserBody,
+  UpdateAppSettingsBody,
 } from "../../../packages/shared/src/types/api.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { requireRole } from "../server/middleware/auth.js";
 import { getAuthAdmin, getServiceRoleClient } from "../server/lib/supabase.js";
 import { isUuid, sendError } from "../server/lib/http-helpers.js";
+import {
+  GithubWorkflowError,
+  dispatchNewListingsWorkflow,
+  listNewListingsRuns,
+} from "../server/lib/admin/github-workflow.js";
 import {
   rowToAdminUser,
   rowToAdvisorConnection,
@@ -18,6 +26,16 @@ import {
 } from "../server/lib/row-mappers.js";
 
 const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
+
+/**
+ * Emails on this domain are "mock" test accounts: inviting one creates the
+ * auth user immediately (email pre-confirmed, fixed password below) instead
+ * of sending a real invitation email, and the invitation row is marked
+ * accepted right away. Lets an admin stamp out test users for every role
+ * without a real inbox.
+ */
+const MOCK_EMAIL_DOMAIN = "@test.com";
+const MOCK_USER_PASSWORD = "test1234";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
@@ -41,6 +59,11 @@ function str(v: unknown): string | undefined {
  *   POST   /api/admin?resource=advisor-connections
  *   DELETE /api/admin?resource=advisor-connections&id=:id
  *   GET    /api/admin?resource=dashboard
+ *   GET    /api/admin?resource=app-settings
+ *   PATCH  /api/admin?resource=app-settings
+ *   GET    /api/admin?resource=agents
+ *   GET    /api/admin?resource=new-listings   (recent GitHub Actions runs)
+ *   POST   /api/admin?resource=new-listings   (dispatch the workflow now)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -64,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await handleInvitations(req, res, client, auth.userId, id);
       return;
     case "users":
-      await handleUsers(req, res, client, id);
+      await handleUsers(req, res, client, auth.userId, id);
       return;
     case "advisor-connections":
       await handleAdvisorConnections(req, res, client, auth.userId, id);
@@ -72,6 +95,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "dashboard":
       if (id !== undefined || req.method !== "GET") break;
       await handleDashboard(res, client);
+      return;
+    case "app-settings":
+      if (id !== undefined) break;
+      await handleAppSettings(req, res, client);
+      return;
+    case "agents":
+      if (id !== undefined || req.method !== "GET") break;
+      await handleAgents(res, client);
+      return;
+    case "new-listings":
+      if (id !== undefined) break;
+      await handleNewListings(req, res);
       return;
   }
   res.status(404).json({ error: "Not found" });
@@ -116,6 +151,36 @@ async function handleInvitations(
       } else {
         sendError(res, 500, "Failed to create invitation", insertError ?? undefined);
       }
+      return;
+    }
+
+    if (email.endsWith(MOCK_EMAIL_DOMAIN)) {
+      // Mock account: create the user directly (pre-confirmed, fixed test
+      // password) instead of emailing an invite. handle_new_user() picks up
+      // the pending invitation row above and assigns its role; the
+      // confirmed-email trigger never fires for pre-confirmed inserts, so
+      // the invitation is marked accepted explicitly here.
+      const { error: createError } = await getAuthAdmin(client).createUser({
+        email,
+        password: MOCK_USER_PASSWORD,
+        email_confirm: true,
+      });
+      if (createError) {
+        await client.from("invitations").delete().eq("id", invitation.id);
+        sendError(res, 500, "Failed to create mock user", createError);
+        return;
+      }
+      const { data: accepted, error: acceptError } = await client
+        .from("invitations")
+        .update({ status: "accepted", accepted_at: new Date().toISOString() })
+        .eq("id", invitation.id)
+        .select("*")
+        .single();
+      if (acceptError || !accepted) {
+        sendError(res, 500, "Mock user created but failed to mark invitation accepted", acceptError ?? undefined);
+        return;
+      }
+      res.status(201).json(rowToInvitation(accepted));
       return;
     }
 
@@ -200,6 +265,7 @@ async function handleUsers(
   req: VercelRequest,
   res: VercelResponse,
   client: SupabaseClient,
+  adminUserId: string,
   id: string | undefined,
 ) {
   if (req.method === "GET" && id === undefined) {
@@ -263,9 +329,36 @@ async function handleUsers(
     return;
   }
 
+  if (req.method === "DELETE" && id !== undefined) {
+    if (!isUuid(id)) {
+      sendError(res, 400, "Invalid user id");
+      return;
+    }
+    if (id === adminUserId) {
+      res.status(400).json({ error: "You cannot remove your own account" });
+      return;
+    }
+    // Deleting the auth user cascades to user_profiles, favorites, saved
+    // searches, notifications, and advisor connections (all FK on delete
+    // cascade), so this is the whole removal.
+    const { error } = await getAuthAdmin(client).deleteUser(id);
+    if (error) {
+      const status = (error as { status?: number }).status === 404 ? 404 : 500;
+      sendError(res, status, status === 404 ? "User not found" : "Failed to remove user", error);
+      return;
+    }
+    res.status(204).end();
+    return;
+  }
+
   res.status(405).json({ error: "Method not allowed" });
 }
 
+/**
+ * Despite the "advisor" naming (kept for backwards compatibility with the
+ * advisor_connections table/column names), this pairs any professional
+ * account — advisor, agent or admin — with a customer account.
+ */
 async function handleAdvisorConnections(
   req: VercelRequest,
   res: VercelResponse,
@@ -296,8 +389,8 @@ async function handleAdvisorConnections(
       client.from("user_profiles").select("role").eq("id", body.advisorId).single(),
       client.from("user_profiles").select("role").eq("id", body.userId).single(),
     ]);
-    if (advisorProfile?.role !== "advisor") {
-      res.status(400).json({ error: "advisorId does not belong to an advisor account" });
+    if (advisorProfile?.role !== "advisor" && advisorProfile?.role !== "agent" && advisorProfile?.role !== "admin") {
+      res.status(400).json({ error: "advisorId does not belong to an advisor, agent or admin account" });
       return;
     }
     if (!userProfile) {
@@ -373,4 +466,86 @@ async function handleDashboard(res: VercelResponse, client: SupabaseClient) {
     recentApprovals: recentApprovals.count ?? 0,
   };
   res.status(200).json(body);
+}
+
+/** The singleton app_settings row — id is a boolean PK pinned to `true`. */
+async function handleAppSettings(req: VercelRequest, res: VercelResponse, client: SupabaseClient) {
+  if (req.method === "GET") {
+    const { data, error } = await client.from("app_settings").select("*").eq("id", true).single();
+    if (error || !data) {
+      sendError(res, 500, "Failed to load app settings", error ?? undefined);
+      return;
+    }
+    res.status(200).json({
+      settings: { broadcastEnabled: data.broadcast_enabled, updatedAt: data.updated_at },
+    });
+    return;
+  }
+
+  if (req.method === "PATCH") {
+    const body = req.body as UpdateAppSettingsBody;
+    if (typeof body?.broadcastEnabled !== "boolean") {
+      res.status(400).json({ error: "broadcastEnabled (boolean) is required" });
+      return;
+    }
+    const { data, error } = await client
+      .from("app_settings")
+      .update({ broadcast_enabled: body.broadcastEnabled, updated_at: new Date().toISOString() })
+      .eq("id", true)
+      .select("*")
+      .single();
+    if (error || !data) {
+      sendError(res, 500, "Failed to update app settings", error ?? undefined);
+      return;
+    }
+    res.status(200).json({
+      settings: { broadcastEnabled: data.broadcast_enabled, updatedAt: data.updated_at },
+    });
+    return;
+  }
+
+  res.status(405).json({ error: "Method not allowed" });
+}
+
+/** Read-only agency directory for the admin Settings view — no CRUD, just the existing agent accounts. */
+async function handleAgents(res: VercelResponse, client: SupabaseClient) {
+  const [{ data: profiles, error: profilesError }, { data: userList, error: usersError }] =
+    await Promise.all([
+      client.from("user_profiles").select("id, organization_name").eq("role", "agent"),
+      getAuthAdmin(client).listUsers({ perPage: 1000 }),
+    ]);
+  if (profilesError || usersError) {
+    sendError(res, 500, "Failed to load agents", profilesError ?? usersError);
+    return;
+  }
+  const emailById = new Map(userList.users.map((u) => [u.id, u.email ?? ""]));
+  const agents: RegisteredAgent[] = (profiles ?? []).map((row) => ({
+    id: row.id,
+    organizationName: row.organization_name,
+    email: emailById.get(row.id) ?? "",
+  }));
+  res.status(200).json({ agents });
+}
+
+/** Admin control for the new-listings GitHub Actions workflow: list its runs, or dispatch one now. */
+async function handleNewListings(req: VercelRequest, res: VercelResponse) {
+  try {
+    if (req.method === "GET") {
+      const body: NewListingsRunsResponse = { runs: await listNewListingsRuns() };
+      res.status(200).json(body);
+      return;
+    }
+    if (req.method === "POST") {
+      await dispatchNewListingsWorkflow();
+      res.status(202).json({ ok: true });
+      return;
+    }
+    res.status(405).json({ error: "Method not allowed" });
+  } catch (err) {
+    if (err instanceof GithubWorkflowError) {
+      sendError(res, err.status, err.publicMessage, err);
+      return;
+    }
+    sendError(res, 500, "Failed to reach GitHub Actions", err);
+  }
 }

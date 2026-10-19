@@ -1,0 +1,50 @@
+import { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import "../property-map.css";
+import type { ResearchAnalysisFilters, ResearchTransaction } from "@shared/analysis";
+import { mapStyleUrl, readableMapStyle } from "@/lib/map-theme";
+import { useMapStyleTheme } from "@/lib/use-map-style-theme";
+import { useTheme } from "@/theme/theme";
+import { buttonClass, useResearchText } from "./fields";
+
+export function SalesMap({ rows, onFilter, onFocus }: { rows: ResearchTransaction[]; onFilter: (v: Partial<ResearchAnalysisFilters>) => void; onFocus: (id: string) => void }) {
+  const tx = useResearchText(); const container = useRef<HTMLDivElement>(null); const map = useRef<maplibregl.Map | null>(null);
+  const { theme } = useTheme();
+  const [ready, setReady] = useState(false);
+  const mapStyleTheme = useMapStyleTheme(map, ready, theme);
+  const markers = useRef<maplibregl.Marker[]>([]); const vertices = useRef<maplibregl.Marker[]>([]);
+  const drawing = useRef(false); const polygon = useRef<[number, number][]>([]);
+  const [drawingState, setDrawingState] = useState(false); const [count, setCount] = useState(0); const [error, setError] = useState(false);
+  const wasChangingTheme = useRef(false);
+  useEffect(() => {
+    if (wasChangingTheme.current && ready && !mapStyleTheme.changing && !mapStyleTheme.error) setError(false);
+    wasChangingTheme.current = mapStyleTheme.changing;
+  }, [ready, mapStyleTheme.changing, mapStyleTheme.error]);
+  const located = rows.filter(r => typeof r.lat === "number" && typeof r.lon === "number" && Number.isFinite(r.lat) && Number.isFinite(r.lon) && Math.abs(r.lat) <= 90 && Math.abs(r.lon) <= 180);
+  useEffect(() => {
+    if (!container.current) return;
+    try {
+      const instance = new maplibregl.Map({ container: container.current, center: [9.9, 57.04], zoom: 11 });
+      instance.setStyle(mapStyleUrl(theme), { transformStyle: (_previous, next) => readableMapStyle(next, theme) });
+      map.current = instance; instance.addControl(new maplibregl.NavigationControl(), "top-right");
+      instance.on("load", () => setReady(true));
+      instance.on("click", e => { if (drawing.current) { const point: [number, number] = [e.lngLat.lng, e.lngLat.lat]; polygon.current.push(point); const element = document.createElement("span"); element.className = "research-map-vertex"; element.setAttribute("aria-hidden", "true"); vertices.current.push(new maplibregl.Marker({ element }).setLngLat(point).addTo(instance)); setCount(polygon.current.length); } });
+      instance.on("error", () => setError(true));
+      return () => { instance.remove(); map.current = null; };
+    } catch { setError(true); }
+  }, []);
+  useEffect(() => {
+    const instance = map.current; if (!instance) return;
+    markers.current.forEach(m => m.remove());
+    markers.current = located.map(r => {
+      const button = document.createElement("button"); button.type = "button"; button.className = "research-map-point"; button.title = r.address;
+      button.addEventListener("click", e => { if (!drawing.current) { e.stopPropagation(); onFocus(r.id); } });
+      const marker = new maplibregl.Marker({ element: button }).setLngLat([r.lon!, r.lat!]).addTo(instance);
+      button.setAttribute("aria-label", r.address);
+      return marker;
+    });
+  }, [rows, onFocus]);
+  const clearVertices = () => { polygon.current = []; vertices.current.forEach(m => m.remove()); vertices.current = []; setCount(0); };
+  return <div className="my-4"><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => { const b = map.current?.getBounds(); if (b) onFilter({ bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], polygon: undefined }); }}>{tx("Brug kortudsnit", "Use map bounds")}</button><button className={buttonClass} onClick={() => { clearVertices(); drawing.current = true; setDrawingState(true); }}>{tx("Tegn område", "Draw area")}</button>{drawingState && <button disabled={count < 3} className={buttonClass} onClick={() => { onFilter({ polygon: [...polygon.current], bbox: undefined }); drawing.current = false; setDrawingState(false); }}>{tx("Brug polygon", "Use polygon")} ({count})</button>}<button className={buttonClass} onClick={() => { clearVertices(); drawing.current = false; setDrawingState(false); onFilter({ polygon: undefined, bbox: undefined }); }}>{tx("Ryd områdefilter", "Clear area filter")}</button></div>{drawingState && <p className="my-2 text-xs">{tx("Klik mindst tre hjørner på kortet, og vælg Brug polygon.", "Click at least three corners on the map, then choose Use polygon.")}</p>}<div ref={container} data-map-theme={mapStyleTheme.appliedTheme} aria-busy={!ready || mapStyleTheme.changing} className="mt-3 h-72 overflow-hidden rounded-xl bg-surface-alt" />{error && <p className="mt-2 text-xs text-warning">{tx("Kortlaget kunne ikke indlæses. Tabellen viser stadig data.", "Map tiles could not load. The table still shows data.")}</p>}{mapStyleTheme.error && <p className="mt-2 text-xs text-warning">{tx("Korttemaet kunne ikke indlæses fuldt. Prøv at skifte tema igen.", "The map theme could not fully load. Try switching the theme again.")}</p>}<p className="mt-2 text-xs text-ink-soft">{located.length}/{rows.length} {tx("handler har koordinater. Kortvalg filtrerer samme analyse.", "transactions have coordinates. Map selection filters this analysis.")}</p></div>;
+}

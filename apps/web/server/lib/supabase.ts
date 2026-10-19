@@ -56,6 +56,12 @@ interface AuthAdmin {
     perPage?: number;
   }): Promise<{ data: { users: AuthAdminUser[] }; error: unknown }>;
   getUserById(id: string): Promise<{ data: { user: AuthAdminUser | null }; error: unknown }>;
+  createUser(attributes: {
+    email: string;
+    password?: string;
+    email_confirm?: boolean;
+  }): Promise<{ data: { user: AuthAdminUser | null }; error: { message: string; status?: number } | null }>;
+  deleteUser(id: string): Promise<{ data: unknown; error: { message: string; status?: number } | null }>;
 }
 
 /** Only valid on a client from getServiceRoleClient() — the anon client has no `admin` namespace. */

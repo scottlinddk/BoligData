@@ -1,9 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BbrData, RiskFlags } from "../../../../packages/shared/src/types/index.js";
 import type {
   SearchPropertiesQuery,
   SearchPropertiesResponse,
 } from "../../../../packages/shared/src/types/api.js";
 import { rowToProperty, rowToPropertySummary } from "./row-mappers.js";
+import { safeBbrData, safeRiskFlags } from "./source-facts.js";
+import { parseSearchBoundary } from "../../../../packages/shared/src/utils/search-boundary.js";
+
+export class InvalidSearchBoundaryError extends Error {
+  constructor() { super("Invalid map boundary: use a simple area with 3–64 distinct points"); this.name = "InvalidSearchBoundaryError"; }
+}
 
 const SORT_COLUMNS: Record<string, string> = {
   listingDate: "listing_date",
@@ -30,6 +37,41 @@ function sanitizeForOrFilter(value: string): string {
   return value.replace(/[,().]/g, "").trim();
 }
 
+/**
+ * Splits a free-text location query into its street/city text and an
+ * optional 4-digit Danish postal code, e.g. "Rundvejen 7, 9000" -> address
+ * text "Rundvejen 7" + postal code "9000". Without this split, a query that
+ * includes a zip code never matched anything: sanitizeForOrFilter() strips
+ * the comma (PostgREST `or()` syntax) but left the zip digits appended to
+ * the address term, so "Rundvejen 7 9000" was searched as one substring
+ * against a stored `address` column that only ever holds "Rundvejen 7" —
+ * the zip lives in its own `postal_code` column and was never checked at
+ * all.
+ */
+export function splitLocationQuery(raw: string): { text: string; postalCode: string | null } {
+  const match = raw.match(/\b(\d{4})\b/);
+  const postalCode = match?.[1] ?? null;
+  const text = (postalCode ? raw.replace(match![0], " ") : raw).trim();
+  return { text, postalCode };
+}
+
+/**
+ * Parses a `minLon,minLat,maxLon,maxLat` bbox string (the map view's current
+ * viewport) into numeric bounds, or null when malformed/absent. Used by
+ * PropertyMap's live viewport fetch so panning/zooming into a specific
+ * street shows every matching listing there, not just whichever page the
+ * list's own pagination happens to be showing.
+ */
+export function parseBbox(
+  raw: string | undefined,
+): { minLon: number; minLat: number; maxLon: number; maxLat: number } | null {
+  if (!raw) return null;
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [minLon, minLat, maxLon, maxLat] = parts as [number, number, number, number];
+  return { minLon, minLat, maxLon, maxLat };
+}
+
 function resolveSort(sortField: string, sortDirection: string) {
   const column = SORT_COLUMNS[sortField] ?? "listing_date";
   let ascending = sortDirection === "asc";
@@ -42,7 +84,7 @@ function resolveSort(sortField: string, sortDirection: string) {
 /**
  * Anonymous callers only ever see the listing name (address) plus the total
  * match count; signing in reveals the full record. This is enforced here
- * (not just hidden in the UI) by selecting fewer columns for the anon path.
+ * (not just hidden in the UI) by mapping anonymous rows to address-only summaries.
  */
 export async function searchProperties(
   client: SupabaseClient,
@@ -54,11 +96,24 @@ export async function searchProperties(
   const { column, ascending } = resolveSort(query.sortField ?? "listingDate", query.sortDirection ?? "desc");
 
   const columns = authenticated ? "*" : "id, address";
-  let builder = client.from("properties").select(columns, { count: "exact" }).eq("status", "active");
+  const boundary = typeof query.polygon === "string" ? parseSearchBoundary(query.polygon) : null;
+  if (query.polygon !== undefined && query.polygon !== null && !boundary) throw new InvalidSearchBoundaryError();
+  // Spatial filtering happens before count/range, never on an already-paginated browser result.
+  // Older PostgREST versions cannot sort/filter RPC columns excluded by select.
+  // Keep the full row internally; rowToPropertySummary strips it for anonymous callers.
+  let builder = (boundary
+    ? client.rpc("properties_in_boundary", { boundary }, { count: "exact" }).select("*")
+    : client.from("properties").select(columns, { count: "exact" }))
+    .eq("status", "active");
 
   if (query.location) {
-    const term = sanitizeForOrFilter(query.location);
+    const { text, postalCode } = splitLocationQuery(query.location);
+    const term = sanitizeForOrFilter(text);
     if (term) builder = builder.or(`address.ilike.%${term}%,municipality.ilike.%${term}%`);
+    if (postalCode) builder = builder.eq("postal_code", postalCode);
+  }
+  if (query.propertyTypes && query.propertyTypes.length > 0) {
+    builder = builder.in("property_type", query.propertyTypes);
   }
   if (query.postnummer) {
     const term = sanitizeForOrFilter(query.postnummer);
@@ -76,6 +131,14 @@ export async function searchProperties(
     builder = builder.gte("listing_date", cutoff.toISOString().slice(0, 10));
   }
   if (query.createdAfter) builder = builder.gt("created_at", query.createdAfter);
+  const bbox = parseBbox(query.bbox);
+  if (bbox) {
+    builder = builder
+      .gte("lon", bbox.minLon)
+      .lte("lon", bbox.maxLon)
+      .gte("lat", bbox.minLat)
+      .lte("lat", bbox.maxLat);
+  }
 
   const { data, count, error } = await builder
     .order(column, { ascending })
@@ -84,10 +147,37 @@ export async function searchProperties(
   if (error) throw error;
 
   const total = count ?? 0;
+  // Both sources return property rows; the dynamic projection is not represented in the untyped client's RPC inference.
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { id: string }>;
+
+  // BBR data lives on a separate enrichments row (Fase 2 enrichment, not a
+  // properties column) — batch-fetch it for the page's property ids, same
+  // pattern comparables.ts uses for sold_price_history, so listing cards get
+  // energy label/heating without a per-card round trip.
+  const bbrByPropertyId = new Map<string, BbrData>();
+  const riskByPropertyId = new Map<string, RiskFlags>();
+  if (authenticated && rows.length > 0) {
+    const propertyIds = rows.map((row) => row.id);
+    const { data: enrichments } = await client
+      .from("enrichments")
+      .select("property_id, bbr_data, risk_flags, source_status")
+      .in("property_id", propertyIds);
+    for (const row of enrichments ?? []) {
+      const bbr = safeBbrData(row);
+      const risk = safeRiskFlags(row);
+      if (bbr) bbrByPropertyId.set(row.property_id, bbr);
+      if (risk) riskByPropertyId.set(row.property_id, risk);
+    }
+  }
+
   return {
     authenticated,
-    properties: authenticated ? (data ?? []).map(rowToProperty) : [],
-    summaries: authenticated ? [] : (data ?? []).map(rowToPropertySummary),
+    properties: authenticated
+      ? rows.map((row) =>
+          rowToProperty(row, bbrByPropertyId.get(row.id) ?? null, riskByPropertyId.get(row.id) ?? null),
+        )
+      : [],
+    summaries: authenticated ? [] : rows.map(rowToPropertySummary),
     total,
     limit,
     offset,

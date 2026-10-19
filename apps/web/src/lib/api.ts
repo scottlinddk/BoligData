@@ -3,23 +3,42 @@ import type {
   AdminUsersResponse,
   AdvisorConnectionsResponse,
   AgentListingsResponse,
+  AppSettingsResponse,
+  NewListingsRunsResponse,
   ApproveListingBody,
   ComparablesResponse,
+  ConversationsResponse,
   MarketStatsResponse,
   CreateAdvisorConnectionBody,
+  CreateConversationBody,
   CreateFavoriteBody,
   CreateInvitationBody,
   CreateSearchBody,
   FavoritesResponse,
   InvitationsResponse,
+  CreateRecommendationsBody,
+  MessagesResponse,
+  MyConnectionsResponse,
   NotificationsResponse,
+  ProfileResponse,
   PropertyDetailResponse,
+  RecommendationsResponse,
+  RegisteredAgentsResponse,
+  RespondRecommendationBody,
   SearchPropertiesQuery,
   SearchPropertiesResponse,
+  SendMessageBody,
   UpdateAdminUserBody,
   UpdateAlertBody,
+  UpdateAppSettingsBody,
+  UpdateProfileBody,
 } from "@shared/types/api";
-import type { AdminUser, Invitation, Property, SavedSearch } from "@shared/types/index";
+import type { AdminUser, Conversation, Invitation, Message, NotificationType, Property, SavedSearch } from "@shared/types/index";
+import type { PropertyLookupResult } from "@shared/types/property-lookup";
+import type { SchoolDistrictResult } from "@shared/types/school-district";
+import type { SparListingEstimate } from "@shared/types/spar";
+import type { LimfjordLanguage, LimfjordNoiseResult } from "@shared/types/limfjord-noise";
+import type { MiljoegisNoiseReport, NoiseMetric, NoiseSource } from "@shared/types/miljoegis-noise";
 import { supabase } from "./supabase";
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -54,7 +73,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function searchProperties(query: SearchPropertiesQuery): Promise<SearchPropertiesResponse> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
-    if (value !== null && value !== undefined) params.set(key, String(value));
+    if (value === null || value === undefined) continue;
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(key, value.join(","));
+      continue;
+    }
+    params.set(key, String(value));
   }
   return request(`/properties?${params.toString()}`);
 }
@@ -63,12 +87,62 @@ export function getProperty(id: string): Promise<PropertyDetailResponse> {
   return request(`/properties?id=${id}`);
 }
 
+export function getSchoolDistrict(id: string): Promise<SchoolDistrictResult> {
+  return request(`/properties?id=${encodeURIComponent(id)}&resource=school-district`);
+}
+
+export function getSparEstimate(id: string): Promise<SparListingEstimate> {
+  return request(`/properties?id=${encodeURIComponent(id)}&resource=spar`);
+}
+
+export function getLimfjordNoise(id: string, language: LimfjordLanguage, signal?: AbortSignal): Promise<LimfjordNoiseResult> {
+  const query = new URLSearchParams({ id, resource: "limfjord-noise", lang: language });
+  return request(`/properties?${query}`, { signal });
+}
+
+export function getMiljoegisNoise(id: string, source: NoiseSource, metric: NoiseMetric, signal?: AbortSignal): Promise<MiljoegisNoiseReport> {
+  const query = new URLSearchParams({ id, resource: "miljoegis-noise", source, metric });
+  return request(`/properties?${query}`, { signal });
+}
+
 export function getComparables(id: string): Promise<ComparablesResponse> {
   return request(`/properties?id=${id}&comparables=true`);
 }
 
 export function getMarketStats(id: string): Promise<MarketStatsResponse> {
   return request(`/properties?id=${id}&marketStats=true`);
+}
+
+export interface PropertyLookupQuery {
+  /** Free text for a listing; may be empty when `husnummerId` identifies the address. */
+  address: string;
+  /** DAR husnummer UUID from the address autocomplete: an address that is not a listing. */
+  husnummerId?: string | null;
+  /** Omit for an address with no listing: there is then no price to screen. */
+  askingPrice?: number | null;
+  postalCode?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  roomCount?: number | null;
+  energyLabel?: string | null;
+}
+
+/**
+ * Live register read for one address: DAR identifiers and coordinates, BBR
+ * building facts, the public valuation, registered sales and nearby sales.
+ * Requires a signed-in account and spends one of its hourly register lookups
+ * (HTTP 429 when exhausted); the response is never publicly cached.
+ *
+ * `energyLabel` and `roomCount` are pass-throughs: no register in the pipeline
+ * resolves either, so the endpoint screens against whatever the caller knows
+ * from the listing and echoes it back.
+ */
+export function getPropertyLookup(query: PropertyLookupQuery): Promise<PropertyLookupResult> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== null && value !== undefined && value !== "") params.set(key, String(value));
+  }
+  return request(`/property-lookup?${params.toString()}`);
 }
 
 export function listSearches(): Promise<SavedSearch[]> {
@@ -95,8 +169,16 @@ export function removeFavorite(propertyId: string): Promise<void> {
   return request(`/favorites?propertyId=${propertyId}`, { method: "DELETE" });
 }
 
-export function listNotifications(unreadOnly = false): Promise<NotificationsResponse> {
-  return request(`/notifications${unreadOnly ? "?unreadOnly=true" : ""}`);
+export function listMyConnections(): Promise<MyConnectionsResponse> {
+  return request(`/account?resource=connections`);
+}
+
+export function listNotifications(unreadOnly = false, type?: NotificationType): Promise<NotificationsResponse> {
+  const params = new URLSearchParams();
+  if (unreadOnly) params.set("unreadOnly", "true");
+  if (type) params.set("type", type);
+  const qs = params.toString();
+  return request(`/notifications${qs ? `?${qs}` : ""}`);
 }
 
 export function markNotificationRead(id: string): Promise<void> {
@@ -127,6 +209,10 @@ export function listAdminUsers(): Promise<AdminUsersResponse> {
 
 export function updateAdminUser(id: string, body: UpdateAdminUserBody): Promise<AdminUser> {
   return request(`/admin?resource=users&id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function deleteAdminUser(id: string): Promise<void> {
+  return request(`/admin?resource=users&id=${id}`, { method: "DELETE" });
 }
 
 export function listAdminAdvisorConnections(): Promise<AdvisorConnectionsResponse> {
@@ -178,5 +264,74 @@ export function unpromoteListing(propertyId: string): Promise<Property> {
 }
 
 export function listAgentListings(): Promise<AgentListingsResponse> {
-  return request(`/agent/listings`);
+  return request(`/advisor/listings`);
+}
+
+// --- Recommendations ---
+
+export function listRecommendations(direction: "sent" | "received"): Promise<RecommendationsResponse> {
+  return request(`/recommendations?direction=${direction}`);
+}
+
+export function sendRecommendations(body: CreateRecommendationsBody) {
+  return request(`/recommendations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function respondToRecommendation(id: string, body: RespondRecommendationBody) {
+  return request(`/recommendations?id=${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// --- Messages ---
+
+export function listConversations(): Promise<ConversationsResponse> {
+  return request(`/account?resource=conversations`);
+}
+
+export function startConversation(body: CreateConversationBody): Promise<Conversation> {
+  return request(`/account?resource=conversations`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function listMessages(conversationId: string): Promise<MessagesResponse> {
+  return request(`/account?resource=thread&conversationId=${conversationId}`);
+}
+
+export function sendMessage(conversationId: string, body: SendMessageBody): Promise<Message> {
+  return request(`/account?resource=thread&conversationId=${conversationId}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// --- Profile ---
+
+export function getProfile(): Promise<ProfileResponse> {
+  return request(`/account?resource=profile`);
+}
+
+export function updateProfile(body: UpdateProfileBody): Promise<ProfileResponse> {
+  return request(`/account?resource=profile`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+// --- Admin: app settings & agents ---
+
+export function getAppSettings(): Promise<AppSettingsResponse> {
+  return request(`/admin?resource=app-settings`);
+}
+
+export function updateAppSettings(body: UpdateAppSettingsBody): Promise<AppSettingsResponse> {
+  return request(`/admin?resource=app-settings`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function listRegisteredAgents(): Promise<RegisteredAgentsResponse> {
+  return request(`/admin?resource=agents`);
+}
+
+// --- Admin: new-listings GitHub Actions workflow ---
+
+export function listNewListingsRuns(): Promise<NewListingsRunsResponse> {
+  return request(`/admin?resource=new-listings`);
+}
+
+export function triggerNewListingsFetch(): Promise<{ ok: true }> {
+  return request(`/admin?resource=new-listings`, { method: "POST" });
 }

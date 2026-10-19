@@ -1,17 +1,24 @@
+import { handleCadastral } from "../server/lib/cadastral/handler.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   SearchPropertiesQuery,
   SortDirection,
   SortField,
 } from "../../../packages/shared/src/types/api.js";
+import type { PropertyType } from "../../../packages/shared/src/types/index.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { getOptionalUser, requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 import { isUuid, sendError, setPublicCache } from "../server/lib/http-helpers.js";
 import { rowToEnrichment, rowToProperty } from "../server/lib/row-mappers.js";
-import { searchProperties } from "../server/lib/search.js";
+import { InvalidSearchBoundaryError, searchProperties } from "../server/lib/search.js";
 import { getComparables } from "../server/lib/comparables.js";
 import { getMarketStats } from "../server/lib/market-stats.js";
+import { handleSchoolDistrict } from "../server/lib/school-district.handler.js";
+import { handleSpar } from "../server/lib/spar.handler.js";
+import { handleLimfjordNoise } from "../server/lib/limfjord-noise-handler.js";
+import { handleMiljoegisNoise } from "../server/lib/miljoegis-noise/handler.js";
+import { fetchBoligsidenDetails } from "../server/lib/boligsiden-listing-details.js";
 
 function str(v: unknown): string | undefined {
   return Array.isArray(v) ? v[0] : (v as string | undefined);
@@ -24,11 +31,36 @@ function num(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+const PROPERTY_TYPES: readonly PropertyType[] = [
+  "villa",
+  "apartment",
+  "terraced_house",
+  "summer_house",
+  "farm",
+  "villa_apartment",
+  "cooperative",
+  "holiday_plot",
+  "residential_plot",
+  "houseboat",
+  "other",
+];
+
+/** Comma-separated `propertyTypes=villa,apartment` — unknown values are dropped rather than sent to the DB. */
+function propertyTypes(v: unknown): PropertyType[] | undefined {
+  const s = str(v);
+  if (!s) return undefined;
+  const values = s.split(",").filter((t): t is PropertyType => (PROPERTY_TYPES as readonly string[]).includes(t));
+  return values.length > 0 ? values : undefined;
+}
+
 function parseQuery(req: VercelRequest): SearchPropertiesQuery {
   const q = req.query;
+  if (q.polygon !== undefined && typeof q.polygon !== "string") throw new InvalidSearchBoundaryError();
   return {
+    polygon: str(q.polygon),
     location: str(q.location),
     postnummer: str(q.postnummer),
+    propertyTypes: propertyTypes(q.propertyTypes),
     minPrice: num(q.minPrice),
     maxPrice: num(q.maxPrice),
     minSqm: num(q.minSqm),
@@ -40,6 +72,7 @@ function parseQuery(req: VercelRequest): SearchPropertiesQuery {
     sortDirection: str(q.sortDirection) as SortDirection | undefined,
     limit: num(q.limit),
     offset: num(q.offset),
+    bbox: str(q.bbox),
   };
 }
 
@@ -66,13 +99,34 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
   const client = getAnonClient(user.jwt);
   const wantsComparables = str(req.query.comparables) === "true";
 
+  if (str(req.query.resource) === "cadastral") {
+    try { await handleCadastral(client, id, res); }
+    catch (error) { sendError(res, 500, "Failed to load cadastral records", error); }
+    return;
+  }
+
   try {
     if (str(req.query.marketStats) === "true") {
       res.setHeader("Cache-Control", "private, no-store");
       res.status(200).json(await getMarketStats(client, id));
       return;
     }
-
+    if (req.query.resource === "miljoegis-noise") {
+      await handleMiljoegisNoise(client, id, req, res);
+      return;
+    }
+    if (str(req.query.resource) === "school-district") {
+      await handleSchoolDistrict(client, res, id);
+      return;
+    }
+    if (str(req.query.resource) === "spar") {
+      await handleSpar(client, res, id);
+      return;
+    }
+    if (req.query.resource === "limfjord-noise") {
+      await handleLimfjordNoise(client, id, req, res);
+      return;
+    }
     if (wantsComparables) {
       const result = await getComparables(client, id);
       res.setHeader("Cache-Control", "private, no-store");
@@ -90,11 +144,25 @@ async function handlePropertyById(req: VercelRequest, res: VercelResponse, id: s
       return;
     }
 
+    // Supplement old, heading-only rows on read without changing the stored
+    // listing or labelling source-reported facts as an official register read.
+    const row = propertyResult.data;
+    // Legacy rows may have unknown provenance; the fresh response establishes
+    // its own source identity. Explicit demo/mock rows never use live data.
+    const listingDetails = row.listing_source === "boligsiden" && row.data_mode !== "mock" && row.data_mode !== "demo"
+      ? await fetchBoligsidenDetails(row.external_id, {
+        postalCode: row.postal_code,
+        lat: Number(row.lat),
+        lon: Number(row.lon),
+      }).catch(() => null)
+      : null;
+
     // Per-user auth response — never let a CDN share it across callers.
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
       property: rowToProperty(propertyResult.data),
       enrichment: enrichmentResult.data ? rowToEnrichment(enrichmentResult.data) : null,
+      listingDetails,
     });
   } catch (err) {
     sendError(res, 500, wantsComparables ? "Failed to load comparables" : "Failed to load property", err);
@@ -128,6 +196,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     res.status(200).json(result);
   } catch (err) {
-    sendError(res, 500, "Failed to search properties", err);
+    if (err instanceof InvalidSearchBoundaryError || (req.query.polygon !== undefined && (err as { code?: string })?.code === "22023")) {
+      sendError(res, 400, "Invalid map boundary: use a simple area with 3–64 distinct points");
+    } else sendError(res, 500, "Failed to search properties", err);
   }
 }

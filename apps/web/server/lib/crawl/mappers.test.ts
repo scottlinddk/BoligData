@@ -41,6 +41,7 @@ describe("mapBoligaRecord", () => {
   it("maps a valid record to a RawListing", () => {
     const listing = mapBoligaRecord(boligaRecord);
     expect(listing).toEqual({
+      data_mode: "real",
       address: "Testgade 12, 2. th",
       municipality: "Aalborg",
       postal_code: "9000",
@@ -58,6 +59,8 @@ describe("mapBoligaRecord", () => {
       images: [],
       description: null,
       agent_name: null,
+      listing_url: "https://www.boliga.dk/bolig/123456",
+      sold_price_history: [],
     });
   });
 
@@ -81,9 +84,80 @@ describe("mapBoligaRecord", () => {
 });
 
 describe("mapBoligsidenCase", () => {
+  it("retains the broker body and construction year from the live feed fields", () => {
+    expect(mapBoligsidenCase({ ...boligsidenCase, descriptionTitle: "Lejlighed med altan", descriptionBody: "En lys bolig.\nTo værelser og altan.", yearBuilt: 1937 }))
+      .toMatchObject({ description: "En lys bolig.\nTo værelser og altan.", building_year: 1937 });
+    expect(mapBoligsidenCase({ ...boligsidenCase, descriptionTitle: "Lejlighed med altan", descriptionBody: "  " })?.description)
+      .toBe("Lejlighed med altan");
+  });
+
+  it("preserves the provider's address identity and verified public address-page slug", () => {
+    const sourceAddressId = "0a3f50c9-be71-32b8-e044-0003ba298018";
+    const mapped = mapBoligsidenCase({ ...boligsidenCase, slugAddress: "bejsebakkevej-30-9000-aalborg",
+      address: { ...boligsidenCase.address, addressID: sourceAddressId } });
+    expect(mapped?.source_address_id).toBe(sourceAddressId);
+    expect(mapped?.listing_url).toBe("https://www.boligsiden.dk/adresse/bejsebakkevej-30-9000-aalborg");
+    expect(mapBoligsidenCase({ ...boligsidenCase, address: { ...boligsidenCase.address, addressID: "not-an-id" } }))
+      .not.toHaveProperty("source_address_id");
+  });
+
+  it("retains signed rounded asking-price changes as source evidence, never a first price", () => {
+    for (const changePercent of [-9.26, 0, 3.13]) {
+      expect(mapBoligsidenCase({ ...boligsidenCase, priceChangePercentage: changePercent })?.reported_price_change)
+        .toEqual({ currentAsking: 3_200_000, changePercent });
+    }
+    for (const value of [null, undefined, "-5", NaN, Infinity, -100, -101]) {
+      expect(mapBoligsidenCase({ ...boligsidenCase, priceChangePercentage: value })).not.toHaveProperty("reported_price_change");
+    }
+  });
+
+  it("retains live reported durations without deriving a listing date", () => {
+    const mapped = mapBoligsidenCase({ ...boligsidenCase, status: "open", timeOnMarket: { current: { days: 464 }, total: { days: 700 } } });
+    expect(mapped?.reported_time_on_market).toEqual({ latestEpisodeDays: 464, totalDays: 700 });
+    expect(mapped?.listing_date).toBeNull();
+  });
+
+  it("keeps zero days and an independently valid duration while rejecting malformed values", () => {
+    const mapped = (current: unknown, total: unknown) => mapBoligsidenCase({ ...boligsidenCase, timeOnMarket: { current: { days: current }, total: { days: total } } });
+    expect(mapped(0, 36_500)?.reported_time_on_market).toEqual({ latestEpisodeDays: 0, totalDays: 36_500 });
+    expect(mapped(null, 12)?.reported_time_on_market).toEqual({ latestEpisodeDays: null, totalDays: 12 });
+    for (const invalid of [-1, 1.5, 36_501, NaN, Infinity, "464", null, undefined]) {
+      expect(mapped(invalid, invalid)).not.toHaveProperty("reported_time_on_market");
+    }
+    expect(mapBoligsidenCase({ ...boligsidenCase, timeOnMarket: 464 })).not.toHaveProperty("reported_time_on_market");
+  });
+
+  it("retains the per-broker breakdown of the total period (Hasserisvej 278 broker change)", () => {
+    const current = "5b781f91-8bca-498b-b889-422e83706cb5";
+    const previous = "0573c09d-bcd0-430d-add5-2ab3ae2155b9";
+    const realtors = [
+      { days: 119, realtorId: current.toUpperCase(), realtorName: "Hansen & Thoft" },
+      { days: 45, realtorId: previous, realtorName: "Thorkild Kristensen Hasseris" },
+    ];
+    const mapped = (rows: unknown, realtorID: unknown = current) => mapBoligsidenCase({
+      ...boligsidenCase, realtor: { name: "Hansen & Thoft", realtorID },
+      timeOnMarket: { current: { days: 119 }, total: { days: 164, realtors: rows } },
+    })?.reported_time_on_market;
+    expect(mapped(realtors)).toEqual({
+      latestEpisodeDays: 119, totalDays: 164, currentRealtorId: current,
+      realtors: [
+        { realtorId: current, realtorName: "Hansen & Thoft", days: 119 },
+        { realtorId: previous, realtorName: "Thorkild Kristensen Hasseris", days: 45 },
+      ],
+    });
+    // Older payloads omit names; the identity and days still count.
+    expect(mapped([{ days: 164, realtorId: current }])?.realtors).toEqual([{ realtorId: current, realtorName: null, days: 164 }]);
+    expect(mapped(realtors, "not-a-uuid")).not.toHaveProperty("currentRealtorId");
+    // A partial list would understate earlier brokers, so it is dropped whole.
+    for (const invalid of [[], null, "x", [realtors[0], { days: 45 }], [realtors[0], { ...realtors[1], days: -1 }], [realtors[0], realtors[0]]]) {
+      expect(mapped(invalid)).toEqual({ latestEpisodeDays: 119, totalDays: 164 });
+    }
+  });
+
   it("maps a valid case to a RawListing", () => {
     const listing = mapBoligsidenCase(boligsidenCase);
     expect(listing).toEqual({
+      data_mode: "real",
       address: "Prøvevej 7",
       municipality: "Aarhus",
       postal_code: "8000",
@@ -101,6 +175,8 @@ describe("mapBoligsidenCase", () => {
       images: [],
       description: null,
       agent_name: "EDC Aarhus",
+      listing_url: null,
+      sold_price_history: [],
     });
   });
 
@@ -113,6 +189,65 @@ describe("mapBoligsidenCase", () => {
 
   it("normalizes unknown address types to 'other'", () => {
     expect(mapBoligsidenCase({ ...boligsidenCase, addressType: "castle" })?.property_type).toBe("other");
+  });
+
+  it("maps the address's registered sales, newest first", () => {
+    // Registration shape captured from a live response (2026-08-01).
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [
+          { amount: 1_495_000, area: 201, date: "2004-08-23", registrationID: "2736865", type: "normal" },
+          {
+            amount: 2_050_000,
+            area: 190,
+            date: "2021-08-30",
+            livingArea: 201,
+            perAreaPrice: 10199,
+            registrationID: "5654008",
+            type: "normal",
+          },
+        ],
+      },
+    });
+
+    expect(listing?.sold_price_history).toEqual([
+      { soldDate: "2021-08-30", price: 2_050_000, pricePerSqm: 10199, saleType: "normal", registrationId: "5654008", residentialArea: 201, areaDefinition: "residential" },
+      // No perAreaPrice on the older row — derived from amount/area instead.
+      { soldDate: "2004-08-23", price: 1_495_000, pricePerSqm: Math.round(1_495_000 / 201), saleType: "normal", registrationId: "2736865", areaDefinition: "unknown" },
+    ]);
+  });
+
+  it("carries the registration type through so a family sale isn't read as a market price", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [{ amount: 900_000, livingArea: 120, date: "2020-01-01", type: "family" }],
+      },
+    });
+    expect(listing?.sold_price_history[0]?.saleType).toBe("family");
+  });
+
+  it("rejects invalid registrations but preserves sales with unknown area", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: {
+        ...boligsidenCase.address,
+        registrations: [
+          { amount: 1_000_000, type: "normal" },
+          { date: "2020-01-01", type: "normal" },
+          { amount: 1_000_000, date: "2020-01-01", type: "normal" },
+          "not an object",
+        ],
+      },
+    });
+    expect(listing?.sold_price_history).toEqual([{ soldDate: "2020-01-01", price: 1_000_000, pricePerSqm: null, saleType: "normal", areaDefinition: "unknown" }]);
+  });
+
+  it("treats a missing registrations array as no history, not as a failure", () => {
+    expect(mapBoligsidenCase(boligsidenCase)?.sold_price_history).toEqual([]);
   });
 
   it("parses images with categories and sized variants", () => {
@@ -157,6 +292,27 @@ describe("mapBoligsidenCase", () => {
     expect(listing?.images).toEqual([]);
   });
 
+  it("retains nested size metadata from the live Boligsiden imageSources payload", () => {
+    // Same field structure/presets as the public feed checked 2026-09-28.
+    const base = "https://images.boligsiden.dk/images/case/example";
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      images: [{ imageSources: [
+        { url: `${base}/100x80/photo.webp`, size: { width: 100, height: 80 } },
+        { url: `${base}/600x400/photo.webp`, size: { width: 600, height: 400 } },
+        { url: `${base}/1440x960/photo.webp`, size: { width: 1440, height: 960 } },
+        { url: `${base}/broken/photo.webp`, size: { width: -1, height: "invalid" } },
+      ] }],
+    });
+    expect(listing?.images).toEqual([{
+      url: `${base}/100x80/photo.webp`, category: "photo", sources: [
+        { url: `${base}/100x80/photo.webp`, width: 100, height: 80 },
+        { url: `${base}/600x400/photo.webp`, width: 600, height: 400 },
+        { url: `${base}/1440x960/photo.webp`, width: 1440, height: 960 },
+      ],
+    }]);
+  });
+
   it("keeps an image whose imageSources lack width/height metadata", () => {
     const listing = mapBoligsidenCase({
       ...boligsidenCase,
@@ -165,6 +321,52 @@ describe("mapBoligsidenCase", () => {
     expect(listing?.images).toEqual([
       { url: "https://cdn.example/photo-unsized.jpg", category: "photo", sources: [] },
     ]);
+  });
+});
+
+describe("listing_url mapping", () => {
+  it("prefers a URL the Boliga record states outright", () => {
+    const listing = mapBoligaRecord({ ...boligaRecord, url: "https://www.boliga.dk/bolig/999/testgade-12" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/999/testgade-12");
+  });
+
+  it("resolves a relative Boliga path against boliga.dk", () => {
+    const listing = mapBoligaRecord({ ...boligaRecord, detailUrl: "/bolig/123456/testgade-12" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/123456/testgade-12");
+  });
+
+  it("falls back to the id-based Boliga route when the record carries no link", () => {
+    expect(mapBoligaRecord(boligaRecord)!.listing_url).toBe("https://www.boliga.dk/bolig/123456");
+  });
+
+  it("builds a Boligsiden link from the case slug", () => {
+    const listing = mapBoligsidenCase({ ...boligsidenCase, slug: "villa/proevevej-7-8000-aarhus" });
+    expect(listing!.listing_url).toBe("https://www.boligsiden.dk/villa/proevevej-7-8000-aarhus");
+  });
+
+  it("falls back to the address slug when the case has none", () => {
+    const listing = mapBoligsidenCase({
+      ...boligsidenCase,
+      address: { ...boligsidenCase.address, slug: "/adresse/proevevej-7-8000-aarhus" },
+    });
+    expect(listing!.listing_url).toBe("https://www.boligsiden.dk/adresse/proevevej-7-8000-aarhus");
+  });
+
+  it("leaves the Boligsiden link null rather than guessing a route from the case id", () => {
+    expect(mapBoligsidenCase(boligsidenCase)!.listing_url).toBeNull();
+  });
+
+  // The value lands in an href, so a non-http scheme from an undocumented
+  // upstream API must never survive mapping.
+  it("rejects a javascript: URL instead of storing it", () => {
+    // eslint-disable-next-line no-script-url
+    const listing = mapBoligaRecord({ ...boligaRecord, url: "javascript:alert(1)" });
+    expect(listing!.listing_url).toBe("https://www.boliga.dk/bolig/123456");
+  });
+
+  it("rejects a slug that resolves off the source's origin", () => {
+    const listing = mapBoligsidenCase({ ...boligsidenCase, slug: "//evil.example/pwned" });
+    expect(listing!.listing_url).toBeNull();
   });
 });
 

@@ -2,15 +2,26 @@ import type {
   AdminUser,
   AdvisorConnection,
   AlertFrequency,
+  AppSettings,
+  BestTimeToContact,
+  ContactPreference,
+  ConversationWithContext,
   FavoriteProperty,
   Invitation,
+  LeadRouting,
   ListingApproval,
+  ListingRecommendation,
+  Message,
   Notification,
+  NotificationChannels,
+  NotificationType,
   Property,
   PropertyFilters,
   PropertySummary,
+  RecommendationStatus,
   SortDirection,
   SortField,
+  UserProfile,
   UserRole,
 } from "./index.js";
 
@@ -23,6 +34,8 @@ export interface SearchPropertiesQuery extends Partial<PropertyFilters> {
   offset?: number;
   /** ISO timestamp; only match listings created after this (used by the notification cron). */
   createdAfter?: string;
+  /** `minLon,minLat,maxLon,maxLat` — restricts results to a map viewport (PropertyMap's live viewport fetch; not part of PropertyFilters since it's transient view state, never saved with a search). */
+  bbox?: string;
 }
 
 export interface SearchPropertiesResponse {
@@ -42,6 +55,8 @@ export interface SearchPropertiesResponse {
 export interface PropertyDetailResponse {
   property: Property;
   enrichment: import("./index.js").Enrichment | null;
+  /** Live source listing details; separate from independently retrieved register facts. */
+  listingDetails?: import("./index.js").ListingDetails | null;
 }
 
 export interface ComparableEntry {
@@ -112,6 +127,27 @@ export interface AdvisorConnectionsResponse {
   connections: AdvisorConnection[];
 }
 
+/**
+ * One connection from the caller's own point of view, with the other
+ * party's contact info resolved (email lives in auth.users, which callers
+ * can't read directly). "professional" means the caller is the customer and
+ * the other party is their advisor/agent; "client" means the caller is the
+ * advisor/agent and the other party is one of their connected customers.
+ */
+export interface MyConnection {
+  id: string;
+  direction: "professional" | "client";
+  otherUserId: string;
+  otherUserEmail: string;
+  otherUserRole: UserRole;
+  otherUserOrganizationName: string | null;
+  createdAt: string;
+}
+
+export interface MyConnectionsResponse {
+  connections: MyConnection[];
+}
+
 export interface AdminDashboardResponse {
   pendingInvitations: number;
   usersByRole: Record<UserRole, number>;
@@ -137,10 +173,106 @@ export interface ListingApprovalsResponse {
   approvals: ListingApproval[];
 }
 
+export interface NotificationsQuery {
+  unreadOnly?: boolean;
+  type?: NotificationType;
+}
+
 export interface NotificationsResponse {
   notifications: Notification[];
 }
 
+// --- Messages ---
+
+export interface ConversationsResponse {
+  conversations: ConversationWithContext[];
+}
+
+export interface MessagesResponse {
+  messages: Message[];
+}
+
+export interface SendMessageBody {
+  body: string;
+}
+
+export interface CreateConversationBody {
+  /** The connected professional (agent/advisor) to start a thread with. */
+  otherUserId: string;
+  propertyId?: string | null;
+}
+
+// --- Profile ---
+
+export interface ProfileResponse {
+  profile: UserProfile;
+  email: string;
+}
+
+export interface UpdateProfileBody {
+  fullName?: string | null;
+  phone?: string | null;
+  contactPref?: ContactPreference;
+  bestTime?: BestTimeToContact;
+  notificationChannels?: NotificationChannels;
+  licenseNumber?: string | null;
+  leadRouting?: LeadRouting;
+  notifyNewLead?: boolean;
+}
+
+// --- Admin: app settings & agents ---
+
+export interface AppSettingsResponse {
+  settings: AppSettings;
+}
+
+export interface UpdateAppSettingsBody {
+  broadcastEnabled: boolean;
+}
+
+/** One run of the .github/workflows/new-listings.yml workflow. */
+export interface NewListingsRun {
+  id: number;
+  runNumber: number;
+  /** GitHub run status: queued, in_progress, completed, ... */
+  status: string;
+  /** Set once completed: success, failure, cancelled, ... */
+  conclusion: string | null;
+  trigger: "manual" | "scheduled";
+  createdAt: string;
+  url: string;
+}
+
+export interface NewListingsRunsResponse {
+  runs: NewListingsRun[];
+}
+
+export interface RegisteredAgent {
+  id: string;
+  organizationName: string | null;
+  email: string;
+}
+
+export interface RegisteredAgentsResponse {
+  agents: RegisteredAgent[];
+}
+
 export interface AgentListingsResponse {
+  properties: Property[];
+}
+
+export interface CreateRecommendationsBody {
+  propertyIds: string[];
+  userIds: string[];
+  message?: string;
+}
+
+export interface RespondRecommendationBody {
+  status: Extract<RecommendationStatus, "accepted" | "dismissed">;
+  responseMessage?: string;
+}
+
+export interface RecommendationsResponse {
+  recommendations: ListingRecommendation[];
   properties: Property[];
 }

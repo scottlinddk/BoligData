@@ -5,6 +5,7 @@ import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 import { isUuid, sendError } from "../server/lib/http-helpers.js";
 import { rowToSearch } from "../server/lib/row-mappers.js";
+import { parseSearchBoundary, serializeSearchBoundary } from "../../../packages/shared/src/utils/search-boundary.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -33,12 +34,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "name and filters are required" });
       return;
     }
+    const filters = { ...body.filters };
+    if (filters.polygon !== undefined && filters.polygon !== null) {
+      const boundary = typeof filters.polygon === "string" ? parseSearchBoundary(filters.polygon) : null;
+      if (!boundary) {
+        sendError(res, 400, "Invalid map boundary: use a simple area with 3–64 distinct points");
+        return;
+      }
+      filters.polygon = serializeSearchBoundary(boundary);
+    }
     const { data, error } = await client
       .from("searches")
       .insert({
         user_id: auth.userId,
         name: body.name,
-        filters: body.filters,
+        filters,
         alert_frequency: body.alertFrequency ?? "none",
       })
       .select("*")

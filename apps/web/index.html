@@ -2,34 +2,47 @@
 <html lang="da">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="application-name" content="BoligData" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BoligData" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#ffffff" />
     <title>BoligData</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <script>
       // Apply the persisted (or system) theme and language before React mounts
       // to avoid a flash of the wrong theme / lang attribute.
       (function () {
+        var storedTheme;
+        var storedLang;
         try {
-          var storedTheme = localStorage.getItem("boligdata.theme");
-          var theme =
-            storedTheme === "light" || storedTheme === "dark"
-              ? storedTheme
-              : window.matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light";
-          document.documentElement.classList.toggle("dark", theme === "dark");
-
-          var storedLang = localStorage.getItem("boligdata.lang");
-          document.documentElement.lang =
-            storedLang === "da" || storedLang === "en" ? storedLang : "da";
+          storedTheme = localStorage.getItem("boligdata.theme");
+          storedLang = localStorage.getItem("boligdata.lang");
         } catch (e) {
-          /* localStorage unavailable — fall back to markup defaults. */
+          /* Storage may be blocked; system theme still applies. */
         }
+        var theme =
+          storedTheme === "light" || storedTheme === "dark"
+            ? storedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#171917" : "#ffffff";
+        document.documentElement.lang =
+          storedLang === "da" || storedLang === "en" ? storedLang : "da";
       })();
     </script>
   </head>

@@ -19,6 +19,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Validate before deploying
+        run: |
+          pnpm typecheck
+          pnpm test
+
+      - name: Verify public database drawn-area search
+        # Vercel pull redacts protected values as [SENSITIVE]; check the committed
+        # public database configuration before downloading that environment.
+        run: node --env-file=apps/web/.env.production scripts/verify-search-boundary.mjs
+
       - name: Pull Vercel environment
         run: npx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
         env:

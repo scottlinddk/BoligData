@@ -8,9 +8,9 @@ import type { UserRole } from "@shared/types/index";
 const ROLES: UserRole[] = ["admin", "user", "advisor", "agent"];
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  accepted: "bg-emerald-100 text-emerald-800",
-  revoked: "bg-neutral-200 text-neutral-600",
+  pending: "bg-warning-soft text-warning-text",
+  accepted: "bg-success-soft text-success-text",
+  revoked: "bg-unknown-soft text-unknown-text",
 };
 
 export function AdminInvitationsPage() {
@@ -52,7 +52,7 @@ export function AdminInvitationsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="mb-4 font-serif text-3xl italic text-ink">{t("admin.invitations.title")}</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight text-ink">{t("admin.invitations.title")}</h1>
 
       <form onSubmit={handleSubmit} className="mb-6 flex flex-wrap gap-2">
         <input
@@ -77,11 +77,12 @@ export function AdminInvitationsPage() {
         <button
           type="submit"
           disabled={inviteMutation.isPending}
-          className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+          className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
         >
           {inviteMutation.isPending ? t("admin.invitations.sending") : t("admin.invitations.invite")}
         </button>
       </form>
+      <p className="-mt-4 mb-4 text-xs font-medium text-ink-faint">{t("admin.invitations.mockHint")}</p>
       {error && <p className="mb-4 text-sm font-semibold text-danger">{error}</p>}
 
       {invitationsQuery.isPending && (

@@ -5,9 +5,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Geist", "system-ui", "sans-serif"],
-        serif: ['"Instrument Serif"', "ui-serif", "serif"],
-        mono: ['"Geist Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ['"Inter"', "system-ui", "sans-serif"],
+        serif: ['"DM Serif Display"', "Georgia", "serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         paper: "var(--color-bg)",
@@ -25,11 +25,21 @@ export default {
           soft: "var(--color-text-secondary)",
           faint: "var(--color-text-tertiary)",
         },
+        cta: {
+          DEFAULT: "var(--color-cta)",
+          hover: "var(--color-cta-hover)",
+          text: "var(--color-cta-text)",
+        },
         brand: {
           DEFAULT: "var(--color-brand)",
           hover: "var(--color-brand-hover)",
           soft: "var(--color-brand-soft)",
           text: "var(--color-brand-text)",
+        },
+        accent: {
+          DEFAULT: "var(--color-accent)",
+          hover: "var(--color-accent-hover)",
+          text: "var(--color-accent-text)",
         },
         success: {
           DEFAULT: "var(--color-success)",

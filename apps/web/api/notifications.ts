@@ -1,9 +1,18 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { NotificationType } from "../../../packages/shared/src/types/index.js";
 import { applyCors } from "../server/middleware/cors.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";
 import { isUuid, sendError } from "../server/lib/http-helpers.js";
 import { rowToNotification } from "../server/lib/row-mappers.js";
+
+const NOTIFICATION_TYPES: NotificationType[] = [
+  "new_listing",
+  "price_drop",
+  "message",
+  "data_update",
+  "system",
+];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -21,6 +30,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .order("created_at", { ascending: false });
     if (req.query.unreadOnly === "true") {
       query = query.is("read_at", null);
+    }
+    const type = req.query.type;
+    if (typeof type === "string" && NOTIFICATION_TYPES.includes(type as NotificationType)) {
+      query = query.eq("type", type);
     }
 
     const { data, error } = await query;

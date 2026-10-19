@@ -15,10 +15,23 @@ function getUser(client: SupabaseClient, jwt: string) {
   return (client.auth as unknown as AuthGetUser).getUser(jwt);
 }
 
+const BEARER_SCHEME = /^Bearer[ \t]+/i;
+
+/**
+ * Pulls the JWT out of `Authorization: Bearer <jwt>`.
+ *
+ * Matching on the literal `"Bearer "` prefix was too strict: RFC 7235 makes
+ * the auth scheme case-insensitive and allows more than one space before the
+ * credentials, and shells routinely leave a trailing newline behind
+ * (`-H "Authorization: Bearer $(cat token.txt)"`). Each of those turned a
+ * perfectly good session into a 401 "Missing bearer token". Parse the same
+ * way /api/crawl and /api/notify already do, and treat a scheme with no
+ * credentials after it as missing rather than as an empty token.
+ */
 export function extractJwt(req: VercelRequest): string | undefined {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return undefined;
-  return header.slice("Bearer ".length);
+  const header = req.headers.authorization?.trim();
+  if (!header || !BEARER_SCHEME.test(header)) return undefined;
+  return header.replace(BEARER_SCHEME, "").trim() || undefined;
 }
 
 /**

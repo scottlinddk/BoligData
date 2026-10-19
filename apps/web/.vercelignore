@@ -1,0 +1,12 @@
+# Vercel turns every file it uploads under api/ into its own Serverless
+# Function, and the Hobby plan caps a deployment at 12. This project sits at
+# exactly 12 real endpoints, so a single stray file under api/ fails the
+# build with "No more than 12 Serverless Functions can be added to a
+# Deployment on the Hobby plan".
+#
+# Tests are never needed at runtime, so keep them out of the upload
+# entirely. Endpoint tests still belong under server/ (see
+# server/lib/property-lookup/property-lookup.endpoint.test.ts) — this is a
+# backstop, not a licence to put them back in api/.
+*.test.ts
+*.test.tsx

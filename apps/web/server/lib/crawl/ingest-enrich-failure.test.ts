@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runIngest } from "./ingest";
+
+beforeEach(() => vi.stubEnv("CRAWL_MOCK_MODE", "true"));
+afterEach(() => vi.unstubAllEnvs());
 
 // Simulates ENRICH_MOCK_MODE=false with no real clients implemented (or any
 // enrichment crash): enrichProperty rejects for every listing.
@@ -42,6 +45,12 @@ function fakeDb() {
           }),
         };
       }
+      if (table !== "enrichments") return {
+        upsert: () => Object.assign(Promise.resolve({ error: null }), {
+          select: () => ({ single: () => Promise.resolve({ data: { id: `${table}-id` }, error: null }) }),
+        }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      };
       return {
         select: () => ({
           in: () => Promise.resolve({ data: [], error: null }),

@@ -1,286 +1,180 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { usePropertySearch } from "@/hooks/use-property-search";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { parseFilters, serializeFilters, type FiltersWithSort } from "@/lib/url-filters";
+import { pageToOffset, readViewPrefs, writeLastSearch, writeViewPrefs } from "@/lib/search-session";
 import { countActiveFilters } from "@/components/filter-fields";
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/constants";
-import { FilterSidebar } from "@/components/filter-sidebar";
+import { PAGE_SIZE_OPTIONS, PROPERTY_TYPE_OPTIONS, SORT_OPTIONS } from "@/lib/constants";
 import { FiltersSheet } from "@/components/filters-sheet";
 import { PropertyCard } from "@/components/property-card";
+import { PropertyCardSkeleton } from "@/components/ui/loading";
 import { LockedPropertyCard } from "@/components/locked-property-card";
 import { PropertyMap } from "@/components/property-map";
+import { FilterSidebar } from "@/components/filter-sidebar";
+import { MapListingCarousel } from "@/components/map-listing-carousel";
+import { Footer } from "@/components/footer";
+import { RecommendModal } from "@/components/recommend-modal";
 import { useToast } from "@/components/toast";
 import { useI18n } from "@/i18n/i18n";
+import type { PropertyType } from "@shared/types/index";
+import { canSendRecommendations } from "@/lib/roles";
 
-type MobileTab = "list" | "map";
+const pill = "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-ink transition active:scale-[0.98] hover:border-border-strong hover:bg-surface-alt";
+const primary = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-cta-text transition active:scale-[0.98] hover:bg-cta-hover disabled:opacity-40";
+function ViewIcon({ map }: { map: boolean }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">{map ? <path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /> : <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>;
+}
 
 export function SearchPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const tx = (da: string, en: string) => language === "da" ? da : en;
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const { showToast } = useToast();
   const { createSearch } = useSavedSearches();
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery("(max-width: 899px)");
+  const compactCards = useMediaQuery("(max-width: 639px)");
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const resultsRef = useRef<HTMLElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const filters = parseFilters(searchParams);
-  const [offset, setOffset] = useState(0);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
+  const [initialView] = useState(readViewPrefs);
+  const [pageSize, setPageSize] = useState<number>(initialView.pageSize);
+  const offset = pageToOffset(searchParams.get("page"), pageSize);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("list");
+  const [mobileTab, setMobileTab] = useState<"list" | "map">(initialView.mobileTab);
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
+  const [desktopMap, setDesktopMap] = useState(initialView.desktopMap);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState("");
   const [savingSearch, setSavingSearch] = useState(false);
-
-  const { data, isLoading, isError, refetch } = usePropertySearch(filters, offset, pageSize);
-
-  function handleFilterChange(patch: Partial<FiltersWithSort>) {
-    setOffset(0);
-    setSearchParams(serializeFilters({ ...filters, ...patch }));
-  }
-
-  function handlePageSizeChange(size: number) {
-    setOffset(0);
-    setPageSize(size);
-  }
-
-  async function handleSaveSearch() {
-    const name = saveSearchName.trim();
-    if (!name) return;
-    const { sortField: _sortField, sortDirection: _sortDirection, ...propertyFilters } = filters;
-    setSavingSearch(true);
-    try {
-      await createSearch({ name, filters: propertyFilters, alertFrequency: "none" });
-      showToast(t("search.saveSearchSuccess"), "success");
-      setSaveSearchOpen(false);
-      setSaveSearchName("");
-    } catch {
-      showToast(t("search.saveSearchError"), "error");
-    } finally {
-      setSavingSearch(false);
-    }
-  }
-
+  const canRecommend = canSendRecommendations(profile?.role);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [recommendOpen, setRecommendOpen] = useState(false);
+  const filterKey = serializeFilters(filters).toString();
+  // Selections belong to one result set; a page change keeps them, a new search clears them.
+  useEffect(() => { setSelectedIds(new Set()); setSelectedMapId(null); }, [filterKey]);
+  // Other pages link back to the last search, and view choices follow the user between visits.
+  useEffect(() => { writeLastSearch(searchParams.toString()); }, [searchParams]);
+  useEffect(() => { writeViewPrefs({ pageSize, desktopMap, mobileTab }); }, [pageSize, desktopMap, mobileTab]);
+  const { data, isLoading, isFetching, isError, error, refetch } = usePropertySearch(filters, offset, pageSize);
   const authenticated = data?.authenticated ?? Boolean(user);
   const properties = data?.properties ?? [];
   const summaries = data?.summaries ?? [];
   const total = data?.total ?? 0;
   const limit = data?.limit ?? pageSize;
   const activeFilterCount = countActiveFilters(filters);
-  const showMap = authenticated && (!isMobile || mobileTab === "map");
+  const showMap = authenticated && (isMobile ? mobileTab === "map" : desktopMap);
   const showList = !isMobile || mobileTab === "list";
+  // On phones the map view drops the title block and sort row so map and cards share the screen.
+  const mobileMapOpen = isMobile && showMap;
+  // Wide screens in list view get the always-visible filter column and a banner map.
+  const sidebar = isDesktop && authenticated && !showMap;
 
-  return (
-    <div className="mx-auto flex max-w-6xl gap-5 px-4 py-4 md:items-start md:py-6">
-      {!isMobile && <FilterSidebar filters={filters} onChange={handleFilterChange} />}
+  function handleFilterChange(patch: Partial<FiltersWithSort>) {
+    // Replace, so typing in a field doesn't fill the history and Back leaves the search.
+    setSearchParams(serializeFilters({ ...filters, ...patch }), { replace: true });
+  }
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+  function goToPage(nextOffset: number) {
+    const params = new URLSearchParams(searchParams);
+    if (nextOffset > 0) params.set("page", String(Math.floor(nextOffset / pageSize) + 1)); else params.delete("page");
+    setSearchParams(params);
+    resultsRef.current?.focus({ preventScroll: true });
+    resultsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "instant" : "smooth", block: "start" });
+  }
+  async function handleSaveSearch() {
+    const name = saveSearchName.trim();
+    if (!name || savingSearch) return;
+    const { sortField: _sortField, sortDirection: _sortDirection, ...propertyFilters } = filters;
+    setSavingSearch(true);
+    try {
+      await createSearch({ name, filters: propertyFilters, alertFrequency: "none" });
+      showToast(t("search.saveSearchSuccess"), "success"); setSaveSearchOpen(false); setSaveSearchName("");
+    } catch { showToast(t("search.saveSearchError"), "error"); }
+    finally { setSavingSearch(false); }
+  }
+  const displayedOffset = data?.offset ?? offset;
+  const range = isLoading ? t("search.loading") : !data ? "" : total > 0 ? t("search.range", { from: displayedOffset + 1, to: Math.min(displayedOffset + limit, total), total }) : t("search.noResults");
+  const grid = `grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 sm:gap-y-9 ${!showMap ? "xl:grid-cols-3" : "min-[900px]:grid-cols-1 min-[1100px]:grid-cols-2"}`;
+  const title = filters.location ? tx(`Boliger til salg i ${filters.location}`, `Homes for sale in ${filters.location}`) : filters.polygon ? tx("Boliger i dit markerede område", "Homes in your drawn area") : tx("Find dit næste hjem", "Find your next home");
+  const mapSelected = isMobile ? mobileTab === "map" : desktopMap;
+  const viewToggle = authenticated && <div className="flex shrink-0 rounded-full border border-border bg-surface p-1" aria-label={tx("Visning af boliger", "Listing view")}>
+    <button aria-label={t("search.tabList")} aria-pressed={!mapSelected} onClick={() => isMobile ? setMobileTab("list") : setDesktopMap(false)} className={`flex h-9 w-10 items-center justify-center rounded-full transition ${!mapSelected ? "bg-cta text-cta-text" : "text-ink-soft hover:bg-surface-alt"}`}><ViewIcon map={false} /></button>
+    <button aria-label={t("search.tabMap")} aria-pressed={mapSelected} onClick={() => isMobile ? setMobileTab("map") : setDesktopMap(true)} className={`flex h-9 w-10 items-center justify-center rounded-full transition ${mapSelected ? "bg-cta text-cta-text" : "text-ink-soft hover:bg-surface-alt"}`}><ViewIcon map /></button>
+  </div>;
 
-      <div className="flex flex-1 flex-col gap-3.5">
-        {isMobile && (
-          <div className="flex flex-col gap-2.5">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={filters.location ?? ""}
-                onChange={(e) => handleFilterChange({ location: e.target.value || null })}
-                placeholder={t("filters.locationPlaceholder")}
-                className="min-w-0 flex-1 rounded-[10px] border border-border bg-paper px-3 py-2.5 text-sm font-medium text-ink placeholder:text-ink-faint"
-              />
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(true)}
-                className="relative shrink-0 rounded-[10px] border border-border bg-paper px-4 py-2.5 font-mono text-[11px] uppercase tracking-widest text-ink"
-              >
-                {t("filters.title")}
-                {activeFilterCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-[17px] w-[17px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-surface">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </div>
-            {authenticated && (
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setMobileTab("list")}
-                  className={`flex-1 rounded-lg px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "list" ? "bg-brand text-white" : "border border-border bg-surface text-ink-soft"}`}
-                >
-                  {t("search.tabList")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileTab("map")}
-                  className={`flex-1 rounded-lg px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${mobileTab === "map" ? "bg-brand text-white" : "border border-border bg-surface text-ink-soft"}`}
-                >
-                  {t("search.tabMap")}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {!authenticated && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-brand-soft px-4 py-3 text-sm font-semibold text-brand-text">
-            <span>{t("search.signInForDetails")}</span>
-            <Link to="/auth/signin" className="rounded-md bg-brand px-3 py-1.5 text-xs font-bold text-white">
-              {t("nav.signIn")}
-            </Link>
-          </div>
-        )}
-
-        {showMap && (
-          <div className="h-[230px] overflow-hidden rounded-2xl border border-border md:h-72">
-            <PropertyMap properties={properties} />
-          </div>
-        )}
-
-        {showList && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
-              <span className="text-[13px] font-semibold text-ink-soft">
-                {total > 0
-                  ? t("search.range", { from: offset + 1, to: Math.min(offset + limit, total), total })
-                  : t("search.noResults")}
-              </span>
-              {authenticated &&
-                (saveSearchOpen ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={saveSearchName}
-                      onChange={(e) => setSaveSearchName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSaveSearch()}
-                      placeholder={t("search.saveSearchNamePlaceholder")}
-                      className="min-w-0 rounded-lg border border-border bg-paper px-2.5 py-1.5 text-sm font-medium text-ink placeholder:text-ink-faint"
-                    />
-                    <button
-                      type="button"
-                      disabled={savingSearch || !saveSearchName.trim()}
-                      onClick={handleSaveSearch}
-                      className="shrink-0 rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-                    >
-                      {t("search.saveSearchConfirm")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSaveSearchOpen(false);
-                        setSaveSearchName("");
-                      }}
-                      className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
-                    >
-                      {t("common.cancel")}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSaveSearchOpen(true)}
-                    className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-ink"
-                  >
-                    {t("search.saveSearch")}
-                  </button>
-                ))}
-            </div>
-
-            {isLoading && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="overflow-hidden rounded-2xl border border-border bg-surface">
-                    <div className="h-[140px] animate-pulse bg-surface-alt" />
-                    <div className="flex flex-col gap-2 p-4">
-                      <div className="h-3.5 w-2/3 animate-pulse rounded bg-surface-alt" />
-                      <div className="h-3 w-1/3 animate-pulse rounded bg-surface-alt" />
-                      <div className="h-5 w-1/2 animate-pulse rounded bg-surface-alt" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {isError && (
-              <div className="flex flex-col items-center gap-2.5 rounded-2xl border border-danger-soft bg-danger-soft p-6 text-center animate-pop-in">
-                <p className="font-semibold text-danger">{t("search.error")}</p>
-                <button onClick={() => refetch()} className="rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white">
-                  {t("common.retry")}
-                </button>
-              </div>
-            )}
-
-            {!isLoading &&
-              !isError &&
-              (authenticated ? (
-                properties.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {properties.map((property) => (
-                      <PropertyCard key={property.id} property={property} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center">
-                    <p className="font-semibold text-ink">{t("search.noResults")}</p>
-                  </div>
-                )
-              ) : summaries.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {summaries.map((summary) => (
-                    <LockedPropertyCard key={summary.id} summary={summary} />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-border-strong px-5 py-8 text-center">
-                  <p className="font-semibold text-ink">{t("search.noResults")}</p>
-                </div>
-              ))}
-
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs font-semibold text-ink-soft">
-              <span>
-                {total > 0
-                  ? t("search.range", { from: offset + 1, to: Math.min(offset + limit, total), total })
-                  : t("search.noResults")}
-              </span>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2">
-                  {t("search.pageSize")}
-                  <select
-                    value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="rounded-lg border border-border bg-surface px-2 py-1 text-ink"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    disabled={offset === 0}
-                    onClick={() => setOffset(Math.max(0, offset - limit))}
-                    className="rounded-lg border border-border bg-surface px-3 py-1.5 font-bold text-ink disabled:opacity-40"
-                  >
-                    {t("search.previous")}
-                  </button>
-                  <button
-                    disabled={offset + limit >= total}
-                    onClick={() => setOffset(offset + limit)}
-                    className="rounded-lg border border-border bg-surface px-3 py-1.5 font-bold text-ink disabled:opacity-40"
-                  >
-                    {t("search.next")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+  return <>
+    <div className="mx-auto max-w-[1480px] px-4 pb-16 pt-4 sm:px-7 sm:pt-12 lg:px-10">
+      <div className={`mb-4 flex items-end justify-between gap-3 sm:mb-9 sm:flex-wrap sm:gap-5 ${mobileMapOpen ? "max-sm:hidden" : ""}`}>
+        <div className="min-w-0 flex-1 sm:max-w-3xl sm:flex-none">
+          <p className="mb-3 hidden text-[11px] font-medium uppercase tracking-[0.2em] text-ink-soft sm:block">{tx("Boliger til salg", "Homes for sale")}</p>
+          <h1 className="text-[28px] font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-[46px] xl:text-[38px]">{filters.location || filters.polygon ? title : <>{tx("Find dit næste", "Find your next")} <span className="font-serif font-normal italic">{tx("hjem", "home")}</span></>}</h1>
+          <p className="mt-3 hidden max-w-xl text-sm leading-relaxed text-ink-soft sm:block xl:hidden">{tx("Gå på opdagelse i boligerne. Få overblik over priser, historik og området.", "Explore the homes. Get a clear view of prices, history and the neighbourhood.")}</p>
+        </div>
+        {authenticated && <button onClick={() => setSaveSearchOpen(v => !v)} disabled={savingSearch} aria-label={t("search.saveSearch")} className={`${pill} !px-0 w-11 disabled:cursor-wait disabled:opacity-50 sm:w-auto sm:!px-4`} aria-expanded={saveSearchOpen}><span aria-hidden="true">♡</span><span className="hidden sm:inline">{t("search.saveSearch")}</span></button>}
       </div>
-
-      {filtersOpen && (
-        <FiltersSheet filters={filters} onChange={handleFilterChange} onClose={() => setFiltersOpen(false)} />
-      )}
+      <div className={sidebar ? "xl:grid xl:grid-cols-[250px_minmax(0,1fr)] xl:items-start xl:gap-12" : ""}>
+      {sidebar && <div className="xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1"><FilterSidebar filters={filters} onChange={handleFilterChange} /></div>}
+      <div className="min-w-0">
+      <div className="mb-5 sm:mb-8 sm:rounded-[22px] sm:bg-surface-alt sm:p-4">
+        <div className="flex flex-wrap items-center gap-2.5" role="search">
+          <label className="relative min-w-0 flex-1 sm:min-w-[220px] sm:flex-[1_1_220px]">
+            <span className="sr-only">{t("filters.location")}</span>
+            <input type="search" value={filters.location ?? ""} onChange={e => handleFilterChange({ location: e.target.value || null })} placeholder={tx("By, postnummer eller adresse", "City, postcode or address")} className="h-12 w-full rounded-2xl border border-border bg-surface py-2 pl-11 pr-4 text-sm sm:rounded-full text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft" />
+            <svg className="pointer-events-none absolute left-4 top-4 text-ink-soft" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.7" /><path d="m16 16 5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
+          </label>
+          <select aria-label={t("filters.propertyType")} className={`${pill} ${sidebar ? "xl:!hidden" : ""} hidden h-12 min-w-[9.5rem] max-w-full flex-1 pr-7 sm:inline-flex sm:max-w-44 sm:flex-none`} value={filters.propertyTypes && filters.propertyTypes.length > 1 ? "multiple" : filters.propertyTypes?.[0] ?? ""} onChange={e => handleFilterChange({ propertyTypes: e.target.value ? [e.target.value as PropertyType] : null })}>
+            <option value="">{t("filters.propertyType")}</option>
+            {filters.propertyTypes && filters.propertyTypes.length > 1 && <option value="multiple">{tx("Flere boligtyper", "Multiple types")}</option>}
+            {PROPERTY_TYPE_OPTIONS.map(value => <option key={value} value={value}>{t(`propertyType.${value}`)}</option>)}
+          </select>
+          <button className={`${pill} ${sidebar ? "xl:!hidden" : ""} relative h-12 w-12 !rounded-2xl !px-0 sm:w-auto sm:!rounded-full sm:!px-4`} onClick={() => setFiltersOpen(true)} aria-label={tx("Filtre", "Filters")} aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" className="fill-surface" /><circle cx="15" cy="17" r="3" className="fill-surface" /></svg><span className="hidden sm:inline">{tx("Filtre", "Filters")}</span>{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-xs font-semibold text-surface sm:static sm:bg-brand-soft sm:font-normal sm:text-brand-text">{activeFilterCount}</span>}</button>
+          <div className="hidden sm:block">{viewToggle}</div>
+        </div>
+        {filters.polygon && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs"><span className="rounded-full bg-brand-soft px-3 py-1.5 font-medium text-brand-text">{tx("Søger i markeret område", "Searching your drawn area")}</span><button className="text-ink-soft underline underline-offset-2 hover:text-ink" onClick={() => handleFilterChange({ polygon: null })}>{tx("Fjern afgrænsning", "Remove boundary")} ×</button></div>}
+        {saveSearchOpen && <form className="ui-enter mt-4 flex flex-wrap gap-2 border-t border-border pt-4" onSubmit={e => { e.preventDefault(); void handleSaveSearch(); }}><input aria-label={t("search.saveSearchNamePlaceholder")} autoFocus disabled={savingSearch} value={saveSearchName} onChange={e => setSaveSearchName(e.target.value)} placeholder={t("search.saveSearchNamePlaceholder")} className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm disabled:opacity-50" /><button className={primary} aria-busy={savingSearch} disabled={savingSearch || !saveSearchName.trim()}>{savingSearch && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{savingSearch ? t("common.saving") : t("search.saveSearchConfirm")}</button><button type="button" disabled={savingSearch} onClick={() => setSaveSearchOpen(false)} className={`${pill} disabled:opacity-50`}>{t("common.cancel")}</button>{filters.polygon && <p className="w-full text-xs text-ink-soft">{tx("Det markerede område gemmes sammen med filtrene.", "The drawn area will be saved with your filters.")}</p>}</form>}
+      </div>
+      {sidebar && <div className="relative mb-6 h-48 overflow-hidden rounded-md border border-border [&>div]:min-h-0">
+        <PropertyMap properties={properties} />
+        <button type="button" onClick={() => setDesktopMap(true)} className="absolute left-3 top-3 z-10 rounded-md bg-cta px-3.5 py-2 text-xs font-semibold text-cta-text shadow-card transition hover:bg-cta-hover">{tx("Vis på kort", "Show on map")}</button>
+      </div>}
+      <div className={showMap && !isMobile ? "grid items-start gap-7 min-[900px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:gap-9" : ""}>
+        <section ref={resultsRef} tabIndex={-1} className="min-w-0 scroll-mt-24 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" aria-label={tx("Boligsøgning", "Property search")}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-ink-soft sm:mb-6">
+            <span role="status" aria-atomic="true" className="order-1 inline-flex min-h-6 items-center gap-2">{isFetching && <span className="ui-spinner h-3.5 w-3.5" aria-hidden="true" />}{isFetching ? data ? tx("Opdaterer boliger…", "Updating homes…") : t("search.loading") : isError && !data ? tx("Boligerne kunne ikke indlæses", "Homes could not be loaded") : tx(`${total.toLocaleString("da-DK")} boliger`, `${total.toLocaleString("en-GB")} homes`)}</span>
+            <div className="order-2 sm:hidden">{viewToggle}</div>
+            <label className={`order-3 flex min-w-0 basis-full items-center gap-1.5 sm:order-2 sm:basis-auto ${mobileMapOpen ? "max-sm:hidden" : ""}`}>{t("filters.sortBy")}<select aria-label={t("filters.sortBy")} value={`${filters.sortField}:${filters.sortDirection}`} onChange={e => { const [sortField, sortDirection] = e.target.value.split(":"); handleFilterChange({ sortField: sortField as FiltersWithSort["sortField"], sortDirection: sortDirection as FiltersWithSort["sortDirection"] }); }} className="max-w-44 bg-transparent py-1 font-medium text-ink focus:outline-brand">{SORT_OPTIONS.map(value => <option value={value} key={value}>{t(`sort.${value}`)}</option>)}</select></label>
+          </div>
+        {canRecommend && <p className="mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{t("recommend.selectHint")}</p>}
+        {!authenticated && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl bg-brand-soft p-4 text-sm text-brand-text"><p className="flex-1">{t("search.signInForDetails")}</p><Link to="/auth/signin" className={primary}>{t("nav.signIn")}</Link></div>}
+        {isError && <div role="alert" className="ui-enter mb-5 rounded-xl border border-danger-soft bg-danger-soft p-5"><p className="font-medium text-danger">{t("search.error")}</p>{filters.polygon && <p className="mt-1 text-sm text-ink-soft">{error?.message}</p>}<button disabled={isFetching} onClick={() => refetch()} className={`${pill} mt-3 disabled:opacity-50`}>{isFetching && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{t("common.retry")}</button></div>}
+        {showList && <div aria-busy={isFetching}>
+          {isLoading && <div className={grid} aria-hidden="true">{Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)}</div>}
+          {!isLoading && data && <div className={`transition-opacity duration-200 motion-reduce:transition-none ${isFetching ? "opacity-60" : "opacity-100"}`}>{authenticated ? properties.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-stagger`} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} compact={compactCards} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="ui-enter rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="ui-enter py-8 text-center text-ink-soft">{t("search.noResults")}</p>}</div>}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-xs text-ink-soft"><span>{range}</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2">{t("search.pageSize")}<select value={pageSize} disabled={isFetching} onChange={e => { const size = Number(e.target.value); setPageSize(size); const params = new URLSearchParams(searchParams); params.delete("page"); setSearchParams(params, { replace: true }); resultsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "instant" : "smooth", block: "start" }); }} className="rounded-lg border border-border bg-surface p-1.5 text-ink disabled:opacity-50">{PAGE_SIZE_OPTIONS.map(size => <option key={size} value={size}>{size}</option>)}</select></label><div className="flex gap-1.5"><button disabled={offset === 0 || isFetching} onClick={() => goToPage(Math.max(0, offset - limit))} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.previous")}</button><button disabled={offset + limit >= total || isFetching} onClick={() => goToPage(offset + limit)} className="rounded-full border border-border px-3 py-2 text-ink disabled:opacity-40">{t("search.next")}</button></div></div></div>
+        </div>}
+        </section>
+        {showMap && <aside aria-label={tx("Kort over boliger", "Map of homes")} className={isMobile ? "min-w-0" : "sticky top-20 h-[calc(100dvh-7rem)] min-h-[500px] max-h-[900px] self-start overflow-hidden rounded-[22px] border border-border"}>
+          <div className={isMobile ? "relative h-[calc(100dvh-26rem)] min-h-[300px] overflow-hidden rounded-[22px] border border-border sm:h-[56dvh] sm:min-h-[360px]" : "h-full"}>
+            <PropertyMap properties={properties} filters={filters} onSelect={property => setSelectedMapId(property.id)} onBoundaryChange={polygon => handleFilterChange({ polygon })} onShowList={isMobile ? () => setMobileTab("list") : undefined} listTotal={data ? total : undefined} />
+          </div>
+          {isMobile && <MapListingCarousel properties={properties} selectedId={selectedMapId} />}
+        </aside>}
+      </div>
+      </div>
+      </div>
     </div>
-  );
+    <Footer />
+    {filtersOpen && <FiltersSheet filters={filters} onChange={handleFilterChange} onClose={() => setFiltersOpen(false)} />}
+    {canRecommend && selectedIds.size > 0 && <div className="ui-enter fixed inset-x-0 bottom-24 z-40 flex justify-center px-4 xl:bottom-5"><div className="flex items-center gap-3 rounded-full border border-border bg-surface px-4 py-2.5 shadow-lift"><span className="text-sm font-semibold">{t("recommend.selectedCount", { count: selectedIds.size })}</span><button onClick={() => setSelectedIds(new Set())} className={pill}>{t("common.cancel")}</button><button onClick={() => setRecommendOpen(true)} className={primary}>{t("recommend.cta")}</button></div></div>}
+    {recommendOpen && <RecommendModal propertyIds={Array.from(selectedIds)} propertyCount={selectedIds.size} onClose={() => setRecommendOpen(false)} onSent={() => setSelectedIds(new Set())} />}
+  </>;
 }

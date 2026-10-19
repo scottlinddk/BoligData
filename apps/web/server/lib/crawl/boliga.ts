@@ -3,20 +3,23 @@ import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import {
+  absoluteUrl,
   asFiniteNumber,
+  asHttpUrl,
   asIsoDate,
   asNonEmptyString,
   asPositiveInt,
   asPositiveNumber,
   asStringArray,
   dedupeByExternalId,
-  filterByZipRange,
-  getZipRange,
+  filterByZipRanges,
+  getZipRanges,
   isDanishCoordinate,
+  overallZipBounds,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boliga.sample.json" with { type: "json" };
+import { mockModeEnabled } from "../enrichment-sources/types.js";
 
-const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 const MAX_ERRORS_REPORTED = 10;
 
 /**
@@ -26,6 +29,9 @@ const MAX_ERRORS_REPORTED = 10;
  * (skip + count, never throw) and the endpoint is env-overridable.
  */
 const API_BASE = process.env.BOLIGA_API_BASE ?? "https://api.boliga.dk/api/v2/search/results";
+
+/** Origin the listing link is built against, and the guard `absoluteUrl` keeps a relative path on. */
+const SITE_ORIGIN = "https://www.boliga.dk";
 
 /**
  * Boliga propertyType codes → our CHECK-constrained enum
@@ -74,12 +80,15 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
   const zip = asPositiveInt(r.zipCode);
   const typeCode = asPositiveInt(r.propertyType);
   return {
+    data_mode: "real",
     address: street,
     municipality,
     postal_code: zip !== null ? String(zip) : null,
     price,
     sqm,
-    listing_date: asIsoDate(r.createdDate) ?? new Date().toISOString().slice(0, 10),
+    // Null (not a "today" guess) when unparseable — see boligsiden.ts for why;
+    // ingest.ts resolves the final stored value.
+    listing_date: asIsoDate(r.createdDate),
     listing_source: "boliga",
     external_id: String(id),
     lat,
@@ -91,6 +100,15 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
     images: asStringArray(r.images).map((url): ListingImage => ({ url, category: "photo", sources: [] })),
     description: null,
     agent_name: null,
+    // Prefer a link the payload states outright; `/bolig/<estate id>` is
+    // boliga.dk's own listing route (their frontend appends an address slug,
+    // which the bare id redirects to) and `id` is that estate id — the same
+    // value external_id is keyed on.
+    listing_url:
+      asHttpUrl(r.url) ?? absoluteUrl(SITE_ORIGIN, asNonEmptyString(r.detailUrl)) ?? `${SITE_ORIGIN}/bolig/${id}`,
+    // Boliga's listing payload carries no registered-sale history; only
+    // Boligsiden embeds one (see boligsiden.ts#mapRegistrations).
+    sold_price_history: [],
   };
 }
 
@@ -100,21 +118,28 @@ export function mapBoligaRecord(raw: unknown): RawListing | null {
  * partial data beats none; the gap is visible in stats.errors.
  */
 export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
+  const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
+  const mappingWarnings: string[] = [];
   const stats: SourceCrawlStats = {
     source: "boliga",
+    complete: false,
+    dataMode: mockMode ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
+    recordsOutOfArea: 0,
     errors: [],
+    mappingWarnings,
   };
 
-  const zipRange = getZipRange();
+  const zipRanges = getZipRanges();
 
-  if (MOCK_MODE) {
-    const all = fixtures as RawListing[];
-    const { kept, excluded } = filterByZipRange(all, zipRange);
+  if (mockMode) {
+    const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
+    const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
-    stats.recordsSkipped = excluded;
+    stats.recordsOutOfArea = excluded;
+    stats.complete = true;
     return { listings: kept, stats };
   }
 
@@ -139,9 +164,12 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     });
     if (municipalityCodes.length > 0) params.set("municipality", municipalityCodes.join(","));
     // Best-effort server-side narrowing (undocumented param name, may be a
-    // no-op) — filterByZipRange() below is the source of truth either way.
-    params.set("zipcodeFrom", String(zipRange.min));
-    params.set("zipcodeTo", String(zipRange.max));
+    // no-op, and only supports one contiguous span even with multiple
+    // configured ranges) — filterByZipRanges() below is the source of truth
+    // either way.
+    const bounds = overallZipBounds(zipRanges);
+    params.set("zipcodeFrom", String(bounds.min));
+    params.set("zipcodeTo", String(bounds.max));
     const url = `${API_BASE}?${params}`;
 
     let body: BoligaPage;
@@ -156,14 +184,20 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     }
 
     stats.pagesFetched += 1;
-    const results = Array.isArray(body.results) ? body.results : [];
+    if (!Array.isArray(body.results)) {
+      stats.errors.push(`page ${page}: missing results array`);
+      break;
+    }
+    const results = body.results;
+    let processed = 0;
     for (const record of results) {
+      processed += 1;
       stats.recordsSeen += 1;
       const listing = mapBoligaRecord(record);
       if (listing === null) {
         stats.recordsSkipped += 1;
-        if (stats.errors.length < MAX_ERRORS_REPORTED) {
-          stats.errors.push(`page ${page}: skipped unmappable record`);
+        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+          mappingWarnings.push(`page ${page}: skipped unmappable record`);
         }
         continue;
       }
@@ -172,13 +206,14 @@ export async function fetchBoligaListings(): Promise<SourceCrawlResult> {
     }
 
     const pageCount = asPositiveInt(body.meta?.pageCount);
-    if (pageCount !== null && page >= pageCount) break;
-    // No trustworthy page count — stop when a page comes back short.
-    if (pageCount === null && results.length < pageSize) break;
+    if ((pageCount !== null && page >= pageCount) || (pageCount === null && results.length < pageSize)) {
+      stats.complete = processed === results.length && stats.recordsSkipped === 0;
+      break;
+    }
   }
 
-  const { kept, excluded } = filterByZipRange(listings, zipRange);
-  stats.recordsSkipped += excluded;
+  const { kept, excluded } = filterByZipRanges(listings, zipRanges);
+  stats.recordsOutOfArea = excluded;
 
   logEvent("crawl.boliga.fetched", { ...stats, listings: kept.length });
   return { listings: dedupeByExternalId(kept), stats };

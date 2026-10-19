@@ -7,26 +7,39 @@ interface FilterSidebarProps {
   onChange: (patch: Partial<FiltersWithSort>) => void;
 }
 
+/** Always-visible desktop filters. Location lives in the search bar above the results. */
 export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
   const { t } = useI18n();
   const activeCount = countActiveFilters(filters);
 
   return (
-    <aside className="sticky top-[78px] flex w-64 shrink-0 flex-col gap-3.5 rounded-2xl border border-border bg-surface p-4.5 shadow-card">
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-xs uppercase tracking-widest text-ink">{t("filters.title")}</span>
+    <aside aria-label={t("filters.title")} className="grid content-start gap-7">
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <span className="text-[15px] font-semibold text-ink">{t("filters.title")}</span>
         {activeCount > 0 && (
           <button
             type="button"
-            onClick={() => onChange({ location: null, postnummer: null, minPrice: null, maxPrice: null, minSqm: null, maxSqm: null, maxDaysOnMarket: null, minBuildingYear: null, maxBuildingYear: null })}
-            className="font-mono text-[10.5px] uppercase tracking-widest text-brand-text"
+            onClick={() =>
+              onChange({
+                location: null,
+                postnummer: null,
+                propertyTypes: null,
+                minPrice: null,
+                maxPrice: null,
+                minSqm: null,
+                maxSqm: null,
+                maxDaysOnMarket: null,
+                minBuildingYear: null,
+                maxBuildingYear: null,
+              })
+            }
+            className="text-xs font-medium text-ink-soft underline underline-offset-4 hover:text-ink"
           >
             {t("filters.reset")}
           </button>
         )}
       </div>
-
-      <FilterFields filters={filters} onChange={onChange} />
+      <FilterFields filters={filters} onChange={onChange} variant="sidebar" />
     </aside>
   );
 }

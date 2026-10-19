@@ -8,7 +8,9 @@
  * site's real, working entry point instead of a guessed URL that 404s, and
  * let the due-diligence UI tell the advisor to search by address there.
  */
+export const TINGLYSNING_ENTRY_URL = "https://www.tinglysning.dk/";
+
 export function buildTinglysningUrl(matrikelnr: string | null, ejerlav: string | null): string | null {
   if (!matrikelnr || !ejerlav) return null;
-  return "https://www.tinglysning.dk/";
+  return TINGLYSNING_ENTRY_URL;
 }

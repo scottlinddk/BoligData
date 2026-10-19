@@ -19,7 +19,7 @@ export function ResetPasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="mb-6 font-serif text-3xl italic text-ink">{t("auth.reset.title")}</h1>
+      <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.reset.title")}</h1>
       {sent ? (
         <p className="font-medium text-ink-soft">{t("auth.reset.sent", { email })}</p>
       ) : (
@@ -35,7 +35,7 @@ export function ResetPasswordPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-brand px-3 py-2 font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+            className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
           >
             {submitting ? t("auth.reset.submitting") : t("auth.reset.submit")}
           </button>

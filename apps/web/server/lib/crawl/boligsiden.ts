@@ -1,21 +1,27 @@
-import type { ListingImage } from "../../../../../packages/shared/src/types/index.js";
-import type { RawListing, SourceCrawlResult, SourceCrawlStats } from "./types.js";
+import { createHash } from "node:crypto";
+import type { ListingImage, SaleType, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
+import type { RawListing, ReportedRealtorPeriod, SourceCrawlResult, SourceCrawlStats } from "./types.js";
 import { envInt, fetchJson, sleep } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import {
+  absoluteUrl,
   asFiniteNumber,
+  asHttpUrl,
   asIsoDate,
   asNonEmptyString,
   asPositiveInt,
   asPositiveNumber,
   dedupeByExternalId,
-  filterByZipRange,
-  getZipRange,
+  enumerateZipCodes,
+  filterByZipRanges,
+  getZipRanges,
   isDanishCoordinate,
+  isInZipRange,
 } from "./map-utils.js";
 import fixtures from "./fixtures/boligsiden.sample.json" with { type: "json" };
+import { mockModeEnabled } from "../enrichment-sources/types.js";
+import { isUuid } from "../http-helpers.js";
 
-const MOCK_MODE = process.env.CRAWL_MOCK_MODE !== "false";
 const MAX_ERRORS_REPORTED = 10;
 
 /**
@@ -26,7 +32,13 @@ const MAX_ERRORS_REPORTED = 10;
  */
 const API_BASE = process.env.BOLIGSIDEN_API_BASE ?? "https://api.boligsiden.dk/search/cases";
 
-/** Boligsiden addressType strings → our CHECK-constrained enum (001_init_schema.sql). */
+/**
+ * Boligsiden addressType strings → our CHECK-constrained enum
+ * (022_property_type_boligtype.sql). Unknown strings fall back to "other"
+ * (see the call site below), so a wrong or missing guess degrades data
+ * quality but never fails an upsert — same defensive posture as Boliga's
+ * PROPERTY_TYPE_BY_CODE.
+ */
 const PROPERTY_TYPE_BY_ADDRESS_TYPE: Record<string, RawListing["property_type"]> = {
   villa: "villa",
   condo: "apartment",
@@ -37,9 +49,23 @@ const PROPERTY_TYPE_BY_ADDRESS_TYPE: Record<string, RawListing["property_type"]>
   "holiday house": "summer_house",
   fritidshus: "summer_house",
   sommerhus: "summer_house",
+  fritidsbolig: "summer_house",
   farm: "farm",
   landejendom: "farm",
-  "villa apartment": "apartment",
+  "villa apartment": "villa_apartment",
+  villalejlighed: "villa_apartment",
+  "cooperative housing": "cooperative",
+  andelsbolig: "cooperative",
+  "holiday plot": "holiday_plot",
+  fritidsgrund: "holiday_plot",
+  sommerhusgrund: "holiday_plot",
+  "residential plot": "residential_plot",
+  helårsgrund: "residential_plot",
+  helaarsgrund: "residential_plot",
+  villagrund: "residential_plot",
+  houseboat: "houseboat",
+  husbåd: "houseboat",
+  husbaad: "houseboat",
 };
 
 interface BoligsidenPage {
@@ -57,9 +83,48 @@ function get(obj: unknown, ...path: string[]): unknown {
   return cur;
 }
 
+/** Only a valid, unambiguous postcode can establish that a record is out
+ * of scope. Missing/conflicting geography must remain a coverage warning. */
+function mapPostalCode(raw: unknown): string | null {
+  const supplied = [get(raw, "address", "zipCode"), get(raw, "address", "zip", "zipCode"), get(raw, "zipCode")]
+    .filter((value) => value !== undefined && value !== null);
+  const codes = supplied.map(asFiniteNumber);
+  if (codes.length === 0 || codes.some((code) => code === null || !Number.isInteger(code) || code < 1000 || code > 9999)) return null;
+  return new Set(codes).size === 1 ? String(codes[0]) : null;
+}
+
+function mapReportedTimeOnMarket(value: unknown, currentRealtor: unknown): RawListing["reported_time_on_market"] {
+  const days = (candidate: unknown): number | null =>
+    typeof candidate === "number" && Number.isSafeInteger(candidate) && candidate >= 0 && candidate <= 36_500 ? candidate : null;
+  const latestEpisodeDays = days(get(value, "current", "days"));
+  const totalDays = days(get(value, "total", "days"));
+  if (latestEpisodeDays === null && totalDays === null) return undefined;
+  const realtors = mapRealtorPeriods(get(value, "total", "realtors"), days);
+  const currentRealtorId = isUuid(currentRealtor) ? currentRealtor.toLowerCase() : null;
+  return {
+    latestEpisodeDays, totalDays,
+    ...(realtors && totalDays !== null ? { realtors } : {}),
+    ...(realtors && currentRealtorId ? { currentRealtorId } : {}),
+  };
+}
+
+/** All-or-nothing: a partial breakdown would understate earlier brokers, so a
+ * single malformed or duplicated row drops the whole list. */
+function mapRealtorPeriods(value: unknown, days: (candidate: unknown) => number | null): ReportedRealtorPeriod[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const periods: ReportedRealtorPeriod[] = [];
+  for (const row of value) {
+    const realtorId = get(row, "realtorId");
+    const share = days(get(row, "days"));
+    if (!isUuid(realtorId) || share === null) return null;
+    periods.push({ realtorId: realtorId.toLowerCase(), realtorName: asNonEmptyString(get(row, "realtorName")), days: share });
+  }
+  return new Set(periods.map(period => period.realtorId)).size === periods.length ? periods : null;
+}
+
 /**
  * Boligsiden images carry a `category` (photo/floorplan/...) and an
- * `imageSources` array of pre-sized variants ({url, width, height}) — we
+ * `imageSources` array of pre-sized variants ({url, size: {width, height}}) — we
  * keep the whole set so the UI can pick the size it needs instead of only
  * ever seeing one fixed URL.
  */
@@ -70,8 +135,10 @@ function mapImage(img: unknown): ListingImage | null {
   const sources = sourceItems
     .map((s) => {
       const url = asNonEmptyString(get(s, "url"));
-      const width = asPositiveInt(get(s, "width"));
-      const height = asPositiveInt(get(s, "height"));
+      // The live feed nests dimensions under `size`; retain support for
+      // older flat payloads. Dropping these left only the 100x80 thumbnail.
+      const width = asPositiveInt(get(s, "size", "width")) ?? asPositiveInt(get(s, "width"));
+      const height = asPositiveInt(get(s, "size", "height")) ?? asPositiveInt(get(s, "height"));
       return url !== null && width !== null && height !== null ? { url, width, height } : null;
     })
     .filter((s): s is { url: string; width: number; height: number } => s !== null);
@@ -91,6 +158,70 @@ function mapImage(img: unknown): ListingImage | null {
       : "other";
 
   return { url, category, sources };
+}
+
+/** Origin the listing link is built against, and the guard `absoluteUrl` keeps a relative slug on. */
+const SITE_ORIGIN = "https://www.boligsiden.dk";
+
+/**
+ * Prefer the address-page slug verified against the live feed and public site.
+ * Only source-provided identity is used; no address text is converted to a slug.
+ */
+function mapListingUrl(r: Record<string, unknown>): string | null {
+  const addressSlug = asNonEmptyString(r.slugAddress) ?? asNonEmptyString(get(r, "address", "slugAddress"));
+  return (
+    asHttpUrl(r.url) ??
+    asHttpUrl(get(r, "case", "url")) ??
+    (addressSlug && /^[a-z0-9æøå_-]+$/i.test(addressSlug) ? absoluteUrl(SITE_ORIGIN, `/adresse/${addressSlug}`) : null) ??
+    absoluteUrl(SITE_ORIGIN, asNonEmptyString(r.slug)) ??
+    absoluteUrl(SITE_ORIGIN, asNonEmptyString(get(r, "address", "slug")))
+  );
+}
+
+const SALE_TYPES: readonly SaleType[] = ["normal", "family", "auction", "other"];
+
+/**
+ * Maps `address.registrations[]` — the registered sales of the address, which
+ * Boligsiden already embeds in every case record, so the property's price
+ * history costs no extra request. Shape confirmed against a live response
+ * (2026-08-01):
+ *
+ *   { amount, area, date, livingArea, perAreaPrice, registrationID, type }
+ *
+ * `perAreaPrice` is only present on newer registrations, so it falls back to
+ * amount/area — and `livingArea` is preferred over `area` where both exist,
+ * because `area` on older rows is the whole-property figure rather than the
+ * dwelling's. Entries are returned newest-first. `type` is carried through
+ * rather than filtered: a family transfer or a forced auction is *not* a
+ * market price, and the reader needs to know that instead of seeing it
+ * averaged in silently.
+ */
+export function mapRegistrations(raw: unknown): SoldPriceEntry[] {
+  const registrations = Array.isArray(raw) ? raw : [];
+
+  return registrations
+    .map((entry): SoldPriceEntry | null => {
+      const soldDate = asIsoDate(get(entry, "date"));
+      const price = asPositiveNumber(get(entry, "amount"));
+      if (soldDate === null || price === null) return null;
+
+      const area = asPositiveNumber(get(entry, "livingArea")) ?? asPositiveNumber(get(entry, "area"));
+      const pricePerSqm =
+        asPositiveInt(get(entry, "perAreaPrice")) ?? (area !== null ? Math.round(price / area) : null);
+
+      const typeRaw = asNonEmptyString(get(entry, "type"))?.toLowerCase() ?? "";
+      const saleType = SALE_TYPES.find((t) => t === typeRaw) ?? "other";
+
+      const residentialArea = asPositiveNumber(get(entry, "livingArea"));
+      const registrationId = asNonEmptyString(get(entry, "registrationID"));
+      return {
+        soldDate, price, pricePerSqm, saleType,
+        ...(registrationId ? { registrationId } : {}),
+        ...(residentialArea !== null ? { residentialArea, areaDefinition: "residential" as const } : { areaDefinition: "unknown" as const }),
+      };
+    })
+    .filter((entry): entry is SoldPriceEntry => entry !== null)
+    .sort((a, b) => b.soldDate.localeCompare(a.soldDate));
 }
 
 export function mapBoligsidenCase(raw: unknown): RawListing | null {
@@ -129,34 +260,57 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   }
 
   const addressType = asNonEmptyString(r.addressType)?.toLowerCase() ?? "";
-  const zip = asPositiveInt(get(r, "address", "zipCode")) ?? asPositiveInt(r.zipCode);
+  const postalCode = mapPostalCode(r);
   const images = (Array.isArray(r.images) ? r.images : [])
     .map(mapImage)
     .filter((img): img is ListingImage => img !== null);
+  const reportedTimeOnMarket = mapReportedTimeOnMarket(r.timeOnMarket, get(r, "realtor", "realtorID"));
+  const changePercent = typeof r.priceChangePercentage === "number" && Number.isFinite(r.priceChangePercentage)
+    && r.priceChangePercentage > -100 ? r.priceChangePercentage : null;
+  const sourceAddressId = get(r, "address", "addressID");
 
   return {
+    data_mode: "real",
     address,
     municipality,
-    postal_code: zip !== null ? String(zip) : null,
+    postal_code: postalCode,
     price,
     sqm,
+    // Null (rather than a "today" guess) when none of these parse — a
+    // fallback to today here would re-stamp every re-crawled listing with
+    // the current date each run, since the same unparseable source field
+    // fails the same way every time, permanently masquerading as freshest.
+    // The crawler's first observation is stored separately.
     listing_date:
-      asIsoDate(r.timeOnMarket) ??
-      asIsoDate(get(r, "status", "createdDate")) ??
-      asIsoDate(r.createdDate) ??
-      new Date().toISOString().slice(0, 10),
+      asIsoDate(r.timeOnMarket) ?? asIsoDate(get(r, "status", "createdDate")) ?? asIsoDate(r.createdDate),
+    ...(reportedTimeOnMarket ? { reported_time_on_market: reportedTimeOnMarket } : {}),
+    ...(changePercent !== null ? { reported_price_change: { currentAsking: price, changePercent } } : {}),
     listing_source: "boligsiden",
     external_id: externalId,
+    ...(isUuid(sourceAddressId) ? { source_address_id: sourceAddressId.toLowerCase() } : {}),
     lat,
     lon,
     status: "active",
-    building_year: asPositiveInt(get(r, "address", "buildYear")) ?? asPositiveInt(r.buildYear),
+    building_year: asPositiveInt(r.yearBuilt) ?? asPositiveInt(get(r, "address", "buildYear")) ?? asPositiveInt(r.buildYear),
     property_type: PROPERTY_TYPE_BY_ADDRESS_TYPE[addressType] ?? "other",
     rooms: asPositiveInt(r.numberOfRooms) ?? asPositiveInt(get(r, "address", "numberOfRooms")),
     images,
-    description: asNonEmptyString(r.descriptionTitle),
+    description: asNonEmptyString(r.descriptionBody) ?? asNonEmptyString(r.descriptionTitle),
     agent_name: asNonEmptyString(get(r, "realtor", "name")),
+    listing_url: mapListingUrl(r),
+    sold_price_history: mapRegistrations(get(r, "address", "registrations")),
   };
+}
+
+/** The search endpoint answers HTTP 400 for any page that starts past this many records. */
+const RESULT_WINDOW = 10_000;
+/** Keeps the query string well inside URL limits. */
+const MAX_ZIP_CODES_PER_QUERY = 300;
+
+function chunkZipCodes(zipCodes: number[], size: number): number[][] {
+  const batches: number[][] = [];
+  for (let i = 0; i < zipCodes.length; i += size) batches.push(zipCodes.slice(i, i + size));
+  return batches;
 }
 
 /**
@@ -165,77 +319,176 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
  * beats none; the gap is visible in stats.errors.
  */
 export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
+  const mockMode = mockModeEnabled("CRAWL_MOCK_MODE");
+  const mappingWarnings: string[] = [];
   const stats: SourceCrawlStats = {
     source: "boligsiden",
+    complete: false,
+    dataMode: mockMode ? "mock" : "real",
     pagesFetched: 0,
     recordsSeen: 0,
     recordsSkipped: 0,
+    recordsOutOfArea: 0,
     errors: [],
+    mappingWarnings,
   };
 
-  const zipRange = getZipRange();
+  const zipRanges = getZipRanges();
 
-  if (MOCK_MODE) {
-    const all = fixtures as RawListing[];
-    const { kept, excluded } = filterByZipRange(all, zipRange);
+  if (mockMode) {
+    const all = (fixtures as unknown as RawListing[]).map((listing) => ({ ...listing, data_mode: "mock" as const }));
+    const { kept, excluded } = filterByZipRanges(all, zipRanges);
     stats.recordsSeen = all.length;
-    stats.recordsSkipped = excluded;
+    stats.recordsOutOfArea = excluded;
+    stats.complete = true;
     return { listings: kept, stats };
   }
 
   const pageSize = envInt("CRAWL_PAGE_SIZE", 100, 1, 500);
-  const maxPages = envInt("CRAWL_MAX_PAGES", 10, 1, 100);
+  const maxPages = envInt("CRAWL_MAX_PAGES", 10, 1, 1000);
   const maxListings = envInt("CRAWL_MAX_LISTINGS", 1000, 1, 50_000);
   const delayMs = envInt("CRAWL_DELAY_MS", 250, 0, 10_000);
 
   const listings: RawListing[] = [];
+  const seenIds = new Set<string>();
+  let duplicateRecords = 0;
+  let scopeComplete = true;
+  // The upstream search is an Elasticsearch-style feed: it rejects any page
+  // past RESULT_WINDOW records (HTTP 400). Never send a truncated postcode
+  // scope either, since a complete-looking response would conceal the gap.
+  // So the scope is split into postcode batches that each fit the window.
+  const queue = chunkZipCodes(enumerateZipCodes(zipRanges, Number.POSITIVE_INFINITY), MAX_ZIP_CODES_PER_QUERY);
 
-  for (let page = 1; page <= maxPages && listings.length < maxListings; page++) {
-    if (page > 1) await sleep(delayMs);
+  scope: while (queue.length > 0) {
+    const zipBatch = queue.shift()!;
+    let batchSeen = 0;
+    let batchComplete = false;
 
-    const params = new URLSearchParams({
-      per_page: String(pageSize),
-      page: String(page),
-      sortBy: "timeOnMarket",
-      sortAscending: "true", // newest listings first
-    });
-    const url = `${API_BASE}?${params}`;
-
-    let body: BoligsidenPage;
-    try {
-      body = await fetchJson<BoligsidenPage>(url);
-    } catch (err) {
-      logError("crawl.boligsiden.page_failed", err, { page });
-      stats.errors.push(
-        `page ${page}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      break;
-    }
-
-    stats.pagesFetched += 1;
-    const cases = Array.isArray(body.cases) ? body.cases : [];
-    for (const record of cases) {
-      stats.recordsSeen += 1;
-      const listing = mapBoligsidenCase(record);
-      if (listing === null) {
-        stats.recordsSkipped += 1;
-        if (stats.errors.length < MAX_ERRORS_REPORTED) {
-          stats.errors.push(`page ${page}: skipped unmappable record`);
-        }
-        continue;
+    for (let page = 1; ; page++) {
+      if (stats.pagesFetched >= maxPages || stats.recordsSeen >= maxListings) break;
+      if ((page - 1) * pageSize >= RESULT_WINDOW) {
+        stats.errors.push(`postcodes ${zipBatch[0]}-${zipBatch.at(-1)}: more than ${RESULT_WINDOW} results`);
+        break;
       }
-      listings.push(listing);
-      if (listings.length >= maxListings) break;
+      if (stats.pagesFetched > 0) await sleep(delayMs);
+
+      const params = new URLSearchParams({
+        per_page: String(pageSize),
+        page: String(page),
+        sortBy: "timeOnMarket",
+        sortAscending: "true", // newest listings first
+      });
+      // Server-side narrowing. Local filtering remains required because the
+      // frontend API is undocumented and can change independently.
+      for (const zip of zipBatch) params.append("zipCodes", String(zip));
+      const url = `${API_BASE}?${params}`;
+
+      let body: BoligsidenPage;
+      try {
+        body = await fetchJson<BoligsidenPage>(url);
+      } catch (err) {
+        logError("crawl.boligsiden.page_failed", err, { page });
+        stats.errors.push(
+          `page ${page}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        scopeComplete = false;
+        break scope;
+      }
+
+      stats.pagesFetched += 1;
+      if (!Array.isArray(body.cases)) {
+        stats.errors.push(`page ${page}: missing cases array`);
+        scopeComplete = false;
+        break scope;
+      }
+      const cases = body.cases;
+      const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
+      if (page === 1) {
+        logEvent("crawl.boligsiden.scope", {
+          totalHits: body.totalHits,
+          total: body.total,
+          casesLength: cases.length,
+          zipCodesSent: params.getAll("zipCodes").length,
+          zipFrom: zipBatch[0],
+          zipTo: zipBatch.at(-1),
+        });
+        // A batch larger than the result window cannot be paged to the end.
+        // Halve it, so every record stays reachable, and discard this page.
+        if (total !== null && total > RESULT_WINDOW && zipBatch.length > 1) {
+          const middle = Math.ceil(zipBatch.length / 2);
+          queue.unshift(zipBatch.slice(0, middle), zipBatch.slice(middle));
+          batchComplete = true;
+          break;
+        }
+      }
+      let processed = 0;
+      let newIdentities = 0;
+      const duplicatesBeforePage = duplicateRecords;
+      for (const record of cases) {
+        if (stats.recordsSeen >= maxListings) break;
+        processed += 1;
+        stats.recordsSeen += 1;
+        batchSeen += 1;
+        // Track pagination before scope/mapping exclusions. A repeated page of
+        // out-of-area plots must not inflate recordsSeen into apparent coverage.
+        const externalId = asNonEmptyString(get(record, "caseID")) ?? asNonEmptyString(get(record, "caseId"));
+        const identity = externalId !== null ? `id:${externalId}`
+          : `raw:${createHash("sha256").update(JSON.stringify(record) ?? "undefined").digest("hex")}`;
+        const duplicate = seenIds.has(identity);
+        if (duplicate) {
+          duplicateRecords += 1;
+        } else {
+          seenIds.add(identity);
+          newIdentities += 1;
+        }
+
+        const postalCode = mapPostalCode(record);
+        if (postalCode !== null && !isInZipRange(postalCode, zipRanges)) {
+          stats.recordsOutOfArea += 1;
+          continue;
+        }
+        if (postalCode === null) {
+          stats.recordsSkipped += 1;
+          if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+            mappingWarnings.push(`page ${page}: skipped record with unknown or conflicting postcode`);
+          }
+          continue;
+        }
+        const listing = mapBoligsidenCase(record);
+        if (listing === null) {
+          stats.recordsSkipped += 1;
+          if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+            mappingWarnings.push(`page ${page}: skipped unmappable record`);
+          }
+          continue;
+        }
+        if (!duplicate) listings.push(listing);
+      }
+
+      if (newIdentities === 0 && duplicateRecords > duplicatesBeforePage) {
+        stats.errors.push(`page ${page}: no new listing identities; pagination did not advance`);
+        break;
+      }
+      // Count returned records, not requested page size: providers may cap
+      // per_page. Without a total, only an empty page proves exhaustion.
+      if ((total !== null && batchSeen >= total) || cases.length === 0) {
+        const exhausted = total === null || batchSeen >= total;
+        batchComplete = exhausted && processed === cases.length && stats.recordsSkipped === 0 && duplicateRecords === 0;
+        if (!exhausted) stats.errors.push(`page ${page}: empty page before the reported feed total`);
+        break;
+      }
     }
 
-    const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
-    if (total !== null && page * pageSize >= total) break;
-    // No trustworthy total — stop when a page comes back short.
-    if (total === null && cases.length < pageSize) break;
+    if (!batchComplete) scopeComplete = false;
+  }
+  stats.complete = scopeComplete;
+
+  if (duplicateRecords > 0 && mappingWarnings.length < MAX_ERRORS_REPORTED) {
+    mappingWarnings.push(`${duplicateRecords} duplicate listing identities; feed changed or pagination overlapped`);
   }
 
-  const { kept, excluded } = filterByZipRange(listings, zipRange);
-  stats.recordsSkipped += excluded;
+  const { kept, excluded } = filterByZipRanges(listings, zipRanges);
+  stats.recordsOutOfArea += excluded;
 
   logEvent("crawl.boligsiden.fetched", { ...stats, listings: kept.length });
   return { listings: dedupeByExternalId(kept), stats };
