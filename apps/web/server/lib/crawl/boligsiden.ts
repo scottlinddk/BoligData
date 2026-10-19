@@ -302,6 +302,17 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   };
 }
 
+/** The search endpoint answers HTTP 400 for any page that starts past this many records. */
+const RESULT_WINDOW = 10_000;
+/** Keeps the query string well inside URL limits. */
+const MAX_ZIP_CODES_PER_QUERY = 300;
+
+function chunkZipCodes(zipCodes: number[], size: number): number[][] {
+  const batches: number[][] = [];
+  for (let i = 0; i < zipCodes.length; i += size) batches.push(zipCodes.slice(i, i + size));
+  return batches;
+}
+
 /**
  * Fetches active listings from Boligsiden, paginated. A page failure (after
  * retries) stops pagination but returns what was collected — partial data
@@ -341,109 +352,136 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
   const listings: RawListing[] = [];
   const seenIds = new Set<string>();
   let duplicateRecords = 0;
-  // Never send a truncated scope: upstream would correctly exclude the
-  // omitted postcodes and a complete response would conceal that gap.
-  // Broad scopes use a nationwide feed plus the authoritative local filter.
-  const zipCodes = enumerateZipCodes(zipRanges, 301);
+  let scopeComplete = true;
+  // The upstream search is an Elasticsearch-style feed: it rejects any page
+  // past RESULT_WINDOW records (HTTP 400). Never send a truncated postcode
+  // scope either, since a complete-looking response would conceal the gap.
+  // So the scope is split into postcode batches that each fit the window.
+  const queue = chunkZipCodes(enumerateZipCodes(zipRanges, Number.POSITIVE_INFINITY), MAX_ZIP_CODES_PER_QUERY);
 
-  for (let page = 1; page <= maxPages && stats.recordsSeen < maxListings; page++) {
-    if (page > 1) await sleep(delayMs);
+  scope: while (queue.length > 0) {
+    const zipBatch = queue.shift()!;
+    let batchSeen = 0;
+    let batchComplete = false;
 
-    const params = new URLSearchParams({
-      per_page: String(pageSize),
-      page: String(page),
-      sortBy: "timeOnMarket",
-      sortAscending: "true", // newest listings first
-    });
-    // Best-effort server-side narrowing. Local filtering remains required
-    // because the frontend API is undocumented and can change independently.
-    if (zipCodes.length <= 300) {
-      for (const zip of zipCodes) params.append("zipCodes", String(zip));
-    }
-    const url = `${API_BASE}?${params}`;
+    for (let page = 1; ; page++) {
+      if (stats.pagesFetched >= maxPages || stats.recordsSeen >= maxListings) break;
+      if ((page - 1) * pageSize >= RESULT_WINDOW) {
+        stats.errors.push(`postcodes ${zipBatch[0]}-${zipBatch.at(-1)}: more than ${RESULT_WINDOW} results`);
+        break;
+      }
+      if (stats.pagesFetched > 0) await sleep(delayMs);
 
-    let body: BoligsidenPage;
-    try {
-      body = await fetchJson<BoligsidenPage>(url);
-    } catch (err) {
-      logError("crawl.boligsiden.page_failed", err, { page });
-      stats.errors.push(
-        `page ${page}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      break;
-    }
-
-    stats.pagesFetched += 1;
-    if (!Array.isArray(body.cases)) {
-      stats.errors.push(`page ${page}: missing cases array`);
-      break;
-    }
-    const cases = body.cases;
-    let processed = 0;
-    let newIdentities = 0;
-    const duplicatesBeforePage = duplicateRecords;
-    if (page === 1) {
-      logEvent("crawl.boligsiden.scope", {
-        totalHits: body.totalHits,
-        total: body.total,
-        casesLength: cases.length,
-        zipCodesSent: params.getAll("zipCodes").length,
+      const params = new URLSearchParams({
+        per_page: String(pageSize),
+        page: String(page),
+        sortBy: "timeOnMarket",
+        sortAscending: "true", // newest listings first
       });
-    }
-    for (const record of cases) {
-      if (stats.recordsSeen >= maxListings) break;
-      processed += 1;
-      stats.recordsSeen += 1;
-      // Track pagination before scope/mapping exclusions. A repeated page of
-      // out-of-area plots must not inflate recordsSeen into apparent coverage.
-      const externalId = asNonEmptyString(get(record, "caseID")) ?? asNonEmptyString(get(record, "caseId"));
-      const identity = externalId !== null ? `id:${externalId}`
-        : `raw:${createHash("sha256").update(JSON.stringify(record) ?? "undefined").digest("hex")}`;
-      const duplicate = seenIds.has(identity);
-      if (duplicate) {
-        duplicateRecords += 1;
-      } else {
-        seenIds.add(identity);
-        newIdentities += 1;
+      // Server-side narrowing. Local filtering remains required because the
+      // frontend API is undocumented and can change independently.
+      for (const zip of zipBatch) params.append("zipCodes", String(zip));
+      const url = `${API_BASE}?${params}`;
+
+      let body: BoligsidenPage;
+      try {
+        body = await fetchJson<BoligsidenPage>(url);
+      } catch (err) {
+        logError("crawl.boligsiden.page_failed", err, { page });
+        stats.errors.push(
+          `page ${page}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        scopeComplete = false;
+        break scope;
       }
 
-      const postalCode = mapPostalCode(record);
-      if (postalCode !== null && !isInZipRange(postalCode, zipRanges)) {
-        stats.recordsOutOfArea += 1;
-        continue;
+      stats.pagesFetched += 1;
+      if (!Array.isArray(body.cases)) {
+        stats.errors.push(`page ${page}: missing cases array`);
+        scopeComplete = false;
+        break scope;
       }
-      if (postalCode === null) {
-        stats.recordsSkipped += 1;
-        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
-          mappingWarnings.push(`page ${page}: skipped record with unknown or conflicting postcode`);
+      const cases = body.cases;
+      const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
+      if (page === 1) {
+        logEvent("crawl.boligsiden.scope", {
+          totalHits: body.totalHits,
+          total: body.total,
+          casesLength: cases.length,
+          zipCodesSent: params.getAll("zipCodes").length,
+          zipFrom: zipBatch[0],
+          zipTo: zipBatch.at(-1),
+        });
+        // A batch larger than the result window cannot be paged to the end.
+        // Halve it, so every record stays reachable, and discard this page.
+        if (total !== null && total > RESULT_WINDOW && zipBatch.length > 1) {
+          const middle = Math.ceil(zipBatch.length / 2);
+          queue.unshift(zipBatch.slice(0, middle), zipBatch.slice(middle));
+          batchComplete = true;
+          break;
         }
-        continue;
       }
-      const listing = mapBoligsidenCase(record);
-      if (listing === null) {
-        stats.recordsSkipped += 1;
-        if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
-          mappingWarnings.push(`page ${page}: skipped unmappable record`);
+      let processed = 0;
+      let newIdentities = 0;
+      const duplicatesBeforePage = duplicateRecords;
+      for (const record of cases) {
+        if (stats.recordsSeen >= maxListings) break;
+        processed += 1;
+        stats.recordsSeen += 1;
+        batchSeen += 1;
+        // Track pagination before scope/mapping exclusions. A repeated page of
+        // out-of-area plots must not inflate recordsSeen into apparent coverage.
+        const externalId = asNonEmptyString(get(record, "caseID")) ?? asNonEmptyString(get(record, "caseId"));
+        const identity = externalId !== null ? `id:${externalId}`
+          : `raw:${createHash("sha256").update(JSON.stringify(record) ?? "undefined").digest("hex")}`;
+        const duplicate = seenIds.has(identity);
+        if (duplicate) {
+          duplicateRecords += 1;
+        } else {
+          seenIds.add(identity);
+          newIdentities += 1;
         }
-        continue;
+
+        const postalCode = mapPostalCode(record);
+        if (postalCode !== null && !isInZipRange(postalCode, zipRanges)) {
+          stats.recordsOutOfArea += 1;
+          continue;
+        }
+        if (postalCode === null) {
+          stats.recordsSkipped += 1;
+          if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+            mappingWarnings.push(`page ${page}: skipped record with unknown or conflicting postcode`);
+          }
+          continue;
+        }
+        const listing = mapBoligsidenCase(record);
+        if (listing === null) {
+          stats.recordsSkipped += 1;
+          if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
+            mappingWarnings.push(`page ${page}: skipped unmappable record`);
+          }
+          continue;
+        }
+        if (!duplicate) listings.push(listing);
       }
-      if (!duplicate) listings.push(listing);
+
+      if (newIdentities === 0 && duplicateRecords > duplicatesBeforePage) {
+        stats.errors.push(`page ${page}: no new listing identities; pagination did not advance`);
+        break;
+      }
+      // Count returned records, not requested page size: providers may cap
+      // per_page. Without a total, only an empty page proves exhaustion.
+      if ((total !== null && batchSeen >= total) || cases.length === 0) {
+        const exhausted = total === null || batchSeen >= total;
+        batchComplete = exhausted && processed === cases.length && stats.recordsSkipped === 0 && duplicateRecords === 0;
+        if (!exhausted) stats.errors.push(`page ${page}: empty page before the reported feed total`);
+        break;
+      }
     }
 
-    const total = asPositiveInt(body.totalHits) ?? asPositiveInt(body.total);
-    if (newIdentities === 0 && duplicateRecords > duplicatesBeforePage) {
-      stats.errors.push(`page ${page}: no new listing identities; pagination did not advance`);
-      break;
-    }
-    // Count returned records, not requested page size: providers may cap
-    // per_page. Without a total, only an empty page proves exhaustion.
-    if ((total !== null && stats.recordsSeen >= total) || cases.length === 0) {
-      const exhausted = total === null || stats.recordsSeen >= total;
-      stats.complete = exhausted && processed === cases.length && stats.recordsSkipped === 0 && duplicateRecords === 0;
-      if (!exhausted) stats.errors.push(`page ${page}: empty page before the reported feed total`);
-      break;
-    }
+    if (!batchComplete) scopeComplete = false;
   }
+  stats.complete = scopeComplete;
 
   if (duplicateRecords > 0 && mappingWarnings.length < MAX_ERRORS_REPORTED) {
     mappingWarnings.push(`${duplicateRecords} duplicate listing identities; feed changed or pagination overlapped`);
