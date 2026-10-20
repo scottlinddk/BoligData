@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const { getClient, ingest, verify, originalPrices, logError, cors } = vi.hoisted(() => ({ getClient: vi.fn(), ingest: vi.fn(), verify: vi.fn(), originalPrices: vi.fn(), logError: vi.fn(), cors: vi.fn() }));
+const { getClient, ingest, verify, originalPrices, marketStats, logError, cors } = vi.hoisted(() => ({ getClient: vi.fn(), ingest: vi.fn(), verify: vi.fn(), originalPrices: vi.fn(), marketStats: vi.fn(), logError: vi.fn(), cors: vi.fn() }));
 vi.mock("../../middleware/cors.js", () => ({ applyCors: cors }));
 vi.mock("../supabase.js", () => ({ getServiceRoleClient: getClient }));
 vi.mock("./ingest.js", () => ({ runIngest: ingest }));
 vi.mock("./runner-verification.js", () => ({ verifyCrawlData: verify }));
 vi.mock("./original-price-backfill.js", () => ({ runOriginalPriceBackfill: originalPrices }));
+vi.mock("./market-stats-refresh.js", () => ({ runMarketStatsBatch: marketStats }));
 vi.mock("./log.js", () => ({ logError }));
 import handler from "../../../api/crawl.js";
 
@@ -77,6 +78,20 @@ describe("authenticated crawl API", () => {
     expect(res.json).toHaveBeenCalledWith(result);
   });
 
+  it("runs only a market-stats slice and forwards the validated cursor", async () => {
+    const result = { ok: true, mode: "market-stats", batch: { offset: 4, batchSize: 2, processed: 2, total: 9, nextOffset: 6 }, upserted: 50, errors: [] };
+    marketStats.mockResolvedValue(result);
+    const res = await call({ mode: "market-stats", offset: 4, batchSize: 2 });
+    expect(marketStats).toHaveBeenCalledExactlyOnceWith(CLIENT, { offset: 4, batchSize: 2 });
+    expect(ingest).not.toHaveBeenCalled(); expect(verify).not.toHaveBeenCalled(); expect(originalPrices).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200); expect(res.json).toHaveBeenCalledWith(result);
+  });
+
+  it("answers 502 when the market-stats database work fails", async () => {
+    marketStats.mockResolvedValue({ ok: false, mode: "market-stats", errors: ["boom"] });
+    expect((await call({ mode: "market-stats", offset: 0, batchSize: 2 })).status).toHaveBeenCalledWith(502);
+  });
+
   it("starts original-price enumeration without a cursor and keeps failed writes retryable", async () => {
     const result = { ok: false, results: [{ outcome: "write_failed" }], counters: { write_failed: 1 }, batch: { afterId: null, nextAfterId: null } };
     originalPrices.mockResolvedValue(result);
@@ -100,12 +115,16 @@ describe("authenticated crawl API", () => {
     { mode: "original-prices", dryRun: true, batchSize: 8, afterId: "not-a-uuid" },
     { mode: "original-prices", dryRun: true, batchSize: 8, afterId: 8 },
     { mode: "original-prices", dryRun: true, batchSize: 8, offset: 0 },
+    { mode: "market-stats" }, { mode: "market-stats", offset: 0 }, { mode: "market-stats", offset: -1, batchSize: 2 },
+    { mode: "market-stats", offset: 10_001, batchSize: 2 }, { mode: "market-stats", offset: 0, batchSize: 0 },
+    { mode: "market-stats", offset: 0, batchSize: 11 }, { mode: "market-stats", offset: 0, batchSize: "2" },
+    { mode: "market-stats", offset: 0, batchSize: 2, dryRun: true },
   ])("rejects invalid or mismatched fields before connecting (%j)", async body => {
     const res = await call(body);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(getClient).not.toHaveBeenCalled();
     expect(verify).not.toHaveBeenCalled(); expect(ingest).not.toHaveBeenCalled();
-    expect(originalPrices).not.toHaveBeenCalled();
+    expect(originalPrices).not.toHaveBeenCalled(); expect(marketStats).not.toHaveBeenCalled();
   });
 
   it("preserves source failure reports and the existing 502 status", async () => {

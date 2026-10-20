@@ -116,6 +116,40 @@ if [ "${RUN_MODE:-api}" = "original-prices" ]; then
   exit 1
 fi
 
+if [ "${RUN_MODE:-api}" = "market-stats" ]; then
+  # Two pairs per request: each pair is a separate Boligsiden call and the server
+  # also stops early on its time budget, so the cursor follows what was processed.
+  offset=0
+  batch_size=2
+  upserted=0
+  for ((batch=1; batch<=100; batch++)); do
+    echo "Market-stats batch $batch at offset=$offset"
+    request "{\"mode\":\"market-stats\",\"offset\":$offset,\"batchSize\":$batch_size}"
+    if ! jq -e --argjson offset "$offset" --argjson size "$batch_size" \
+      '.mode == "market-stats" and .batch.offset == $offset and .batch.batchSize == $size' response.json > /dev/null; then
+      echo "::error::The deployed API does not support the market-stats contract. Deploy it before running this mode."
+      exit 1
+    fi
+    jq -c '{batch, upserted, errors}' response.json
+    # Pairs Boligsiden has no data for or fails on are warnings: the listings are
+    # the critical path and the stats refresh again on the next run.
+    jq -r '.errors[]? | "::warning::market-stats " + .' response.json
+    upserted=$((upserted + $(jq -r '.upserted' response.json)))
+    next=$(jq -r '.batch.nextOffset' response.json)
+    if [ "$next" = "null" ]; then
+      echo "Market-stats refresh completed: $upserted rows upserted across $(jq -r '.batch.total' response.json) pairs."
+      exit 0
+    fi
+    if ! [[ "$next" =~ ^[0-9]+$ ]] || ((next <= offset)); then
+      echo "::error::The API returned an invalid market-stats cursor."
+      exit 1
+    fi
+    offset=$next
+  done
+  echo "::error::Reached the market-stats batch limit."
+  exit 1
+fi
+
 offset=${RUN_START_OFFSET:-0}
 if ! [[ "$offset" =~ ^[0-9]{1,5}$ ]]; then
   echo "::error::start_offset must be an integer from 0 to 50000."

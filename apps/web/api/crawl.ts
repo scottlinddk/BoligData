@@ -4,11 +4,13 @@ import { getServiceRoleClient } from "../server/lib/supabase.js";
 import { runIngest } from "../server/lib/crawl/ingest.js";
 import { logError } from "../server/lib/crawl/log.js";
 import { verifyCrawlData } from "../server/lib/crawl/runner-verification.js";
+import { runMarketStatsBatch, type MarketStatsBatchOptions } from "../server/lib/crawl/market-stats-refresh.js";
 import { runOriginalPriceBackfill, type OriginalPriceBackfillOptions } from "../server/lib/crawl/original-price-backfill.js";
 import { isUuid } from "../server/lib/http-helpers.js";
 
 type CrawlRequest = { mode: "verify" } | { mode: "ingest"; batch?: { offset: number; batchSize: number } }
-  | { mode: "original-prices"; options: OriginalPriceBackfillOptions };
+  | { mode: "original-prices"; options: OriginalPriceBackfillOptions }
+  | { mode: "market-stats"; options: MarketStatsBatchOptions };
 
 function parseRequest(body: unknown): CrawlRequest | null {
   if (body === undefined || body === null || body === "") return { mode: "ingest" };
@@ -24,6 +26,12 @@ function parseRequest(body: unknown): CrawlRequest | null {
         (value.afterId !== undefined && value.afterId !== null && !isUuid(value.afterId))) return null;
     return { mode: "original-prices", options: { dryRun: value.dryRun, batchSize: value.batchSize,
       afterId: typeof value.afterId === "string" ? value.afterId.toLowerCase() : null } };
+  }
+  if (value.mode === "market-stats") {
+    const { offset, batchSize } = value;
+    if (keys.length !== 3 || typeof offset !== "number" || !Number.isInteger(offset) || offset < 0 || offset > 10_000 ||
+        typeof batchSize !== "number" || !Number.isInteger(batchSize) || batchSize < 1 || batchSize > 10) return null;
+    return { mode: "market-stats", options: { offset, batchSize } };
   }
   if (keys.length !== 2 || !keys.includes("offset") || !keys.includes("batchSize")) return null;
   const { offset, batchSize } = value;
@@ -44,6 +52,9 @@ function parseRequest(body: unknown): CrawlRequest | null {
  * - POST { mode: "original-prices", dryRun, afterId?, batchSize } audits or
  *   refreshes original-price evidence and reconciles source-confirmed removals
  *   for at most eight stored listings (dry runs never write)
+ * - POST { mode: "market-stats", offset, batchSize } refreshes Boligsiden Markedsindeks
+ *   stats for a slice of (municipality, property type) pairs, kept apart from the
+ *   listing ingest so its upstream calls cannot eat that request's time budget
  * - POST { offset, batchSize } ingests a bounded listing slice (batchSize 1–50)
  * - POST with no body preserves the existing full ingest behavior
  * - 200 { ok: true, reports }  — every source fetched and ingested cleanly
@@ -70,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
   const request = parseRequest(req.body);
   if (!request) {
-    res.status(400).json({ error: "Use no body, { mode: 'verify' }, offset 0–50000 with batchSize 1–50, or { mode: 'original-prices', dryRun: boolean, afterId?: UUID, batchSize: 1–8 }" });
+    res.status(400).json({ error: "Use no body, { mode: 'verify' }, offset 0–50000 with batchSize 1–50, { mode: 'original-prices', dryRun: boolean, afterId?: UUID, batchSize: 1–8 }, or { mode: 'market-stats', offset: 0–10000, batchSize: 1–10 }" });
     return;
   }
 
@@ -83,6 +94,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (request.mode === "original-prices") {
       const result = await runOriginalPriceBackfill(client, request.options);
+      res.status(result.ok ? 200 : 502).json(result);
+      return;
+    }
+    if (request.mode === "market-stats") {
+      const result = await runMarketStatsBatch(client, request.options);
       res.status(result.ok ? 200 : 502).json(result);
       return;
     }

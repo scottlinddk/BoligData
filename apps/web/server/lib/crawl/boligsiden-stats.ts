@@ -34,11 +34,6 @@ export interface MarketStatRow {
   prev_year_value: number | null;
 }
 
-export interface MarketStatsResult {
-  rows: MarketStatRow[];
-  errors: string[];
-}
-
 function get(obj: unknown, ...path: string[]): unknown {
   let cur: unknown = obj;
   for (const key of path) {
@@ -70,50 +65,43 @@ export function mapStatPoint(raw: unknown, propertyType: string): MarketStatRow 
   };
 }
 
+/** Whether Boligsiden publishes Markedsindeks stats for this property type ("other" has none). */
+export function hasStatsCategory(propertyType: string): boolean {
+  return propertyType in STATS_ADDRESS_TYPE;
+}
+
 /**
- * Fetches the last `months` months of every stat type for each
- * (municipality, property_type) pair. A failed pair is reported in `errors`
- * and skipped — partial data beats none. Disabled (empty result) in mock mode.
+ * Fetches the last `months` months of every stat type for one
+ * (municipality, property_type) pair. Throws on request failure so the caller
+ * can skip the pair and keep the rest.
  */
-export async function fetchMarketStats(
-  pairs: Array<{ municipality: string; propertyType: string }>,
+export async function fetchPairStats(
+  municipality: string,
+  propertyType: string,
   today = new Date(),
-): Promise<MarketStatsResult> {
-  const result: MarketStatsResult = { rows: [], errors: [] };
-  if (process.env.CRAWL_MOCK_MODE !== "false") return result;
+): Promise<MarketStatRow[]> {
+  const addressType = STATS_ADDRESS_TYPE[propertyType];
+  if (!addressType) return [];
 
   const months = envInt("MARKET_STATS_MONTHS", 12, 1, 36);
   const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - months, 1)).toISOString().slice(0, 10);
   const to = today.toISOString().slice(0, 10);
-
-  for (const { municipality, propertyType } of pairs) {
-    const addressType = STATS_ADDRESS_TYPE[propertyType];
-    if (!addressType) continue; // "other" has no Boligsiden stat category
-    try {
-      const body = JSON.stringify(
-        STAT_TYPES.map((type) => ({
-          type,
-          locationType: "municipality",
-          locationName: municipality,
-          addressType,
-          from,
-          to,
-        })),
-      );
-      const series = await fetchJson<unknown[]>(STATS_URL, {
-        method: "POST",
-        body,
-        headers: { "Content-Type": "application/json" },
-      });
-      for (const points of Array.isArray(series) ? series : []) {
-        for (const point of Array.isArray(points) ? points : []) {
-          const row = mapStatPoint(point, propertyType);
-          if (row) result.rows.push(row);
-        }
-      }
-    } catch (err) {
-      result.errors.push(`${municipality}/${propertyType}: ${err instanceof Error ? err.message : String(err)}`);
+  const body = JSON.stringify(
+    STAT_TYPES.map((type) => ({ type, locationType: "municipality", locationName: municipality, addressType, from, to })),
+  );
+  const series = await fetchJson<unknown[]>(STATS_URL, {
+    method: "POST",
+    body,
+    headers: { "Content-Type": "application/json" },
+    attempts: 2,
+    timeoutMs: 8_000,
+  });
+  const rows: MarketStatRow[] = [];
+  for (const points of Array.isArray(series) ? series : []) {
+    for (const point of Array.isArray(points) ? points : []) {
+      const row = mapStatPoint(point, propertyType);
+      if (row) rows.push(row);
     }
   }
-  return result;
+  return rows;
 }
