@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "API crawl, weekly refresh, runner, verification, or original asking-price backfill"
+        description: "API crawl, weekly refresh, runner, verification, market stats, or original asking-price backfill"
         type: choice
         default: api
-        options: [api, weekly, runner, verify, original-prices]
+        options: [api, weekly, runner, verify, market-stats, original-prices]
       dry_run:
         description: "Original prices only: inspect source evidence without writing"
         type: boolean
@@ -32,7 +32,7 @@ on:
 
 jobs:
   crawl:
-    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'api' || inputs.mode == 'verify' || inputs.mode == 'original-prices'))
+    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'api' || inputs.mode == 'verify' || inputs.mode == 'original-prices' || inputs.mode == 'market-stats'))
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.mode == 'original-prices' && 180 || 45 }}
     concurrency:
@@ -104,9 +104,29 @@ jobs:
       - name: Remove downloaded environment
         if: always()
         run: rm -f .vercel/.env.production.local
+  market-stats-refresh:
+    name: Refresh Boligsiden market stats
+    needs: [crawl, runner]
+    if: always() && github.event_name == 'schedule' && (needs.crawl.result == 'success' || needs.runner.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Same group as the other refresh steps; they are chained with `needs` because a
+    # group holds one pending run and a second queued job would cancel the first.
+    concurrency:
+      group: boligdata-crawl-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refresh Markedsindeks stats after the listing refresh
+        run: bash scripts/crawl-api.sh
+        env:
+          RUN_MODE: market-stats
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
   original-price-refresh:
     name: Refresh original asking-price evidence
-    needs: [crawl, runner]
+    needs: [crawl, runner, market-stats-refresh]
     if: always() && github.event_name == 'schedule' && (needs.crawl.result == 'success' || needs.runner.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
