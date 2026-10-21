@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createRetryingFetch } from "./retrying-fetch.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -25,14 +26,18 @@ export function getAnonClient(jwt?: string): SupabaseClient {
  * the Vercel project's environment variables (no MCP tool can set this — it
  * must be added manually in the dashboard).
  */
-export function getServiceRoleClient(): SupabaseClient {
+export function getServiceRoleClient(options: { retryTransient?: boolean } = {}): SupabaseClient {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SUPABASE_URL || !serviceRoleKey) {
     throw new Error(
       "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — set SUPABASE_SERVICE_ROLE_KEY in the Vercel dashboard",
     );
   }
-  return createClient(SUPABASE_URL, serviceRoleKey, { auth: { persistSession: false } });
+  return createClient(SUPABASE_URL, serviceRoleKey, {
+    auth: { persistSession: false },
+    // Opt-in for the long-running crawl: survives dropped connections mid-run.
+    ...(options.retryTransient ? { global: { fetch: createRetryingFetch() } } : {}),
+  });
 }
 
 // Same issue as auth.ts's AuthGetUser: Vercel's per-function type check

@@ -14,7 +14,7 @@ async function main() {
   // A protected optional register credential is unavailable to this runner;
   // never send Vercel's redaction marker to the register as an API key.
   if (isSensitivePlaceholder(process.env.DATAFORDELER_API_KEY)) delete process.env.DATAFORDELER_API_KEY;
-  const client = getServiceRoleClient();
+  const client = getServiceRoleClient({ retryTransient: true });
   async function verify() {
     console.log(JSON.stringify({ event: "crawl.verification", ...await verifyCrawlData(client) }));
   }
