@@ -281,7 +281,10 @@ export async function lookupAddressCadastral(
   if (!apiKey) return sourceFailed(`DAWA: ${dawaResult.error}; Adressevælger: ${adressevaelgerResult.error}`);
 
   const fallbackResult = await lookupAddressCadastralViaDar(address, postalCode, apiKey);
-  if (fallbackResult.ok) return fallbackResult;
+  if (fallbackResult.ok) {
+    const found = fallbackResult.data;
+    return sourceOk({ ...found, lat: found.lat ?? fallbackLat, lon: found.lon ?? fallbackLon, postalCode: found.postalCode ?? postalCode });
+  }
 
   return sourceFailed(`DAWA: ${dawaResult.error}; Adressevælger: ${adressevaelgerResult.error}; DAR fallback: ${fallbackResult.error}`);
 }

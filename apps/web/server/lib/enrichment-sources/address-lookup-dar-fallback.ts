@@ -1,45 +1,43 @@
 import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../crawl/map-utils.js";
+import { etrs89Utm32ToWgs84 } from "../geo/etrs89-utm32.js";
 import { DAR_SERVICE } from "./bbr.js";
-import { entityFields, GraphQlError, pickField, postGraphQl } from "./datafordeler.js";
+import { postGraphQl } from "./datafordeler.js";
 import { sourceFailed, sourceOk, type SourceResult } from "./types.js";
 import type { AddressCadastral } from "./address-lookup.js";
 
 /**
  * Fallback address resolver for when DAWA (`address-lookup.ts`'s primary
- * path) is unreachable — which, per DAWA's own announced sunset
- * (2026-08-17, already past as of this writing), is no longer a remote
- * possibility. Queries Datafordeler's DAR GraphQL service directly, reusing
- * the same GraphQL client, version-walking and schema-introspection helpers
- * (`datafordeler.ts`) that `bbr.ts` already relies on for its DAR->BBR
- * traversal, and the same `DAR_SERVICE` endpoint definition.
+ * path) is unreachable. DAWA closed on 2026-10-01 and answers HTTP 410, so in
+ * practice this is now the keyed path whenever Adressevælger has no answer.
+ * Queries Datafordeler's DAR GraphQL service, reusing the `postGraphQl` client
+ * (version walk, `apiKey` handling) that `bbr.ts` already relies on.
  *
- * DAR has no fuzzy free-text search equivalent to DAWA's `q=`, so this
- * parses the address into structured components first (see
- * `parseStructuredAddress`) and filters DAR's `Husnummer` entity by them.
+ * The query shape follows what the live DAR service accepts (verified against
+ * it on 2026-10-01 by the public `datafordeler-dar-mcp` project; it differs
+ * from Datafordeler's published transition guide):
+ *
+ * - Every entity query carries `virkningstid` AND `registreringstid` set to
+ *   now. With only one of them, superseded registrations come back too.
+ * - There is no street-name filter on `DAR_Husnummer`. The only text filter is
+ *   `adgangsadressebetegnelse: { startsWith }` ("Vejnavn 12, 9000 By"), which
+ *   is case-sensitive. A trailing comma after the house number keeps "33" from
+ *   also matching "330".
+ * - References are UUIDs, not nested objects: `adgangspunkt` is the id of a
+ *   `DAR_Adressepunkt`, whose `position { wkt crs }` holds the coordinates
+ *   (EPSG:25832 unless `crs` says otherwise).
  *
  * Scope, deliberately narrower than DAWA: this resolves address *identity*
- * and *geocoding* (`idLokalid`, coordinates, postal code, municipality code)
- * — enough to unblock BBR, VUR and the noise/sales lookups, which all key off
- * the husnummer UUID or coordinates — but not the cadastral parcel
- * (`matrikelnr`/`ejerlav`/`bfeNummer`/`zone`). Resolving those from DAR alone
- * would need a spatial join against Matriklen's parcel geometry, which is a
- * separately-scoped piece of work; returning them as `null` here follows this
- * repo's existing rule (`sourceFailed`/null over a fabricated or unverifiable
- * join) rather than guessing.
- *
- * Field names below are guessed from Datafordeler's published DAR data
- * model, not verified against a live schema — this sandbox has no network
- * egress to `datafordeler.dk`. `husnummerSchema` narrows the guesses to
- * whatever the live schema actually defines when introspection is available,
- * the same safety net `bbr.ts` uses.
+ * and *geocoding* (`idLokalid`, coordinates, postal code) — enough to unblock
+ * BBR, VUR and the noise/sales lookups, which all key off the husnummer UUID
+ * or coordinates — but not the cadastral parcel (`matrikelnr`/`ejerlav`/
+ * `bfeNummer`/`zone`) or the municipality code, which the husnummer only
+ * references by id. Those stay `null` rather than guessed.
  */
 const HUSNUMMER_TYPE = "DAR_Husnummer";
-
-const STREET_FIELD_CANDIDATES = ["adresseringsvejnavn", "vejnavn"];
-const HOUSE_NUMBER_FIELD_CANDIDATES = ["husnummertekst", "husnr"];
-const POSTNR_FIELD_CANDIDATES = ["postnr", "postnummer"];
-const MUNICIPALITY_FIELD_CANDIDATES = ["kommunekode", "kommune"];
-const COORDINATE_FIELD = "adgangspunkt";
+const ADRESSEPUNKT_TYPE = "DAR_Adressepunkt";
+/** DAR status 3 = gældende (current). */
+const STATUS_CURRENT = "3";
+const MAX_CANDIDATES = 25;
 
 export interface StructuredAddress {
   streetName: string;
@@ -48,20 +46,21 @@ export interface StructuredAddress {
 }
 
 /**
- * Splits a free-text Danish address into the components DAR's GraphQL
- * service can filter on: "Hobrovej 123, 9000 Aalborg" -> street "Hobrovej",
- * house number "123", postal code "9000". Floor/door suffixes ("2. tv") are
- * dropped — Husnummer identifies the building entrance, not the unit.
- * Returns null when the first comma-separated segment doesn't end in a
- * house-number-shaped token, which this can't turn into a useful filter.
+ * Splits a free-text Danish address into the components the register lookups
+ * key on: "Hobrovej 123, 9000 Aalborg" -> street "Hobrovej", house number
+ * "123", postal code "9000". Floor/door suffixes ("2. tv") are dropped,
+ * since a husnummer identifies the entrance, not the unit. A letter may be
+ * glued on ("6a"), spaced ("10 B") or written with a plus as Boligsiden does
+ * for some entrances ("10+B"); all normalise to "10B". Returns null when the
+ * first comma-separated segment doesn't end in a house-number-shaped token.
  */
 export function parseStructuredAddress(address: string, postalCodeHint: string | null): StructuredAddress | null {
   const firstPart = address.split(",")[0]?.trim() ?? "";
-  const match = /^(.+?)\s+(\d+[a-zA-Z]?)$/.exec(firstPart);
+  const match = /^(.+?)\s+(\d+)\s*\+?\s*([a-zA-Z]?)$/.exec(firstPart);
   if (!match) return null;
 
   const streetName = match[1]!.trim();
-  const houseNumber = match[2]!;
+  const houseNumber = `${match[2]!}${match[3]!}`;
   if (streetName === "") return null;
 
   const postalMatch = /\b(\d{4})\b/.exec(address);
@@ -82,139 +81,136 @@ function asRecordList(value: unknown): Record<string, unknown>[] {
   return single === null ? [] : [single];
 }
 
-async function husnummerSchema(apiKey: string): Promise<Set<string> | null> {
-  try {
-    return await entityFields(DAR_SERVICE, apiKey, HUSNUMMER_TYPE);
-  } catch {
-    // Best-effort: a wrong guess below still costs only this attempt, not the
-    // whole fallback (see the GraphQlError handling in the caller).
-    return null;
-  }
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** DAR writes "Vejnavn 12, [Bynavn,] 9000 By"; the postcode is the 4 digits before the town name. */
+function postalCodeOf(designation: string): string | null {
+  return /(?:^|,\s*)(\d{4})\s+[^,]+$/.exec(designation)?.[1] ?? null;
 }
 
-/** The schema's spelling for a candidate list, or the first candidate as a best guess when the schema is unknown. */
-function resolveField(schema: Set<string> | null, candidates: string[]): string {
-  if (schema === null) return candidates[0]!;
-  return pickField(schema, ...candidates) ?? candidates[0]!;
+function normalize(value: string): string {
+  return value.trim().toLocaleLowerCase("da-DK");
 }
 
-interface ResolvedFields {
-  street: string;
-  houseNumber: string;
-  postnr: string | null;
-  municipality: string | null;
+function upperFirst(value: string): string {
+  return value.charAt(0).toLocaleUpperCase("da-DK") + value.slice(1);
 }
 
-function buildHusnummerQuery(fields: ResolvedFields, structured: StructuredAddress): string {
-  const clauses = [
-    `${fields.street}: { eq: ${JSON.stringify(structured.streetName)} }`,
-    `${fields.houseNumber}: { eq: ${JSON.stringify(structured.houseNumber)} }`,
-  ];
-  if (fields.postnr !== null && structured.postalCode !== null) {
-    clauses.push(`${fields.postnr}: { eq: ${JSON.stringify(structured.postalCode)} }`);
-  }
+function bitemporal(now: string): string {
+  return `virkningstid: ${JSON.stringify(now)}, registreringstid: ${JSON.stringify(now)}`;
+}
 
-  const selection = [
-    "id_lokalId",
-    fields.houseNumber,
-    fields.postnr,
-    fields.municipality,
-    `${COORDINATE_FIELD} { koordinater }`,
-  ].filter((field): field is string => field !== null);
-
+function buildHusnummerQuery(structured: StructuredAddress, now: string): string {
+  const prefix = `${upperFirst(structured.streetName)} ${structured.houseNumber},`;
   return `query HusnummerLookup {
-  ${HUSNUMMER_TYPE}(where: { ${clauses.join("\n    ")} }) {
+  ${HUSNUMMER_TYPE}(first: ${MAX_CANDIDATES}, ${bitemporal(now)}, where: { adgangsadressebetegnelse: { startsWith: ${JSON.stringify(prefix)} }, status: { eq: ${JSON.stringify(STATUS_CURRENT)} } }) {
     nodes {
-      ${selection.join("\n      ")}
+      id_lokalId
+      adgangsadressebetegnelse
+      husnummertekst
+      adgangspunkt
     }
   }
 }`;
 }
 
-function mapHusnummer(node: Record<string, unknown>, fields: ResolvedFields, structured: StructuredAddress): AddressCadastral {
-  const koordinater = asRecord(node[COORDINATE_FIELD])?.koordinater;
-  // Same convention as DAWA: [longitude, latitude].
-  const lon = Array.isArray(koordinater) ? asFiniteNumber(koordinater[0]) : null;
-  const lat = Array.isArray(koordinater) ? asFiniteNumber(koordinater[1]) : null;
-  const hasCoordinates = lat !== null && lon !== null && isDanishCoordinate(lat, lon);
-
-  const postalCode =
-    (fields.postnr !== null ? asNonEmptyString(node[fields.postnr]) : null) ?? structured.postalCode;
-
-  return {
-    idLokalid: asNonEmptyString(node.id_lokalId),
-    matrikelnr: null,
-    ejerlav: null,
-    ejerlavskode: null,
-    bfeNummer: null,
-    zone: null,
-    lat: hasCoordinates ? lat : null,
-    lon: hasCoordinates ? lon : null,
-    postalCode,
-    postalName: null,
-    municipalityCode: fields.municipality !== null ? asNonEmptyString(node[fields.municipality]) : null,
-    formattedAddress: `${structured.streetName} ${structured.houseNumber}${postalCode ? `, ${postalCode}` : ""}`,
-    resolvedVia: "dar_fallback",
-  };
+function buildAdressepunktQuery(id: string, now: string): string {
+  return `query AdressepunktLookup {
+  ${ADRESSEPUNKT_TYPE}(first: 1, ${bitemporal(now)}, where: { id_lokalId: { eq: ${JSON.stringify(id)} } }) {
+    nodes {
+      id_lokalId
+      position { wkt crs }
+    }
+  }
+}`;
 }
 
 /**
- * Resolves one free-text address via Datafordeler's DAR GraphQL service,
- * used as a fallback when DAWA is unreachable. See the module doc for scope
- * (identity + geocoding only, no cadastral parcel).
+ * Picks the one current husnummer that is exactly this street + number (+ postcode).
+ * The `startsWith` prefix is case-sensitive but otherwise loose (it also matches
+ * other towns that share the street name), so the match is re-checked here.
+ * Null when nothing matches or the answer is ambiguous.
+ */
+function selectHusnummer(nodes: Record<string, unknown>[], structured: StructuredAddress): Record<string, unknown> | null {
+  const wanted = `${normalize(structured.streetName)} ${normalize(structured.houseNumber)},`;
+  const matches = nodes.filter((node) => {
+    const designation = asNonEmptyString(node.adgangsadressebetegnelse);
+    if (designation === null || !normalize(designation).startsWith(wanted)) return false;
+    return structured.postalCode === null || postalCodeOf(designation) === structured.postalCode;
+  });
+  const distinct = new Set(matches.map((node) => asNonEmptyString(node.id_lokalId)));
+  return distinct.size === 1 ? matches[0]! : null;
+}
+
+/** Parses "POINT (x y)" / "POINT Z (x y z)" into [x, y]. */
+function pointOf(wkt: unknown): [number, number] | null {
+  const match = typeof wkt === "string" ? /POINT\s*Z?\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)/i.exec(wkt) : null;
+  if (!match) return null;
+  const x = asFiniteNumber(Number(match[1]));
+  const y = asFiniteNumber(Number(match[2]));
+  return x === null || y === null ? null : [x, y];
+}
+
+function wgs84Of(position: Record<string, unknown> | null): { lat: number; lon: number } | null {
+  const point = pointOf(position?.wkt);
+  if (point === null) return null;
+  const crs = String(position?.crs ?? "").match(/\d+$/)?.[0];
+  const coordinate = crs === "4326" ? { lat: point[1], lon: point[0] } : etrs89Utm32ToWgs84(point[0], point[1]);
+  return coordinate !== null && isDanishCoordinate(coordinate.lat, coordinate.lon) ? coordinate : null;
+}
+
+/**
+ * Resolves one free-text address via Datafordeler's DAR GraphQL service. See
+ * the module doc for scope (identity + geocoding only, no cadastral parcel).
+ * A missing or unreadable access point still returns the identity, with the
+ * coordinates null, since the husnummer UUID is what BBR keys off.
  */
 export async function lookupAddressCadastralViaDar(
   address: string,
   postalCode: string | null,
   apiKey: string,
 ): Promise<SourceResult<AddressCadastral>> {
-  const parsed = parseStructuredAddress(address, postalCode);
-  if (parsed === null) {
+  const structured = parseStructuredAddress(address, postalCode);
+  if (structured === null) {
     return sourceFailed(`could not parse "${address}" into street + house number for the DAR fallback`);
   }
-  const structured: StructuredAddress = parsed;
 
-  const schema = await husnummerSchema(apiKey);
-  const fields: ResolvedFields = {
-    street: resolveField(schema, STREET_FIELD_CANDIDATES),
-    houseNumber: resolveField(schema, HOUSE_NUMBER_FIELD_CANDIDATES),
-    postnr: schema === null ? POSTNR_FIELD_CANDIDATES[0]! : pickField(schema, ...POSTNR_FIELD_CANDIDATES),
-    municipality: schema === null ? null : pickField(schema, ...MUNICIPALITY_FIELD_CANDIDATES),
-  };
-
-  interface HusnummerResponse {
-    [key: string]: { nodes?: unknown } | null | undefined;
-  }
-
-  async function run(withPostnrFilter: boolean): Promise<Record<string, unknown> | null> {
-    const attemptFields = withPostnrFilter ? fields : { ...fields, postnr: null };
-    const query = buildHusnummerQuery(attemptFields, structured);
-    const data = await postGraphQl<HusnummerResponse>(DAR_SERVICE, apiKey, query);
-    const nodes = asRecordList(data?.[HUSNUMMER_TYPE]?.nodes);
-    return nodes[0] ?? null;
-  }
-
+  const now = new Date().toISOString();
   try {
-    let node: Record<string, unknown> | null;
-    try {
-      node = await run(true);
-    } catch (err) {
-      // The postnr field name (or the filter itself) may not be what was
-      // guessed — drop it and retry on the street + house number alone
-      // rather than losing the whole lookup to one wrong field.
-      if (!(err instanceof GraphQlError)) throw err;
-      node = await run(false);
+    const husnumre = await postGraphQl<Record<string, { nodes?: unknown } | null | undefined>>(
+      DAR_SERVICE, apiKey, buildHusnummerQuery(structured, now),
+    );
+    const node = selectHusnummer(asRecordList(husnumre?.[HUSNUMMER_TYPE]?.nodes), structured);
+    const idLokalid = node === null ? null : asNonEmptyString(node.id_lokalId);
+    if (node === null || idLokalid === null) {
+      return sourceFailed(`no unique DAR husnummer match for "${address}"${structured.postalCode ? ` (${structured.postalCode})` : ""}`);
     }
 
-    if (node === null) {
-      return sourceFailed(`no DAR husnummer match for "${address}"${postalCode ? ` (${postalCode})` : ""}`);
+    let coordinate: { lat: number; lon: number } | null = null;
+    const adgangspunkt = asNonEmptyString(node.adgangspunkt);
+    if (adgangspunkt !== null && UUID.test(adgangspunkt)) {
+      const punkter = await postGraphQl<Record<string, { nodes?: unknown } | null | undefined>>(
+        DAR_SERVICE, apiKey, buildAdressepunktQuery(adgangspunkt, now),
+      );
+      coordinate = wgs84Of(asRecord(asRecordList(punkter?.[ADRESSEPUNKT_TYPE]?.nodes)[0]?.position));
     }
 
-    const mapped = mapHusnummer(node, fields, structured);
-    if (mapped.idLokalid === null) {
-      return sourceFailed(`DAR husnummer match for "${address}" had no id_lokalId`);
-    }
-    return sourceOk(mapped);
+    const resolvedPostalCode = postalCodeOf(asNonEmptyString(node.adgangsadressebetegnelse) ?? "") ?? structured.postalCode;
+    return sourceOk({
+      idLokalid,
+      matrikelnr: null,
+      ejerlav: null,
+      ejerlavskode: null,
+      bfeNummer: null,
+      zone: null,
+      lat: coordinate?.lat ?? null,
+      lon: coordinate?.lon ?? null,
+      postalCode: resolvedPostalCode,
+      postalName: null,
+      municipalityCode: null,
+      formattedAddress: asNonEmptyString(node.adgangsadressebetegnelse) ?? `${structured.streetName} ${structured.houseNumber}`,
+      resolvedVia: "dar_fallback",
+    });
   } catch (err) {
     return sourceFailed(err);
   }
