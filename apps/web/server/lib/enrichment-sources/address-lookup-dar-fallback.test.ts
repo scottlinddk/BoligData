@@ -30,6 +30,11 @@ describe("parseStructuredAddress", () => {
     });
   });
 
+  it("normalises a spaced or plus-joined letter suffix to the glued form DAR uses", () => {
+    expect(parseStructuredAddress("Lundagervej 10+B", "9330")?.houseNumber).toBe("10B");
+    expect(parseStructuredAddress("Lundagervej 10 B", "9330")).toEqual({ streetName: "Lundagervej", houseNumber: "10B", postalCode: "9330" });
+  });
+
   it("returns null when the text has no house-number-shaped token", () => {
     expect(parseStructuredAddress("ikke en adresse", null)).toBeNull();
     expect(parseStructuredAddress("", null)).toBeNull();

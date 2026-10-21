@@ -179,34 +179,31 @@ describe("lookupAddressCadastral (live)", () => {
 });
 
 describe("lookupAddressCadastral (DAR fallback)", () => {
-  function introspection(fields: string[]) {
-    return { data: { __type: { fields: fields.map((name) => ({ name })) } } };
-  }
-
-  const HUSNUMMER_FIELDS = ["adresseringsvejnavn", "husnummertekst", "postnr", "kommunekode"];
+  const ADRESSEPUNKT_ID = "0a3f509c-38ed-32b8-e044-0003ba298018";
 
   function husnummerResponse(nodes: unknown[]) {
     return { data: { DAR_Husnummer: { nodes } } };
   }
 
-  it("falls back to Datafordeler DAR when DAWA has no match and a key is configured", async () => {
+  const husnummerNode = {
+    id_lokalId: "fallback-uuid",
+    adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
+    husnummertekst: "6",
+    adgangspunkt: ADRESSEPUNKT_ID,
+  };
+
+  const adressepunktResponse = {
+    data: { DAR_Adressepunkt: { nodes: [{ id_lokalId: ADRESSEPUNKT_ID, position: { wkt: "POINT (555784.21 6322850.06)", crs: "25832" } }] } },
+  };
+
+  it("falls back to Datafordeler DAR when DAWA and Adressevælger have no match and a key is configured", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     const stub = stubFetch([
       { body: [] }, // DAWA exact search: no match
       { body: [] }, // DAWA fuzzy retry: no match
       { body: { status: "ok", fund: [] } }, // Adressevælger search: no match
-      { body: introspection(HUSNUMMER_FIELDS) }, // DAR schema introspection
-      {
-        body: husnummerResponse([
-          {
-            id_lokalId: "fallback-uuid",
-            husnummertekst: "6",
-            postnr: "9000",
-            kommunekode: "0851",
-            adgangspunkt: { koordinater: [9.8764, 57.0459] },
-          },
-        ]),
-      },
+      { body: husnummerResponse([husnummerNode]) }, // DAR_Husnummer
+      { body: adressepunktResponse }, // DAR_Adressepunkt
     ]);
 
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
@@ -215,20 +212,57 @@ describe("lookupAddressCadastral (DAR fallback)", () => {
     if (!result.ok) return;
     expect(result.data.resolvedVia).toBe("dar_fallback");
     expect(result.data.idLokalid).toBe("fallback-uuid");
-    expect(result.data.lat).toBeCloseTo(57.0459);
-    expect(result.data.lon).toBeCloseTo(9.8764);
+    // EPSG:25832 access point, projected back to WGS84.
+    expect(result.data.lat).toBeCloseTo(57.05, 1);
+    expect(result.data.lon).toBeCloseTo(9.92, 1);
     expect(result.data.postalCode).toBe("9000");
-    expect(result.data.municipalityCode).toBe("0851");
-    // Cadastral fields need a spatial join this fallback deliberately doesn't do.
+    // Cadastral fields and the municipality code are only ids on the husnummer; not guessed.
     expect(result.data.matrikelnr).toBeNull();
     expect(result.data.bfeNummer).toBeNull();
-    expect(stub.urls[2]).toContain("adressevaelger.dk/husnumre/soeg");
-    expect(stub.urls[4]).toContain("graphql.datafordeler.dk/DAR");
+    expect(result.data.municipalityCode).toBeNull();
+    expect(stub.urls[3]).toContain("graphql.datafordeler.dk/DAR");
+
+    const husnummerQuery = JSON.parse(stub.bodies[3]!).query as string;
+    // Both bitemporal arguments, the comma-terminated prefix and the current-status filter.
+    expect(husnummerQuery).toContain("virkningstid:");
+    expect(husnummerQuery).toContain("registreringstid:");
+    expect(husnummerQuery).toContain('adgangsadressebetegnelse: { startsWith: "Floravej 6," }');
+    expect(husnummerQuery).toContain('status: { eq: "3" }');
+    expect(JSON.parse(stub.bodies[4]!).query).toContain(`id_lokalId: { eq: "${ADRESSEPUNKT_ID}" }`);
+  });
+
+  it("keeps the husnummer identity and the caller's coordinates when the access point cannot be read", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubFetch([
+      { body: [] }, { body: [] }, { body: { status: "ok", fund: [] } },
+      { body: husnummerResponse([husnummerNode]) },
+      { body: { data: { DAR_Adressepunkt: { nodes: [] } } } },
+    ]);
+
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000", 57.05, 9.92);
+
+    expect(result.ok && result.data.idLokalid).toBe("fallback-uuid");
+    expect(result.ok && result.data.lat).toBe(57.05);
+    expect(result.ok && result.data.lon).toBe(9.92);
+  });
+
+  it("rejects a husnummer in another postcode instead of guessing", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubFetch([
+      { body: [] }, { body: [] }, { body: { status: "ok", fund: [] } },
+      { body: husnummerResponse([{ ...husnummerNode, adgangsadressebetegnelse: "Floravej 6, 9700 Brønderslev" }]) },
+    ]);
+
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("DAR fallback: no unique DAR husnummer match");
   });
 
   it("reports both failures when DAWA and the DAR fallback both come up empty", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubFetch([{ body: [] }, { body: [] }, { body: introspection(HUSNUMMER_FIELDS) }, { body: husnummerResponse([]) }]);
+    stubFetch([{ body: [] }, { body: [] }, { body: { status: "ok", fund: [] } }, { body: husnummerResponse([]) }]);
 
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
