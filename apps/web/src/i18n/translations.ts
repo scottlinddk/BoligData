@@ -277,6 +277,11 @@ const da = {
   "marketStats.daysOnMarket": "Salgstid (dage)",
   "marketStats.yoy": "{pct} % ift. sidste år",
   "marketStats.none": "Ingen markedsstatistik for området endnu.",
+  "marketStats.regionalTitle": "{region} (Danmarks Statistik)",
+  "marketStats.avgPrice": "Gennemsnitspris pr. ejendom (kvartal)",
+  "marketStats.salesCount": "Antal frie handler (kvartal)",
+  "marketStats.indexYoy": "Prisindeks: {pct} % ift. samme kvartal sidste år",
+  "marketStats.regionalSource": "Regionale tal fra Danmarks Statistik (EJEN77, EJ56), ikke kommunespecifikke.",
 
   "dashboard.heading": "Overblik",
   "dashboard.title": "Gemte søgninger",
@@ -823,6 +828,11 @@ const en: Translations = {
   "marketStats.daysOnMarket": "Days on market (sold)",
   "marketStats.yoy": "{pct}% vs. last year",
   "marketStats.none": "No market statistics for this area yet.",
+  "marketStats.regionalTitle": "{region} (Statistics Denmark)",
+  "marketStats.avgPrice": "Average price per property (quarter)",
+  "marketStats.salesCount": "Ordinary free trades (quarter)",
+  "marketStats.indexYoy": "Price index: {pct}% vs. the same quarter last year",
+  "marketStats.regionalSource": "Regional figures from Statistics Denmark (EJEN77, EJ56), not municipality-specific.",
 
   "dashboard.heading": "Overview",
   "dashboard.title": "Saved searches",

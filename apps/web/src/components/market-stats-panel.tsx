@@ -1,4 +1,4 @@
-import type { MarketStatPoint, MarketStatsResponse } from "@shared/types/api";
+import type { MarketStatPoint, MarketStatsResponse, RegionalMarketStats } from "@shared/types/api";
 import { formatDkk } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
 import { SparklineChart } from "./sparkline-chart";
@@ -22,8 +22,31 @@ function StatBlock({ label, points, format }: { label: string; points: MarketSta
   );
 }
 
+function RegionalSection({ regional }: { regional: RegionalMarketStats }) {
+  const { t } = useI18n();
+  const latestIndexChange = regional.priceChangeYoy[regional.priceChangeYoy.length - 1];
+  return (
+    <div className="mt-4 border-t border-border pt-3">
+      <h4 className="mb-2 text-[13px] font-extrabold text-ink">
+        {t("marketStats.regionalTitle", { region: regional.regionName })}
+      </h4>
+      <div className="flex flex-col gap-3">
+        <StatBlock label={t("marketStats.avgPrice")} points={regional.avgPrice} format={(v) => formatDkk(v)} />
+        <StatBlock label={t("marketStats.salesCount")} points={regional.salesCount} format={(v) => String(Math.round(v))} />
+      </div>
+      {latestIndexChange && (
+        <div className="mt-2 text-xs font-medium text-ink-soft">
+          {t("marketStats.indexYoy", { pct: (latestIndexChange.value > 0 ? "+" : "") + latestIndexChange.value.toFixed(1) })}
+        </div>
+      )}
+      <p className="mt-2 text-[11px] font-medium text-ink-faint">{t("marketStats.regionalSource")}</p>
+    </div>
+  );
+}
+
 export function MarketStatsPanel({ stats }: { stats: MarketStatsResponse }) {
   const { t } = useI18n();
+  const hasRegional = !!stats.regional && stats.regional.avgPrice.length > 0;
   const empty = stats.pricePerSqm.length === 0 && stats.daysOnMarket.length === 0;
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
@@ -38,6 +61,7 @@ export function MarketStatsPanel({ stats }: { stats: MarketStatsResponse }) {
           <StatBlock label={t("marketStats.daysOnMarket")} points={stats.daysOnMarket} format={(v) => String(Math.round(v))} />
         </div>
       )}
+      {hasRegional && <RegionalSection regional={stats.regional!} />}
     </div>
   );
 }

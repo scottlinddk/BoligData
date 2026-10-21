@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const { fetchPairStats } = vi.hoisted(() => ({ fetchPairStats: vi.fn() }));
+const { fetchPairStats, fetchDstRegionalStats } = vi.hoisted(() => ({ fetchPairStats: vi.fn(), fetchDstRegionalStats: vi.fn() }));
+vi.mock("./dst-stats.js", () => ({ fetchDstRegionalStats }));
 vi.mock("./boligsiden-stats.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./boligsiden-stats.js")>()),
   fetchPairStats,
@@ -13,11 +14,14 @@ type Row = { municipality: string | null; property_type: string | null };
 
 function fakeClient(properties: Row[], upsertError: { message: string } | null = null) {
   const upsert = vi.fn().mockResolvedValue({ error: upsertError });
+  const regionalUpsert = vi.fn().mockResolvedValue({ error: null });
   const ranges: Array<[number, number]> = [];
   const client = {
     from: (table: string) =>
       table === "market_stats"
         ? { upsert }
+        : table === "regional_market_stats"
+        ? { upsert: regionalUpsert }
         : {
             select: () => ({
               order: () => ({
@@ -29,7 +33,7 @@ function fakeClient(properties: Row[], upsertError: { message: string } | null =
             }),
           },
   } as unknown as SupabaseClient;
-  return { client, upsert, ranges };
+  return { client, upsert, regionalUpsert, ranges };
 }
 
 const statRow = (name: string, type: string) => ({ location_name: name, property_type: type, value: 1 });
@@ -38,6 +42,8 @@ const listings = (municipality: string, property_type: string, n = 1): Row[] => 
 beforeEach(() => {
   vi.stubEnv("CRAWL_MOCK_MODE", "false");
   fetchPairStats.mockReset();
+  fetchDstRegionalStats.mockReset();
+  fetchDstRegionalStats.mockResolvedValue([{ region_code: "081" }, { region_code: "000" }]);
   fetchPairStats.mockImplementation(async (m: string, t: string) => [statRow(m, t)]);
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -62,6 +68,27 @@ describe("runMarketStatsBatch", () => {
 
     const last = await runMarketStatsBatch(client, { offset: 2, batchSize: 2 });
     expect(last.batch).toMatchObject({ processed: 1, nextOffset: null });
+  });
+
+  it("refreshes the DST regional series once, on the first slice only", async () => {
+    const { client, regionalUpsert } = fakeClient([...listings("Aalborg", "villa"), ...listings("Brønderslev", "villa")]);
+    const first = await runMarketStatsBatch(client, { offset: 0, batchSize: 1 });
+    expect(fetchDstRegionalStats).toHaveBeenCalledTimes(1);
+    expect(regionalUpsert).toHaveBeenCalledWith([{ region_code: "081" }, { region_code: "000" }], { onConflict: "source,region_code,category_code,stat_type,period_start" });
+    expect(first.regionalUpserted).toBe(2);
+
+    const second = await runMarketStatsBatch(client, { offset: 1, batchSize: 1 });
+    expect(fetchDstRegionalStats).toHaveBeenCalledTimes(1);
+    expect(second.regionalUpserted).toBe(0);
+  });
+
+  it("reports a DST failure as a warning and still refreshes Boligsiden pairs", async () => {
+    fetchDstRegionalStats.mockRejectedValue(new Error("HTTP 503 from https://api.statbank.dk/v1/data"));
+    const { client } = fakeClient(listings("Aalborg", "villa"));
+    const result = await runMarketStatsBatch(client, { offset: 0, batchSize: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.upserted).toBe(1);
+    expect(result.errors).toEqual(["DST: HTTP 503 from https://api.statbank.dk/v1/data"]);
   });
 
   it("pages past PostgREST's 1000-row cap so later pairs are not missed", async () => {
