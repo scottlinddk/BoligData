@@ -130,11 +130,11 @@ if [ "${RUN_MODE:-api}" = "market-stats" ]; then
       echo "::error::The deployed API does not support the market-stats contract. Deploy it before running this mode."
       exit 1
     fi
-    jq -c '{batch, upserted, errors}' response.json
+    jq -c '{batch, upserted, regionalUpserted, errors}' response.json
     # Pairs Boligsiden has no data for or fails on are warnings: the listings are
     # the critical path and the stats refresh again on the next run.
     jq -r '.errors[]? | "::warning::market-stats " + .' response.json
-    upserted=$((upserted + $(jq -r '.upserted' response.json)))
+    upserted=$((upserted + $(jq -r '.upserted + .regionalUpserted' response.json)))
     next=$(jq -r '.batch.nextOffset' response.json)
     if [ "$next" = "null" ]; then
       echo "Market-stats refresh completed: $upserted rows upserted across $(jq -r '.batch.total' response.json) pairs."

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchPairStats, hasStatsCategory } from "./boligsiden-stats.js";
+import { fetchDstRegionalStats } from "./dst-stats.js";
 import { envInt } from "./http.js";
 import { logError, logEvent } from "./log.js";
 import { mockModeEnabled } from "../enrichment-sources/types.js";
@@ -14,6 +15,8 @@ export interface MarketStatsBatchResult {
   mode: "market-stats";
   batch: MarketStatsBatchOptions & { processed: number; total: number; nextOffset: number | null };
   upserted: number;
+  /** Danmarks Statistik regional rows written (offset 0 only: one small request pair covers every region). */
+  regionalUpserted: number;
   /** Per-pair fetch failures. Informational: a failed pair never turns the batch red. */
   errors: string[];
 }
@@ -45,12 +48,27 @@ async function listPairs(client: SupabaseClient): Promise<Array<{ municipality: 
   );
 }
 
+/** DST publishes per region, so a handful of rows covers every property. Failure is a warning. */
+async function refreshRegionalStats(client: SupabaseClient, result: MarketStatsBatchResult): Promise<void> {
+  try {
+    const rows = await fetchDstRegionalStats();
+    const { error } = await client
+      .from("regional_market_stats")
+      .upsert(rows, { onConflict: "source,region_code,category_code,stat_type,period_start" });
+    if (error) throw new Error(error.message);
+    result.regionalUpserted = rows.length;
+  } catch (err) {
+    result.errors.push(`DST: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /**
  * Refreshes Boligsiden Markedsindeks stats for a slice of the sorted
  * (municipality, property_type) pairs. Pairs are fetched one at a time and the
  * slice stops early once the time budget is spent, so a request stays under the
  * serverless limit; `nextOffset` advances by what was actually processed (at
  * least one pair, so the cursor always moves) and the caller resumes from there.
+ * The first slice (offset 0) also refreshes the Danmarks Statistik regional series.
  */
 export async function runMarketStatsBatch(
   client: SupabaseClient,
@@ -62,6 +80,7 @@ export async function runMarketStatsBatch(
     mode: "market-stats",
     batch: { offset, batchSize, processed: 0, total: 0, nextOffset: null },
     upserted: 0,
+    regionalUpserted: 0,
     errors: [],
   };
   // Mirrors the listing crawl: no live calls to Boligsiden in mock mode.
@@ -70,6 +89,7 @@ export async function runMarketStatsBatch(
   const budgetMs = envInt("MARKET_STATS_BATCH_BUDGET_MS", 35_000, 1_000, 50_000);
   const startedAt = now();
   try {
+    if (offset === 0) await refreshRegionalStats(client, result);
     const pairs = await listPairs(client);
     result.batch.total = pairs.length;
     const slice = pairs.slice(offset, offset + batchSize);
@@ -102,6 +122,6 @@ export async function runMarketStatsBatch(
     logError("crawl.market_stats_failed", err);
   }
   result.errors = result.errors.slice(0, MAX_ERRORS_REPORTED);
-  logEvent("crawl.market_stats.batch", { ...result.batch, upserted: result.upserted, errors: result.errors.length });
+  logEvent("crawl.market_stats.batch", { ...result.batch, upserted: result.upserted, regionalUpserted: result.regionalUpserted, errors: result.errors.length });
   return result;
 }

@@ -78,12 +78,24 @@ export interface MarketStatPoint {
   prevYearValue: number | null;
 }
 
+/** Danmarks Statistik quarterly series for the property's region and category, oldest first. */
+export interface RegionalMarketStats {
+  regionName: string;
+  /** DKK, average price per property sold in an ordinary free trade. */
+  avgPrice: MarketStatPoint[];
+  salesCount: MarketStatPoint[];
+  /** Percent change of the price index against the same quarter a year earlier. */
+  priceChangeYoy: MarketStatPoint[];
+}
+
 /** Boligsiden Markedsindeks series for a property's municipality + type, oldest first. */
 export interface MarketStatsResponse {
   municipality: string;
   pricePerSqm: MarketStatPoint[];
   daysOnMarket: MarketStatPoint[];
   priceChangePerSqm: MarketStatPoint[];
+  /** Null when DST has no category for the property type. */
+  regional: RegionalMarketStats | null;
 }
 
 export interface CreateSearchBody {
