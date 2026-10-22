@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseStructuredAddress } from "./address-lookup-dar-fallback.js";
+import { parseStructuredAddress } from "./address-lookup-dar.js";
 
 describe("parseStructuredAddress", () => {
   it("splits a free-text address into street, house number and postal code", () => {

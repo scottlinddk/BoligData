@@ -11,25 +11,27 @@ const input: PropertyLookupInput = {
   energyLabel: "B",
 };
 
-const dawaRecord = {
-  id: "0a3f509c-38ed-32b8-e044-0003ba298018",
-  husnr: "6",
-  vejstykke: { navn: "Floravej" },
-  postnummer: { nr: "9000", navn: "Aalborg" },
-  adgangspunkt: { koordinater: [9.87640126, 57.04591973] },
-  ejerlav: { kode: 610452, navn: "Gl. Hasseris By, Hasseris" },
-  matrikelnr: "42q",
-  jordstykke: { href: "https://api.dataforsyningen.dk/jordstykker/610452/42q", matrikelnr: "42q" },
-  zone: "Udfaset",
-};
+const floravej6 = { id: "0a3f509c-38ed-32b8-e044-0003ba298018" };
 
-const parcelRecord = { bfenummer: 2340871 };
+const POINTER_ID = "1b4f509c-38ed-32b8-e044-0003ba298018";
+const connection = (nodes: unknown[]) => ({ nodes, pageInfo: { hasNextPage: false } });
+
+/** DAR_Husnummer / DAR_Adressepunkt answers for Floravej 6, and the Flexible join to its parcel and BFE number. */
+const DAR_HUSNUMMER = { id_lokalId: floravej6.id, adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg", husnummertekst: "6", adgangspunkt: POINTER_ID };
+const DAR_ADRESSEPUNKT = { id_lokalId: POINTER_ID, position: { wkt: "POINT (553173.08 6322838.76)", crs: "25832" } };
+const FLEXIBLE_PARCEL = {
+  husnummerErPlaceretPaaJordstykke: connection([{
+    matrikelnummer: "42q",
+    jordstykkeLiggerIEjerlav: { ejerlavskode: 610452, ejerlavsnavn: "Gl. Hasseris By, Hasseris" },
+    jordstykkeSamlesISamletFastEjendom: connection([{ BFEnummer: 2340871 }]),
+  }]),
+};
 
 /** Adressevælger `/husnumre/{id}` for the same address, as captured live on 2026-10-17. */
 const husnummerBody = {
   status: "ok",
   husnummer: {
-    id_lokalid: dawaRecord.id,
+    id_lokalid: floravej6.id,
     adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
     vejnavn: "Floravej",
     husnummertekst: "6",
@@ -46,7 +48,7 @@ const bbrBody = {
       nodes: [
         {
           id_lokalId: "a49ca297-725b-4510-ae12-000000000001",
-          husnummer: dawaRecord.id,
+          husnummer: floravej6.id,
           status: "6",
           registreringFra: "2020-01-01T00:00:00Z",
           registreringTil: null,
@@ -158,13 +160,18 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
     if (href.includes("jord.miljoeportal.dk")) {
       return { ok: true, status: 200, headers: new Headers(), json: async () => overrides.soil ?? { features: [] } };
     }
-    const body = href.includes("adressevaelger.dk")
+    const documentBody = typeof init?.body === "string" ? (JSON.parse(init.body).query as string) : "";
+    const body = href.includes("husnumre/soeg")
+      ? { status: "ok", fund: [{ type: "husnummer", id: floravej6.id, titel: "Floravej 6, 9000 Aalborg", vejnavn: "Floravej", husnummer: "6" }] }
+      : href.includes("adressevaelger.dk")
       ? husnummerBody
-      : href.includes("adgangsadresser")
-      ? [dawaRecord]
-      : href.includes("/jordstykker/")
-        ? parcelRecord
-        : href.includes("/BBR/")
+      : href.includes("/Flexible/")
+      ? { data: { DAR_Husnummer: connection([FLEXIBLE_PARCEL]) } }
+      : href.includes("/DAR/")
+      ? documentBody.includes("AdressepunktLookup")
+        ? { data: { DAR_Adressepunkt: connection([DAR_ADRESSEPUNKT]) } }
+        : { data: { DAR_Husnummer: connection([DAR_HUSNUMMER]) } }
+      : href.includes("/BBR/")
           ? introspecting
             ? introspectionBody(BYGNING_FIELDS)
             : (overrides.bbr ?? bbrBody)
@@ -231,17 +238,18 @@ describe("lookupProperty (live)", () => {
     const bbr = result.sources.find((s) => s.key === "bbr");
     expect(bbr?.mode).toBe("unavailable");
     expect(bbr?.error).toContain("DATAFORDELER_API_KEY");
-    // The credential-free source still resolves.
+    // The credential-free source still resolves identity, but without a Datafordeler key there is no parcel.
     expect(result.sources.find((s) => s.key === "address")?.mode).toBe("live");
-    expect(result.resolved.matrikelnr).toBe("42q");
+    expect(result.resolved.idLokalid).toBe(floravej6.id);
+    expect(result.resolved.matrikelnr).toBeNull();
   });
 
   it("skips the noise lookup rather than querying it at 0,0 when the address is unresolvable", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown) => ({
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((async () => ({
       ok: true,
       status: 200,
       headers: new Headers(),
-      json: async () => (String(url).includes("adgangsadresser") ? [] : {}),
+      json: async () => ({}),
     })) as unknown as typeof fetch);
 
     const result = await lookupProperty({ ...input, address: "ikke en adresse" });
@@ -290,20 +298,20 @@ describe("lookupProperty (mock mode)", () => {
 });
 
 describe("lookupProperty by husnummer id (an address that is not a listing)", () => {
-  const byId: PropertyLookupInput = { address: "", husnummerId: dawaRecord.id };
+  const byId: PropertyLookupInput = { address: "", husnummerId: floravej6.id };
 
-  it("resolves from the id alone, never touching the closed free-text register", async () => {
+  it("resolves from the id alone, never searching by free text", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     const fetchSpy = stubPipeline();
 
     const result = await lookupProperty(byId);
 
     const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
-    expect(urls.some((u) => u.includes("adgangsadresser"))).toBe(false);
-    expect(urls.some((u) => u.includes(`adressevaelger.dk/husnumre/${dawaRecord.id}`))).toBe(true);
+    expect(urls.some((u) => u.includes("husnumre/soeg") || u.includes("/DAR/"))).toBe(false);
+    expect(urls.some((u) => u.includes(`adressevaelger.dk/husnumre/${floravej6.id}`))).toBe(true);
     expect(result.address).toBe("Floravej 6, 9000 Aalborg");
     expect(result.resolved).toMatchObject({
-      idLokalid: dawaRecord.id,
+      idLokalid: floravej6.id,
       formattedAddress: "Floravej 6, 9000 Aalborg",
       postalCode: "9000",
     });
@@ -492,7 +500,7 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
 });
 
 describe("lookupProperty: land, tanks and valuation in the due-diligence flags", () => {
-  const byId: PropertyLookupInput = { address: "", husnummerId: dawaRecord.id };
+  const byId: PropertyLookupInput = { address: "", husnummerId: floravej6.id };
 
   it("reports MAT and the BBR tank register as sources and fills the flags from them", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");

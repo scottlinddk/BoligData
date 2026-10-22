@@ -82,9 +82,10 @@ describe("live-schema cadastral integration", () => {
     expect(fetch.urls).toHaveLength(1);
   });
   it("does not use a fuzzy or wrong-house address hit", async () => {
-    const fetch = stubFetch([{ body: [{ id: "0a3f509c-b58c-32b8-e044-0003ba298018", vejstykke: { navn: "Slåenvej" }, husnr: "20", postnummer: { nr: "9000" } }] }]);
+    const fetch = stubFetch([graph("DAR_Husnummer", connection([{ id_lokalId: "0a3f509c-b58c-32b8-e044-0003ba298018", adgangsadressebetegnelse: "Slåenvej 20, 9000 Aalborg" }]))]);
     expect((await getCadastralReport({ ...property, bfeNummer: null })).status).toBe("not_found");
     expect(fetch.urls).toHaveLength(1);
+    expect(fetch.urls[0]).toContain("/DAR/");
   });
   it("does not make network requests without deployment credentials or for demo listings", async () => {
     const fetch = stubFetch([]);

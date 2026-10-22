@@ -77,8 +77,8 @@ function parseInput(req: VercelRequest): PropertyLookupInput | null {
  * address lookup for a home that is not for sale passes `husnummerId` (the DAR
  * id picked in the Adressevælger autocomplete) and no price; the three
  * price-based screening criteria then report "no asking price". Free-text
- * resolution depends on DAWA, which is closed, so `husnummerId` is the path
- * that works without a Datafordeler fallback.
+ * resolution goes through Datafordeler's DAR service and needs
+ * `DATAFORDELER_API_KEY`, so `husnummerId` is the path that works without one.
  *
  * A `husnummerId` lookup also finds a house's public valuation from the id
  * alone and returns a `spar` fair-price estimate built from it (see

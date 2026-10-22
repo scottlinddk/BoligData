@@ -73,8 +73,7 @@ export async function lookupProperty(
   assumptions: FinancingAssumptions = DEFAULT_FINANCING_ASSUMPTIONS,
 ): Promise<PropertyLookupResult> {
   // An id the user picked in the Adressevælger autocomplete is resolved
-  // directly. It is not a free-text guess, and it is the only path that still
-  // works now that DAWA (the free-text resolver) is closed.
+  // directly. It is not a free-text guess, and it needs no Datafordeler key.
   const addressMockFlag = input.husnummerId ? null : "ADDRESS_LOOKUP_MOCK_MODE";
   const cadastralResult = input.husnummerId
     ? await lookupHusnummerById(input.husnummerId)
@@ -157,11 +156,9 @@ export async function lookupProperty(
 
   const addressRegisterLabel = input.husnummerId
     ? "DAR via Adressevælger (adressevaelger.dk)"
-    : cadastral?.resolvedVia === "dar_fallback"
-      ? "DAR via Datafordeler GraphQL (DAWA fallback)"
-      : cadastral?.resolvedVia === "adressevaelger"
-        ? "DAR via Adressevælger (adressevaelger.dk)"
-        : "DAR via DAWA (api.dataforsyningen.dk)";
+    : cadastral?.resolvedVia === "adressevaelger"
+      ? "DAR via Adressevælger (adressevaelger.dk)"
+      : "DAR via Datafordeler GraphQL";
 
   const sources: PropertyLookupSourceStatus[] = [
     status("address", addressRegisterLabel, addressMockFlag, cadastralResult),

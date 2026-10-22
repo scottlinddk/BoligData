@@ -11,9 +11,14 @@ import { mockModeEnabled } from "../enrichment-sources/types.js";
 import { buildHistoryRows, persistHistoryRows, type PreviousListingObservation } from "./history.js";
 import { enrichmentNeedsRefresh } from "./enrichment-refresh.js";
 import { mapConcurrent } from "./concurrency.js";
-import { envInt } from "./http.js";
+import { envInt, sleep } from "./http.js";
 
 const CHUNK_SIZE = 500;
+// 500 rows per upsert hit Supabase's statement timeout against the indexed, geometry-bearing `properties` table.
+const UPSERT_CHUNK_SIZE = 100;
+const UPSERT_ATTEMPTS = 3;
+const UPSERT_RETRY_DELAY_MS = 1_000;
+const STATEMENT_TIMEOUT = /statement timeout/i;
 // `.in()` filters travel in the GET query string. 500 UUIDs is ~20 KB, past what
 // PostgREST and its proxy accept, and surfaces as a bare "fetch failed".
 const LOOKUP_CHUNK_SIZE = 100;
@@ -307,6 +312,10 @@ async function ingestSource(
   }
 
   const propertyIdByExternalId = new Map<string, string>();
+  const upsertProperties = (batch: Array<Record<string, unknown>>) => client
+    .from("properties")
+    .upsert(batch, { onConflict: "listing_source,external_id" })
+    .select("id, external_id");
   async function persistListingHistory(listing: RawListing, propertyId: string): Promise<boolean> {
     const before = existing.get(listing.external_id) ?? null;
     const rows = buildHistoryRows({ ...listing,
@@ -348,21 +357,25 @@ async function ingestSource(
         registered_area_sqm: registeredAreaByExternalId.get(l.external_id) ?? null,
       };
     });
-    if (rows.length === 0) continue;
-    const { data, error } = await client
-      .from("properties")
-      .upsert(rows, { onConflict: "listing_source,external_id" })
-      .select("id, external_id");
-    if (error) {
-      report.dbErrors += 1;
-      pushDbError(`properties upsert: ${error.message}`);
-      logError("crawl.db.upsert_failed", error, { source, chunkSize: listingChunk.length });
-      continue;
+    for (const batch of chunk(rows, UPSERT_CHUNK_SIZE)) {
+      let result = await upsertProperties(batch);
+      // A statement timeout is load on the database, not a bad row: a smaller batch after a pause usually fits.
+      for (let attempt = 1; result.error && STATEMENT_TIMEOUT.test(result.error.message) && attempt < UPSERT_ATTEMPTS; attempt += 1) {
+        logEvent("crawl.db.upsert_retry", { source, attempt, chunkSize: batch.length });
+        await sleep(UPSERT_RETRY_DELAY_MS * attempt);
+        result = await upsertProperties(batch);
+      }
+      if (result.error) {
+        report.dbErrors += 1;
+        pushDbError(`properties upsert: ${result.error.message}`);
+        logError("crawl.db.upsert_failed", result.error, { source, chunkSize: batch.length });
+        continue;
+      }
+      for (const row of result.data ?? []) {
+        propertyIdByExternalId.set(row.external_id as string, row.id as string);
+      }
+      report.upserted += result.data?.length ?? 0;
     }
-    for (const row of data ?? []) {
-      propertyIdByExternalId.set(row.external_id as string, row.id as string);
-    }
-    report.upserted += data?.length ?? 0;
   }
 
   // This runs for every observed listing, independent of enrichment hashes.

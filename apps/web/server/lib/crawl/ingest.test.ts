@@ -143,6 +143,21 @@ function fakeDb() {
   return { client, properties, enrichments };
 }
 
+type UpsertResult = { select: () => Promise<unknown> };
+const statementTimeout = (): UpsertResult => ({ select: () => Promise.resolve({ data: null, error: { message: "canceling statement due to statement timeout" } }) });
+
+/** Routes the `properties` upsert through `handler`, which can answer itself or defer to the fake DB. */
+function overridePropertiesUpsert(
+  client: SupabaseClient,
+  handler: (rows: Array<Record<string, unknown>>, real: (rows: Array<Record<string, unknown>>) => UpsertResult) => UpsertResult,
+): void {
+  const realFrom = client.from.bind(client) as unknown as (table: string) => { upsert: (rows: Array<Record<string, unknown>>) => UpsertResult };
+  (client as unknown as { from: unknown }).from = (table: string) => {
+    const builder = realFrom(table);
+    return table === "properties" ? { ...builder, upsert: (rows: Array<Record<string, unknown>>) => handler(rows, builder.upsert) } : builder;
+  };
+}
+
 describe("runIngest (mock mode, stubbed DB)", () => {
   it("upserts and enriches every fixture listing on the first run", async () => {
     const { client, enrichments } = fakeDb();
@@ -244,6 +259,35 @@ describe("runIngest (CRAWL_SOURCES)", () => {
     if (original === undefined) delete process.env.CRAWL_SOURCES;
     else process.env.CRAWL_SOURCES = original;
   });
+
+  it("retries a properties upsert that hits the statement timeout instead of counting a db error", async () => {
+    process.env.CRAWL_SOURCES = "boligsiden";
+    const { client } = fakeDb();
+    let failures = 1;
+    const attempts: number[] = [];
+    overridePropertiesUpsert(client, (rows, real) => {
+      attempts.push(rows.length);
+      return failures-- > 0 ? statementTimeout() : real(rows);
+    });
+
+    const report = (await runIngest(client)).reports[0]!;
+
+    expect(report.dbErrors).toBe(0);
+    expect(report.upserted).toBe(report.fetched);
+    // The failed batch is sent again, whole.
+    expect(attempts[0]).toBe(attempts[1]);
+  });
+
+  it("reports a db error once the timeout retries are exhausted", async () => {
+    process.env.CRAWL_SOURCES = "boligsiden";
+    const { client } = fakeDb();
+    overridePropertiesUpsert(client, () => statementTimeout());
+
+    const report = (await runIngest(client)).reports[0]!;
+
+    expect(report.dbErrors).toBeGreaterThan(0);
+    expect(report.upserted).toBe(0);
+  }, 30_000);
 
   it("only crawls the requested source when CRAWL_SOURCES is set", async () => {
     process.env.CRAWL_SOURCES = "boligsiden";

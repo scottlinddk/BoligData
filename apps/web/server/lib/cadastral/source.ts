@@ -1,6 +1,7 @@
 import type { Property } from "../../../../../packages/shared/src/types/index.js";
 import type { CadastralOwner, CadastralParcel, CadastralReport } from "../../../../../packages/shared/src/types/cadastral.js";
 import { fetchJson, HttpError } from "../crawl/http.js";
+import { resolveHusnummerId } from "../enrichment-sources/address-lookup-dar.js";
 import { parseCadastralGeometry } from "./geometry.js";
 
 const API = "https://api.matriklen.dk/api/v3.3";
@@ -32,23 +33,16 @@ async function query(root: string, selection: string, key: string): Promise<unkn
 }
 
 /** Strict address match before resolving owners; no fuzzy first hit or coordinate-nearest match. */
-async function accessAddress(property: Property): Promise<string | null> {
+async function accessAddress(property: Property, key: string): Promise<string | null> {
   if (/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(property.idLokalid ?? "")) return property.idLokalid;
-  const streetHouse = property.address.split(",")[0]!.trim();
-  const postcode = property.postalCode ?? /\b\d{4}\b/.exec(property.address)?.[0];
-  if (!postcode || !/\s\d+[a-z]?$/i.test(streetHouse)) return null;
-  const params = new URLSearchParams({ q: streetHouse, postnr: postcode, per_side: "2" });
-  const raw = await fetchJson<unknown>(`https://api.dataforsyningen.dk/adgangsadresser?${params}`, { timeoutMs: TIMEOUT, attempts: 1 });
-  if (!Array.isArray(raw)) return null;
-  const normalize = (s: string) => s.normalize("NFC").toLocaleLowerCase("da-DK").replace(/\s+/g, " ").trim();
-  const matches = raw.map(record).filter(item => normalize(`${record(item.vejstykke).navn ?? ""} ${item.husnr ?? ""}`) === normalize(streetHouse) && String(record(item.postnummer).nr) === postcode);
-  const resolved = matches.length === 1 ? text(matches[0]!.id) : null;
-  return resolved && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(resolved) ? resolved : null;
+  const postcode = property.postalCode ?? /\b\d{4}\b/.exec(property.address)?.[0] ?? null;
+  if (!postcode) return null;
+  return resolveHusnummerId(property.address, postcode, key);
 }
 
 async function resolveBfe(property: Property, key: string, now: string): Promise<string | null> {
   if (id(property.bfeNummer)) return id(property.bfeNummer);
-  const addressId = await accessAddress(property);
+  const addressId = await accessAddress(property, key);
   if (!addressId) return null;
   const result = await query("DAR_Husnummer", `DAR_Husnummer(first: 2, ${temporal(now)}, where: {id_lokalId: {eq: ${JSON.stringify(addressId)}}}) {
     nodes { husnummerErPlaceretPaaJordstykke(first: 10, where: {status: {eq: "Gældende"}}) { nodes {
