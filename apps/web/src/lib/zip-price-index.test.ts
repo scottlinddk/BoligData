@@ -48,3 +48,13 @@ describe("zipPriceIndex", () => {
     }
   });
 });
+
+describe("zipPriceIndexCovers", () => {
+  it("is about the postcode only", async () => {
+    const { zipPriceIndexCovers } = await import("@shared/analysis/zip-price-index");
+    expect(zipPriceIndexCovers("9000")).toBe(true);
+    expect(zipPriceIndexCovers(" 9000 ")).toBe(true);
+    expect(zipPriceIndexCovers("9200")).toBe(false);
+    expect(zipPriceIndexCovers(null)).toBe(false);
+  });
+});

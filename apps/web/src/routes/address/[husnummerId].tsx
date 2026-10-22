@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import type { SoldPriceEntry } from "@shared/types/index";
 import { formatDkk } from "@shared/utils/price";
 import { ApiError, getPropertyLookup } from "@/lib/api";
 import { isHusnummerId } from "@/lib/address-search";
@@ -107,7 +108,7 @@ export function AddressReportPage() {
     <ComparablesPanel soldPriceHistory={[]} showHistory={false}
       nearbySales={report.nearbySales} comparables={[]} neighborhoodAvgPricePerSqm={null} />
 
-    <ZipPriceIndexCard postalCode={report.postalCode} areaSqm={bbrData?.areaSqm} areaSource="register" />
+    <ZipPriceIndexCard postalCode={report.postalCode} areaSqm={saleAreaSqm(report.priceHistory)} areaSource="sale" editableArea />
 
     {spar !== undefined && <>
       <SmartEstimateView result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} />
@@ -122,6 +123,12 @@ export function AddressReportPage() {
     <RegisterSourcesPanel sources={report.sources} isLoading={lookupQuery.isFetching} isError={false} onRetry={() => { void lookupQuery.refetch(); }} />
     <p className="text-xs leading-5 text-ink-faint">{t("address.report.listingOnly")}</p>
   </>);
+}
+
+/** Residential area of the address's latest sale that states one; BBR gives no usable home size on a live lookup. */
+function saleAreaSqm(history: SoldPriceEntry[]): number | null {
+  const latest = [...history].filter(entry => entry.areaDefinition === "residential" && (entry.residentialArea ?? 0) > 0).sort((a, b) => b.soldDate.localeCompare(a.soldDate))[0];
+  return latest?.residentialArea ?? null;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

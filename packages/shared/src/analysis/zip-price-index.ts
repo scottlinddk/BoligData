@@ -30,14 +30,19 @@ export interface ZipPriceIndex {
   latestMonth: string;
 }
 
+/** Whether the snapshot is for this postcode, regardless of any home size. */
+export function zipPriceIndexCovers(postalCode: string | null | undefined, snapshot: ZipMarketSnapshot = zipMarketSnapshot): boolean {
+  return !!postalCode && postalCode.trim() === snapshot.source.locationName;
+}
+
 /** Null when the snapshot does not cover the postcode or the size is not a usable number. */
 export function zipPriceIndex(
   input: { postalCode: string | null | undefined; areaSqm: number | null | undefined },
   snapshot: ZipMarketSnapshot = zipMarketSnapshot,
 ): ZipPriceIndex | null {
-  const postalCode = input.postalCode?.trim();
+  if (!zipPriceIndexCovers(input.postalCode, snapshot)) return null;
+  const postalCode = input.postalCode!.trim();
   const { areaSqm } = input;
-  if (!postalCode || postalCode !== snapshot.source.locationName) return null;
   if (typeof areaSqm !== "number" || !Number.isFinite(areaSqm) || areaSqm <= 0) return null;
 
   const years = yearlyAverages(monthlySeries("sold_per_area_price", snapshot)).map((row): ZipPriceIndexYear => {
