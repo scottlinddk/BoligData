@@ -1,308 +1,196 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { lookupAddressCadastral, parcelUrl, parseAdgangsadresse } from "./address-lookup.js";
+import { lookupAddressCadastral } from "./address-lookup.js";
 import { resetDatafordelerCache } from "./datafordeler.js";
-import { stubFetch } from "../test-support/stub-fetch.js";
 
 beforeEach(() => {
   resetDatafordelerCache();
 });
-
-/**
- * One DAWA /adgangsadresser record, trimmed to the fields this repo reads but
- * otherwise shaped exactly as the live API answers (captured 2026-08-01):
- * `zone` is the retired "Udfaset" placeholder, and `jordstykke` links to the
- * parcel rather than carrying its BFE number.
- */
-const dawaRecord = {
-  id: "0a3f509c-38ed-32b8-e044-0003ba298018",
-  adressebetegnelse: "Floravej 6, 9000 Aalborg",
-  husnr: "6",
-  vejstykke: { navn: "Floravej" },
-  postnummer: { nr: "9000", navn: "Aalborg" },
-  kommune: { kode: "0851", navn: "Aalborg" },
-  ejerlav: { kode: 610452, navn: "Gl. Hasseris By, Hasseris" },
-  matrikelnr: "42q",
-  adgangspunkt: { koordinater: [9.87640126, 57.04591973] },
-  jordstykke: {
-    href: "https://api.dataforsyningen.dk/jordstykker/610452/42q",
-    ejerlav: { kode: 610452, navn: "Gl. Hasseris By, Hasseris" },
-    matrikelnr: "42q",
-    esrejendomsnr: "0",
-  },
-  zone: "Udfaset",
-};
-
-/** The linked /jordstykker record, which is where the BFE number lives. */
-const parcelRecord = { matrikelnr: "42q", bfenummer: 2340871, registreretareal: 812 };
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
-describe("parseAdgangsadresse", () => {
-  it("maps a live DAWA record onto cadastral fields", () => {
-    const parsed = parseAdgangsadresse(dawaRecord);
-    expect(parsed).toEqual({
-      idLokalid: "0a3f509c-38ed-32b8-e044-0003ba298018",
-      matrikelnr: "42q",
-      ejerlav: "Gl. Hasseris By, Hasseris",
-      ejerlavskode: "610452",
-      bfeNummer: null,
-      zone: null,
-      lat: 57.04591973,
-      lon: 9.87640126,
-      postalCode: "9000",
-      postalName: "Aalborg",
-      municipalityCode: "0851",
-      formattedAddress: "Floravej 6, 9000 Aalborg",
-      resolvedVia: "dawa",
-    });
-  });
+const HUSNUMMER_ID = "0a3f509c-38ed-32b8-e044-0003ba298018";
+const ADRESSEPUNKT_ID = "1b4f509c-38ed-32b8-e044-0003ba298018";
 
-  it("reads cadastral fields out of a nested jordstykke when one carries them", () => {
-    const parsed = parseAdgangsadresse({
-      id: "abc",
-      jordstykke: { matrikelnr: "481i", ejerlav: { kode: 620551, navn: "Sofiendal" }, bfenummer: 2340871 },
-    });
-    expect(parsed?.matrikelnr).toBe("481i");
-    expect(parsed?.ejerlavskode).toBe("620551");
-    expect(parsed?.bfeNummer).toBe("2340871");
-  });
+const husnummerNode = {
+  id_lokalId: HUSNUMMER_ID,
+  adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
+  husnummertekst: "6",
+  adgangspunkt: ADRESSEPUNKT_ID,
+};
 
-  it("reads the flat structure where cadastral fields sit at the top level", () => {
-    const parsed = parseAdgangsadresse({
-      id: "abc",
-      matrikelnr: "7000a",
-      ejerlav: { kode: "100", navn: "Flat Ejerlav" },
-      zone: "Landzone",
-    });
-    expect(parsed?.matrikelnr).toBe("7000a");
-    expect(parsed?.ejerlavskode).toBe("100");
-    expect(parsed?.zone).toBe("landzone");
-  });
-
-  it("folds Danish zone spellings and numeric zone codes onto the ASCII union", () => {
-    expect(parseAdgangsadresse({ id: "a", zone: "Sommerhusområde" })?.zone).toBe("sommerhusomraade");
-    expect(parseAdgangsadresse({ id: "a", zone: 2 })?.zone).toBe("sommerhusomraade");
-    expect(parseAdgangsadresse({ id: "a", zone: "Byzone" })?.zone).toBe("byzone");
-    expect(parseAdgangsadresse({ id: "a", zone: "ukendt" })?.zone).toBeNull();
-  });
-
-  it("maps DAWA's retired zone placeholder to null rather than a bogus zone", () => {
-    expect(parseAdgangsadresse({ id: "a", zone: "Udfaset" })?.zone).toBeNull();
-  });
-
-  it("rejects coordinates outside Denmark rather than passing 0,0 downstream", () => {
-    const parsed = parseAdgangsadresse({ id: "a", adgangspunkt: { koordinater: [0, 0] } });
-    expect(parsed?.lat).toBeNull();
-    expect(parsed?.lon).toBeNull();
-  });
+const connection = (nodes: unknown[], hasNextPage = false) => ({ nodes, pageInfo: { hasNextPage } });
+const estates = (...bfe: number[]) => connection(bfe.map((BFEnummer) => ({ BFEnummer })));
+const parcel = (matrikelnummer: string, bfe: number[] = [2340871]) => ({
+  matrikelnummer,
+  jordstykkeLiggerIEjerlav: { ejerlavskode: 610452, ejerlavsnavn: "Gl. Hasseris By, Hasseris" },
+  jordstykkeSamlesISamletFastEjendom: estates(...bfe),
 });
-
-describe("parcelUrl", () => {
-  it("prefers the link the address record already carries", () => {
-    expect(parcelUrl(dawaRecord)).toBe("https://api.dataforsyningen.dk/jordstykker/610452/42q");
-  });
-
-  it("composes the parcel URL from ejerlav code and matrikelnr when there is no link", () => {
-    const record = { id: "a", jordstykke: { ejerlav: { kode: 610452 }, matrikelnr: "42q" } };
-    expect(parcelUrl(record)).toBe("https://api.dataforsyningen.dk/jordstykker/610452/42q");
-  });
-
-  it("returns null when the address has no parcel at all", () => {
-    expect(parcelUrl({ id: "a" })).toBeNull();
-  });
+const parcelResponse = (parcels: unknown[], hasNextPage = false) => ({
+  data: { DAR_Husnummer: connection([{ husnummerErPlaceretPaaJordstykke: connection(parcels, hasNextPage) }]) },
 });
+const husnummerResponse = (nodes: unknown[]) => ({ data: { DAR_Husnummer: connection(nodes) } });
+const adressepunktResponse = {
+  data: { DAR_Adressepunkt: connection([{ id_lokalId: ADRESSEPUNKT_ID, position: { wkt: "POINT (555784.21 6322850.06)", crs: "25832" } }]) },
+};
 
-describe("lookupAddressCadastral (live)", () => {
-  it("resolves an address against the address register", async () => {
-    const stub = stubFetch([{ body: [dawaRecord] }, { body: parcelRecord }]);
-    const result = await lookupAddressCadastral("floravej 6 9000 aalborg", null);
+interface Answers {
+  husnummer?: unknown;
+  adressepunkt?: unknown;
+  parcel?: unknown | { status: number };
+  adressevaelgerSearch?: unknown;
+  adressevaelgerHusnummer?: unknown;
+}
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.idLokalid).toBe("0a3f509c-38ed-32b8-e044-0003ba298018");
-    expect(result.data.matrikelnr).toBe("42q");
-    expect(result.data.ejerlav).toBe("Gl. Hasseris By, Hasseris");
-    expect(result.data.lat).toBeCloseTo(57.0459);
-    expect(stub.urls[0]).toContain("api.dataforsyningen.dk/adgangsadresser");
-    expect(stub.urls[0]).toContain("q=floravej+6+9000+aalborg");
-    expect(stub.urls[0]).not.toContain("fuzzy");
-  });
+/** Routes by request, not by order: the access point and the parcel are fetched concurrently. */
+function routeFetch(answers: Answers) {
+  const requests: { url: string; query?: string }[] = [];
+  const reply = (body: unknown) => ({ ok: true, status: 200, headers: new Headers(), json: async () => body });
+  vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
+    const href = String(url);
+    const query = typeof init?.body === "string" ? (JSON.parse(init.body).query as string) : undefined;
+    requests.push({ url: href, query });
+    if (href.includes("/Flexible/")) {
+      const body = answers.parcel ?? parcelResponse([parcel("42q")]);
+      const failure = (body as { status?: number }).status;
+      return typeof failure === "number" ? { ok: false, status: failure, headers: new Headers(), json: async () => ({}) } : reply(body);
+    }
+    if (href.includes("/DAR/")) {
+      return reply(query?.includes("AdressepunktLookup") ? (answers.adressepunkt ?? adressepunktResponse) : (answers.husnummer ?? husnummerResponse([husnummerNode])));
+    }
+    if (href.includes("husnumre/soeg")) return reply(answers.adressevaelgerSearch ?? { status: "ok", fund: [] });
+    if (href.includes("adressevaelger.dk/husnumre/")) return reply(answers.adressevaelgerHusnummer ?? {});
+    return reply({ error: `unexpected request ${href}` });
+  }) as unknown as typeof fetch);
+  return requests;
+}
 
-  it("follows the parcel link to pick up the BFE number VUR is keyed by", async () => {
-    const stub = stubFetch([{ body: [dawaRecord] }, { body: parcelRecord }]);
-    const result = await lookupAddressCadastral("Floravej 6", "9000");
-
-    expect(result.ok && result.data.bfeNummer).toBe("2340871");
-    expect(stub.urls[1]).toBe("https://api.dataforsyningen.dk/jordstykker/610452/42q");
-  });
-
-  it("keeps the address result when the parcel lookup fails", async () => {
-    stubFetch([{ body: [dawaRecord] }, { status: 404 }]);
-    const result = await lookupAddressCadastral("Floravej 6", "9000");
-
-    expect(result.ok).toBe(true);
-    expect(result.ok && result.data.bfeNummer).toBeNull();
-    expect(result.ok && result.data.matrikelnr).toBe("42q");
-  });
-
-  it("retries once with fuzzy matching when the exact search finds nothing", async () => {
-    const stub = stubFetch([{ body: [] }, { body: [dawaRecord] }, { body: parcelRecord }]);
-    const result = await lookupAddressCadastral("floravei 6", "9000");
-
-    expect(result.ok).toBe(true);
-    expect(stub.urls[1]).toContain("fuzzy=");
-    expect(stub.urls[1]).toContain("postnr=9000");
-  });
-
-  it("fails rather than inventing identifiers when nothing matches", async () => {
-    stubFetch([{ body: [] }, { body: [] }]);
-    const result = await lookupAddressCadastral("ikke en adresse", null);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error).toContain("no address match");
-  });
-
-  it("keeps caller-supplied coordinates when the register has none", async () => {
-    stubFetch([{ body: [{ ...dawaRecord, adgangspunkt: undefined }] }, { body: parcelRecord }]);
-    const result = await lookupAddressCadastral("Floravej 6", "9000", 57.05, 9.92);
-    expect(result.ok && result.data.lat).toBe(57.05);
-  });
-
-  it("reports upstream failures instead of throwing", async () => {
-    stubFetch([{ status: 400 }]);
-    const result = await lookupAddressCadastral("Floravej 6", null);
-    expect(result.ok).toBe(false);
-  });
-});
-
-describe("lookupAddressCadastral (DAR fallback)", () => {
-  const ADRESSEPUNKT_ID = "0a3f509c-38ed-32b8-e044-0003ba298018";
-
-  function husnummerResponse(nodes: unknown[]) {
-    return { data: { DAR_Husnummer: { nodes } } };
-  }
-
-  const husnummerNode = {
-    id_lokalId: "fallback-uuid",
-    adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
-    husnummertekst: "6",
-    adgangspunkt: ADRESSEPUNKT_ID,
-  };
-
-  const adressepunktResponse = {
-    data: { DAR_Adressepunkt: { nodes: [{ id_lokalId: ADRESSEPUNKT_ID, position: { wkt: "POINT (555784.21 6322850.06)", crs: "25832" } }] } },
-  };
-
-  it("falls back to Datafordeler DAR when DAWA and Adressevælger have no match and a key is configured", async () => {
+describe("lookupAddressCadastral (DAR)", () => {
+  beforeEach(() => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    const stub = stubFetch([
-      { body: [] }, // DAWA exact search: no match
-      { body: [] }, // DAWA fuzzy retry: no match
-      { body: { status: "ok", fund: [] } }, // Adressevælger search: no match
-      { body: husnummerResponse([husnummerNode]) }, // DAR_Husnummer
-      { body: adressepunktResponse }, // DAR_Adressepunkt
-    ]);
+  });
 
+  it("resolves identity, coordinates and the cadastral parcel from Datafordeler", async () => {
+    const requests = routeFetch({});
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.resolvedVia).toBe("dar_fallback");
-    expect(result.data.idLokalid).toBe("fallback-uuid");
+    expect(result.data).toMatchObject({
+      idLokalid: HUSNUMMER_ID,
+      matrikelnr: "42q",
+      ejerlav: "Gl. Hasseris By, Hasseris",
+      ejerlavskode: "610452",
+      bfeNummer: "2340871",
+      postalCode: "9000",
+      zone: null,
+      resolvedVia: "dar",
+    });
     // EPSG:25832 access point, projected back to WGS84.
     expect(result.data.lat).toBeCloseTo(57.05, 1);
     expect(result.data.lon).toBeCloseTo(9.92, 1);
-    expect(result.data.postalCode).toBe("9000");
-    // Cadastral fields and the municipality code are only ids on the husnummer; not guessed.
-    expect(result.data.matrikelnr).toBeNull();
-    expect(result.data.bfeNummer).toBeNull();
-    expect(result.data.municipalityCode).toBeNull();
-    expect(stub.urls[3]).toContain("graphql.datafordeler.dk/DAR");
 
-    const husnummerQuery = JSON.parse(stub.bodies[3]!).query as string;
+    expect(requests.some((r) => r.url.includes("dataforsyningen.dk"))).toBe(false);
+    const husnummerQuery = requests.find((r) => r.query?.includes("HusnummerLookup"))!.query!;
     // Both bitemporal arguments, the comma-terminated prefix and the current-status filter.
     expect(husnummerQuery).toContain("virkningstid:");
     expect(husnummerQuery).toContain("registreringstid:");
     expect(husnummerQuery).toContain('adgangsadressebetegnelse: { startsWith: "Floravej 6," }');
     expect(husnummerQuery).toContain('status: { eq: "3" }');
-    expect(JSON.parse(stub.bodies[4]!).query).toContain(`id_lokalId: { eq: "${ADRESSEPUNKT_ID}" }`);
+    expect(requests.find((r) => r.query?.includes("AdressepunktLookup"))!.query).toContain(`id_lokalId: { eq: "${ADRESSEPUNKT_ID}" }`);
+    expect(requests.find((r) => r.url.includes("/Flexible/"))!.query).toContain(`id_lokalId: { eq: "${HUSNUMMER_ID}" }`);
+  });
+
+  it("leaves matrikelnr and ejerlav empty, but keeps a single BFE, when the husnummer sits on several parcels", async () => {
+    routeFetch({ parcel: parcelResponse([parcel("42q"), parcel("42r")]) });
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+
+    expect(result.ok && result.data).toMatchObject({ matrikelnr: null, ejerlav: null, ejerlavskode: null, bfeNummer: "2340871" });
+  });
+
+  it("never picks a BFE when the husnummer maps to several estates", async () => {
+    routeFetch({ parcel: parcelResponse([parcel("42q", [2340871, 42])]) });
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+
+    expect(result.ok && result.data.matrikelnr).toBe("42q");
+    expect(result.ok && result.data.bfeNummer).toBeNull();
+  });
+
+  it("does not trust a truncated parcel page", async () => {
+    routeFetch({ parcel: parcelResponse([parcel("42q")], true) });
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+
+    expect(result.ok && result.data).toMatchObject({ matrikelnr: null, bfeNummer: null });
+  });
+
+  it("keeps the address result when the parcel service fails", async () => {
+    routeFetch({ parcel: { status: 500 } });
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+
+    expect(result.ok && result.data.idLokalid).toBe(HUSNUMMER_ID);
+    expect(result.ok && result.data.matrikelnr).toBeNull();
+    expect(result.ok && result.data.bfeNummer).toBeNull();
   });
 
   it("keeps the husnummer identity and the caller's coordinates when the access point cannot be read", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubFetch([
-      { body: [] }, { body: [] }, { body: { status: "ok", fund: [] } },
-      { body: husnummerResponse([husnummerNode]) },
-      { body: { data: { DAR_Adressepunkt: { nodes: [] } } } },
-    ]);
-
+    routeFetch({ adressepunkt: { data: { DAR_Adressepunkt: connection([]) } } });
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000", 57.05, 9.92);
 
-    expect(result.ok && result.data.idLokalid).toBe("fallback-uuid");
+    expect(result.ok && result.data.idLokalid).toBe(HUSNUMMER_ID);
     expect(result.ok && result.data.lat).toBe(57.05);
     expect(result.ok && result.data.lon).toBe(9.92);
   });
 
   it("rejects a husnummer in another postcode instead of guessing", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubFetch([
-      { body: [] }, { body: [] }, { body: { status: "ok", fund: [] } },
-      { body: husnummerResponse([{ ...husnummerNode, adgangsadressebetegnelse: "Floravej 6, 9700 Brønderslev" }]) },
-    ]);
-
+    routeFetch({ husnummer: husnummerResponse([{ ...husnummerNode, adgangsadressebetegnelse: "Floravej 6, 9700 Brønderslev" }]) });
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error).toContain("DAR fallback: no unique DAR husnummer match");
+    expect(result.error).toContain("DAR: no unique DAR husnummer match");
   });
 
-  it("reports both failures when DAWA and the DAR fallback both come up empty", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubFetch([{ body: [] }, { body: [] }, { body: { status: "ok", fund: [] } }, { body: husnummerResponse([]) }]);
-
+  it("reports both failures when DAR and Adressevælger come up empty", async () => {
+    routeFetch({ husnummer: husnummerResponse([]) });
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error).toContain("DAWA:");
-    expect(result.error).toContain("DAR fallback:");
+    expect(result.error).toContain("DAR:");
+    expect(result.error).toContain("Adressevælger:");
   });
 
-  it("does not attempt the DAR fallback when no Datafordeler key is configured", async () => {
-    const stub = stubFetch([{ body: [] }, { body: [] }]);
+  it("falls back to Adressevælger when DAR has no match", async () => {
+    routeFetch({
+      husnummer: husnummerResponse([]),
+      adressevaelgerSearch: { status: "ok", fund: [{ type: "husnummer", id: HUSNUMMER_ID, titel: "Floravej 6, 9000 Aalborg", vejnavn: "Floravej", husnummer: "6" }] },
+      adressevaelgerHusnummer: {
+        husnummer: {
+          id_lokalid: HUSNUMMER_ID, husnummertekst: "6", vejnavn: "Floravej", adgangsadressebetegnelse: "Floravej 6, 9000 Aalborg",
+          adgangspunkt: { koordinater: { x: 555784.21, y: 6322850.06 } },
+          postnummer: { postnr: "9000", navn: "Aalborg" }, navngivenvejkommunedel: { kommune: "0851" },
+        },
+      },
+    });
     const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
-    expect(result.ok).toBe(false);
-    expect(stub.urls.every((url) => !url.includes("datafordeler.dk"))).toBe(true);
+    expect(result.ok && result.data).toMatchObject({ idLokalid: HUSNUMMER_ID, resolvedVia: "adressevaelger", matrikelnr: null, municipalityCode: "0851" });
   });
 });
 
-describe("lookupAddressCadastral (Adressevælger, now that DAWA is gone)", () => {
-  const husnummer = {
-    husnummer: {
-      id_lokalid: "0a3f509c-4f33-32b8-e044-0003ba298018", husnummertekst: "3", vejnavn: "Hasserisgade",
-      adgangsadressebetegnelse: "Hasserisgade 3, 9000 Aalborg",
-      adgangspunkt: { koordinater: { x: 555784.21, y: 6322850.06 } },
-      postnummer: { postnr: "9000", navn: "Aalborg" }, navngivenvejkommunedel: { kommune: "0851" },
-    },
-  };
+describe("lookupAddressCadastral (no Datafordeler key)", () => {
+  it("goes straight to Adressevælger and never calls Datafordeler", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "");
+    const requests = routeFetch({});
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
 
-  it("resolves an exact street, number and postcode through the search and then the husnummer record", async () => {
-    const stub = stubFetch([
-      { status: 410 }, // DAWA closed
-      { body: { status: "ok", fund: [{ type: "husnummer", id: "0a3f509c-4f33-32b8-e044-0003ba298018", titel: "Hasserisgade 3, 9000 Aalborg", vejnavn: "Hasserisgade", husnummer: "3" }] } },
-      { body: husnummer },
-    ]);
-    const result = await lookupAddressCadastral("Hasserisgade 3", "9000");
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data).toMatchObject({ idLokalid: "0a3f509c-4f33-32b8-e044-0003ba298018", municipalityCode: "0851", postalCode: "9000", resolvedVia: "adressevaelger", matrikelnr: null });
-    expect(result.data.lat).toBeCloseTo(57.046, 2);
-    expect(stub.urls.some((url) => url.includes("/husnumre/soeg?") && url.includes("tekst=Hasserisgade+3%2C+9000"))).toBe(true);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("DATAFORDELER_API_KEY");
+    expect(requests.every((r) => !r.url.includes("datafordeler.dk"))).toBe(true);
+    expect(requests.some((r) => r.url.includes("husnumre/soeg"))).toBe(true);
   });
 });
 
@@ -327,9 +215,10 @@ describe("lookupAddressCadastral (mock mode)", () => {
   });
 
   it("treats an unset flag as live, not as mock", async () => {
-    const stub = stubFetch([{ body: [dawaRecord] }, { body: parcelRecord }]);
-    const result = await lookupAddressCadastral("Floravej 6", "9000");
-    expect(stub.urls[0]).toContain("api.dataforsyningen.dk");
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const requests = routeFetch({});
+    const result = await lookupAddressCadastral("Floravej 6, 9000 Aalborg", "9000");
+    expect(requests[0]!.url).toContain("graphql.datafordeler.dk");
     expect(result.ok && result.data.idLokalid).not.toMatch(/^mock-/);
   });
 });

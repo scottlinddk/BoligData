@@ -1,5 +1,5 @@
 import type { SchoolDistrictResult } from "../../../../../packages/shared/src/types/school-district.js";
-import { parseStructuredAddress } from "../enrichment-sources/address-lookup-dar-fallback.js";
+import { parseStructuredAddress } from "../enrichment-sources/address-lookup-dar.js";
 
 export const REQUEST_OPTIONS = { timeoutMs: 5_000, attempts: 1 };
 

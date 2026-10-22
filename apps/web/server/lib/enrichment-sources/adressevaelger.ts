@@ -123,7 +123,7 @@ export function pickExactHusnummer(
 
 /**
  * Free-text address ("Vej 12B, 9000 Aalborg") -> the husnummer, through Adressevælger's search and then its
- * `/husnumre/{id}` record. This is what listings use now that DAWA is gone: the search is the one open,
+ * `/husnumre/{id}` record. This is the keyless path for listings (and for those DAR cannot match): the search is the one open,
  * keyless register search left, and only an exact match is accepted (see `pickExactHusnummer`).
  */
 export async function searchHusnummerByAddress(

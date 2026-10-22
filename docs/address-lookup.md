@@ -13,7 +13,12 @@ Without an asking price the three price-based screening criteria (`priceCeiling`
 
 ## Why not DAWA
 
-DAWA closed on 2026-10-01 and answers `410 Gone` (verified 2026-10-17). Its replacement, Adressevælger, needs no registration, only a `token` of at least 10 characters. KDS recommends the shared value `adressevaelger123`, which is the default. Override with `ADRESSEVAELGER_TOKEN` / `ADRESSEVAELGER_API_BASE` (server only; the browser client uses the published token). When KDS introduces user management, update both.
+DAWA closed on 2026-10-01 and answers `410 Gone` (verified 2026-10-17). Two services replace it:
+
+- **Free-text addresses (listings, crawl)** resolve through Datafordeler's DAR GraphQL service (`enrichment-sources/address-lookup-dar.ts`, needs `DATAFORDELER_API_KEY`): `DAR_Husnummer` for identity, `DAR_Adressepunkt` for coordinates, and the Flexible service (`husnummerErPlaceretPaaJordstykke` -> `jordstykkeSamlesISamletFastEjendom`) for `matrikelnr`, ejerlav and BFE number. A husnummer on several parcels leaves matrikelnr/ejerlav empty, and one on several estates leaves the BFE empty. The parcel step never fails the lookup.
+- **Adressevælger** needs no registration, only a `token` of at least 10 characters. KDS recommends the shared value `adressevaelger123`, which is the default. Override with `ADRESSEVAELGER_TOKEN` / `ADRESSEVAELGER_API_BASE` (server only; the browser client uses the published token). When KDS introduces user management, update both. It serves the autocomplete, id lookups, and is the keyless fallback for free text (identity and coordinates, no parcel).
+
+**Not verified against live data:** the Flexible parcel query reuses the field names and join `cadastral/source.ts` already sends (`matrikelnummer`, `jordstykkeLiggerIEjerlav { ejerlavskode ejerlavsnavn }`, `BFEnummer`), but the unit tests pin the document and a stubbed answer, not a real response. After deploying, check that a crawl's `matrikelLookupFailed` count drops sharply.
 
 ## Valuation, smart estimate and SPAR (houses)
 
