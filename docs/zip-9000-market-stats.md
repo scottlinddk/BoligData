@@ -86,6 +86,41 @@ relationship would need differenced or detrended series.
 - **Snapshot age.** The capture time is unknown. The importer did not fetch this data.
   It was pasted into the session on 2026-10-22.
 
+## The /stats page
+
+`/stats` (signed-in users) shows the snapshot as KPI cards, a four-panel timeline, a
+year table, written remarks and relationship charts. The route is `apps/web/src/routes/stats.tsx`.
+
+How the pieces fit:
+
+| Layer | File | Role |
+| --- | --- | --- |
+| Statistics | `packages/shared/src/analysis/zip-market-relationships.ts` | 12-month changes, lagged correlation, phase summaries, relationship report |
+| Remarks | `apps/web/src/lib/zip-market-remarks.ts` | Danish and English text. Fixed wording, figures read from the computed data |
+| View model | `apps/web/src/lib/zip-market-view.ts` | KPI, yearly and seasonal numbers for the page |
+| Charts | `apps/web/src/components/stats/` | SVG charts, no chart library |
+
+Choices that affect how to read it:
+
+- **Changes, not levels.** Relationships use 12-month changes, with annual averages as a
+  cross-check. Levels share a long trend, which is why the level correlations above are
+  only descriptive.
+- **Discount as a size.** The snapshot stores the discount as a negative number. The
+  analysis module and the page present it as a positive size, so "up" means a larger discount.
+- **Phases.** Eight phases bounded by turning points in the price series (`MARKET_PHASES`).
+  They describe, they do not assign a cause. Mentions of covid-19 and 2022-23 mortgage rates
+  are context only, because the snapshot holds no such data.
+- **Conservative strength labels.** Each remark's badge uses the weaker of the best-lag and
+  the annual-average correlation.
+
+### Refreshing the snapshot
+
+The remarks quote numbers from the data, but their wording makes claims such as "supply is
+the strongest companion of the asking price". `zip-market-relationships.test.ts` and
+`zip-market-view.test.ts` pin each claim. If a refresh breaks one, the test fails and the
+matching text in `zip-market-remarks.ts` or `stats.tsx` needs rewriting. Do not loosen the
+test to make it pass.
+
 ## Refresh
 
 No importer exists for this postcode yet. To update, obtain a new extract with the
