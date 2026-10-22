@@ -216,7 +216,7 @@ export function PropertyDetailPage() {
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
           <div ref={priceReference} id="price-reference" tabIndex={-1} aria-label={tx("Prisoverblik", "Price overview")} className="section-anchor rounded-2xl">
-            <PriceTabs propertyId={property.id} propertyType={property.propertyType} askingPriceDkk={property.price} timeOnMarketPriceDkk={timeOnMarketReference.status === "available" ? timeOnMarketReference.referencePrice : null}
+            <PriceTabs propertyId={property.id} propertyType={property.propertyType} askingPriceDkk={property.price} postalCode={property.postalCode} areaSqm={property.sqm} timeOnMarketPriceDkk={timeOnMarketReference.status === "available" ? timeOnMarketReference.referencePrice : null}
               timeOnMarket={<WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />} />
           </div>
           <div id="description" className="section-anchor"><PropertyDescription key={property.id} property={property} details={listingDetails} /></div>

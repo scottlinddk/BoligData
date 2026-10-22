@@ -12,6 +12,7 @@ import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { SalesHistoryCard } from "@/components/sales-history-card";
 import { SmartEstimateView } from "@/components/estimate/smart-estimate";
 import { SparContent } from "@/components/spar-panel";
+import { ZipPriceIndexCard } from "@/components/estimate/zip-price-index-card";
 import { Footer } from "@/components/footer";
 import { LoadingStatus, Skeleton, Spinner } from "@/components/ui/loading";
 import { useI18n } from "@/i18n/i18n";
@@ -105,6 +106,8 @@ export function AddressReportPage() {
 
     <ComparablesPanel soldPriceHistory={[]} showHistory={false}
       nearbySales={report.nearbySales} comparables={[]} neighborhoodAvgPricePerSqm={null} />
+
+    <ZipPriceIndexCard postalCode={report.postalCode} areaSqm={bbrData?.areaSqm} areaSource="register" />
 
     {spar !== undefined && <>
       <SmartEstimateView result={spar ?? undefined} loading={false} failed={spar === null} onRetry={retry} />
