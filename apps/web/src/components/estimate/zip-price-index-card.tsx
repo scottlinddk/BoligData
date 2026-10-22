@@ -1,24 +1,65 @@
-import { zipPriceIndex, type ZipPriceIndex } from "@shared/analysis/zip-price-index";
+import { useState, type ReactNode } from "react";
+import { zipPriceIndex, zipPriceIndexCovers, type ZipPriceIndex } from "@shared/analysis/zip-price-index";
 import { formatDkk } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
 import { formatPeriod, formatSignedPercent } from "@/lib/smart-estimate";
 
 const sqmFormat = (value: number, language: "da" | "en") => `${value.toLocaleString(language === "da" ? "da-DK" : "en-GB")} m²`;
 
+export type ZipPriceIndexAreaSource = "listing" | "sale" | "entered";
+
 /**
  * The home's size times the postcode's average sold price per m², for every year of the snapshot.
- * Renders nothing when the postcode is not covered or the size is unknown, so callers can mount it unconditionally.
+ * Renders nothing when the postcode is not covered. Without a known size it renders nothing too, unless
+ * `editableArea` is set: then the visitor can enter the size, which is how an address without a listing gets one.
  */
-export function ZipPriceIndexCard({ postalCode, areaSqm, askingPriceDkk = null, areaSource }: {
+export function ZipPriceIndexCard({ postalCode, areaSqm, askingPriceDkk = null, areaSource, editableArea = false }: {
   postalCode: string | null | undefined; areaSqm: number | null | undefined; askingPriceDkk?: number | null;
-  /** Where the size comes from, since a listing's living area and a register's building area are not the same number. */
-  areaSource: "listing" | "register";
+  /** Where `areaSqm` comes from, since a listing's living area and a sale's residential area are not the same number. */
+  areaSource: Exclude<ZipPriceIndexAreaSource, "entered">;
+  editableArea?: boolean;
 }) {
-  const index = zipPriceIndex({ postalCode, areaSqm });
-  return index ? <ZipPriceIndexView index={index} askingPriceDkk={askingPriceDkk} areaSource={areaSource} /> : null;
+  if (!zipPriceIndexCovers(postalCode)) return null;
+  if (!editableArea) {
+    const index = zipPriceIndex({ postalCode, areaSqm });
+    return index ? <ZipPriceIndexView index={index} askingPriceDkk={askingPriceDkk} areaSource={areaSource} /> : null;
+  }
+  return <EditableZipPriceIndex postalCode={postalCode} knownAreaSqm={areaSqm ?? null} areaSource={areaSource} askingPriceDkk={askingPriceDkk} />;
 }
 
-function ZipPriceIndexView({ index, askingPriceDkk, areaSource }: { index: ZipPriceIndex; askingPriceDkk: number | null; areaSource: "listing" | "register" }) {
+function EditableZipPriceIndex({ postalCode, knownAreaSqm, areaSource, askingPriceDkk }: { postalCode: string | null | undefined; knownAreaSqm: number | null; areaSource: Exclude<ZipPriceIndexAreaSource, "entered">; askingPriceDkk: number | null }) {
+  const { language } = useI18n();
+  const tx = (da: string, en: string) => language === "da" ? da : en;
+  const [text, setText] = useState(knownAreaSqm !== null ? String(knownAreaSqm) : "");
+  const entered = Number(text.replace(",", "."));
+  const areaSqm = text.trim() !== "" && Number.isFinite(entered) ? entered : null;
+  const index = zipPriceIndex({ postalCode, areaSqm });
+  const edited = knownAreaSqm === null || areaSqm !== knownAreaSqm;
+  return <div className="min-w-0">
+    {index
+      ? <ZipPriceIndexView index={index} askingPriceDkk={askingPriceDkk} areaSource={edited ? "entered" : areaSource}>
+          <AreaInput value={text} onChange={setText} />
+        </ZipPriceIndexView>
+      : <section id="price-index" aria-labelledby="price-index-heading" data-testid="zip-price-index" className="section-anchor min-w-0 rounded-2xl bg-surface-alt p-5 sm:p-7">
+          <h2 id="price-index-heading" className="text-xl font-medium tracking-tight">{tx("Prisindeks pr. m²", "Price by square meter index")}</h2>
+          <p className="mt-1 text-sm text-ink-soft">{tx("Boligens størrelse gange den gennemsnitlige salgspris pr. m² i 9000 Aalborg", "The home's size times the average sold price per m² in 9000 Aalborg")}</p>
+          <p className="mt-4 text-sm text-ink-soft">{tx("Boligarealet kendes ikke for denne adresse. Indtast det for at se prisindekset.", "The living area is not known for this address. Enter it to see the price index.")}</p>
+          <div className="mt-3"><AreaInput value={text} onChange={setText} /></div>
+        </section>}
+  </div>;
+}
+
+function AreaInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { language } = useI18n();
+  return <label className="mt-4 flex items-center gap-3 text-sm text-ink-soft">
+    <span>{language === "da" ? "Boligareal" : "Living area"}</span>
+    <input type="number" inputMode="decimal" min={1} step={1} value={value} onChange={event => onChange(event.target.value)}
+      className="min-h-11 w-28 rounded-lg border border-border-strong bg-surface px-3 text-base text-ink" />
+    <span>m²</span>
+  </label>;
+}
+
+function ZipPriceIndexView({ index, askingPriceDkk, areaSource, children }: { index: ZipPriceIndex; askingPriceDkk: number | null; areaSource: ZipPriceIndexAreaSource; children?: ReactNode }) {
   const { language } = useI18n();
   const tx = (da: string, en: string) => language === "da" ? da : en;
   const { current } = index;
@@ -31,6 +72,7 @@ function ZipPriceIndexView({ index, askingPriceDkk, areaSource }: { index: ZipPr
     <h2 id="price-index-heading" className="text-xl font-medium tracking-tight">{tx("Prisindeks pr. m²", "Price by square meter index")}</h2>
     <p className="mt-1 text-sm text-ink-soft">{tx(`Boligens størrelse gange den gennemsnitlige salgspris pr. m² i ${index.postalCode} ${index.municipality}`, `The home's size times the average sold price per m² in ${index.postalCode} ${index.municipality}`)}</p>
 
+    {children}
     <div className="mt-6 rounded-xl border border-border bg-surface p-5 shadow-card">
       <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-soft">{partial ? tx(`${current.year} indtil ${formatPeriod(index.latestMonth, language)}`, `${current.year} up to ${formatPeriod(index.latestMonth, language)}`) : String(current.year)}</p>
       <p className="mt-2 text-[32px] font-semibold leading-none tracking-[-0.04em]" data-testid="zip-price-index-value">{formatDkk(current.valueDkk)}</p>
@@ -58,7 +100,9 @@ function ZipPriceIndexView({ index, askingPriceDkk, areaSource }: { index: ZipPr
       {tx("Et grovt pejlemærke, ikke en vurdering. Indekset kender kun områdets gennemsnitlige m²-pris for villaer og rækkehuse (Boligsiden Markedsindeks) og tager ikke højde for boligens stand, grund eller beliggenhed.", "A rough reference point, not an appraisal. The index only knows the area's average m² price for villas and terraced houses (Boligsiden Markedsindeks) and ignores the home's condition, plot and location.")}
       {" "}{areaSource === "listing"
         ? tx("Størrelsen er boligarealet fra annoncen.", "The size is the living area from the listing.")
-        : tx("Størrelsen er bygningens areal fra BBR, som kan afvige fra boligarealet.", "The size is the building area from BBR, which can differ from the living area.")}
+        : areaSource === "sale"
+          ? tx("Størrelsen er boligarealet fra adressens seneste registrerede handel og kan være ændret siden.", "The size is the living area from the address's latest registered sale and may have changed since.")
+          : tx("Størrelsen er indtastet af dig.", "The size is the one you entered.")}
       {partial && " " + tx(`${current.year} er et ufuldstændigt år, så gennemsnittet kan ændre sig.`, `${current.year} is an incomplete year, so its average can still change.`)}
     </p>
   </section>;
