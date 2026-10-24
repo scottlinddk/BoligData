@@ -164,6 +164,25 @@ describe("Boligsiden weekly coverage", () => {
     expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
+  it("retries a page that answers 200 without a cases array instead of truncating the scope", async () => {
+    vi.mocked(fetchJson)
+      .mockResolvedValueOnce({ totalHits: 2, cases: [record(1)] })
+      .mockResolvedValueOnce({ message: "temporarily unavailable" } as never)
+      .mockResolvedValueOnce({ totalHits: 2, cases: [record(2)] });
+    const { listings, stats } = await fetchBoligsidenListings();
+    expect(listings).toHaveLength(2);
+    expect(stats).toMatchObject({ complete: true, errors: [] });
+    expect(fetchJson).toHaveBeenCalledTimes(3);
+  });
+
+  it("still reports a persistent missing cases array after bounded retries", async () => {
+    vi.mocked(fetchJson).mockResolvedValue({ message: "changed" } as never);
+    const { stats } = await fetchBoligsidenListings();
+    expect(stats.complete).toBe(false);
+    expect(stats.errors).toEqual(["page 1: missing cases array"]);
+    expect(fetchJson).toHaveBeenCalledTimes(3);
+  });
+
   it("fails when an empty page arrives before the source-reported total", async () => {
     vi.mocked(fetchJson).mockResolvedValueOnce({ totalHits: 3, cases: [record(1)] }).mockResolvedValueOnce({ totalHits: 3, cases: [] });
     const { stats } = await fetchBoligsidenListings();
