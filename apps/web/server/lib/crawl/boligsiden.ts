@@ -313,6 +313,26 @@ function chunkZipCodes(zipCodes: number[], size: number): number[][] {
   return batches;
 }
 
+/** Total tries for one page whose 200 response carries no `cases` array. */
+const PAGE_SHAPE_ATTEMPTS = 3;
+
+/**
+ * The search endpoint occasionally answers HTTP 200 with a body that has no
+ * `cases` array (an error envelope under load). That is transient, so the same
+ * page is requested again instead of truncating the whole crawl scope, which
+ * would fail the batch with a 502. A persistent shape change still surfaces
+ * after the last attempt.
+ */
+async function fetchPage(url: string, delayMs: number): Promise<BoligsidenPage> {
+  let body = await fetchJson<BoligsidenPage>(url);
+  for (let attempt = 1; attempt < PAGE_SHAPE_ATTEMPTS && !Array.isArray(body?.cases); attempt++) {
+    logEvent("crawl.boligsiden.page_shape_retry", { attempt, keys: Object.keys(body ?? {}).slice(0, 10) });
+    await sleep(Math.max(delayMs, 500) * 2 ** (attempt - 1));
+    body = await fetchJson<BoligsidenPage>(url);
+  }
+  return body;
+}
+
 /**
  * Fetches active listings from Boligsiden, paginated. A page failure (after
  * retries) stops pagination but returns what was collected — partial data
@@ -385,7 +405,7 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
 
       let body: BoligsidenPage;
       try {
-        body = await fetchJson<BoligsidenPage>(url);
+        body = await fetchPage(url, delayMs);
       } catch (err) {
         logError("crawl.boligsiden.page_failed", err, { page });
         stats.errors.push(
