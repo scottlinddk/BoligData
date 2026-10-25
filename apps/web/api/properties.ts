@@ -1,4 +1,5 @@
 import { handleCadastral } from "../server/lib/cadastral/handler.js";
+import { handleParcelOwner, handleParcels } from "../server/lib/parcel-map/handler.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type {
   SearchPropertiesQuery,
@@ -173,6 +174,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  const resource = str(req.query.resource);
+  if (resource === "parcels" || resource === "parcel-owner") {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    try {
+      if (resource === "parcels") await handleParcels(str(req.query.bbox), res);
+      else await handleParcelOwner(getAnonClient(user.jwt), str(req.query.bfe), res);
+    } catch (error) { sendError(res, 500, "Failed to load parcels", error); }
     return;
   }
 

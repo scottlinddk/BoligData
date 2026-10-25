@@ -22,6 +22,10 @@ The private **Boligprojekt / Buying project** workspace adds project requirement
 
 **Apply migration 023 before deploying this change.** Legacy provenance remains unknown until real source observations establish it. Register lookup now requires sign-in, uses an atomic 30-per-hour/account quota and returns private, uncached responses. This supersedes the earlier anonymous-lookup and public-cache descriptions below. New sales refresh independently of asking-price changes; missing listing dates and missing sale-area values remain unknown. No user workbook or production database was imported/modified during implementation.
 
+## Parcel owner map
+
+Signed-in users can open `/map`, zoom to street level and click a parcel to see its registered owner. Mock mode is the default; the live parcel query still needs verifying before it is switched on. See [parcel owner map](docs/parcel-owner-map.md). No migration is needed.
+
 ## Due-diligence checklist from live registers
 
 Noise, oil tank and soil contamination are now answered from Miljøstyrelsen's noise maps, BBR (heating and the tank register) and Danmarks Miljøportal's V1/V2 register, and listing addresses resolve through Adressevælger now that DAWA is closed. The checklist also reads Matriklen (MAT) for fredskov, strandbeskyttelse, klitfredning and farmland notes, and VUR for the public valuation against the asking price. Listing pages show live answers; stored rows heal on the next crawl. No migration is needed. See [checklist sources and what was verified](docs/due-diligence-checklist.md).

@@ -20,6 +20,7 @@ import { ComparePage } from "@/routes/compare";
 import { PropertyEstimatePage } from "@/routes/property/estimate";
 import { AddressLookupPage } from "@/routes/address/index";
 import { AddressReportPage } from "@/routes/address/[husnummerId]";
+import { ParcelMapPage } from "@/routes/map";
 import { RecommendationsPage } from "@/routes/recommendations";
 import { StatsPage } from "@/routes/stats";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
@@ -40,7 +41,7 @@ import "./index.css";
 
 function RootLayout() {
   const { pathname } = useLocation();
-  const isWorkspace = ["/research", "/dashboard", "/recommendations"].includes(pathname.replace(/\/$/, ""));
+  const isWorkspace = ["/research", "/dashboard", "/recommendations", "/map"].includes(pathname.replace(/\/$/, ""));
   const { user } = useAuth();
   const hasTabBar = Boolean(user) && !pathname.startsWith("/property/") && !pathname.startsWith("/auth/");
   return (
@@ -75,6 +76,14 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <PropertyEstimatePage />
+          </AuthGuard>
+        ),
+      },
+      {
+        path: "/map",
+        element: (
+          <AuthGuard>
+            <ParcelMapPage />
           </AuthGuard>
         ),
       },

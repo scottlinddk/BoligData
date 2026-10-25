@@ -60,3 +60,29 @@ export function etrs89Utm32ToWgs84(easting: number, northing: number): { lat: nu
     lon: CENTRAL_MERIDIAN_DEG + (longitudeOffset * 180) / Math.PI,
   };
 }
+
+const ALPHA = [
+  n / 2 - (2 * n2) / 3 + (5 * n3) / 16 + (41 * n4) / 180,
+  (13 * n2) / 48 - (3 * n3) / 5 + (557 * n4) / 1440,
+  (61 * n3) / 240 - (103 * n4) / 140,
+  (49_561 * n4) / 161_280,
+];
+
+/** WGS84 latitude/longitude -> ETRS89 / UTM zone 32N (forward Krüger series; same datum assumption as above). */
+export function wgs84ToEtrs89Utm32(lat: number, lon: number): { easting: number; northing: number } | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const phi = (lat * Math.PI) / 180;
+  const lambda = ((lon - CENTRAL_MERIDIAN_DEG) * Math.PI) / 180;
+  const e = Math.sqrt(FLATTENING * (2 - FLATTENING));
+  const t = Math.sinh(Math.atanh(Math.sin(phi)) - e * Math.atanh(e * Math.sin(phi)));
+  const xiPrime = Math.atan2(t, Math.cos(lambda));
+  const etaPrime = Math.atanh(Math.sin(lambda) / Math.sqrt(1 + t * t));
+  let xi = xiPrime;
+  let eta = etaPrime;
+  ALPHA.forEach((alpha, index) => {
+    const j = 2 * (index + 1);
+    xi += alpha * Math.sin(j * xiPrime) * Math.cosh(j * etaPrime);
+    eta += alpha * Math.cos(j * xiPrime) * Math.sinh(j * etaPrime);
+  });
+  return { easting: FALSE_EASTING + SCALE * rectifyingRadius * eta, northing: SCALE * rectifyingRadius * xi };
+}
