@@ -98,6 +98,9 @@ export function mapOwners(raw: unknown): CadastralOwner[] {
   });
 }
 
+export async function getParcelOwners(bfe: string)
+  : Promise<CadastralReport["owners"]> { return owners(bfe); }
+
 async function owners(bfe: string): Promise<CadastralReport["owners"]> {
   try {
     const raw = await fetchJson<unknown>(`${API}/BfeEjer?${new URLSearchParams({ bfe })}`, { timeoutMs: TIMEOUT, attempts: 1 });
