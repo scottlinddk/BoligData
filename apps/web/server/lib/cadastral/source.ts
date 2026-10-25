@@ -98,8 +98,22 @@ export function mapOwners(raw: unknown): CadastralOwner[] {
   });
 }
 
-export async function getParcelOwners(bfe: string)
-  : Promise<CadastralReport["owners"]> { return owners(bfe); }
+/** Same gate as getCadastralReport: owners only when the estate is explicitly neither a condominium parent nor a common lot. */
+export async function getParcelOwners(bfe: string): Promise<CadastralReport["owners"]> {
+  const unavailable: CadastralReport["owners"] = { status: "unavailable", items: [], reason: "source_unavailable" };
+  const key = process.env.DATAFORDELER_API_KEY?.trim();
+  if (!key || !id(bfe)) return unavailable;
+  try {
+    const now = new Date().toISOString();
+    const estates = nodes(await query("MAT_SamletFastEjendom", `MAT_SamletFastEjendom(first: 2, ${temporal(now)}, where: {BFEnummer: {eq: ${bfe}}, status: {eq: "Gældende"}}) {
+      nodes { BFEnummer hovedejendomOpdeltIEjerlejligh erFaelleslod }
+    }`, key));
+    if (estates.length !== 1 || id(estates[0]!.BFEnummer) !== bfe) return { status: "not_found", items: [], reason: null };
+    const condominiumParent = bool(estates[0]!.hovedejendomOpdeltIEjerlejligh), commonLot = bool(estates[0]!.erFaelleslod);
+    if (condominiumParent !== false || commonLot !== false) return { status: "unavailable", items: [], reason: condominiumParent ? "condominium_parent" : commonLot ? "common_lot" : "source_unavailable" };
+    return await owners(bfe);
+  } catch { return unavailable; }
+}
 
 async function owners(bfe: string): Promise<CadastralReport["owners"]> {
   try {

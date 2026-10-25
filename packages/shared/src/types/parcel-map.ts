@@ -25,5 +25,5 @@ export interface ParcelOwnerResponse {
   status: CadastralStatus;
   /** Protected persons are returned with `name: null, protected: true`. */
   owners: CadastralOwner[];
-  reason: "source_unavailable" | "condominium_parent" | null;
+  reason: "source_unavailable" | "condominium_parent" | "common_lot" | null;
 }

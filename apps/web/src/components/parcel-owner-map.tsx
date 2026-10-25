@@ -87,6 +87,7 @@ export function ParcelOwnerMap() {
           : limited ? <p role="alert" className="text-warning">{tx("Grænsen for registeropslag er nået. Prøv igen om lidt.", "Register lookup limit reached. Try again later.")}</p>
           : owner.isError ? <p role="alert" className="text-warning">{tx("Ejeren kunne ikke hentes.", "The owner could not be loaded.")}</p>
           : owner.data.reason === "condominium_parent" ? <p className="text-ink-soft">{tx("Opdelt i ejerlejligheder – ejerne er knyttet til de enkelte lejligheder.", "Divided into condominiums – owners belong to the individual units.")}</p>
+          : owner.data.reason === "common_lot" ? <p className="text-ink-soft">{tx("Fælleslod – ejerne er knyttet til de tilhørende ejendomme.", "Common lot – owners belong to the properties that share it.")}</p>
           : owner.data.status !== "available" ? <p className="text-ink-soft">{owner.data.status === "not_found" ? tx("Ingen registreret ejer.", "No registered owner.") : tx("Ejeroplysninger er ikke tilgængelige.", "Owner details are unavailable.")}</p>
           : <ul className="space-y-2">{owner.data.owners.map((o, i) => <li key={i}>
               <span className="font-medium">{o.protected ? tx("Navne- og adressebeskyttet", "Name and address protected") : o.name ?? "–"}</span>

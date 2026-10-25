@@ -24,5 +24,5 @@ export async function handleParcelOwner(client: SupabaseClient, bfeParam: unknow
   if (budget.error) { res.status(503).json({ error: "Register lookup temporarily unavailable" }); return; }
   if (budget.data !== true) { res.setHeader("Retry-After", "3600"); res.status(429).json({ error: "Register lookup limit reached" }); return; }
   const owners = await getParcelOwners(bfe);
-  res.status(200).json({ bfeNumber: bfe, status: owners.status, owners: owners.items, reason: owners.reason === "common_lot" ? null : owners.reason } satisfies ParcelOwnerResponse);
+  res.status(200).json({ bfeNumber: bfe, status: owners.status, owners: owners.items, reason: owners.reason } satisfies ParcelOwnerResponse);
 }

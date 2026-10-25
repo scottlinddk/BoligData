@@ -60,4 +60,26 @@ describe("owner endpoint", () => {
     await handleParcelOwner({ rpc: vi.fn(async () => ({ data: false, error: null })) } as never, "3299123", r as never);
     expect(r.code).toBe(429); expect(r.headers["Retry-After"]).toBe("3600");
   });
+  const gate = async (estate: Record<string, unknown>) => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("graphql")
+      ? { data: { MAT_SamletFastEjendom: { nodes: [{ BFEnummer: 3299123, ...estate }] } } }
+      : { ejere: [{ navn: "Test Owner", type: "Person" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { getParcelOwners } = await import("../cadastral/source.js");
+    return { result: await getParcelOwners("3299123"), fetchMock };
+  };
+  it("returns owners only when the estate is explicitly not a condominium parent or common lot", async () => {
+    const ok = await gate({ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: false });
+    expect(ok.result.items).toHaveLength(1);
+  });
+  it.each([
+    [{ hovedejendomOpdeltIEjerlejligh: true, erFaelleslod: false }, "condominium_parent"],
+    [{ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: true }, "common_lot"],
+    [{ hovedejendomOpdeltIEjerlejligh: false }, "source_unavailable"],
+  ])("withholds owners and never calls BfeEjer for %j", async (estate, reason) => {
+    const { result, fetchMock } = await gate(estate);
+    expect(result.items).toEqual([]); expect(result.reason).toBe(reason);
+    expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("BfeEjer"))).toBe(true);
+  });
 });
