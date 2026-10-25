@@ -163,7 +163,7 @@ export function SearchPage() {
         </div>}
         </section>
         {showMap && <aside aria-label={tx("Kort over boliger", "Map of homes")} className={isMobile ? "min-w-0" : "sticky top-20 h-[calc(100dvh-7rem)] min-h-[500px] max-h-[900px] self-start overflow-hidden rounded-[22px] border border-border"}>
-          <div className={isMobile ? "relative h-[calc(100dvh-26rem)] min-h-[300px] overflow-hidden rounded-[22px] border border-border sm:h-[56dvh] sm:min-h-[360px]" : "h-full"}>
+          <div className={isMobile ? "relative h-[calc(100dvh-9rem)] min-h-[480px] overflow-hidden rounded-[22px] border border-border" : "h-full"}>
             <PropertyMap properties={properties} filters={filters} onSelect={property => setSelectedMapId(property.id)} onBoundaryChange={polygon => handleFilterChange({ polygon })} onShowList={isMobile ? () => setMobileTab("list") : undefined} listTotal={data ? total : undefined} />
           </div>
           {isMobile && <MapListingCarousel properties={properties} selectedId={selectedMapId} />}
