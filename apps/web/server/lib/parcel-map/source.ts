@@ -59,31 +59,43 @@ export function parcelsQuery(bbox: Bbox, now: string): string | null {
     } } }`;
 }
 
+/** Server-side only: the response is deliberately generic, so without this the real cause (bad filter, 401, 400) is invisible. */
+function logUnavailable(reason: string): void {
+  console.warn(`[parcel-map] unavailable: ${reason.slice(0, 600)}`);
+}
+
 export async function getParcelsInView(bbox: Bbox): Promise<ParcelMapResponse> {
   if (parcelMapMockMode()) return mockParcels(bbox);
   const unavailable: ParcelMapResponse = { status: "unavailable", source: "datafordeler", parcels: [], truncated: false };
   const key = process.env.DATAFORDELER_API_KEY?.trim();
   const query = key ? parcelsQuery(bbox, new Date().toISOString()) : null;
-  if (!key || !query) return unavailable;
+  if (!key || !query) { logUnavailable(!key ? "DATAFORDELER_API_KEY is not set" : "bbox could not be projected to ETRS89 UTM32"); return unavailable; }
   try {
     const result = record(await fetchJson<unknown>(`${GRAPHQL}?${new URLSearchParams({ apiKey: key })}`, {
       method: "POST", body: JSON.stringify({ query }), headers: { "Content-Type": "application/json" }, timeoutMs: TIMEOUT, attempts: 1,
     }));
     const list = record(record(record(result.data).MAT_Jordstykke)).nodes;
-    if (result.errors || !Array.isArray(list)) return unavailable;
+    if (result.errors || !Array.isArray(list)) {
+      const messages = Array.isArray(result.errors) ? result.errors.map(e => text(record(e).message) ?? "unknown error").join(" | ") : "response had no MAT_Jordstykke.nodes";
+      logUnavailable(`GraphQL: ${messages}`);
+      return unavailable;
+    }
     const parcels: ParcelMapParcel[] = [];
     for (const raw of list.slice(0, MAX_PARCELS)) {
       const node = record(raw), parcelId = id(node.id_lokalId);
       const estates = record(record(node.jordstykkeSamlesISamletFastEjendom)).nodes;
       const bfes = new Set((Array.isArray(estates) ? estates : []).map(e => id(record(e).BFEnummer)).filter((v): v is string => v !== null));
       const parts = record(record(node.lodfladeRepraesentationJordstykke)).nodes;
-      if (!parcelId || !Array.isArray(parts)) return unavailable;
+      if (!parcelId || !Array.isArray(parts)) { logUnavailable("malformed parcel node"); return unavailable; }
       const shapes = parts.map(part => parseCadastralGeometry(record(part).geometri));
-      if (!shapes.length || shapes.some(shape => shape === null)) return unavailable;
+      if (!shapes.length || shapes.some(shape => shape === null)) { logUnavailable(`unparseable geometry on parcel ${parcelId}`); return unavailable; }
       const geometry = toWgs84(shapes.flatMap(shape => shape!.polygons));
-      if (!geometry) return unavailable;
+      if (!geometry) { logUnavailable(`coordinate conversion failed on parcel ${parcelId}`); return unavailable; }
       parcels.push({ id: parcelId, bfeNumber: bfes.size === 1 ? [...bfes][0]! : null, number: text(node.matrikelnummer), district: text(record(node.jordstykkeLiggerIEjerlav).ejerlavsnavn), geometry });
     }
     return { status: "available", source: "datafordeler", parcels, truncated: list.length > MAX_PARCELS };
-  } catch { return unavailable; }
+  } catch (error) {
+    logUnavailable(error instanceof Error ? `${error.name}: ${error.message}` : "request failed");
+    return unavailable;
+  }
 }
