@@ -224,8 +224,25 @@ export function mapRegistrations(raw: unknown): SoldPriceEntry[] {
     .sort((a, b) => b.soldDate.localeCompare(a.soldDate));
 }
 
+/**
+ * Why a case could not become a listing. `no_dwelling_area` is the one
+ * expected, data-driven reason: building plots (typed "full year plot",
+ * "holiday plot", or mislabelled "villa" with a "byggegrund" description) carry
+ * a price and a lot area but no `housingArea`. `properties.sqm` is NOT NULL and
+ * a lot area or an old building's `address.livingArea` is a different quantity,
+ * so such a record is left out rather than stored with an invented figure.
+ * Everything else is `invalid`: a required field missing from an otherwise
+ * dwelling record points at upstream drift.
+ */
+export type BoligsidenSkipReason = "no_dwelling_area" | "invalid";
+export type BoligsidenCaseMapping = { listing: RawListing; reason?: undefined } | { listing: null; reason: BoligsidenSkipReason };
+
 export function mapBoligsidenCase(raw: unknown): RawListing | null {
-  if (typeof raw !== "object" || raw === null) return null;
+  return classifyBoligsidenCase(raw).listing;
+}
+
+export function classifyBoligsidenCase(raw: unknown): BoligsidenCaseMapping {
+  if (typeof raw !== "object" || raw === null) return { listing: null, reason: "invalid" };
   const r = raw as Record<string, unknown>;
 
   const externalId = asNonEmptyString(r.caseID) ?? asNonEmptyString(r.caseId);
@@ -249,15 +266,15 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
   if (
     externalId === null ||
     price === null ||
-    sqm === null ||
     address === null ||
     municipality === null ||
     lat === null ||
     lon === null ||
     !isDanishCoordinate(lat, lon)
   ) {
-    return null;
+    return { listing: null, reason: "invalid" };
   }
+  if (sqm === null) return { listing: null, reason: "no_dwelling_area" };
 
   const addressType = asNonEmptyString(r.addressType)?.toLowerCase() ?? "";
   const postalCode = mapPostalCode(r);
@@ -269,7 +286,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     && r.priceChangePercentage > -100 ? r.priceChangePercentage : null;
   const sourceAddressId = get(r, "address", "addressID");
 
-  return {
+  const listing: RawListing = {
     data_mode: "real",
     address,
     municipality,
@@ -300,6 +317,7 @@ export function mapBoligsidenCase(raw: unknown): RawListing | null {
     listing_url: mapListingUrl(r),
     sold_price_history: mapRegistrations(get(r, "address", "registrations")),
   };
+  return { listing };
 }
 
 /** The search endpoint answers HTTP 400 for any page that starts past this many records. */
@@ -352,6 +370,8 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     errors: [],
     mappingWarnings,
   };
+  const withoutAreaByType = new Map<string, number>();
+  let withoutDwellingArea = 0;
 
   const zipRanges = getZipRanges();
 
@@ -474,8 +494,17 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
           }
           continue;
         }
-        const listing = mapBoligsidenCase(record);
+        const { listing, reason } = classifyBoligsidenCase(record);
         if (listing === null) {
+          if (reason === "no_dwelling_area") {
+            // Counted only on first sight, so an overlapping page cannot inflate it.
+            if (!duplicate) {
+              withoutDwellingArea += 1;
+              const type = asNonEmptyString(get(record, "addressType")) ?? asNonEmptyString(get(record, "address", "addressType")) ?? "unknown";
+              withoutAreaByType.set(type, (withoutAreaByType.get(type) ?? 0) + 1);
+            }
+            continue;
+          }
           stats.recordsSkipped += 1;
           if (mappingWarnings.length < MAX_ERRORS_REPORTED) {
             mappingWarnings.push(`page ${page}: skipped unmappable record`);
@@ -500,6 +529,22 @@ export async function fetchBoligsidenListings(): Promise<SourceCrawlResult> {
     }
 
     if (!batchComplete) scopeComplete = false;
+  }
+
+  // Plots are a minority of any real feed. If most in-area records lack a
+  // dwelling area, the field was renamed or dropped upstream, which must fail
+  // the run instead of passing as "only plots".
+  const inAreaSeen = stats.recordsSeen - stats.recordsOutOfArea;
+  if (withoutDwellingArea * 2 > inAreaSeen) {
+    stats.errors.push(
+      `${withoutDwellingArea} of ${inAreaSeen} in-area records have no dwelling area; upstream housingArea field likely changed`,
+    );
+    scopeComplete = false;
+  }
+  stats.recordsWithoutDwellingArea = withoutDwellingArea;
+  if (withoutDwellingArea > 0 && mappingWarnings.length < MAX_ERRORS_REPORTED) {
+    const byType = [...withoutAreaByType].sort((a, b) => b[1] - a[1]).map(([type, n]) => `${type}: ${n}`).join(", ");
+    mappingWarnings.push(`${withoutDwellingArea} listings without a dwelling area left out (${byType})`);
   }
   stats.complete = scopeComplete;
 

@@ -139,7 +139,7 @@ describe("Boligsiden weekly coverage", () => {
     vi.stubEnv("CRAWL_MAX_LISTINGS", "2");
     vi.mocked(fetchJson).mockResolvedValue({ totalHits: 3, cases: [
       { ...record(1, 1000), housingArea: 0 },
-      { ...record(2), housingArea: 0 },
+      { ...record(2), priceCash: 0 },
       record(3),
     ] });
     const { listings, stats } = await fetchBoligsidenListings();
@@ -195,5 +195,37 @@ describe("Boligsiden weekly coverage", () => {
     const { listings, stats } = await fetchBoligsidenListings();
     expect(listings).toHaveLength(2);
     expect(stats).toMatchObject({ complete: true, pagesFetched: 3 });
+  });
+
+  describe("listings without a dwelling area (building plots)", () => {
+    const plot = (id: number, addressType = "full year plot") => ({ ...record(id), housingArea: undefined, lotArea: 900, addressType });
+
+    it("leaves plots out without failing an otherwise exhausted scan", async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ totalHits: 5, cases: [record(1), record(2), record(3), plot(4), plot(5, "holiday plot")] });
+      const { listings, stats } = await fetchBoligsidenListings();
+      expect(listings.map((listing) => listing.external_id)).toEqual(["case-1", "case-2", "case-3"]);
+      expect(stats).toMatchObject({ complete: true, recordsSeen: 5, recordsSkipped: 0, recordsWithoutDwellingArea: 2, errors: [] });
+      expect(stats.mappingWarnings).toEqual(["2 listings without a dwelling area left out (full year plot: 1, holiday plot: 1)"]);
+    });
+
+    it("does not count a plot repeated across pages twice", async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ totalHits: 3, cases: [record(1), plot(2), plot(2)] });
+      const { stats } = await fetchBoligsidenListings();
+      expect(stats.recordsWithoutDwellingArea).toBe(1);
+      expect(stats.complete).toBe(false);
+    });
+
+    it("still fails the run when most in-area records lack an area, which means the field drifted", async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ totalHits: 3, cases: [record(1), plot(2, "villa"), plot(3, "villa")] });
+      const { stats } = await fetchBoligsidenListings();
+      expect(stats).toMatchObject({ complete: false, recordsWithoutDwellingArea: 2 });
+      expect(stats.errors).toEqual(["2 of 3 in-area records have no dwelling area; upstream housingArea field likely changed"]);
+    });
+
+    it("still treats a record missing any other required field as unmappable", async () => {
+      vi.mocked(fetchJson).mockResolvedValue({ totalHits: 2, cases: [record(1), { ...plot(2), priceCash: undefined }] });
+      const { stats } = await fetchBoligsidenListings();
+      expect(stats).toMatchObject({ complete: false, recordsSkipped: 1, recordsWithoutDwellingArea: 0 });
+    });
   });
 });

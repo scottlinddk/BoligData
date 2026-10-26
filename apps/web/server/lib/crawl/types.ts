@@ -77,6 +77,12 @@ export interface SourceCrawlStats {
   /** Records that failed defensive mapping (missing/invalid required fields). */
   recordsSkipped: number;
   /**
+   * Otherwise valid in-area listings that report no dwelling area (building
+   * plots). `properties.sqm` cannot hold them, so they are left out. Counted
+   * apart from `recordsSkipped` because this is expected data, not drift.
+   */
+  recordsWithoutDwellingArea?: number;
+  /**
    * Records positively identified as outside the configured zip ranges.
    * Boligsiden skips full mapping once a valid raw postcode proves exclusion.
    * Counted apart from `recordsSkipped` because the two mean opposite
