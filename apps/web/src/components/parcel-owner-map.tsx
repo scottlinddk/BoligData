@@ -1,30 +1,34 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./property-map.css";
-import type { ParcelMapParcel } from "@shared/types/parcel-map";
+import type { ParcelMapParcel, ParcelOwnerResponse } from "@shared/types/parcel-map";
 import { DEFAULT_MAP_CENTER } from "@/lib/constants";
 import { mapStyleUrl, readableMapStyle } from "@/lib/map-theme";
 import { useMapStyleTheme } from "@/lib/use-map-style-theme";
 import { useTheme } from "@/theme/theme";
 import { useI18n } from "@/i18n/i18n";
 import { ApiError } from "@/lib/api";
-import { useParcelOwner, useParcelsInView } from "@/hooks/use-parcel-map";
+import { parcelOwnerKey, useParcelOwner, useParcelsInView } from "@/hooks/use-parcel-map";
+import { useAuth } from "@/hooks/use-auth";
+import { parcelOwnerLabel } from "@/lib/parcel-owner-label";
 
-const SOURCE = "parcels", FILL = "parcels-fill", LINE = "parcels-line", LABEL = "parcels-label";
-const MIN_ZOOM = 16;
+const SOURCE = "parcels", FILL = "parcels-fill", LINE = "parcels-line", LABEL = "parcels-label", OWNER_LABEL = "parcels-owner-label";
+const MIN_ZOOM = 16, OWNER_LABEL_ZOOM = 18;
 const OVERLAYS = [SOURCE];
 
 const bboxOf = (b: maplibregl.LngLatBounds) => [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(n => n.toFixed(6)).join(",");
 
-function featureCollection(parcels: ParcelMapParcel[], selected: string | null) {
+function featureCollection(parcels: ParcelMapParcel[], selected: string | null, ownerOf: (p: ParcelMapParcel) => string) {
   return { type: "FeatureCollection" as const, features: parcels.map(p => ({ type: "Feature" as const, id: Number(p.id.replace(/\D/g, "")) || undefined,
-    geometry: p.geometry, properties: { id: p.id, bfe: p.bfeNumber, label: p.number ?? "", selected: p.id === selected } })) };
+    geometry: p.geometry, properties: { id: p.id, bfe: p.bfeNumber, label: p.number ?? "", owner: ownerOf(p), selected: p.id === selected } })) };
 }
 
 /** Cadastral parcels over the basemap; click one to see its registered owner. */
 export function ParcelOwnerMap() {
   const { language } = useI18n(), { theme } = useTheme();
+  const { user } = useAuth(), queryClient = useQueryClient();
   const da = language === "da", tx = (a: string, b: string) => (da ? a : b);
   const container = useRef<HTMLDivElement>(null), map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false), [mapError, setMapError] = useState(false);
@@ -42,10 +46,11 @@ export function ParcelOwnerMap() {
       map.current = instance;
       instance.addControl(new maplibregl.NavigationControl(), "top-right");
       instance.on("load", () => {
-        instance.addSource(SOURCE, { type: "geojson", data: featureCollection([], null) });
+        instance.addSource(SOURCE, { type: "geojson", data: featureCollection([], null, () => "") });
         instance.addLayer({ id: FILL, type: "fill", source: SOURCE, paint: { "fill-color": ["case", ["get", "selected"], "#3b82f6", "#94a3b8"], "fill-opacity": ["case", ["get", "selected"], 0.45, 0.18] } });
         instance.addLayer({ id: LINE, type: "line", source: SOURCE, paint: { "line-color": ["case", ["get", "selected"], "#dc2626", "#475569"], "line-width": ["case", ["get", "selected"], 2.5, 1] } });
         instance.addLayer({ id: LABEL, type: "symbol", source: SOURCE, minzoom: 17, layout: { "text-field": ["get", "label"], "text-size": 11, "text-font": ["Noto Sans Regular"] }, paint: { "text-color": "#1e293b", "text-halo-color": "#fff", "text-halo-width": 1.2 } });
+        instance.addLayer({ id: OWNER_LABEL, type: "symbol", source: SOURCE, minzoom: OWNER_LABEL_ZOOM, layout: { "text-field": ["get", "owner"], "text-size": 10, "text-font": ["Noto Sans Regular"], "text-offset": [0, 1.3], "text-max-width": 9 }, paint: { "text-color": "#1e293b", "text-halo-color": "#fff", "text-halo-width": 1.2 } });
         setReady(true);
       });
       const update = () => setBbox(instance.getZoom() >= MIN_ZOOM ? bboxOf(instance.getBounds()) : null);
@@ -63,8 +68,10 @@ export function ParcelOwnerMap() {
 
   useEffect(() => {
     const source = map.current?.getSource(SOURCE) as maplibregl.GeoJSONSource | undefined;
-    source?.setData(featureCollection(parcels.data?.parcels ?? [], selected?.id ?? null) as never);
-  }, [parcels.data, selected, ready]);
+    // Owners come only from the cache of lookups already made (clicked parcels): auto-fetching every visible parcel would burn the hourly budget.
+    const ownerOf = (p: ParcelMapParcel) => p.bfeNumber ? parcelOwnerLabel(queryClient.getQueryData<ParcelOwnerResponse>(parcelOwnerKey(user?.id, p.bfeNumber)), da) : "";
+    source?.setData(featureCollection(parcels.data?.parcels ?? [], selected?.id ?? null, ownerOf) as never);
+  }, [parcels.data, selected, ready, owner.data, da, user?.id, queryClient]);
 
   const limited = owner.error instanceof ApiError && owner.error.status === 429;
   return <div className="relative h-[calc(100dvh-72px)] min-h-[480px] w-full">

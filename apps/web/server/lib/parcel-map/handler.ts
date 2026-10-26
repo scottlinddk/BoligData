@@ -24,5 +24,8 @@ export async function handleParcelOwner(client: SupabaseClient, bfeParam: unknow
   if (budget.error) { res.status(503).json({ error: "Register lookup temporarily unavailable" }); return; }
   if (budget.data !== true) { res.setHeader("Retry-After", "3600"); res.status(429).json({ error: "Register lookup limit reached" }); return; }
   const owners = await getParcelOwners(bfe);
+  // Definitive answers are cached by the browser for a day so repeat views never spend the hourly budget again.
+  // A failed or inconclusive lookup stays `no-store` so it is retried.
+  if ((owners.status === "available" || owners.status === "not_found") && owners.reason !== "source_unavailable") res.setHeader("Cache-Control", "private, max-age=86400");
   res.status(200).json({ bfeNumber: bfe, status: owners.status, owners: owners.items, reason: owners.reason } satisfies ParcelOwnerResponse);
 }
