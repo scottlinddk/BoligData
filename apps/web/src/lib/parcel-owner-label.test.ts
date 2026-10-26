@@ -3,7 +3,7 @@ import type { ParcelOwnerResponse } from "@shared/types/parcel-map";
 import { parcelOwnerLabel } from "./parcel-owner-label";
 
 const response = (owners: Array<{ name: string | null; protected?: boolean }>, status: ParcelOwnerResponse["status"] = "available"): ParcelOwnerResponse =>
-  ({ bfeNumber: "1", status, reason: null, owners: owners.map(o => ({ protected: false, ...o })) } as unknown as ParcelOwnerResponse);
+  ({ bfeNumber: "1", status, reason: null, addresses: [], owners: owners.map(o => ({ protected: false, ...o })) } as unknown as ParcelOwnerResponse);
 
 describe("parcelOwnerLabel", () => {
   it("is empty without a looked-up owner", () => {

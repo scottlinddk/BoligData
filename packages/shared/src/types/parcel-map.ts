@@ -20,10 +20,18 @@ export interface ParcelMapResponse {
   truncated: boolean;
 }
 
+/** One access address (husnummer) on the land property, e.g. `label: "Vejnavn 12A, 9000 By"`, `houseNumber: "12A"`. */
+export interface ParcelAddress {
+  label: string;
+  houseNumber: string | null;
+}
+
 export interface ParcelOwnerResponse {
   bfeNumber: string;
   status: CadastralStatus;
   /** Protected persons are returned with `name: null, protected: true`. */
   owners: CadastralOwner[];
+  /** Empty when the register has none or could not be read; never blocks the owner answer. */
+  addresses: ParcelAddress[];
   reason: "source_unavailable" | "condominium_parent" | "common_lot" | null;
 }

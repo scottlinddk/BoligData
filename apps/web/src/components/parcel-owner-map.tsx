@@ -88,6 +88,8 @@ export function ParcelOwnerMap() {
         <div><p className="ds-mono text-[10px] text-ink-soft">{tx("Matrikel", "Parcel")}</p><p className="text-sm font-semibold text-ink">{selected.number ?? "–"}{selected.bfe && <span className="ml-2 font-normal text-ink-soft">BFE {selected.bfe}</span>}</p></div>
         <button type="button" onClick={() => setSelected(null)} aria-label={tx("Luk", "Close")} className="rounded-full px-2 text-ink-soft hover:bg-surface-alt">×</button>
       </div>
+      {owner.data?.addresses.length ? <div className="mt-2 text-sm text-ink"><p className="ds-mono text-[10px] text-ink-soft">{tx("Adresse", "Address")}</p>
+        <ul>{owner.data.addresses.map(a => <li key={a.label}>{a.label}</li>)}</ul></div> : null}
       <div className="mt-3 text-sm text-ink">
         {!selected.bfe ? <p className="text-ink-soft">{tx("Ingen ejendom knyttet til matriklen.", "No land property is linked to this parcel.")}</p>
           : owner.isPending ? <p role="status" className="text-ink-soft">{tx("Henter ejer…", "Loading owner…")}</p>

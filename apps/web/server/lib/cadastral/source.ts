@@ -1,5 +1,6 @@
 import type { Property } from "../../../../../packages/shared/src/types/index.js";
 import type { CadastralOwner, CadastralParcel, CadastralReport } from "../../../../../packages/shared/src/types/cadastral.js";
+import type { ParcelAddress } from "../../../../../packages/shared/src/types/parcel-map.js";
 import { fetchJson, HttpError } from "../crawl/http.js";
 import { resolveHusnummerId } from "../enrichment-sources/address-lookup-dar.js";
 import { parseCadastralGeometry } from "./geometry.js";
@@ -7,6 +8,9 @@ import { parseCadastralGeometry } from "./geometry.js";
 const API = "https://api.matriklen.dk/api/v3.3";
 const GRAPHQL = "https://graphql.datafordeler.dk";
 const TIMEOUT = 6_000;
+/** Jordstykke -> DAR_Husnummer relation in Flexible v2. NOT verified against the live schema (the forward relation is `husnummerErPlaceretPaaJordstykke`); if addresses never appear, check this name first. */
+const PARCEL_HOUSE_NUMBERS = "jordstykkeIndeholderHusnummer";
+const MAX_ADDRESSES = 20;
 const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const text = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
 const number = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
@@ -23,7 +27,7 @@ const temporal = (now: string): string => `registreringstid: ${JSON.stringify(no
 async function query(root: string, selection: string, key: string): Promise<unknown> {
   // Same MAT v2 / Flexible v2 services and field names as Matriklen.dk's public client.
   // Always use this deployment's key, never the public site's browser key.
-  const service = selection.includes("husnummerErPlaceretPaaJordstykke") || selection.includes("jordstykkeLiggerIEjerlav") ? "Flexible/v2" : "MAT/v2";
+  const service = selection.includes("husnummerErPlaceretPaaJordstykke") || selection.includes(PARCEL_HOUSE_NUMBERS) || selection.includes("jordstykkeLiggerIEjerlav") ? "Flexible/v2" : "MAT/v2";
   const result = record(await fetchJson<unknown>(`${GRAPHQL}/${service}?${new URLSearchParams({ apiKey: key })}`, {
     method: "POST", body: JSON.stringify({ query: `query { ${selection} }` }),
     headers: { "Content-Type": "application/json" }, timeoutMs: TIMEOUT, attempts: 1,
@@ -176,4 +180,34 @@ export async function getCadastralReport(property: Property): Promise<CadastralR
     }
     return report;
   } catch { return report; }
+}
+
+/**
+ * Current access addresses (husnumre) on a land property, via its parcels. Isolated from the owner lookup: any failure,
+ * a truncated page or an unexpected shape yields an empty list, never a partial guess.
+ */
+export async function getParcelAddresses(bfe: string): Promise<ParcelAddress[]> {
+  const key = process.env.DATAFORDELER_API_KEY?.trim();
+  if (!key || !id(bfe)) return [];
+  try {
+    const now = new Date().toISOString();
+    const estates = nodes(await query("MAT_SamletFastEjendom", `MAT_SamletFastEjendom(first: 2, ${temporal(now)}, where: {BFEnummer: {eq: ${bfe}}, status: {eq: "Gældende"}}) { nodes { id_lokalId BFEnummer } }`, key));
+    const estateId = estates.length === 1 && id(estates[0]!.BFEnummer) === bfe ? id(estates[0]!.id_lokalId) : null;
+    if (!estateId) return [];
+    const parcels = await query("MAT_Jordstykke", `MAT_Jordstykke(first: 50, ${temporal(now)}, where: {samletFastEjendomLokalId: {eq: ${JSON.stringify(estateId)}}, status: {eq: "Gældende"}}) {
+      nodes { ${PARCEL_HOUSE_NUMBERS}(first: ${MAX_ADDRESSES}, where: {status: {eq: "3"}}) { nodes { adgangsadressebetegnelse husnummertekst } pageInfo { hasNextPage } } }
+      pageInfo { hasNextPage }
+    }`, key);
+    if (!complete(parcels)) return [];
+    const seen = new Map<string, ParcelAddress>();
+    for (const parcel of nodes(parcels)) {
+      const houses = parcel[PARCEL_HOUSE_NUMBERS];
+      if (!complete(houses)) return [];
+      for (const house of nodes(houses)) {
+        const label = text(house.adgangsadressebetegnelse);
+        if (label) seen.set(label, { label, houseNumber: text(house.husnummertekst) });
+      }
+    }
+    return [...seen.values()].slice(0, MAX_ADDRESSES);
+  } catch { return []; }
 }

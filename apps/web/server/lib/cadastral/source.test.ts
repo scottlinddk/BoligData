@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Property } from "../../../../../packages/shared/src/types/index.js";
 import { stubFetch } from "../test-support/stub-fetch.js";
-import { getCadastralReport, mapOwners } from "./source.js";
+import { getCadastralReport, getParcelAddresses, mapOwners } from "./source.js";
 import { parseCadastralGeometry } from "./geometry.js";
 
 const property = { id: "listing", address: "Slåenvej 18", postalCode: "9000", bfeNummer: "3299386", idLokalid: null, dataMode: "real" } as Property;
@@ -121,5 +121,24 @@ describe("cadastral geometry", () => {
   });
   it.each([{ ...geo, crs: 4326 }, { ...geo, wkt: "POLYGON EMPTY" }, { ...geo, wkt: "POLYGON ((1 2,3 4,5 6,1 2))" }, { ...geo, wkt: geo.wkt.replace("6322122.634))", "6322123.634))") }, { ...geo, wkt: geo.wkt.replace("552731.569", "bogus") }])("rejects malformed or unrecognised geometry", raw => {
     expect(parseCadastralGeometry(raw)).toBeNull();
+  });
+});
+
+describe("parcel addresses", () => {
+  const houses = (items: unknown[], hasNextPage = false) => connection(items, hasNextPage);
+  const run = (parcels: unknown[], hasNextPage = false) => {
+    stubFetch([graph("MAT_SamletFastEjendom", connection([estate])), graph("MAT_Jordstykke", connection(parcels, hasNextPage))]);
+    return getParcelAddresses("3299386");
+  };
+  it("returns de-duplicated address labels with house numbers", async () => {
+    const house = { adgangsadressebetegnelse: "Slåenvej 18, 9000 Aalborg", husnummertekst: "18" };
+    const result = await run([{ jordstykkeIndeholderHusnummer: houses([house]) }, { jordstykkeIndeholderHusnummer: houses([house]) }]);
+    expect(result).toEqual([{ label: "Slåenvej 18, 9000 Aalborg", houseNumber: "18" }]);
+  });
+  it("returns nothing for truncated pages or a failing register", async () => {
+    expect(await run([{ jordstykkeIndeholderHusnummer: houses([], true) }])).toEqual([]);
+    expect(await run([], true)).toEqual([]);
+    stubFetch([{ status: 500, body: {} }]);
+    expect(await getParcelAddresses("3299386")).toEqual([]);
   });
 });
