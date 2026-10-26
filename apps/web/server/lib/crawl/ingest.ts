@@ -57,6 +57,8 @@ export interface IngestSourceReport {
   created: number;
   /** Records the fetcher saw but could not map to a valid RawListing. */
   skippedInvalid: number;
+  /** In-area listings with no dwelling area (building plots): left out because `properties.sqm` is required, not a fault. */
+  skippedNoDwellingArea: number;
   /** Records that mapped fine but sit outside CRAWL_ZIP_RANGES — the filter working, not a fault. */
   skippedOutOfArea: number;
   enriched: number;
@@ -155,6 +157,7 @@ async function ingestSource(
     upserted: 0,
     created: 0,
     skippedInvalid: 0,
+    skippedNoDwellingArea: 0,
     skippedOutOfArea: 0,
     enriched: 0,
     enrichSkippedUnchanged: 0,
@@ -198,6 +201,7 @@ async function ingestSource(
   report.dataMode = stats.dataMode ?? "unknown";
   report.fetched = listings.length;
   report.skippedInvalid = stats.recordsSkipped;
+  report.skippedNoDwellingArea = stats.recordsWithoutDwellingArea ?? 0;
   report.skippedOutOfArea = stats.recordsOutOfArea;
   report.mappingWarnings = stats.mappingWarnings ?? [];
   for (const err of stats.errors) pushFetchError(err);

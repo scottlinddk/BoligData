@@ -72,7 +72,7 @@ describe("weekly runner", () => {
 
   const sourceReport = (overrides: Partial<IngestSourceReport> = {}): IngestSourceReport => ({
     source: "boligsiden", ok: true, complete: true, dataMode: "real", quarantinedSales: 0,
-    fetched: 100, upserted: 100, created: 0, skippedInvalid: 0, skippedOutOfArea: 0, enriched: 0,
+    fetched: 100, upserted: 100, created: 0, skippedInvalid: 0, skippedNoDwellingArea: 0, skippedOutOfArea: 0, enriched: 0,
     enrichSkippedUnchanged: 100, cadastralLookupFailed: 0, matrikelLookupFailed: 0,
     dbErrors: 0, errors: [], mappingWarnings: [], durationMs: 100, ...overrides,
   });
