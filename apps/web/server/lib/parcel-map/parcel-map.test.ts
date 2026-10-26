@@ -34,7 +34,22 @@ describe("parcel source", () => {
   it("fails closed without a key, and builds a UTM box when it has one", async () => {
     vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "");
     expect((await getParcelsInView(parseParcelBbox(BBOX)!)).status).toBe("unavailable");
-    expect(parcelsQuery(parseParcelBbox(BBOX)!, "2026-10-25T00:00:00.000Z")).toMatch(/minX: 5\d{5}\.\d, minY: 63\d{5}\.\d/);
+    expect(parcelsQuery(parseParcelBbox(BBOX)!, "2026-10-25T00:00:00.000Z")).toMatch(/MAT_Lodflade\(.*intersects: \{crs: 25832, wkt: "POLYGON\(\(5\d{5}\.\d 63\d{5}\.\d,/s);
+    expect(parcelsQuery(parseParcelBbox(BBOX)!, "2026-10-25T00:00:00.000Z")).not.toContain("geometriIBoundingBox");
+  });
+  it("joins lodflade, jordstykke, ejerlav and estate into one parcel", async () => {
+    vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const ring = "POLYGON((550000 6300000, 550010 6300000, 550010 6300010, 550000 6300010, 550000 6300000))";
+    const reply = (body: string) => {
+      if (body.includes("MAT_Lodflade")) return { MAT_Lodflade: { nodes: [{ jordstykkeLokalId: "111", geometri: { wkt: ring, crs: 25832 } }] } };
+      if (body.includes("MAT_Jordstykke")) return { b0: { nodes: [{ id_lokalId: "111", matrikelnummer: "12a", ejerlavLokalId: "222", samletFastEjendomLokalId: "333" }] } };
+      if (body.includes("MAT_SamletFastEjendom")) return { b0: { nodes: [{ id_lokalId: "333", BFEnummer: 3299123 }] } };
+      return { b0: { nodes: [{ id_lokalId: "222", ejerlavsnavn: "Test By" }] } };
+    };
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { body: string }) => new Response(JSON.stringify({ data: reply(JSON.parse(init.body).query) }), { status: 200 })));
+    const result = await getParcelsInView(parseParcelBbox(BBOX)!);
+    expect(result.status).toBe("available");
+    expect(result.parcels).toMatchObject([{ id: "111", bfeNumber: "3299123", number: "12a", district: "Test By" }]);
   });
   it("returns unavailable on a GraphQL error instead of partial data", async () => {
     vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
