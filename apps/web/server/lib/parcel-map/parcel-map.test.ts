@@ -42,14 +42,35 @@ describe("parcel source", () => {
     const ring = "POLYGON((550000 6300000, 550010 6300000, 550010 6300010, 550000 6300010, 550000 6300000))";
     const reply = (body: string) => {
       if (body.includes("MAT_Lodflade")) return { MAT_Lodflade: { nodes: [{ jordstykkeLokalId: "111", geometri: { wkt: ring, crs: 25832 } }] } };
-      if (body.includes("MAT_Jordstykke")) return { b0: { nodes: [{ id_lokalId: "111", matrikelnummer: "12a", ejerlavLokalId: "222", samletFastEjendomLokalId: "333" }] } };
-      if (body.includes("MAT_SamletFastEjendom")) return { b0: { nodes: [{ id_lokalId: "333", BFEnummer: 3299123 }] } };
-      return { b0: { nodes: [{ id_lokalId: "222", ejerlavsnavn: "Test By" }] } };
+      if (body.includes("MAT_Jordstykke")) return { MAT_Jordstykke: { nodes: [{ id_lokalId: "111", matrikelnummer: "12a", ejerlavLokalId: "222", samletFastEjendomLokalId: "333" }] } };
+      if (body.includes("MAT_SamletFastEjendom")) return { MAT_SamletFastEjendom: { nodes: [{ id_lokalId: "333", BFEnummer: 3299123 }] } };
+      return { MAT_Ejerlav: { nodes: [{ id_lokalId: "222", ejerlavsnavn: "Test By" }] } };
     };
-    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { body: string }) => new Response(JSON.stringify({ data: reply(JSON.parse(init.body).query) }), { status: 200 })));
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => new Response(JSON.stringify({ data: reply(JSON.parse(init.body).query) }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
     const result = await getParcelsInView(parseParcelBbox(BBOX)!);
     expect(result.status).toBe("available");
     expect(result.parcels).toMatchObject([{ id: "111", bfeNumber: "3299123", number: "12a", district: "Test By" }]);
+    // Datafordeler rejects aliases ("b0: ...") and multiple root fields, so every request must be a single plain root.
+    for (const [, init] of fetchMock.mock.calls) expect(JSON.parse(init.body).query).not.toMatch(/\bb\d+\s*:/);
+  });
+  it("sends one single-root request per 100-id batch", async () => {
+    vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const ring = "POLYGON((550000 6300000, 550010 6300000, 550010 6300010, 550000 6300010, 550000 6300000))";
+    const nodes = Array.from({ length: 150 }, (_, i) => ({ jordstykkeLokalId: String(i + 1), geometri: { wkt: ring, crs: 25832 } }));
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
+      const query: string = JSON.parse(init.body).query;
+      if (query.includes("MAT_Lodflade")) return new Response(JSON.stringify({ data: { MAT_Lodflade: { nodes } } }), { status: 200 });
+      const ids = [...query.matchAll(/"(\d+)"/g)].map(m => m[1]!);
+      return new Response(JSON.stringify({ data: { MAT_Jordstykke: { nodes: ids.map(i => ({ id_lokalId: i, matrikelnummer: `m${i}`, ejerlavLokalId: null, samletFastEjendomLokalId: null })) } } }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await getParcelsInView(parseParcelBbox(BBOX)!);
+    expect(result.status).toBe("available");
+    expect(result.parcels).toHaveLength(150);
+    const jordstykke = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body).query as string).filter(q => q.includes("MAT_Jordstykke"));
+    expect(jordstykke).toHaveLength(2);
+    for (const q of jordstykke) expect(q).not.toMatch(/\bb\d+\s*:/);
   });
   it("returns unavailable on a GraphQL error instead of partial data", async () => {
     vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");

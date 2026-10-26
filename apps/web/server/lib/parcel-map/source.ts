@@ -75,19 +75,21 @@ async function graphql(key: string, query: string): Promise<Record<string, unkno
   return record(result.data);
 }
 
-/** Joins one register by `id_lokalId`, batching to the register's 100-value `in` limit within a single request. */
+/**
+ * Joins one register by `id_lokalId`, batching to the register's 100-value `in` limit. The service rejects aliases and
+ * queries with several root fields, so every batch is its own request with a single, un-aliased root field.
+ */
 async function lookup(key: string, root: string, fields: string, ids: string[], now: string): Promise<Map<string, Record<string, unknown>>> {
-  const found = new Map<string, Record<string, unknown>>();
   const batches: string[][] = [];
   for (let i = 0; i < ids.length; i += ID_BATCH) batches.push(ids.slice(i, i + ID_BATCH));
-  if (!batches.length) return found;
-  const aliases = batches.map((batch, i) => `b${i}: ${root}(first: ${ID_BATCH}, ${temporal(now)}, where: {id_lokalId: {in: ${JSON.stringify(batch)}}}) { nodes { id_lokalId ${fields} } }`);
-  const data = await graphql(key, `query { ${aliases.join("\n")} }`);
-  batches.forEach((_, i) => {
-    const list = record(data[`b${i}`]).nodes;
+  const results = await Promise.all(batches.map(async batch => {
+    const data = await graphql(key, `query { ${root}(first: ${ID_BATCH}, ${temporal(now)}, where: {id_lokalId: {in: ${JSON.stringify(batch)}}}) { nodes { id_lokalId ${fields} } } }`);
+    const list = record(data[root]).nodes;
     if (!Array.isArray(list)) throw new Error(`${root} response had no nodes`);
-    for (const raw of list) { const node = record(raw), nodeId = id(node.id_lokalId); if (nodeId) found.set(nodeId, node); }
-  });
+    return list;
+  }));
+  const found = new Map<string, Record<string, unknown>>();
+  for (const raw of results.flat()) { const node = record(raw), nodeId = id(node.id_lokalId); if (nodeId) found.set(nodeId, node); }
   return found;
 }
 
