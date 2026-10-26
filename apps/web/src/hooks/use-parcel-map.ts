@@ -5,8 +5,8 @@ import { useAuth } from "./use-auth";
 
 function useAuthedFetch() {
   const { session } = useAuth();
-  return async <T,>(params: Record<string, string>, signal?: AbortSignal): Promise<T> => {
-    const response = await fetch(`/api/properties?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${session!.access_token}` }, signal, cache: "no-store" });
+  return async <T,>(params: Record<string, string>, signal?: AbortSignal, cache: RequestCache = "no-store"): Promise<T> => {
+    const response = await fetch(`/api/properties?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${session!.access_token}` }, signal, cache });
     if (!response.ok) throw new ApiError("Parcel request failed", response.status);
     return response.json() as Promise<T>;
   };
@@ -22,12 +22,18 @@ export function useParcelsInView(bbox: string | null) {
   });
 }
 
-/** Spends one register lookup per BFE and is cached for ten minutes, so re-clicking a parcel is free. */
+const OWNER_TTL = 24 * 60 * 60_000;
+export const parcelOwnerKey = (userId: string | undefined, bfe: string | null) => ["parcel-owner", userId, bfe] as const;
+
+/**
+ * Spends one register lookup per BFE, then is cached for a day: in memory here, and in the browser HTTP cache across
+ * reloads (the endpoint sends `private, max-age=86400` for definitive answers), so re-clicking a parcel is free.
+ */
 export function useParcelOwner(bfe: string | null) {
   const { user } = useAuth();
   const get = useAuthedFetch();
   return useQuery({
-    queryKey: ["parcel-owner", user?.id, bfe], enabled: !!user && !!bfe, staleTime: 10 * 60_000, gcTime: 10 * 60_000, retry: false,
-    queryFn: ({ signal }) => get<ParcelOwnerResponse>({ resource: "parcel-owner", bfe: bfe! }, signal),
+    queryKey: parcelOwnerKey(user?.id, bfe), enabled: !!user && !!bfe, staleTime: OWNER_TTL, gcTime: OWNER_TTL, retry: false,
+    queryFn: ({ signal }) => get<ParcelOwnerResponse>({ resource: "parcel-owner", bfe: bfe! }, signal, "default"),
   });
 }

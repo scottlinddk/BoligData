@@ -109,6 +109,16 @@ describe("owner endpoint", () => {
     const ok = await gate({ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: false });
     expect(ok.result.items).toHaveLength(1);
   });
+  it("caches definitive owner answers for a day, but never an inconclusive one", async () => {
+    vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false");
+    const rpc = vi.fn(async () => ({ data: true, error: null }));
+    await gate({ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: false });
+    const ok = res(); await handleParcelOwner({ rpc } as never, "3299123", ok as never);
+    expect(ok.headers["Cache-Control"]).toBe("private, max-age=86400");
+    await gate({ hovedejendomOpdeltIEjerlejligh: false });
+    const unknown = res(); await handleParcelOwner({ rpc } as never, "3299123", unknown as never);
+    expect(unknown.headers["Cache-Control"]).toBe("private, no-store");
+  });
   it.each([
     [{ hovedejendomOpdeltIEjerlejligh: true, erFaelleslod: false }, "condominium_parent"],
     [{ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: true }, "common_lot"],

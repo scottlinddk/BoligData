@@ -7,7 +7,9 @@ Signed-in users get a full-page map of cadastral parcels. Zoom to street level (
 - `GET /api/properties?resource=parcels&bbox=minLon,minLat,maxLon,maxLat` returns parcel geometry as WGS84 GeoJSON plus the BFE of each parcel. The box must be inside Denmark and at most 0.012° tall and 0.024° wide, and at most 400 parcels are returned (`truncated` says if more existed). Geometry only, so it does not use the register quota.
 - `GET /api/properties?resource=parcel-owner&bfe=<BFE>` returns owners through the existing Matriklen `BfeEjer` adapter. It spends one `consume_register_lookup_budget` unit (30 per hour per account) and answers `429` with `Retry-After` when spent. Protected persons stay redacted, and no CPR number or home address is returned.
 
-Both require sign-in and respond `private, no-store`. The client caches owners for ten minutes, so re-clicking a parcel does not spend another lookup.
+Both require sign-in and respond `private, no-store`. Definitive owner answers are cached for a day (`Cache-Control: private, max-age=86400` in the browser, plus a 24 h in-memory query cache), so re-clicking a parcel does not spend another lookup. Inconclusive answers (`source_unavailable`, `unavailable`) are `no-store` and retried.
+
+From zoom 18 the owner name is drawn under the parcel number, but only for parcels whose owner is already cached (looked up by clicking). Owners are never fetched automatically for every visible parcel: a viewport can hold hundreds of parcels against a budget of 30 lookups per hour.
 
 ## Mock mode and what is not verified
 
