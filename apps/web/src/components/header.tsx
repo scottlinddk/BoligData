@@ -19,8 +19,8 @@ export function Header() {
   useLocation(); // Re-render on navigation so the search link tracks the latest search.
   const accountMenuItems = useAccountMenuItems();
   const links = [
-    { to: lastSearchPath(), label: t("nav.search") },
     ...(user ? [
+      { to: lastSearchPath(), label: t("nav.search") },
       { to: "/address", label: t("nav.address") },
       { to: "/map", label: language === "da" ? "Ejerkort" : "Owner map" },
       { to: "/research", label: language === "da" ? "Boligprojekt" : "Buying project" },
