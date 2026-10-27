@@ -12,7 +12,7 @@ import { useI18n } from "@/i18n/i18n";
 import { ApiError } from "@/lib/api";
 import { parcelOwnerKey, useParcelOwner, useParcelsInView } from "@/hooks/use-parcel-map";
 import { useAuth } from "@/hooks/use-auth";
-import { parcelOwnerLabel } from "@/lib/parcel-owner-label";
+import { ownerStatusText, parcelOwnerLabel } from "@/lib/parcel-owner-label";
 
 const SOURCE = "parcels", FILL = "parcels-fill", LINE = "parcels-line", LABEL = "parcels-label", OWNER_LABEL = "parcels-owner-label";
 const MIN_ZOOM = 16, OWNER_LABEL_ZOOM = 18;
@@ -100,6 +100,7 @@ export function ParcelOwnerMap() {
           : owner.data.status !== "available" ? <p className="text-ink-soft">{owner.data.status === "not_found" ? tx("Ingen registreret ejer.", "No registered owner.") : tx("Ejeroplysninger er ikke tilgængelige.", "Owner details are unavailable.")}</p>
           : <ul className="space-y-2">{owner.data.owners.map((o, i) => <li key={i}>
               <span className="font-medium">{o.protected ? tx("Navne- og adressebeskyttet", "Name and address protected") : o.name ?? "–"}</span>
+              {o.status && <span className="ml-2 text-xs text-warning">({ownerStatusText(o.status, da)})</span>}
               {o.companyNumber && <span className="ml-2 text-xs text-ink-soft">CVR {o.companyNumber}</span>}
               {(o.actualShare ?? o.registeredShare) && <span className="ml-2 text-xs text-ink-soft">{o.actualShare ?? o.registeredShare}</span>}
               {o.takeoverDate && <span className="block text-xs text-ink-soft">{tx("Overtaget", "Taken over")} {o.takeoverDate}</span>}

@@ -19,6 +19,8 @@ export interface CadastralOwner {
   name: string | null;
   protected: boolean;
   type: string | null;
+  /** Register flags, as on Matriklen.dk: `deceased` = "person død", `ceased` = "ophørt". Never set for protected persons. */
+  status: "deceased" | "ceased" | null;
   companyNumber: string | null;
   actualShare: string | null;
   registeredShare: string | null;
