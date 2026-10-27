@@ -1,9 +1,9 @@
 name: Fetch new listings
 
 on:
-  schedule:
-    # Every 3 hours at :23, off the hour and clear of the 03:00 and Monday 04:17 refreshes.
-    - cron: "23 */3 * * *"
+  # Scheduled runs are disabled. Boligsiden's data policy
+  # (https://www.boligsiden.dk/information/datapolitik) prohibits scraping and
+  # crawling without a prior written agreement. Do not re-enable without one.
   workflow_dispatch:
 
 jobs:
