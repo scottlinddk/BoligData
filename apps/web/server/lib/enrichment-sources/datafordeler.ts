@@ -1,5 +1,5 @@
-import { fetchJson, HttpError } from "../crawl/http.js";
-import { asNonEmptyString } from "../crawl/map-utils.js";
+import { fetchJson, HttpError } from "../shared/http.js";
+import { asNonEmptyString } from "../shared/map-utils.js";
 
 /**
  * Shared client for Datafordeler's entity-based GraphQL services (BBR via DAR,

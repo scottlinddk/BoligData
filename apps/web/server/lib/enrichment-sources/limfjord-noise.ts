@@ -3,7 +3,7 @@ import type {
   LimfjordLanguage, LimfjordNoiseBand, LimfjordNoiseReport, LimfjordNoiseResult,
   LimfjordNoiseScenario, LimfjordNoiseStatus, LimfjordScenarioId, LimfjordUnavailableReason,
 } from "../../../../../packages/shared/src/types/limfjord-noise.js";
-import { fetchJson, HttpError } from "../crawl/http.js";
+import { fetchJson, HttpError } from "../shared/http.js";
 import { isUuid } from "../http-helpers.js";
 
 // Verified from the Tredjekort repository homepage and live API, 2026-09-28.

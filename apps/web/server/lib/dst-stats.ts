@@ -1,4 +1,4 @@
-import { fetchJson } from "./http.js";
+import { fetchJson } from "./shared/http.js";
 
 /**
  * Regional market statistics from Danmarks Statistik's open StatBank API

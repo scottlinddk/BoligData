@@ -1,5 +1,5 @@
 import type { LandRegistration, LandRestriction } from "../../../../../packages/shared/src/types/index.js";
-import { asNonEmptyString } from "../crawl/map-utils.js";
+import { asNonEmptyString } from "../shared/map-utils.js";
 import { postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 import { classifyHusnummer, lookupHouseBfe } from "./vur-valuations.js";

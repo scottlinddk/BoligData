@@ -1,4 +1,4 @@
-import { isDanishCoordinate } from "../crawl/map-utils.js";
+import { isDanishCoordinate } from "../shared/map-utils.js";
 import { lookupAddressCadastralViaDar, parseStructuredAddress } from "./address-lookup-dar.js";
 import { searchHusnummerByAddress } from "./adressevaelger.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";

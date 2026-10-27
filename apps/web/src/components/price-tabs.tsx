@@ -4,41 +4,32 @@ import { SmartEstimate } from "@/components/estimate/smart-estimate";
 import { SparPanel } from "@/components/spar-panel";
 import { BoligDataIndicatorCard } from "@/components/estimate/boligdata-indicator-card";
 import { useSparEstimate } from "@/hooks/use-spar";
-import { ZipPriceIndexCard } from "@/components/estimate/zip-price-index-card";
 import { boligdataIndicator } from "@/lib/boligdata-indicator";
-import { zipPriceIndex } from "@shared/analysis/zip-price-index";
 
-type PriceTab = "price" | "estimate" | "spar" | "index";
+type PriceTab = "estimate" | "spar";
 
 /** Shared links keep working: each old section anchor now opens its tab. */
-const TAB_BY_HASH: Record<string, PriceTab> = { "#price-reference": "price", "#estimate": "estimate", "#spar": "spar", "#price-index": "index" };
+const TAB_BY_HASH: Record<string, PriceTab> = { "#estimate": "estimate", "#spar": "spar" };
 
 const scrollBehavior = (): ScrollBehavior => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
 /**
- * The price indicators of a home, one at a time: the historical price by time on market, the smart
- * estimate, the SPAR fair price and, where the postcode is covered, the price by square meter index. Panels stay mounted (only hidden) so their data loads once and
- * switching tabs is instant.
+ * The price indicators of a home, one at a time: the smart estimate and the SPAR fair price. Panels stay
+ * mounted (only hidden) so their data loads once and switching tabs is instant.
  */
-export function PriceTabs({ propertyId, propertyType, timeOnMarket, timeOnMarketPriceDkk = null, askingPriceDkk = null, postalCode = null, areaSqm = null }: {
-  propertyId: string; propertyType?: string | null; timeOnMarket: ReactNode;
-  /** Postcode and living area of the listing; the price index tab appears only when the postcode has market data. */
-  postalCode?: string | null; areaSqm?: number | null;
-  /** The "should cost" reference of the time-on-market tab, or null when it cannot be computed. */
-  timeOnMarketPriceDkk?: number | null; askingPriceDkk?: number | null;
+export function PriceTabs({ propertyId, propertyType, askingPriceDkk = null }: {
+  propertyId: string; propertyType?: string | null; askingPriceDkk?: number | null;
 }) {
   const { language } = useI18n();
   const spar = useSparEstimate(propertyId).data;
   // Smart estimate and SPAR fair price are one number, so it enters the indicator once.
-  const indicator = boligdataIndicator({ sparPriceDkk: spar?.status === "available" ? spar.fairPrice?.estimate : null, timeOnMarketPriceDkk, askingPriceDkk });
+  const indicator = boligdataIndicator({ sparPriceDkk: spar?.status === "available" ? spar.fairPrice?.estimate : null, timeOnMarketPriceDkk: null, askingPriceDkk });
   const tx = (da: string, en: string) => language === "da" ? da : en;
-  const [active, setActive] = useState<PriceTab>(() => TAB_BY_HASH[window.location.hash] ?? "price");
+  const [active, setActive] = useState<PriceTab>(() => TAB_BY_HASH[window.location.hash] ?? "estimate");
   const root = useRef<HTMLDivElement>(null);
   const tabs: { id: PriceTab; label: string }[] = [
-    { id: "price", label: tx("Pris efter liggetid", "Price by time on market") },
     { id: "estimate", label: tx("Smart estimat", "Smart estimate") },
     { id: "spar", label: tx("SPAR og fair pris (estimat)", "SPAR and fair price (estimate)") },
-    ...(zipPriceIndex({ postalCode, areaSqm }) ? [{ id: "index" as const, label: tx("Prisindeks pr. m²", "Price by m² index") }] : []),
   ];
 
   useEffect(() => {
@@ -82,9 +73,7 @@ export function PriceTabs({ propertyId, propertyType, timeOnMarket, timeOnMarket
         {tab.label}
       </button>)}
     </div>
-    {panel("price", timeOnMarket)}
     {panel("estimate", <SmartEstimate propertyId={propertyId} propertyType={propertyType} onShowCalculation={showCalculation} />)}
     {panel("spar", <div id="spar" className="section-anchor"><SparPanel propertyId={propertyId} /></div>)}
-    {tabs.some(tab => tab.id === "index") && panel("index", <ZipPriceIndexCard postalCode={postalCode} areaSqm={areaSqm} askingPriceDkk={askingPriceDkk} areaSource="listing" />)}
   </div>;
 }

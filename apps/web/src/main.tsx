@@ -22,7 +22,6 @@ import { AddressLookupPage } from "@/routes/address/index";
 import { AddressReportPage } from "@/routes/address/[husnummerId]";
 import { ParcelMapPage } from "@/routes/map";
 import { RecommendationsPage } from "@/routes/recommendations";
-import { StatsPage } from "@/routes/stats";
 import { AdminDashboardPage } from "@/routes/admin/dashboard";
 import { AdminInvitationsPage } from "@/routes/admin/invitations";
 import { AdminUsersPage } from "@/routes/admin/users";
@@ -124,14 +123,6 @@ const router = createBrowserRouter([
         element: (
           <AuthGuard>
             <RecommendationsPage />
-          </AuthGuard>
-        ),
-      },
-      {
-        path: "/stats",
-        element: (
-          <AuthGuard>
-            <StatsPage />
           </AuthGuard>
         ),
       },

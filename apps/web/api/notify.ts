@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyCors } from "../server/middleware/cors.js";
 import { getServiceRoleClient } from "../server/lib/supabase.js";
 import { runNotify } from "../server/lib/notify/run.js";
-import { logError } from "../server/lib/crawl/log.js";
+import { logError } from "../server/lib/shared/log.js";
 
 /**
  * Notification entry point, triggered by .github/workflows/notify.yml.

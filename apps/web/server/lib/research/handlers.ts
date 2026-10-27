@@ -8,7 +8,6 @@ import { isUuid, sendError } from "../http-helpers.js";
 import { getServiceRoleClient } from "../supabase.js";
 import { object, ResearchValidationError, validateAssessment, validateProject } from "./validation.js";
 import { importIdentity, parseCsv, previewImport, validateImportRequest } from "./import.js";
-import { fetchMarketSales, type MarketSubject } from "./market-source.js";
 
 type Row = Record<string, any>;
 const queryString = (v: unknown): string | undefined => Array.isArray(v) ? v[0] : typeof v === "string" ? v : undefined;
@@ -199,18 +198,8 @@ async function handleMarketHistory(res: VercelResponse, client: SupabaseClient, 
       dataVersion: `research-market/1:${createHash("sha256").update(JSON.stringify(scope)).digest("hex").slice(0, 24)}`, retrievedAt, truncated: false } satisfies ResearchHistoryResponse);
     return;
   }
-  const liveSales = await fetchMarketSales(property as MarketSubject, saleFrom);
-  if (liveSales.status === "available" && liveSales.transactions.length > 0) {
-    scope.population = "registered_postal_sales";
-    scope.postalCode = property.postal_code;
-    const result: ResearchHistoryResponse = { ...empty, transactions: liveSales.transactions, conditionEvidence: [],
-      marketScope: scope, retrievedAt, truncated: liveSales.truncated,
-      dataVersion: `research-market/2:${createHash("sha256").update(JSON.stringify([scope, liveSales.transactions])).digest("hex").slice(0, 24)}` };
-    res.status(200).json(result);
-    return;
-  }
   scope.population = "stored_listing_sales";
-  scope.liveSourceUnavailable = liveSales.status === "unavailable";
+  scope.liveSourceUnavailable = true;
   const candidates: Row[] = [];
   for (let offset = 0; offset <= RESEARCH_MARKET_LIMIT; offset += MARKET_PAGE_SIZE) {
     const end = Math.min(offset + MARKET_PAGE_SIZE - 1, RESEARCH_MARKET_LIMIT);

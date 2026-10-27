@@ -114,26 +114,11 @@ const HOUSE_CHAIN: Record<string, unknown[]> = {
   ],
 };
 
-/** Boligsiden's record of Floravej 6, as its address search answers it. */
-const BOLIGSIDEN_FLORAVEJ_6 = {
-  addressID: "boligsiden-id-we-do-not-know",
-  addressType: "villa",
-  coordinates: { lat: 57.04592, lon: 9.8764 },
-  road: { name: "Floravej" },
-  houseNumber: "6",
-  zipCode: 9000,
-  cityName: "Aalborg",
-  registrations: [
-    { amount: 3_000_000, date: "2019-02-01", livingArea: 150, perAreaPrice: 20000, type: "normal" },
-    { amount: 1_495_000, date: "2004-08-23", area: 201, type: "family" },
-  ],
-};
-
 /** What MAT answers for the estate behind BFE 2340871: one ordinary parcel, nothing registered on it. */
 const MAT_ESTATE = { id_lokalId: "e1", BFEnummer: 2_340_871, landbrugsnotering: null, erFaelleslod: false, hovedejendomOpdeltIEjerlejligh: false };
 const MAT_PARCEL = { id_lokalId: "p1", registreretAreal: 812, fredskov_areal: null, strandbeskyttelse_areal: null, klitfredning_areal: null, majoratsskov_nummer: null, faelleslod: false };
 
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; boligsiden?: unknown[]; matParcels?: unknown[] } = {}) {
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; matParcels?: unknown[] } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
@@ -148,9 +133,6 @@ function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: u
       const entity = JSON.parse(init.body).query.match(/\{\s+(\w+)\(/)?.[1] as string;
       const nodes = entity === "MAT_SamletFastEjendom" ? [MAT_ESTATE] : (overrides.matParcels ?? [MAT_PARCEL]);
       return { ok: true, status: 200, headers: new Headers(), json: async () => ({ data: { [entity]: { pageInfo: { hasNextPage: false }, nodes } } }) };
-    }
-    if (href.includes("api.boligsiden.dk/search/addresses")) {
-      return { ok: true, status: 200, headers: new Headers(), json: async () => ({ addresses: overrides.boligsiden ?? [] }) };
     }
     if (href.includes("wfs2-miljoegis.mim.dk")) {
       const layer = new URL(href).searchParams.get("typeNames");
@@ -211,6 +193,17 @@ describe("lookupProperty (live)", () => {
     expect(result.publicValuation?.assessedPropertyValueDkk).toBe(3_150_000);
     expect(result.scoringInputs.noiseZoneEstimate).toBe(60);
     expect(result.source).toBe("ai");
+  });
+
+  it("returns no sale history, because no licensed sales source is connected", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline();
+
+    const result = await lookupProperty(input);
+
+    expect(result.priceHistory).toEqual([]);
+    expect(result.priceHistoryMatch).toBeNull();
+    expect(result.sources.some((s) => s.key === "sales")).toBe(false);
   });
 
   it("geocodes from the address so downstream lookups get real coordinates", async () => {
@@ -323,7 +316,7 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     });
   });
 
-  it("keys BBR, noise and sales off the resolved id and coordinates", async () => {
+  it("keys BBR and noise off the resolved id and coordinates", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     stubPipeline();
 
@@ -333,39 +326,6 @@ describe("lookupProperty by husnummer id (an address that is not a listing)", ()
     expect(result.scoringInputs.noiseZoneEstimate).toBe(60);
     expect(result.sources.find((s) => s.key === "bbr")?.mode).toBe("live");
     expect(result.sources.find((s) => s.key === "noise")?.mode).toBe("live");
-  });
-
-  it("attributes Boligsiden's sale history to the address by its street, number and postcode", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubPipeline({ boligsiden: [BOLIGSIDEN_FLORAVEJ_6] });
-
-    const result = await lookupProperty(byId);
-
-    expect(result.priceHistoryMatch).toBe("matched");
-    expect(result.priceHistory.map((entry) => [entry.soldDate, entry.price, entry.saleType])).toEqual([
-      ["2019-02-01", 3_000_000, "normal"],
-      ["2004-08-23", 1_495_000, "family"],
-    ]);
-  });
-
-  it("gives no history, and says why, when Boligsiden has no address with this street, number and postcode", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubPipeline({ boligsiden: [{ ...BOLIGSIDEN_FLORAVEJ_6, houseNumber: "8" }] });
-
-    const result = await lookupProperty(byId);
-
-    expect(result.priceHistoryMatch).toBe("not_found");
-    expect(result.priceHistory).toEqual([]);
-  });
-
-  it("does not attribute a history to a free-text listing lookup, which has no verified identity", async () => {
-    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
-    stubPipeline({ boligsiden: [BOLIGSIDEN_FLORAVEJ_6] });
-
-    const result = await lookupProperty(input);
-
-    expect(result.priceHistoryMatch).toBeNull();
-    expect(result.priceHistory).toEqual([]);
   });
 
   it("builds the due-diligence flags from what the lookup found: BBR heating, the noise reading, the municipality's links", async () => {

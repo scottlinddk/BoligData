@@ -1,4 +1,4 @@
-import { asNonEmptyString } from "../crawl/map-utils.js";
+import { asNonEmptyString } from "../shared/map-utils.js";
 import { postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
