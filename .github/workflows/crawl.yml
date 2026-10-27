@@ -1,11 +1,9 @@
 name: Property refresh (daily and weekly)
 
 on:
-  schedule:
-    # 03:00 UTC daily — off-peak, well before the Danish business day starts.
-    - cron: "0 3 * * *"
-    # Monday 04:17 UTC: refresh older listings across the entire postcode scope.
-    - cron: "17 4 * * 1"
+  # Scheduled runs are disabled. Boligsiden's data policy
+  # (https://www.boligsiden.dk/information/datapolitik) prohibits scraping and
+  # crawling without a prior written agreement. Do not re-enable without one.
   workflow_dispatch:
     inputs:
       mode:
