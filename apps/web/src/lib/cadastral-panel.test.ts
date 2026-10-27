@@ -16,7 +16,7 @@ describe("cadastral presentation", () => {
     expect(html).toContain(language === "da" ? "matrikulære ejendom" : "cadastral land property");
   });
   it("does not display protected names even if passed unexpectedly to the UI", () => {
-    const html = renderToStaticMarkup(createElement(CadastralFacts, { report: { ...report, owners: { status: "available", reason: null, items: [{ protected: true, name: "Must not appear", type: "BeskyttetPerson", companyNumber: null, actualShare: null, registeredShare: null, takeoverDate: null, registrationDate: null }] } }, language: "da" }));
+    const html = renderToStaticMarkup(createElement(CadastralFacts, { report: { ...report, owners: { status: "available", reason: null, items: [{ protected: true, name: "Must not appear", type: "BeskyttetPerson", status: null, companyNumber: null, actualShare: null, registeredShare: null, takeoverDate: null, registrationDate: null }] } }, language: "da" }));
     expect(html).not.toContain("Must not appear"); expect(html).toContain("Navne-/adressebeskyttelse");
   });
   it("falls back to the complete estate boundary if any parcel geometry is missing", () => {

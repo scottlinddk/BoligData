@@ -96,6 +96,7 @@ export function mapOwners(raw: unknown): CadastralOwner[] {
     const protectedName = owner.type === "BeskyttetPerson";
     // Whitelist fields. Never return CPR, home/contact addresses, or hidden/protected names.
     return { name: protectedName ? null : text(owner.navn), protected: protectedName, type: text(owner.type),
+      status: protectedName ? null : owner.død === true ? "deceased" : owner.ophørt === true ? "ceased" : null,
       companyNumber: !protectedName && /^\d{8}$/.test(String(owner.cvr)) ? String(owner.cvr) : null,
       actualShare: share(owner.faktiskEjerandel), registeredShare: share(owner.tinglystEjerandel),
       takeoverDate: date(owner.overtagelsesdato), registrationDate: date(owner.tinglysningsdato) };

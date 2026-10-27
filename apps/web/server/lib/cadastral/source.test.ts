@@ -108,6 +108,10 @@ describe("owner privacy and values", () => {
     expect(result[0]).toMatchObject({ name: null, protected: true, companyNumber: null, actualShare: "1/2", registeredShare: "1/1", takeoverDate: "2020-01-01" });
     expect(JSON.stringify(result)).not.toMatch(/secret|Must never appear/);
   });
+  it("passes on Matriklen's deceased/ceased flags, but never for protected persons", () => {
+    const result = mapOwners({ ejere: [{ type: "Person", navn: "A", død: true }, { type: "Virksomhed", navn: "B A/S", ophørt: true }, { type: "Person", navn: "C", død: false }, { type: "BeskyttetPerson", død: true }] });
+    expect(result.map(o => o.status)).toEqual(["deceased", "ceased", null, null]);
+  });
   it("does not fabricate shares or dates from missing or invalid fields", () => {
     expect(mapOwners({ ejere: [{ type: "Person", faktiskEjerandel: { tæller: 1, nævner: 0 }, tinglysningsdato: "no" }] })[0]).toMatchObject({ actualShare: null, registeredShare: null, registrationDate: null });
     expect(() => mapOwners({})).toThrow();
