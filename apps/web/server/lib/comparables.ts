@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ComparableEntry, ComparablesResponse } from "../../../../packages/shared/src/types/api.js";
 import { haversineMeters, rowToProperty } from "./row-mappers.js";
-import { asIsoDate, isDanishCoordinate } from "./crawl/map-utils.js";
+import { asIsoDate, isDanishCoordinate } from "./shared/map-utils.js";
 
 const CANDIDATE_LIMIT = 200;
 const RESULT_LIMIT = 5;

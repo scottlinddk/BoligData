@@ -1,5 +1,5 @@
 import type { OilTankRecord, OilTankRegistry } from "../../../../../packages/shared/src/types/index.js";
-import { asNonEmptyString } from "../crawl/map-utils.js";
+import { asNonEmptyString } from "../shared/map-utils.js";
 import { BBR_SERVICE } from "./bbr.js";
 import { apiKeyOrFailure, asCode, positiveInt, query, unique } from "./register-query.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { RawListing } from "./types.js";
+import type { RawListing } from "../crawl/types.js";
 import { envInt } from "./http.js";
 
 /**

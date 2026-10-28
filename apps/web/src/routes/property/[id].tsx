@@ -2,15 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ListingSource } from "@shared/types/index";
-import { ApiError, getComparables, getMarketStats, getProperty, getPropertyLookup } from "@/lib/api";
+import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
 import { formatDkk, pricePerSqm } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
-import { researchListingTime } from "@/lib/research-listing-time";
-import { originalAskingPrice } from "@/lib/original-asking-price";
-import { reportedMarketingPeriod } from "@/lib/reported-listing-duration";
-import { workbookListingReference } from "@/lib/workbook-listing-reference";
-import { ListingDurationSummary } from "@/components/listing-duration-summary";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
 import { ListingFactsPanel, PropertyDescription } from "@/components/listing-details";
 import { CadastralPanel } from "@/components/cadastral-panel";
@@ -18,10 +13,7 @@ import { RegisterSourcesPanel } from "@/components/register-sources-panel";
 import { DueDiligenceChecklist } from "@/components/due-diligence-checklist";
 import { mergeRiskFlags } from "@shared/utils/merge-risk-flags";
 import { ResearchWorkbench } from "@/components/research/workbench";
-import { WorkbookPriceReferenceCard } from "@/components/research/workbook-price-reference";
-import { useListingHistory } from "@/hooks/use-listing-history";
 import { ComparablesPanel } from "@/components/comparables-panel";
-import { MarketStatsPanel } from "@/components/market-stats-panel";
 import { PropertyGallery } from "@/components/property-gallery";
 import { PropertyMap } from "@/components/property-map";
 import { SchoolDistrictPanel } from "@/components/school-district-panel";
@@ -83,7 +75,6 @@ export function PropertyDetailPage() {
     document.title = listing?.address ? `${listing.address} | ${appName}` : appName;
     return () => { document.title = appName; };
   }, [listing?.address, t]);
-  const listingHistory = useListingHistory(listing?.id);
   const lookupQuery = useQuery({
     queryKey: ["property-lookup", listing?.id],
     queryFn: () => getPropertyLookup({ address: listing!.address, askingPrice: listing!.price, postalCode: listing!.postalCode,
@@ -102,12 +93,6 @@ export function PropertyDetailPage() {
     (target instanceof HTMLDetailsElement ? target.querySelector("summary") : target)?.focus({ preventScroll: true });
   }, [listing?.id]);
 
-  const marketStatsQuery = useQuery({
-    queryKey: ["market-stats", id],
-    queryFn: () => getMarketStats(id!),
-    enabled: !!id,
-  });
-
   if (detailQuery.isLoading) return <PropertyDetailSkeleton />;
   if (detailQuery.error instanceof ApiError && detailQuery.error.status === 401) return <p className="p-6 text-danger">{t("search.signInForDetails")} <Link to="/auth/signin" className="underline">{t("nav.signIn")}</Link></p>;
   if (detailQuery.isError || !detailQuery.data) return <div role="alert" className="mx-auto max-w-[1240px] p-6 text-danger"><p>{t("detail.notFound")}</p><button type="button" disabled={detailQuery.isFetching} onClick={() => { void detailQuery.refetch(); }} className="mt-3 inline-flex items-center gap-2 rounded font-semibold underline disabled:opacity-50">{detailQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>;
@@ -121,8 +106,6 @@ export function PropertyDetailPage() {
   const saved = isSaved(property.id);
   const photos = getPhotos(property.images);
   const floorplan = getFloorplan(property.images);
-  const listingTime = researchListingTime(property, listingHistory.data);
-  const days = listingTime.time.latestEpisodeDays;
   const energyLabel = listingDetails?.facts.energyLabel ?? facts.bbrData?.energyLabel ?? null;
   const builtYear = facts.buildingYear ?? listingDetails?.facts.yearBuilt ?? null;
   const figures = [
@@ -139,12 +122,6 @@ export function PropertyDetailPage() {
     { id: "price-reference", label: tx("Prisoverblik", "Price overview") },
     { id: "map", label: tx("På kortet", "On the map") },
   ];
-  const marketingPeriod = reportedMarketingPeriod(property, listingHistory.data);
-  const timeOnMarketReference = workbookListingReference(property, listingHistory.data).reference;
-  // Only exact, source-reported original asking prices count; nothing is inferred.
-  const original = originalAskingPrice(property, listingHistory.data);
-  const priceCut = original.status === "available" && original.evidence && original.evidence.price > property.price ? original.evidence.price - property.price : null;
-
   async function handleSave() {
     if (saving) return;
     setSaving(true);
@@ -191,7 +168,7 @@ export function PropertyDetailPage() {
           <div>
             <div className="mb-4 lg:hidden">
               {!active && <p className="mb-1 text-xs text-ink-soft">{priceLabel}</p>}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><p className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">{formatDkk(property.price)}</p>{priceCut !== null && <span title={tx("Nedsættelse siden den oprindelige udbudspris", "Reduction from the original asking price")} className="rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-surface">{tx("Prisfald", "Price cut")}: {formatDkk(priceCut)}</span>}</div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><p className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">{formatDkk(property.price)}</p></div>
             </div>
             <ul aria-label={tx("Nøgletal", "Key facts")} className="mb-5 flex flex-wrap gap-2 sm:hidden">
               <FactChip icon="type">{t(`propertyType.${property.propertyType}` as TranslationKey)}</FactChip>
@@ -216,8 +193,7 @@ export function PropertyDetailPage() {
             {facts.registerAreaSqm !== null && <p className="mt-3 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-text">{t("detail.registerAreaMismatch", { listing: String(property.sqm), register: String(facts.registerAreaSqm) })}</p>}
           </div>
           <div ref={priceReference} id="price-reference" tabIndex={-1} aria-label={tx("Prisoverblik", "Price overview")} className="section-anchor rounded-2xl">
-            <PriceTabs propertyId={property.id} propertyType={property.propertyType} askingPriceDkk={property.price} postalCode={property.postalCode} areaSqm={property.sqm} timeOnMarketPriceDkk={timeOnMarketReference.status === "available" ? timeOnMarketReference.referencePrice : null}
-              timeOnMarket={<WorkbookPriceReferenceCard property={property} history={listingHistory.data} loading={listingHistory.isPending} failed={listingHistory.isError} onRetry={() => { void listingHistory.refetch(); }} />} />
+            <PriceTabs propertyId={property.id} propertyType={property.propertyType} askingPriceDkk={property.price} />
           </div>
           <div id="description" className="section-anchor"><PropertyDescription key={property.id} property={property} details={listingDetails} /></div>
           <DetailSection id="facts" title={tx("Fakta og bygningsoplysninger", "Facts and building details")} subtitle={tx("BBR, grund, materialer og offentlig vurdering", "Building records, plot, materials and public valuation")}>
@@ -247,7 +223,6 @@ export function PropertyDetailPage() {
             {comparablesQuery.isError && <div role="status" className="mb-4 rounded-xl bg-warning-soft p-4 text-sm text-warning-text"><p>{t("comparables.error")}</p><button type="button" disabled={comparablesQuery.isFetching} onClick={() => { void comparablesQuery.refetch(); }} className="mt-2 inline-flex items-center gap-2 font-semibold underline disabled:opacity-50">{comparablesQuery.isFetching && <Spinner />}{t("common.retry")}</button></div>}
             {comparablesQuery.isLoading ? <div className="space-y-4"><LoadingStatus>{tx("Henter sammenlignelige boliger…", "Loading comparable homes…")}</LoadingStatus><Skeleton className="h-24 w-full rounded-xl" /></div>
               : <ComparablesPanel soldPriceHistory={facts.priceHistory} priceHistorySource={facts.priceHistorySource} nearbySales={facts.nearbySales} comparables={comparablesQuery.data?.comparables ?? []} neighborhoodAvgPricePerSqm={comparablesQuery.data?.neighborhoodAvgPricePerSqm ?? null} />}
-            {marketStatsQuery.data && <div className="mt-4"><MarketStatsPanel stats={marketStatsQuery.data} /></div>}
           </DetailSection>
           <MiljoegisNoisePanel propertyId={property.id} />
           <LimfjordNoisePanel propertyId={property.id} />
@@ -260,8 +235,7 @@ export function PropertyDetailPage() {
             <p className={`text-xs font-medium uppercase tracking-[0.12em] text-ink-soft ${active ? "lg:hidden" : ""}`}>{priceLabel}</p>
             <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] lg:text-[52px] lg:leading-none lg:tracking-[-0.05em]">{formatDkk(property.price)}</p>
             <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
-            {priceCut !== null && <p className="mt-3"><span title={tx("Nedsættelse siden den oprindelige udbudspris", "Reduction from the original asking price")} className="inline-block rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-surface">{tx("Prisfald", "Price cut")}: {formatDkk(priceCut)}</span></p>}
-            {active && <><ListingDurationSummary currentDays={days} period={marketingPeriod} />
+            {active && <>
               <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90 lg:mt-5 lg:min-h-0 lg:justify-start lg:rounded-none lg:bg-transparent lg:p-0 lg:font-medium lg:text-ink lg:underline lg:underline-offset-4`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a></>}
             <div className="mt-3 flex gap-3 lg:mt-7">
               <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} className={`${actionClass} w-full border border-border-strong bg-surface text-ink hover:bg-surface-hover disabled:opacity-50 lg:min-h-10 lg:w-auto lg:rounded-md lg:px-4 lg:py-2 lg:text-[13px]`}>{saving ? <Spinner /> : <span aria-hidden="true">{saved ? "♥" : "♡"}</span>}{saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")}</button>

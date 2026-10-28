@@ -4,7 +4,7 @@ import { applyCors } from "../server/middleware/cors.js";
 import { sendError } from "../server/lib/http-helpers.js";
 import { lookupProperty } from "../server/lib/property-lookup/property-lookup.handler.js";
 import { estimateAddressSpar } from "../server/lib/property-lookup/address-spar.js";
-import { logError } from "../server/lib/crawl/log.js";
+import { logError } from "../server/lib/shared/log.js";
 import { isHusnummerId } from "../server/lib/enrichment-sources/adressevaelger.js";
 import { requireUser } from "../server/middleware/auth.js";
 import { getAnonClient } from "../server/lib/supabase.js";

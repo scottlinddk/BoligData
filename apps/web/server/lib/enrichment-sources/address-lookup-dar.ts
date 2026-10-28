@@ -1,4 +1,4 @@
-import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../crawl/map-utils.js";
+import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../shared/map-utils.js";
 import { etrs89Utm32ToWgs84 } from "../geo/etrs89-utm32.js";
 import { DAR_SERVICE } from "./bbr.js";
 import { postGraphQl, type DatafordelerService } from "./datafordeler.js";

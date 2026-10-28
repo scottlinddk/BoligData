@@ -3,7 +3,7 @@ import type { AlertFrequency } from "../../../../../packages/shared/src/types/in
 import { searchProperties } from "../search.js";
 import { getAuthAdmin } from "../supabase.js";
 import { sendAlertEmail } from "./email.js";
-import { logError, logEvent } from "../crawl/log.js";
+import { logError, logEvent } from "../shared/log.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CADENCE_MS: Record<Exclude<AlertFrequency, "none">, number> = {

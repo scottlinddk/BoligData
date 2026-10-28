@@ -4,11 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDkk } from "@shared/utils/price";
 import { ApiError, getProperty } from "@/lib/api";
 import { mergePropertyFacts } from "@/lib/property-facts";
-import { originalAskingPrice } from "@/lib/original-asking-price";
 import { buildPriceHistoryRows, type PriceHistoryRow } from "@/lib/price-history";
 import { formatPeriod } from "@/lib/smart-estimate";
 import { useSparEstimate } from "@/hooks/use-spar";
-import { useListingHistory } from "@/hooks/use-listing-history";
 import { useI18n } from "@/i18n/i18n";
 import { EstimateChart } from "@/components/estimate/estimate-chart";
 import { LoadingStatus, Skeleton } from "@/components/ui/loading";
@@ -28,7 +26,6 @@ export function PropertyEstimatePage() {
   const [showAll, setShowAll] = useState(false);
   const detail = useQuery({ queryKey: ["property", id], queryFn: () => getProperty(id!), enabled: !!id });
   const spar = useSparEstimate(id ?? "");
-  const history = useListingHistory(id);
   const property = detail.data?.property;
 
   useEffect(() => {
@@ -41,11 +38,10 @@ export function PropertyEstimatePage() {
   const fair = spar.data?.status === "available" ? spar.data : null;
 
   const rows: PriceHistoryRow[] = property ? (() => {
-    const original = originalAskingPrice(property, history.data);
     const facts = mergePropertyFacts(property, detail.data?.enrichment ?? null, null);
     return buildPriceHistoryRows({
       property, sales: facts.priceHistory,
-      originalAsking: original.status === "available" && original.evidence ? { price: original.evidence.price, date: original.evidence.originalDate } : null,
+      originalAsking: null,
     });
   })() : [];
   const visibleRows = showAll ? rows : rows.slice(0, INITIAL_ROWS);

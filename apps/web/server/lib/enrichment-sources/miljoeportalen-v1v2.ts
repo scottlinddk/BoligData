@@ -1,4 +1,4 @@
-import { fetchJson } from "../crawl/http.js";
+import { fetchJson } from "../shared/http.js";
 import { toUtm32 } from "../miljoegis-noise/geometry.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 import type { SoilContaminationClassification } from "../../../../../packages/shared/src/types/index.js";

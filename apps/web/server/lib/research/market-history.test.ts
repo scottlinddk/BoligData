@@ -46,15 +46,12 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-26T12:
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe("property-scoped market history", () => {
-  it("returns a separate registered-sales population including homes not currently advertised", async () => {
-    vi.stubEnv("BOLIGSIDEN_ADDRESS_API_BASE", "https://source.example/handler-market");
-    stubFetch([{ body: { addresses: [{ addressID: "00000000-0000-4000-8000-000000000001", addressType: "villa", zipCode: 9000, municipality: { name: "Aalborg" }, coordinates: { lat: 57.055, lon: 9.92 }, road: { name: "Soldvej" }, houseNumber: "7", registrations: [{ amount: 2_000_000, livingArea: 130, date: "2026-08-01", type: "normal" }] }], totalHits: 1 } }]);
+  it("reads only stored sales and never calls an external sales source", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     const client = fakeClient({ properties: [{ ...subject, address: "Subjectvej 1", data_mode: "real", postal_code: "9000", lat: 57.05, lon: 9.90 }], sale_transactions: [sale("listing-only")] });
     const { result } = await run(client);
-    expect(result.transactions).toHaveLength(1);
-    expect(result.transactions[0]?.address).toBe("Soldvej 7, 9000 Aalborg");
-    expect(result.marketScope).toMatchObject({ population: "registered_postal_sales", postalCode: "9000" });
-    expect(client.calls.every(call => call.table === "properties")).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.marketScope).toMatchObject({ population: "stored_listing_sales", liveSourceUnavailable: true });
   });
 
   it("retains stored sales with explicit source failure metadata", async () => {

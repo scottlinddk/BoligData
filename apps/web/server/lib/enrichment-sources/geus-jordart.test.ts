@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { lookupSoilType } from "./geus-jordart.js";
-import { fetchJson } from "../crawl/http.js";
-vi.mock("../crawl/http.js", () => ({ fetchJson: vi.fn() }));
+import { fetchJson } from "../shared/http.js";
+vi.mock("../shared/http.js", () => ({ fetchJson: vi.fn() }));
 afterEach(() => { vi.unstubAllEnvs(); vi.resetAllMocks(); });
 
 describe("lookupSoilType (mock mode)", () => {

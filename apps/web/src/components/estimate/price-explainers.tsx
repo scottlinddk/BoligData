@@ -1,4 +1,4 @@
-import { SPAR_MAX_RATIO, SPAR_MIN_RATIO, WORKBOOK_PRICE_REFERENCE_MODEL } from "@shared/analysis";
+import { SPAR_MAX_RATIO, SPAR_MIN_RATIO } from "@shared/analysis";
 import { useI18n } from "@/i18n/i18n";
 import { InfoButton, InfoFormula, InfoSection, InfoSteps } from "@/components/ui/info-modal";
 import { INDICATOR_DISAGREEMENT_RATIO } from "@/lib/boligdata-indicator";
@@ -8,7 +8,6 @@ const useTx = () => {
   return (da: string, en: string) => language === "da" ? da : en;
 };
 
-const WORKBOOK = WORKBOOK_PRICE_REFERENCE_MODEL.metadata;
 
 /** What the SPAR level and the fair price rest on. Shared by the smart estimate and the SPAR tab, since they show one number. */
 function SparMethod() {
@@ -67,30 +66,6 @@ export function SparInfo() {
     <p>{tx("SPAR fair pris er, hvad boligen ville koste, hvis den blev solgt til det niveau, markedet har i forhold til de offentlige vurderinger. Denne fane viser regnestykket bag. Smart estimat bruger det samme tal.", "The SPAR fair price is what the home would cost if it sold at the level the market has relative to the public valuations. This tab shows the calculation behind it. The smart estimate uses the same number.")}</p>
     <SparMethod />
     <SparLimits />
-  </InfoButton>;
-}
-
-export function TimeOnMarketInfo() {
-  const tx = useTx();
-  return <InfoButton label={tx("Sådan beregnes pris efter liggetid", "How price by time on market is calculated")} title={tx("Sådan beregnes pris efter liggetid", "How price by time on market is calculated")}>
-    <p>{tx("‘Burde koste’ viser, hvad boliger plejer at ende på, når de har ligget til salg lige så længe som denne. Jo længere en bolig ligger, jo større er det typiske prisfald fra den første udbudspris.", "‘Should cost’ shows where homes usually end up after being listed for as long as this one. The longer a home sits, the larger the typical reduction from the first asking price.")}</p>
-    <InfoFormula>{tx("Oprindelig udbudspris × (1 − medianfald for liggetidsgruppen)", "Original asking price × (1 − median reduction for the time group)")}</InfoFormula>
-    <InfoSteps>
-      <li>{tx("Vi finder den oprindelige udbudspris. Dagens pris bruges aldrig som erstatning, så tidligere nedsættelser ikke trækkes fra to gange.", "We find the original asking price. Today's price is never used as a substitute, so earlier reductions are not subtracted twice.")}</li>
-      <li>{tx("Boligens liggetid vælger en tidsgruppe, fx 61–90 dage. Ligger den uden for det observerede interval, bruges den nærmeste gruppe. Kendes liggetiden ikke, bruges alle handler.", "The home's time on market selects a time group, for example 61–90 days. Outside the observed range the nearest group is used. If the time is unknown, all sales are used.")}</li>
-      <li>{tx("Gruppens medianfald, målt fra første udbudspris til salgspris, trækkes fra. Intervallet viser de midterste 50 % af de historiske fald.", "The group's median reduction, measured from first asking price to sale price, is subtracted. The range shows the middle 50% of the historical reductions.")}</li>
-      <li>{tx(`Beløbet afrundes til ${WORKBOOK.roundingDkk.toLocaleString("da-DK")} kr.`, `The amount is rounded to DKK ${WORKBOOK.roundingDkk.toLocaleString("en-GB")}.`)}</li>
-    </InfoSteps>
-    <InfoSection title={tx("Datagrundlag", "Data basis")}>
-      <p>{tx(`${WORKBOOK.eligibleCount} historiske villasalg fra ${WORKBOOK.saleYears.from} til ${WORKBOOK.saleYears.to} i et udvalgt kortområde i Aalborg/Hasseris (stand ${WORKBOOK.snapshotDate}). Tidsgrupper samles til mindst ${WORKBOOK.minimumSample} handler.`, `${WORKBOOK.eligibleCount} historical villa sales from ${WORKBOOK.saleYears.from} to ${WORKBOOK.saleYears.to} in a selected map area in Aalborg/Hasseris (as of ${WORKBOOK.snapshotDate}). Time groups are pooled to at least ${WORKBOOK.minimumSample} sales.`)}</p>
-    </InfoSection>
-    <InfoSection title={tx("Begrænsninger", "Limitations")}>
-      <ul className="list-disc space-y-1.5 pl-5 marker:text-ink-soft">
-        <li>{tx("For boliger uden for Aalborg/Hasseris eller andre boligtyper end villa er det et bredt historisk scenarie, ikke lokale sammenlignelige handler.", "For homes outside Aalborg/Hasseris, or property types other than villas, it is a broad historical scenario, not locally comparable sales.")}</li>
-        <li>{tx("Tallet tager ikke højde for stand, areal, grund eller præcis beliggenhed. Et genudbud kan nulstille liggetiden.", "The figure ignores condition, size, plot or exact location. A relisting can reset the time on market.")}</li>
-        <li>{tx("Det er et historisk pejlemærke og ikke en markedsvurdering.", "It is a historical reference, not a market valuation.")}</li>
-      </ul>
-    </InfoSection>
   </InfoButton>;
 }
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildDkJordQuery, lookupSoilContamination } from "./miljoeportalen-v1v2.js";
-import { fetchJson } from "../crawl/http.js";
-vi.mock("../crawl/http.js", () => ({ fetchJson: vi.fn() }));
+import { fetchJson } from "../shared/http.js";
+vi.mock("../shared/http.js", () => ({ fetchJson: vi.fn() }));
 afterEach(() => { vi.unstubAllEnvs(); vi.resetAllMocks(); });
 
 // Shape of a live DKJord answer (18 Oct 2026), trimmed to the requested properties.

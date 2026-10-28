@@ -1,5 +1,5 @@
 import type { ParcelMapParcel, ParcelMapResponse } from "../../../../../packages/shared/src/types/parcel-map.js";
-import { fetchJson } from "../crawl/http.js";
+import { fetchJson } from "../shared/http.js";
 import { etrs89Utm32ToWgs84, wgs84ToEtrs89Utm32 } from "../geo/etrs89-utm32.js";
 import { parseCadastralGeometry } from "../cadastral/geometry.js";
 import { MAX_PARCELS, type Bbox } from "./bbox.js";

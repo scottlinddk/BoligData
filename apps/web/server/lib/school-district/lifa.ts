@@ -1,5 +1,5 @@
 import type { SchoolDistrictMatch, SchoolDistrictResult } from "../../../../../packages/shared/src/types/school-district.js";
-import { fetchJson } from "../crawl/http.js";
+import { fetchJson } from "../shared/http.js";
 import { isUuid } from "../http-helpers.js";
 import { emptyResult, normalize, record, sameAddressParts, text, type SchoolAddress } from "./shared.js";
 

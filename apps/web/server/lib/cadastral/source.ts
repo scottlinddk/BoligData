@@ -1,7 +1,7 @@
 import type { Property } from "../../../../../packages/shared/src/types/index.js";
 import type { CadastralOwner, CadastralParcel, CadastralReport } from "../../../../../packages/shared/src/types/cadastral.js";
 import type { ParcelAddress } from "../../../../../packages/shared/src/types/parcel-map.js";
-import { fetchJson, HttpError } from "../crawl/http.js";
+import { fetchJson, HttpError } from "../shared/http.js";
 import { resolveHusnummerId } from "../enrichment-sources/address-lookup-dar.js";
 import { parseCadastralGeometry } from "./geometry.js";
 

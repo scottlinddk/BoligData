@@ -11,8 +11,7 @@
     "build": "pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm --filter web lint",
-    "test": "node --test scripts/update-market-index.test.mjs scripts/verify-search-boundary.test.mjs scripts/backfill-bfe-valuation.test.mjs scripts/discover-datafordeler.test.mjs scripts/datafordeler-bbr-join.test.mjs && pnpm -r test",
-    "data:market-index": "node scripts/update-market-index.mjs",
+    "test": "node --test scripts/verify-search-boundary.test.mjs scripts/backfill-bfe-valuation.test.mjs scripts/discover-datafordeler.test.mjs scripts/datafordeler-bbr-join.test.mjs && pnpm -r test",
     "data:backfill-valuations": "node scripts/backfill-bfe-valuation.mjs"
   }
 }

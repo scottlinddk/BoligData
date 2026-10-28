@@ -1,5 +1,5 @@
-import { fetchJson } from "../crawl/http.js";
-import { asNonEmptyString } from "../crawl/map-utils.js";
+import { fetchJson } from "../shared/http.js";
+import { asNonEmptyString } from "../shared/map-utils.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
 /** GEUS Jordartskort — free Esri Feature Layer, point query, no auth. Context only, never authoritative for contamination status. */

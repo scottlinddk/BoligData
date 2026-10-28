@@ -1,5 +1,5 @@
-import { fetchJson } from "../crawl/http.js";
-import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../crawl/map-utils.js";
+import { fetchJson } from "../shared/http.js";
+import { asFiniteNumber, asNonEmptyString, isDanishCoordinate } from "../shared/map-utils.js";
 import { etrs89Utm32ToWgs84 } from "../geo/etrs89-utm32.js";
 import { sourceFailed, sourceOk, type SourceResult } from "./types.js";
 import type { AddressCadastral } from "./address-lookup.js";

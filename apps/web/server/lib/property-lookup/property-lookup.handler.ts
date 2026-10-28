@@ -16,9 +16,8 @@ import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
 import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
-import { lookupBoligsidenSales } from "../enrichment-sources/boligsiden-sales.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
-import { isDanishCoordinate } from "../crawl/map-utils.js";
+import { isDanishCoordinate } from "../shared/map-utils.js";
 import { DEFAULT_FINANCING_ASSUMPTIONS, type FinancingAssumptions } from "../screening/config/financing-assumptions.js";
 import { classifyRenovationCategory } from "../screening/renovation-category.js";
 import { evaluateScreening } from "../screening/symbol-engine.js";
@@ -90,15 +89,8 @@ export async function lookupProperty(
   // A listing's valuation is looked up by the parcel the address register returned. An address picked by id has
   // no parcel, so its valuation is found from the husnummer itself (houses only; see vur-valuations.ts).
   const byId = Boolean(input.husnummerId);
-  // Boligsiden's sale history is only attributed to an address that is identified, never by coordinates alone. For
-  // an id lookup the register's own street, number and postcode identify it (see `recordIsAddress`).
-  const subjectAddress =
-    byId && cadastral?.streetName && cadastral.houseNumber && cadastral.postalCode
-      ? { road: cadastral.streetName, houseNumber: cadastral.houseNumber, zipCode: cadastral.postalCode }
-      : undefined;
-
   const husnummerId = cadastral?.idLokalid ?? null;
-  const [bbrResult, listingValuationResult, houseLookup, noiseResult, salesResult, soilResult, landResult, tanksResult] = await Promise.all([
+  const [bbrResult, listingValuationResult, houseLookup, noiseResult, soilResult, landResult, tanksResult] = await Promise.all([
     lookupBbr(husnummerId),
     byId
       ? null
@@ -113,9 +105,6 @@ export async function lookupProperty(
     // for a point in the Atlantic, so an unresolvable address skips the call
     // rather than answering it wrongly.
     hasCoordinates ? lookupNoiseExposure(lat, lon) : null,
-    // Same reasoning: a polygon around 0,0 is a box in the Atlantic, and an
-    // empty "no sales nearby" is indistinguishable from a real answer.
-    hasCoordinates ? lookupBoligsidenSales(lat, lon, subjectAddress ? { subjectAddress } : {}) : null,
     hasCoordinates ? lookupSoilContamination(lat, lon) : null,
     // MAT and the BBR tank register are keyed by the husnummer (through its BFE for MAT), not by coordinates.
     lookupLand({
@@ -152,7 +141,8 @@ export async function lookupProperty(
   const noise = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data : null;
   const noiseExposureLden = noise?.ldenDb ?? null;
   const soil = soilResult?.ok && !mockModeEnabled("MILJOEPORTALEN_MOCK_MODE") ? soilResult.data : null;
-  const sales = salesResult?.ok && !mockModeEnabled("BOLIGSIDEN_SALES_MOCK_MODE") ? salesResult.data : null;
+  // No licensed source for registered sales is connected. Sales history needs an agreement (EJF/Datafordeler).
+  const sales = null as null | { priceHistory: never[]; historyMatch: null; nearbySales: never[] };
 
   const addressRegisterLabel = input.husnummerId
     ? "DAR via Adressevælger (adressevaelger.dk)"
@@ -174,14 +164,6 @@ export async function lookupProperty(
           error: "no usable coordinates for the address",
         }
       : status("noise", NOISE_REGISTER, "STOEJKORT_MOCK_MODE", noiseResult),
-    salesResult === null
-      ? {
-          key: "sales" as const,
-          register: "Boligsiden (registrerede handler)",
-          mode: "unavailable" as const,
-          error: "no usable coordinates for the address",
-        }
-      : status("sales", "Boligsiden (registrerede handler)", "BOLIGSIDEN_SALES_MOCK_MODE", salesResult),
     soilResult === null
       ? { key: "soil" as const, register: SOIL_REGISTER, mode: "unavailable" as const, error: "no usable coordinates for the address" }
       : status("soil", SOIL_REGISTER, "MILJOEPORTALEN_MOCK_MODE", soilResult),

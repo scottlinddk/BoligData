@@ -1,4 +1,4 @@
-import { asNonEmptyString, asPositiveInt } from "../crawl/map-utils.js";
+import { asNonEmptyString, asPositiveInt } from "../shared/map-utils.js";
 import { entityFields, postGraphQl, type DatafordelerService } from "./datafordeler.js";
 import { hashSeed, mockModeEnabled, sourceFailed, sourceOk, type SourceResult } from "./types.js";
 
