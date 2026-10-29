@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import type { Property } from "@shared/types/index";
-import { formatDkk } from "@shared/utils/price";
+import { formatAskingPrice } from "@shared/utils/price";
 import { getImageUrl, getPhotos } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 import { BrandMark } from "@/components/brand-mark";
@@ -37,7 +37,7 @@ export function MapListingCarousel({ properties, selectedId }: MapListingCarouse
               : <span className="flex h-full w-full items-center justify-center text-ink-faint"><BrandMark className="h-8 w-8 opacity-40" /></span>}
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center">
-            <span className="text-[17px] font-semibold leading-6 tracking-[-0.035em] text-ink">{formatDkk(property.price)}</span>
+            <span className="text-[17px] font-semibold leading-6 tracking-[-0.035em] text-ink">{formatAskingPrice(property.price)}</span>
             <span className="mt-0.5 truncate text-sm font-medium text-ink">{property.address}</span>
             <span className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft">
               <span>{t("property.sqm", { sqm: property.sqm })}</span>

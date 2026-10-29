@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysBetween, estimateYield, pricePerSqm, priceTrendPercent } from "@shared/utils/price";
+import { daysBetween, estimateYield, formatAskingPrice, formatDkk, pricePerSqm, priceTrendPercent } from "@shared/utils/price";
 
 describe("pricePerSqm", () => {
   it("rounds to the nearest whole DKK", () => {
@@ -47,5 +47,16 @@ describe("priceTrendPercent", () => {
 
   it("returns null when the neighborhood average is non-positive", () => {
     expect(priceTrendPercent(22000, 0)).toBeNull();
+  });
+});
+
+describe("formatAskingPrice", () => {
+  it("formats a positive price like formatDkk", () => {
+    expect(formatAskingPrice(1250000)).toBe(formatDkk(1250000));
+  });
+
+  it("renders a dash when a saved address has no asking price", () => {
+    expect(formatAskingPrice(0)).toBe("–");
+    expect(formatAskingPrice(Number.NaN)).toBe("–");
   });
 });

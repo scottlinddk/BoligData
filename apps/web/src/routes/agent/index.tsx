@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listAgentListings, listMyConnections, promoteListing, unpromoteListing } from "@/lib/api";
 import { ConnectionList } from "@/components/connection-list";
 import { useI18n } from "@/i18n/i18n";
-import { formatDkk } from "@shared/utils/price";
+import { formatAskingPrice } from "@shared/utils/price";
 
 export function AgentPage() {
   const { t } = useI18n();
@@ -42,7 +42,7 @@ export function AgentPage() {
             <div>
               <div className="font-bold text-ink">{property.address}</div>
               <div className="text-xs font-semibold text-ink-soft">
-                {formatDkk(property.price)}
+                {formatAskingPrice(property.price)}
                 {property.isPromoted && (
                   <span className="ml-2 rounded-md bg-cta px-1.5 py-0.5 text-[10px] font-bold text-cta-text">
                     {t("agent.promoted")}

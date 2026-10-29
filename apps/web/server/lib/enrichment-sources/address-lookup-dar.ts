@@ -58,7 +58,7 @@ export interface StructuredAddress {
  * key on: "Hobrovej 123, 9000 Aalborg" -> street "Hobrovej", house number
  * "123", postal code "9000". Floor/door suffixes ("2. tv") are dropped,
  * since a husnummer identifies the entrance, not the unit. A letter may be
- * glued on ("6a"), spaced ("10 B") or written with a plus as Boligsiden does
+ * glued on ("6a"), spaced ("10 B") or written with a plus
  * for some entrances ("10+B"); all normalise to "10B". Returns null when the
  * first comma-separated segment doesn't end in a house-number-shaped token.
  */

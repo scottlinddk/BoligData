@@ -7,7 +7,7 @@ import { fetchJson } from "./shared/http.js";
  *   (DKK 1000) of ordinary free trades
  * - EJ56: price index, used only for its year-over-year change
  * DST has no municipality level, price per m² or time on market, so these are
- * regional context next to the per-municipality Boligsiden series.
+ * regional context only.
  */
 const DST_DATA_URL = process.env.DST_STATBANK_URL ?? "https://api.statbank.dk/v1/data";
 

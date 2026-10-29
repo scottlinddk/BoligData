@@ -7,7 +7,7 @@ import { handleResearch } from "./handlers.js";
 const ID = "11111111-1111-4111-8111-111111111111";
 type Row = Record<string, any>;
 const original = (id: string, overrides: Row = {}): Row => ({
-  id, property_id: ID, episode_id: "episode", field_name: "original_asking_price", source: "boligsiden",
+  id, property_id: ID, episode_id: "episode", field_name: "original_asking_price", source: "register",
   value: { price: 5_500_000, sourceListingId: "case-1", scope: "listing", originalDate: null },
   observed_at: "2026-09-01T00:00:00Z", effective_date: null, date_precision: "unknown", data_mode: "real",
   method: "source_reported_original_asking", verification_status: "unverified", conflict_group: null,

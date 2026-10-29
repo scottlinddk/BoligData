@@ -7,33 +7,17 @@ function img(url: string, sources: ListingImage["sources"] = []): ListingImage {
 }
 
 describe("getImageUrl", () => {
-  it("recovers a supported CDN preset for existing thumbnail-only rows", () => {
-    const image = img(
-      "https://images.boligsiden.dk/images/case/113ce067/100x80/393ea4e7.webp",
-    );
-    expect(getImageUrl(image, 800, 500)).toBe(
-      "https://images.boligsiden.dk/images/case/113ce067/1440x960/393ea4e7.webp",
-    );
-  });
-
-  it("leaves non-Boligsiden URLs untouched when no sources exist", () => {
-    const image = img("https://i.boliga.org/dk/500x/12345.jpg");
-    expect(getImageUrl(image, 600, 400)).toBe("https://i.boliga.org/dk/500x/12345.jpg");
-  });
-
-  it("leaves Boligsiden URLs without a size segment untouched", () => {
-    const image = img("https://images.boligsiden.dk/images/case/113ce067/original.webp");
-    expect(getImageUrl(image, 600, 400)).toBe(
-      "https://images.boligsiden.dk/images/case/113ce067/original.webp",
-    );
+  it("returns the original URL when no sources exist", () => {
+    const image = img("https://images.example.com/500x/12345.jpg");
+    expect(getImageUrl(image, 600, 400)).toBe("https://images.example.com/500x/12345.jpg");
   });
 
   it("prefers an exact pre-sized source over URL rewriting", () => {
-    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp", [
-      { url: "https://images.boligsiden.dk/images/case/x/600x400/y.webp", width: 600, height: 400 },
+    const image = img("https://images.example.com/photos/x/100x80/y.webp", [
+      { url: "https://images.example.com/photos/x/600x400/y.webp", width: 600, height: 400 },
     ]);
     expect(getImageUrl(image, 600, 400)).toBe(
-      "https://images.boligsiden.dk/images/case/x/600x400/y.webp",
+      "https://images.example.com/photos/x/600x400/y.webp",
     );
   });
 
@@ -55,45 +39,17 @@ describe("getImageUrl", () => {
   });
 
   it("uses the largest provided source rather than inventing unsupported CDN sizes", () => {
-    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp", [
-      { url: "https://images.boligsiden.dk/images/case/x/1440x960/y.webp", width: 1440, height: 960 },
+    const image = img("https://images.example.com/photos/x/100x80/y.webp", [
+      { url: "https://images.example.com/photos/x/1440x960/y.webp", width: 1440, height: 960 },
     ]);
     expect(getImageUrl(image, 2000, 1333)).toBe(
-      "https://images.boligsiden.dk/images/case/x/1440x960/y.webp",
+      "https://images.example.com/photos/x/1440x960/y.webp",
     );
   });
 
-  it("caps legacy fullscreen images at the largest verified preset", () => {
-    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp");
-    expect(getImageUrl(image, 2000, 1333)).toBe("https://images.boligsiden.dk/images/case/x/1440x960/y.webp");
-  });
-
-  it.each([
-    "https://images.boligsiden.dk.example.com/images/case/x/100x80/y.webp",
-    "https://example.com/images/case/x/100x80/y.webp?host=images.boligsiden.dk",
-    "https://images.boligsiden.dk/other/x/100x80/y.webp",
-    "https://images.boligsiden.dk:8443/images/case/x/100x80/y.webp",
-    "https://images.boligsiden.dk/images/case/x/100x80/y.jpg",
-    "not a URL",
-  ])("does not resize URLs outside the verified CDN path: %s", url => {
-    expect(getImageUrl(img(url), 800, 500)).toBe(url);
-  });
-
-  it("preserves URL query parameters when recovering legacy presets", () => {
-    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp?v=2");
-    expect(getImageUrl(image, 600, 400)).toBe("https://images.boligsiden.dk/images/case/x/600x400/y.webp?v=2");
-  });
 });
 
 describe("getImageSrcSet", () => {
-  it("deduplicates supported presets and reports their actual pixel widths", () => {
-    const image = img("https://images.boligsiden.dk/images/case/x/100x80/y.webp");
-    expect(getImageSrcSet(image, [400, 600, 800, 1200, 1600], 8 / 5)).toBe(
-      "https://images.boligsiden.dk/images/case/x/600x400/y.webp 600w, " +
-        "https://images.boligsiden.dk/images/case/x/1440x960/y.webp 1440w",
-    );
-  });
-
   it("describes each candidate by the width it actually resolves to", () => {
     const image = img("https://example.com/a.jpg", [
       { url: "https://example.com/500.jpg", width: 500, height: 250 },
@@ -105,6 +61,6 @@ describe("getImageSrcSet", () => {
   });
 
   it("returns undefined when the image only ever resolves to one URL", () => {
-    expect(getImageSrcSet(img("https://i.boliga.org/dk/500x/12345.jpg"), [400, 800], 2)).toBeUndefined();
+    expect(getImageSrcSet(img("https://images.example.com/500x/12345.jpg"), [400, 800], 2)).toBeUndefined();
   });
 });

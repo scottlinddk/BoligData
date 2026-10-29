@@ -27,7 +27,7 @@ const session = { access_token: token, refresh_token: 'local-test-only', token_t
 const points = [[9.88,57.04],[9.89,57.035],[9.90,57.05],[9.91,57.045],[9.94,57.025],[9.95,57.04],[9.96,57.055],[9.97,57.03]];
 const listings = points.map(([lon, lat], i) => ({
   id: `00000000-0000-4000-8000-${String(i + 10).padStart(12,'0')}`, address: `${['Hasserisvej','Skovbakkevej','Engvej','Klostermarken','Dalgasvej','Vestre Alle','Sofievej','Mølleparkvej'][i]} ${i+2}`, municipality: 'Aalborg', postalCode: '9000', price: 3500000 + i*150000, sqm: 125+i*5, rooms: 4+i%3,
-  listingDate: '2026-01-01', listingSource: 'boligsiden', externalId: `fixture-${i}`, dataMode: 'real', lat, lon, status: 'active', buildingYear: 1965+i*4, propertyType: 'villa',
+  listingDate: '2026-01-01', listingSource: 'saved_address', externalId: `fixture-${i}`, dataMode: 'real', lat, lon, status: 'active', buildingYear: 1965+i*4, propertyType: 'villa',
   images: [{ url: `${base}/__fixtures__/home-${i}.svg`, category: 'photo', sources: [] }], description: 'Synthetic browser fixture', agentName: 'BOLIGDATA · LOKAL TEST', listingUrl: null,
   agentUserId: null, isPromoted: false, promotedAt: null, promotedBy: null, idLokalid: null, matrikelnr: null, ejerlav: null, zone: null, bfeNummer: null, registeredAreaSqm: null, bbrData: null, riskFlags: null, createdAt: now, updatedAt: now,
 }));

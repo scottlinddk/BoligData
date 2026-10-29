@@ -83,7 +83,7 @@ function lookup(overrides: Partial<PropertyLookupResult> = {}): PropertyLookupRe
       { key: "bbr", register: "BBR", mode: overrides.bbrData ? "live" : "unavailable", error: overrides.bbrData ? null : "DATAFORDELER_API_KEY not configured" },
       { key: "publicValuation", register: "VUR", mode: overrides.publicValuation ? "live" : "unavailable", error: overrides.publicValuation ? null : "DATAFORDELER_API_KEY not configured" },
       { key: "noise", register: "Støj", mode: "unavailable", error: "HTTP 400" },
-      { key: "sales", register: "OIS/Boligsiden", mode: overrides.priceHistory?.length || overrides.nearbySales?.length ? "live" : "unavailable", error: null },
+      { key: "sales", register: "OIS", mode: overrides.priceHistory?.length || overrides.nearbySales?.length ? "live" : "unavailable", error: null },
     ],
     dataMode: "unavailable",
     source: "ai",

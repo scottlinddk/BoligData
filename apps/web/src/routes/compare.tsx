@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import type { Property } from "@shared/types/index";
-import { formatDkk } from "@shared/utils/price";
+import { formatDkk, formatAskingPrice } from "@shared/utils/price";
 import { getImageUrl, getPhotos } from "@shared/utils/image";
 import { getProperty, getSparEstimate } from "@/lib/api";
 import { compareValues, parseCompareIds, type CompareValues } from "@/lib/compare";
@@ -96,7 +96,7 @@ function CompareHead({ id, property, loading, failed }: { id: string; property?:
         : <span className="flex h-full w-full items-center justify-center text-ink-faint"><BrandMark className="h-8 w-8 opacity-40" /></span>}
     </div>
     <p className="mt-3 break-words text-[13px] font-medium leading-5 group-hover:text-brand-text">{property.address}</p>
-    <p className="mt-2 text-base font-semibold tracking-tight">{formatDkk(property.price)}</p>
+    <p className="mt-2 text-base font-semibold tracking-tight">{formatAskingPrice(property.price)}</p>
     <p className="mt-1 text-xs text-ink-soft">{property.sqm} m²{property.rooms ? ` · ${property.rooms} ${tx("rum", "rooms")}` : ""}</p>
   </Link>;
 }

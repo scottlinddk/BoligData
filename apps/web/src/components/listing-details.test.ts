@@ -7,11 +7,11 @@ import { ListingFactsPanel, PropertyDescription } from "./listing-details";
 import { BbrFactsPanel } from "./bbr-facts-panel";
 
 const property = {
-  id: "property", address: "Skytten 1A", dataMode: "real", listingSource: "boligsiden",
+  id: "property", address: "Skytten 1A", dataMode: "real", listingSource: "saved_address",
   sqm: 43, rooms: 2, buildingYear: null, description: "Bejsebakkekvarteret", listingUrl: null,
 } as Property;
 const details: ListingDetails = {
-  source: "boligsiden", sourceUrl: "https://www.boligsiden.dk/adresse/skytten-1a-3-th-9000-aalborg",
+  source: "broker", sourceUrl: "https://broker.example/adresse/skytten-1a-3-th-9000-aalborg",
   fetchedAt: "2026-09-28T12:00:00Z", title: "Lejlighed med vestvendt altan",
   description: "Mæglerens tekst om boligen.\nAndet afsnit.",
   facts: {
@@ -45,7 +45,7 @@ describe("property listing content", () => {
 
   it("shows meaningful listing facts, source attribution and no rows of missing values", () => {
     const html = render(createElement(ListingFactsPanel, { property, details }));
-    expect(html).toContain("Boligsiden");
+    expect(html).toContain("Annonce");
     for (const value of ["1937", "Fibercement herunder asbest", "Mursten", "Fjernvarme/blokvarme"]) expect(html).toContain(value);
     expect(html).not.toContain("Grundareal");
     expect(html).not.toContain("Kælderareal");

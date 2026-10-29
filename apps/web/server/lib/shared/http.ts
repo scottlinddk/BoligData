@@ -4,7 +4,7 @@
  */
 
 export const CRAWLER_USER_AGENT =
-  "BoligDataResearch/0.1 (personal research project; low-volume daily crawl)";
+  "BoligDataResearch/0.1 (personal research project; public register lookups)";
 
 const RETRY_AFTER_CAP_MS = 30_000;
 

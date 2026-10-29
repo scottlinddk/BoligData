@@ -39,13 +39,9 @@ Every entity, field and type in the chain was checked against Datafordeler's pub
 
 ## Sales history and latest sale
 
-The report opens with the address's own registered sales: the **latest sale** (price, full date and year), then a table of every sale (year, date, price, price per m², type). A family transfer or auction is labelled, and when it is the newest sale the newest arm's-length sale is shown beside it, since such a price is easy to read as a market price. `lib/sales-history.ts` does the sorting and formatting.
+When a sales source is connected, the report opens with the address's own registered sales: the **latest sale** (price, full date and year), then a table of every sale (year, date, price, price per m², type). A family transfer or auction is labelled, and when it is the newest sale the newest arm's-length sale is shown beside it, since such a price is easy to read as a market price. `lib/sales-history.ts` does the sorting and formatting.
 
-The history comes from Boligsiden's address search (`boligsiden-sales.ts`), which only attributes a history to an address that is *identified*, never by coordinates alone. Listings have a Boligsiden address id; an address picked by id does not, so it is identified by **text**: exactly one record in a 40 m box must carry the register's own street, house number and postcode (`recordIsAddress`). Several matching records (units in one building) are refused as `ambiguous`; none is `not_found`. The page says which, so an empty list is never a blank: never sold, address not found at Boligsiden, several homes at the address, or the register being down (which is never shown as "never sold").
-
-**Not verified against the live API.** Boligsiden sits behind a Cloudflare bot challenge that blocks the development environment (`cf-mitigated: challenge`), so the text match was tested against the record shape pinned in `boligsiden-sales.test.ts` (captured 2026-08-01), not against real records. Two things to check after deploy on a house with known sales: that `road.name`/`houseNumber`/`zipCode` spell the address as the register does, and that the house falls inside the 40 m box (Boligsiden's own coordinates for a set-back rural house may differ from the register's access point). A miss shows `not_found`, never another home's sales.
-
-Free-text listing lookups are unchanged: they get no history from this source, as before.
+No sale history is shown today. It used to come from Boligsiden's address search, which has been removed because Boligsiden prohibits automated collection. Registered sales (tinglysning) need a licensed source, for example the Ejerfortegnelsen/EJF or a data agreement; until one is connected the lookup returns an empty history and the page says it is unavailable. `lib/sales-history.ts` still does the sorting and formatting for when a source returns.
 
 ## Due-diligence checklist
 

@@ -45,7 +45,7 @@ const session = { access_token: token, refresh_token: "local-fixture-only", toke
 const properties = ["Bøgevej 12", "Strandvejen 48", "Skovbrynet 7", "Parkvej 22", "Havnegade 5"].map((address, index) => ({
   id: id(10 + index), address: `${address}, 9000 Aalborg`, municipality: "Aalborg", postalCode: "9000",
   price: [3_450_000, 4_850_000, 2_950_000, 4_100_000, 3_800_000][index], sqm: [146, 175, 130, 162, 141][index],
-  listingDate: daysAgo(30 + index * 15).slice(0, 10), listingSource: "boligsiden", externalId: `dashboard-fixture-${index}`,
+  listingDate: daysAgo(30 + index * 15).slice(0, 10), listingSource: "saved_address", externalId: `dashboard-fixture-${index}`,
   dataMode: "real", lat: 57.04 + index * .001, lon: 9.87 + index * .001, status: "active", buildingYear: 1970 + index * 5,
   propertyType: "villa", rooms: 4 + index % 2, images: index === 4 ? [] : [{ url: `${baseUrl}/fixture/property-${index}.svg`, category: "photo", sources: [] }],
   description: "Lys bolig med plads til familien og en have tæt på byen.", agentName: "Fixture ejendomsmægler", listingUrl: null,

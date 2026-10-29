@@ -109,7 +109,7 @@ defaults to `B`), `energyLabel`.
 | **BBR** (via Datafordeler) | Build year, renovation year, floor area, floors, roof/wall material, heating installation | Datafordeler **GraphQL**, entered via DAR `Husnummer` → `husnummerGiverAdgangTilBygning` (`graphql.datafordeler.dk/DAR/<version>`), `DATAFORDELER_API_KEY` | **Live by default** (`bbr.ts`). Two-tier query: an extended field set falling back to the set verified against Datafordeler's published DAR→BBR example |
 | **OIS / public valuation** | Assessed property value, assessed land value, valuation year | Datafordeler VUR GraphQL, same API key | Implemented as `ejendomsvurdering.ts` — there is no separate "OIS" client; VUR fills this role. `EnrichmentSource` still has an unused `"ois"` literal (dead enum value, cosmetic) |
 | **Matriklen (cadastral)** | Registered parcel area | Datafordeler GraphQL, same API key | Implemented (`matrikel.ts`); field name unverified against live schema |
-| **Boliga/Boligsiden** | Comparable sales, days on market, price history | Unofficial JSON APIs (not official) | Implemented (`crawl/{boliga,boligsiden}.ts`); **Boliga blocked by Vercel-IP-range 403s** as of 2026-07-10, disabled via `CRAWL_SOURCES=boligsiden`; Boligsiden ingests live data cleanly. Feeds `comparables.ts` (Supabase-based, haversine distance) — a separate code path from property-lookup, not a stub |
+| **Boliga/Boligsiden** | Comparable sales, days on market, price history | Unofficial JSON APIs | **Removed.** Scraping is prohibited by Boligsiden's data policy; comparables now need a licensed source. |
 | **GrunddataAPI (optional)** | Wraps BBR/DAR/Tinglysning/Vurderingsstyrelsen/Plandata/Miljøportal in one paid REST API | — | Build-vs-buy still **not decided** — see §7 |
 
 ---
@@ -140,7 +140,6 @@ apps/
         │   └── relative-score-inputs.ts       # 7 raw scoring inputs, no weighting
         ├── property-lookup/
         │   └── property-lookup.handler.ts     # orchestrates DAR -> BBR+VUR -> screening -> scoring
-        ├── crawl/                             # boliga/boligsiden ingest + comparables inputs
         └── comparables.ts                     # Supabase-based comparables (separate from property-lookup)
 
 packages/
@@ -223,8 +222,8 @@ any screening output as a real six-of-six pass.
 - Datafordeler account confirmed, key in Vercel.
 - OIS resolved to be VUR (`ejendomsvurdering.ts`), same Datafordeler
   account/API key as BBR/Matriklen — no separate integration needed.
-- Comparables are not a mock stub — real Boliga/Boligsiden clients exist
-  (Boliga currently blocked by IP-range 403s, Boligsiden live).
+- Comparables came from the Boliga/Boligsiden crawl, which has been removed (scraping is prohibited).
+  They return nothing until a licensed source is connected.
 
 **Phase 1 — address resolution + raw BBR: done.**
 - `address-lookup.ts` (DAR + zone), `bbr.ts` (BBR via GraphQL).

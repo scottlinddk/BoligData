@@ -9,7 +9,7 @@ import { SparklineChart } from "./sparkline-chart";
 
 interface ComparablesPanelProps {
   soldPriceHistory: SoldPriceEntry[];
-  /** Where the history came from — a live Boligsiden read, or the stored crawl row. */
+  /** Where the history came from — a live register read, or the stored row. */
   priceHistorySource?: FactSource | null;
   /** "Salg i nærheden": recent registered sales around the address, nearest first. */
   nearbySales?: NearbySaleEntry[];

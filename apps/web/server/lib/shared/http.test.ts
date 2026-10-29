@@ -55,7 +55,7 @@ describe("fetchJson error messages", () => {
     const started = Date.now();
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status, headers: { "Retry-After": "30" } }));
 
-    await expect(fetchJson("https://api.boligsiden.dk/search/cases", { attempts: 1, timeoutMs: 6_000 })).rejects.toMatchObject({ status });
+    await expect(fetchJson("https://api.example.com/search/cases", { attempts: 1, timeoutMs: 6_000 })).rejects.toMatchObject({ status });
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(Date.now()).toBe(started);
@@ -68,7 +68,7 @@ describe("fetchJson error messages", () => {
     const fetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 429, headers: { "Retry-After": "1" } }))
       .mockResolvedValueOnce(Response.json({ available: true }));
-    const pending = fetchJson("https://api.boligsiden.dk/search/cases", { attempts: 2, baseDelayMs: 0 });
+    const pending = fetchJson("https://api.example.com/search/cases", { attempts: 2, baseDelayMs: 0 });
     await vi.advanceTimersByTimeAsync(999);
     expect(fetch).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(2);

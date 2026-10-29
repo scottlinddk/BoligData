@@ -7,8 +7,8 @@ function transaction(overrides: Record<string, unknown> = {}) {
   return {
     id: "sale-1", property_id: "property-1", sale_price: 3_000_000, sold_date: "2026-01-01", date_precision: "day",
     residential_area: 150, area_definition: "residential", area_as_of: "2026-01-01", sale_type: "normal", data_mode: "real",
-    source: "boligsiden", registration_id: "registration-1",
-    property: { ...target, id: "property-1", address: "Referencevej 1", price: 6_000_000, sqm: 300, listing_date: "2026-02-01", listing_date_definition: "source_reported", listing_source: "boligsiden", external_id: "case-1", lat: 57.001, status: "active" },
+    source: "register", registration_id: "registration-1",
+    property: { ...target, id: "property-1", address: "Referencevej 1", price: 6_000_000, sqm: 300, listing_date: "2026-02-01", listing_date_definition: "source_reported", listing_source: "saved_address", external_id: "case-1", lat: 57.001, status: "active" },
     ...overrides,
   };
 }

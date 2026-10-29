@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ListingSource } from "@shared/types/index";
 import { ApiError, getComparables, getProperty, getPropertyLookup } from "@/lib/api";
-import { formatDkk, pricePerSqm } from "@shared/utils/price";
+import { formatDkk, pricePerSqm, formatAskingPrice } from "@shared/utils/price";
 import { getFloorplan, getImageUrl, getPhotos } from "@shared/utils/image";
 import { mergePropertyFacts, summarizeLookupSources } from "@/lib/property-facts";
 import { BbrFactsPanel } from "@/components/bbr-facts-panel";
@@ -32,7 +32,7 @@ import { MiljoegisNoisePanel } from "@/components/miljoegis-noise-panel";
 import { canSendRecommendations } from "@/lib/roles";
 import { lastSearchPath } from "@/lib/search-session";
 
-const SOURCE_NAMES: Record<ListingSource, string> = { boligsiden: "Boligsiden", boliga: "Boliga" };
+const SOURCE_NAMES: Record<ListingSource, string> = { saved_address: "gemt adresse" };
 const factIcons = {
   area: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></>,
   rooms: <><path d="M5 21V4h11v17M3 21h18M12 12h.01" /></>,
@@ -168,7 +168,7 @@ export function PropertyDetailPage() {
           <div>
             <div className="mb-4 lg:hidden">
               {!active && <p className="mb-1 text-xs text-ink-soft">{priceLabel}</p>}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><p className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">{formatDkk(property.price)}</p></div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><p className="text-[28px] font-semibold leading-tight tracking-[-0.04em]">{formatAskingPrice(property.price)}</p></div>
             </div>
             <ul aria-label={tx("Nøgletal", "Key facts")} className="mb-5 flex flex-wrap gap-2 sm:hidden">
               <FactChip icon="type">{t(`propertyType.${property.propertyType}` as TranslationKey)}</FactChip>
@@ -233,8 +233,8 @@ export function PropertyDetailPage() {
         <aside aria-label={tx("Pris og næste skridt", "Price and next steps")} className="row-start-2 space-y-5 lg:sticky lg:top-24 lg:col-start-1 lg:row-start-1 lg:space-y-9">
           <div className="rounded-2xl bg-surface-alt p-6 lg:rounded-none lg:bg-transparent lg:p-0">
             <p className={`text-xs font-medium uppercase tracking-[0.12em] text-ink-soft ${active ? "lg:hidden" : ""}`}>{priceLabel}</p>
-            <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] lg:text-[52px] lg:leading-none lg:tracking-[-0.05em]">{formatDkk(property.price)}</p>
-            <p className="mt-1 text-sm text-ink-soft">{formatDkk(pricePerSqm(property.price, property.sqm))} / m²</p>
+            <p className="mt-2 text-[32px] font-semibold tracking-[-0.04em] lg:text-[52px] lg:leading-none lg:tracking-[-0.05em]">{formatAskingPrice(property.price)}</p>
+            <p className="mt-1 text-sm text-ink-soft">{formatAskingPrice(pricePerSqm(property.price, property.sqm))} / m²</p>
             {active && <>
               <a href="#price-reference" onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) priceReference.current?.focus({ preventScroll: true }); }} className={`${actionClass} bg-accent text-accent-text hover:opacity-90 lg:mt-5 lg:min-h-0 lg:justify-start lg:rounded-none lg:bg-transparent lg:p-0 lg:font-medium lg:text-ink lg:underline lg:underline-offset-4`}>{tx("Se pris efter liggetid", "Price by time on market")} <span aria-hidden="true">↙</span></a></>}
             <div className="mt-3 flex gap-3 lg:mt-7">
@@ -251,7 +251,7 @@ export function PropertyDetailPage() {
             {canRecommend && <button type="button" onClick={() => setRecommendOpen(true)} className="mt-4 w-full rounded py-1 text-sm font-medium text-ink-soft underline underline-offset-4">{t("recommend.cta")}</button>}
           </section>
           <SectionNav items={sectionItems} label={tx("Sektioner", "Sections")} />
-          <p className="px-2 text-xs leading-5 text-ink-faint lg:px-0">{tx("Annonce fra", "Listing from")} {SOURCE_NAMES[property.listingSource]} · {tx("Opdateret", "Updated")} {property.updatedAt.slice(0, 10)}</p>
+          <p className="px-2 text-xs leading-5 text-ink-faint lg:px-0">{tx("Opdateret", "Updated")} {property.updatedAt.slice(0, 10)}</p>
         </aside>
       </div>
       <details ref={researchDetails} id="research-details" className="section-anchor group mt-10 rounded-2xl border border-border bg-surface-alt p-5 sm:p-7">
@@ -263,7 +263,7 @@ export function PropertyDetailPage() {
       </details>
       {recommendOpen && <RecommendModal propertyIds={[property.id]} propertyCount={1} onClose={() => setRecommendOpen(false)} />}
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 rounded-t-3xl border-t border-border bg-surface px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lift lg:hidden">
-        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{priceLabel}</p><p className="text-lg font-semibold tracking-tight">{formatDkk(property.price)}</p></div>
+        <div className="mr-auto min-w-0"><p className="text-[10px] uppercase tracking-wide text-ink-soft">{priceLabel}</p><p className="text-lg font-semibold tracking-tight">{formatAskingPrice(property.price)}</p></div>
         <button type="button" onClick={handleSave} disabled={saving} aria-busy={saving} aria-pressed={saved} aria-label={saving ? t("common.saving") : saved ? t("property.saved") : t("property.save")} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-xl disabled:opacity-50">{saving ? <Spinner /> : saved ? "♥" : "♡"}</button>
         {property.listingUrl ? <a href={property.listingUrl} target="_blank" rel="noopener noreferrer" className={`${actionClass} bg-cta text-cta-text`}>{tx("Se annonce", "View listing")} ↗</a> : <button type="button" onClick={openResearch} className={`${actionClass} bg-cta text-cta-text`}>{tx("Undersøg", "Research")}</button>}
       </div>
