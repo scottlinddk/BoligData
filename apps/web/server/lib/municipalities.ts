@@ -2,7 +2,7 @@
  * Municipality code -> name, for the municipalities the advisory link builders know
  * (`buildSpildevandsplanUrl`, `buildWeblagerUrl`), which are keyed by name. The address
  * register returns only the code, so an address picked by id needs this to get the same links
- * a listing gets from Boligsiden's municipality name.
+ * a listing gets from its municipality name.
  *
  * Scope is the crawl's default area (Region Nordjylland, postcodes 9000-9900, plus Thisted and
  * Morsø): exactly the municipalities those builders cover. Any other code returns null, and the

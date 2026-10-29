@@ -1,4 +1,5 @@
-export type ListingSource = "boligsiden" | "boliga";
+/** Where a property row came from. Only addresses a user saved or looked up exist; no listing feed is connected. */
+export type ListingSource = "saved_address";
 
 export type PropertyStatus = "active" | "sold" | "withdrawn";
 
@@ -21,7 +22,7 @@ export interface PropertySummary {
   address: string;
 }
 
-/** A single pre-sized image variant a source may provide (e.g. Boligsiden's imageSources). */
+/** A single pre-sized image variant a source may provide. */
 export interface ListingImageSource {
   url: string;
   width: number;
@@ -58,10 +59,9 @@ export interface Property {
   description: string | null;
   agentName: string | null;
   /**
-   * Canonical URL of this listing on the source site (boliga.dk /
-   * boligsiden.dk) — what the "go to broker listing" link points at. Always
-   * an absolute http(s) URL: the crawl validates the scheme before storing,
-   * since this value goes straight into an `href`. Null when the source
+   * Canonical URL of this listing on the source site — what the "go to broker
+   * listing" link points at. Always an absolute http(s) URL, since this value
+   * goes straight into an `href`. Null when the source
    * record carried no usable link, or for rows written before migration 020;
    * consumers must hide the link rather than fabricate one.
    */
@@ -99,12 +99,11 @@ export interface Property {
 }
 
 /**
- * One registered sale of the property (OIS/tinglysning, via Boligsiden).
+ * One registered sale of the property (OIS/tinglysning).
  * `saleType` matters for due diligence: only `normal` is an arm's-length
  * market price — a `family` transfer or an `auction` says little about what
  * the property is worth, so the UI must be able to tell them apart rather
- * than averaging them together. Optional because rows written before the
- * Boligsiden registration mapping existed don't carry it.
+ * than averaging them together. Optional because older rows don't carry it.
  */
 export type SaleType = "normal" | "family" | "auction" | "other";
 
@@ -305,7 +304,7 @@ export interface ListingSourceFacts {
 
 /** A fresh, identity-matched read of the provider's property listing. */
 export interface ListingDetails {
-  source: "boligsiden";
+  source: string;
   sourceUrl: string;
   title: string | null;
   description: string | null;

@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { pathToFileURL } from 'node:url';
-import { FatalError, foldFieldName, redact } from './backfill-bfe-valuation.mjs';
+import { FatalError, foldFieldName, redact } from './datafordeler-common.mjs';
 import { analyzeBbr, readCsvZip } from './datafordeler-bbr-join.mjs';
 
 const FILE_HOST = 'https://api.datafordeler.dk/FileDownloads';

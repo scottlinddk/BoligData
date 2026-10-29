@@ -1,3 +1,5 @@
+> **Historical document.** The Boligsiden/Boliga crawl described below has been removed: Boligsiden's data policy prohibits scraping without a written agreement. Read the crawl-related rows as past state, not as current behaviour.
+
 # Reconciling the ChatGPT "adresse → due-diligence rapport" plan (2026-08-22)
 
 A ChatGPT-authored plan proposed BoligData as a general-purpose, address-based property

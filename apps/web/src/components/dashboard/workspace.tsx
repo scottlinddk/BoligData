@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import type { ListingImage, Property } from "@shared/types/index";
 import { getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
-import { formatDkk } from "@shared/utils/price";
+import { formatAskingPrice } from "@shared/utils/price";
 import { useI18n } from "@/i18n/i18n";
 import { BrandMark } from "@/components/brand-mark";
 import { PropertyCard } from "@/components/property-card";
@@ -133,7 +133,7 @@ export function WorkspacePropertyPreview({ property, children }: { property: Pro
     <p className="mt-0.5 text-xs text-ink-soft">{[property.postalCode, property.municipality].filter(Boolean).join(" ")}</p>
     <div className="mt-4">
       {property.status !== "active" && <p className="mb-1 text-xs text-ink-soft">{t("property.lastAskingPrice")}</p>}
-      <p className="text-2xl font-bold tracking-[-0.04em] text-ink">{formatDkk(property.price)}</p>
+      <p className="text-2xl font-bold tracking-[-0.04em] text-ink">{formatAskingPrice(property.price)}</p>
     </div>
     <dl className="workspace-property-facts mt-4 grid grid-cols-3 gap-2">
       <WorkspaceStat label={tx("Boligareal", "Living area")} value={`${property.sqm} m²`} />

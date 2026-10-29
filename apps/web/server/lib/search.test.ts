@@ -36,7 +36,7 @@ function toResponseRow(row: FakeRow, columns: string): Record<string, unknown> {
       postal_code: "9000",
       sqm: 80,
       listing_date: "2026-01-01",
-      listing_source: "boliga",
+      listing_source: "saved_address",
       external_id: row.id,
       lat: row.lat ?? 57,
       lon: row.lon ?? 9.9,

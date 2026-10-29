@@ -13,7 +13,7 @@ export { isoTimestamp, positiveInt, registerId };
  *   husnummer --BBR_Grund.bestemtFastEjendom--> BBR_Ejendomsrelation.bfeNummer
  *   BFE --VUR_BFEKrydsreference--> VUR_Ejendomsvurdering (one row per valuation year)
  *
- * This is a TypeScript port of the chain in `scripts/backfill-bfe-valuation.mjs`, which fills the
+ * This is a TypeScript port of the chain in the removed BFE valuation backfill script, which fills the
  * stored valuations. Keep the two in step: same entities, same valuation-year rules.
  *
  * Why it does not use `lookupEjendomsvurdering`: that source finds field names by introspection,

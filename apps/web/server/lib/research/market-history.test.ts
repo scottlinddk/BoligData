@@ -10,7 +10,7 @@ type Row = Record<string, any>;
 const subject: Row = { id: ID, municipality: "Aalborg", property_type: "villa", data_mode: "unknown" };
 const sale = (id: string, overrides: Row = {}): Row => ({ id, property_id: id, properties: { address: `${id} 1`, municipality: "Aalborg", property_type: "villa" },
   sold_date: "2026-08-01", date_precision: "day", sale_price: 3_000_000, sale_type: "normal", residential_area: 140, area_definition: "residential", area_as_of: "2026-08-01",
-  observed_at: "2026-09-25T00:00:00Z", data_mode: "real", source: "boligsiden", ...overrides });
+  observed_at: "2026-09-25T00:00:00Z", data_mode: "real", source: "register", ...overrides });
 
 function fakeClient(tables: Record<string, Row[]>) {
   const calls: { table: string; operation: string; args: unknown[] }[] = [];
@@ -55,8 +55,6 @@ describe("property-scoped market history", () => {
   });
 
   it("retains stored sales with explicit source failure metadata", async () => {
-    vi.stubEnv("BOLIGSIDEN_ADDRESS_API_BASE", "https://source.example/handler-failure");
-    stubFetch([{ status: 403, body: {} }]);
     const { result } = await run(fakeClient({ properties: [{ ...subject, address: "Subjectvej 1", data_mode: "real", postal_code: "9000", lat: 57.05, lon: 9.90 }], sale_transactions: [sale("stored")] }));
     expect(result.transactions[0]?.id).toBe("stored");
     expect(result.marketScope).toMatchObject({ population: "stored_listing_sales", liveSourceUnavailable: true });

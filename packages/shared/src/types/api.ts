@@ -88,7 +88,7 @@ export interface RegionalMarketStats {
   priceChangeYoy: MarketStatPoint[];
 }
 
-/** Boligsiden Markedsindeks series for a property's municipality + type, oldest first. */
+/** Market index series for a property's municipality + type, oldest first. */
 export interface MarketStatsResponse {
   municipality: string;
   pricePerSqm: MarketStatPoint[];
@@ -240,23 +240,6 @@ export interface AppSettingsResponse {
 
 export interface UpdateAppSettingsBody {
   broadcastEnabled: boolean;
-}
-
-/** One run of the .github/workflows/new-listings.yml workflow. */
-export interface NewListingsRun {
-  id: number;
-  runNumber: number;
-  /** GitHub run status: queued, in_progress, completed, ... */
-  status: string;
-  /** Set once completed: success, failure, cancelled, ... */
-  conclusion: string | null;
-  trigger: "manual" | "scheduled";
-  createdAt: string;
-  url: string;
-}
-
-export interface NewListingsRunsResponse {
-  runs: NewListingsRun[];
 }
 
 export interface RegisteredAgent {

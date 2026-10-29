@@ -5,7 +5,7 @@ import { COMPARE_MAX, compareValues, parseCompareIds, toggleCompareId } from "./
 
 const property = (over: Partial<Property> = {}): Property => ({
   id: "a", address: "Hobrovej 79", municipality: "Aalborg", postalCode: "9000", status: "active", price: 3_000_000, sqm: 150, rooms: 5, images: [],
-  riskFlags: null, listingSource: "boligsiden", listingDate: "2026-09-01", agentName: null, externalId: "1", lat: 57, lon: 9.9, buildingYear: 1930,
+  riskFlags: null, listingSource: "saved_address", listingDate: "2026-09-01", agentName: null, externalId: "1", lat: 57, lon: 9.9, buildingYear: 1930,
   propertyType: "villa", description: null, listingUrl: null, agentUserId: null, isPromoted: false, promotedAt: null, promotedBy: null,
   idLokalid: null, matrikelnr: null, ejerlav: null, zone: null, bfeNummer: null, registeredAreaSqm: null, bbrData: null, createdAt: "", updatedAt: "", ...over,
 });

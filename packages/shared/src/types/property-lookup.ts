@@ -140,11 +140,11 @@ export interface PropertyLookupResult {
    * the ingest stores for listings so one checklist renders both. Null when the address could not be resolved.
    */
   riskFlags: RiskFlags | null;
-  /** Registered sales of this address, newest first — Boligsiden's "boligens historie". */
+  /** Registered sales of this address, newest first — the address sale history. */
   priceHistory: SoldPriceEntry[];
   /**
    * How the sale history was attributed to this address, so an empty list can say why. `matched`: identified (it
-   * may still be empty, the home was never sold). `not_found`: no Boligsiden address has this street, number and
+   * may still be empty, the home was never sold). `not_found`: no address has this street, number and
    * postcode. `ambiguous`: several do (units in a building). `null`: no attribution was attempted.
    */
   priceHistoryMatch: "matched" | "not_found" | "ambiguous" | null;

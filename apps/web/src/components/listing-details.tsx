@@ -14,14 +14,14 @@ export function PropertyDescription({ property, details }: { property: Property;
 
   return <section className="rounded-2xl bg-surface-alt p-5 sm:p-7">
     <h2 className="text-xl font-medium tracking-tight">{tx("Om boligen", "About this home")}</h2>
-    {details?.description && <p className="mt-3 text-xs font-medium text-ink-soft">{tx("Mægler skriver", "The agent writes")} · Boligsiden</p>}
+    {details?.description && <p className="mt-3 text-xs font-medium text-ink-soft">{tx("Mægler skriver", "The agent writes")}</p>}
     {title && <h3 className="mt-3 text-base font-semibold">{title}</h3>}
     {description && description !== title && <p className={`mt-4 whitespace-pre-line text-sm leading-7 text-ink-soft ${!expanded && description.length > 500 ? "line-clamp-4" : ""}`}>{description}</p>}
     {description && description.length > 500 && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="mt-3 rounded text-sm font-semibold underline underline-offset-4">
       {expanded ? tx("Vis mindre", "Show less") : tx("Læs mere", "Read more")}
     </button>}
     {sourceUrl && <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-4 block w-fit rounded text-sm font-semibold underline underline-offset-4">
-      {tx("Læs hele annoncen hos", "Read the full listing on")} {property.listingSource === "boligsiden" ? "Boligsiden" : "Boliga"} ↗
+      {tx("Læs hele annoncen hos mægleren", "Read the full listing at the broker")} ↗
     </a>}
   </section>;
 }
@@ -34,7 +34,7 @@ export function ListingFactsPanel({ property, details }: { property: Property; d
   const number = (value: number | null | undefined) => value == null ? null : String(value);
   const area = (value: number | null | undefined) => value == null ? null : t("property.sqm", { sqm: value });
   const valuation = facts?.publicValuation;
-  const sourceName = property.listingSource === "boligsiden" ? "Boligsiden" : "Boliga";
+  const sourceName = tx("Annonce", "Listing");
   const sourceUrl = details?.sourceUrl ?? property.listingUrl;
   const rows = [
     { label: t("detail.size"), value: area(facts?.areaSqm ?? property.sqm) },

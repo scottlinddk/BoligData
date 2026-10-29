@@ -15,7 +15,7 @@ vi.mock("@/hooks/use-saved-properties", () => ({
 const property: Property = {
   id: "saved-property", address: "Hobrovej 79", municipality: "Aalborg", postalCode: "9000",
   status: "active", price: 3_000_000, sqm: 160, rooms: 5, images: [], riskFlags: null,
-  listingSource: "boligsiden", listingDate: "2026-09-01", agentName: null,
+  listingSource: "saved_address", listingDate: "2026-09-01", agentName: null,
   externalId: "case-1", lat: 57, lon: 9.9, buildingYear: 1930, propertyType: "villa",
   description: null, listingUrl: null,
   agentUserId: null, isPromoted: false, promotedAt: null, promotedBy: null,

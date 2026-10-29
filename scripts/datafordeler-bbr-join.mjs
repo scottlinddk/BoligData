@@ -5,7 +5,7 @@
  */
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { foldFieldName } from './backfill-bfe-valuation.mjs';
+import { foldFieldName } from './datafordeler-common.mjs';
 
 /** BBR byg021 codes for houses: fritliggende, sammenbygget, tæt-lav, række/kæde/dobbelthus. */
 export const HOUSE_CODES = new Set(['120', '121', '122', '130', '131', '132']);

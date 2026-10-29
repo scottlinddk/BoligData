@@ -69,12 +69,7 @@ export function mergePropertyFacts(
 
   const registerArea = live?.areaSqm ?? null;
 
-  // Boligsiden embeds an address's registered sales in the same case record
-  // the crawl already reads, so the stored row carries a history too. The live
-  // read still wins: the stored one is only as fresh as the last crawl of this
-  // listing, and `listingContentHash` doesn't change when a *neighbour*
-  // transacts — or when this address does, if nothing else about the listing
-  // moved.
+  // The live read wins; a stored history is used only when the live lookup has none.
   const livePriceHistory = lookupIsLive("sales") ? lookup?.priceHistory ?? [] : [];
   const storedPriceHistory = storedIsReal("sales") ? enrichment?.soldPriceHistory ?? [] : [];
   const priceHistory = livePriceHistory.length > 0 ? livePriceHistory : storedPriceHistory;

@@ -11,6 +11,14 @@ export function formatDkk(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Formats a property's asking price. Properties that are only saved addresses have no asking price
+ * (stored as 0), so a non-positive amount renders as a dash rather than "0 kr.".
+ */
+export function formatAskingPrice(amount: number): string {
+  return Number.isFinite(amount) && amount > 0 ? formatDkk(amount) : "–";
+}
+
 export function daysBetween(fromIso: string, toIso: string = new Date().toISOString()): number {
   // Listing dates have day precision. The afternoon must not add another day
   // or place the same listing in a different bracket than its research card.

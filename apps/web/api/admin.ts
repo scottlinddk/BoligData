@@ -3,7 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserRole } from "../../../packages/shared/src/types/index.js";
 import type {
   AdminDashboardResponse,
-  NewListingsRunsResponse,
   CreateAdvisorConnectionBody,
   CreateInvitationBody,
   RegisteredAgent,
@@ -14,11 +13,6 @@ import { applyCors } from "../server/middleware/cors.js";
 import { requireRole } from "../server/middleware/auth.js";
 import { getAuthAdmin, getServiceRoleClient } from "../server/lib/supabase.js";
 import { isUuid, sendError } from "../server/lib/http-helpers.js";
-import {
-  GithubWorkflowError,
-  dispatchNewListingsWorkflow,
-  listNewListingsRuns,
-} from "../server/lib/admin/github-workflow.js";
 import {
   rowToAdminUser,
   rowToAdvisorConnection,
@@ -62,8 +56,6 @@ function str(v: unknown): string | undefined {
  *   GET    /api/admin?resource=app-settings
  *   PATCH  /api/admin?resource=app-settings
  *   GET    /api/admin?resource=agents
- *   GET    /api/admin?resource=new-listings   (recent GitHub Actions runs)
- *   POST   /api/admin?resource=new-listings   (dispatch the workflow now)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return;
@@ -103,10 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "agents":
       if (id !== undefined || req.method !== "GET") break;
       await handleAgents(res, client);
-      return;
-    case "new-listings":
-      if (id !== undefined) break;
-      await handleNewListings(req, res);
       return;
   }
   res.status(404).json({ error: "Not found" });
@@ -525,27 +513,4 @@ async function handleAgents(res: VercelResponse, client: SupabaseClient) {
     email: emailById.get(row.id) ?? "",
   }));
   res.status(200).json({ agents });
-}
-
-/** Admin control for the new-listings GitHub Actions workflow: list its runs, or dispatch one now. */
-async function handleNewListings(req: VercelRequest, res: VercelResponse) {
-  try {
-    if (req.method === "GET") {
-      const body: NewListingsRunsResponse = { runs: await listNewListingsRuns() };
-      res.status(200).json(body);
-      return;
-    }
-    if (req.method === "POST") {
-      await dispatchNewListingsWorkflow();
-      res.status(202).json({ ok: true });
-      return;
-    }
-    res.status(405).json({ error: "Method not allowed" });
-  } catch (err) {
-    if (err instanceof GithubWorkflowError) {
-      sendError(res, err.status, err.publicMessage, err);
-      return;
-    }
-    sendError(res, 500, "Failed to reach GitHub Actions", err);
-  }
 }

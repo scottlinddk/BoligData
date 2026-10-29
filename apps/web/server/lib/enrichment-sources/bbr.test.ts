@@ -2,9 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildBygningQuery, decodeHeating, fieldsInSchema, lookupBbr } from "./bbr.js";
 import { resetDatafordelerCache } from "./datafordeler.js";
 import { stubFetch } from "../test-support/stub-fetch.js";
-import { enrichProperty } from "../crawl/enrich.js";
-import type { RawListing } from "../crawl/types.js";
-import type { AddressCadastral } from "./address-lookup.js";
 
 // Exercise real BBR mapping through enrichment without unrelated network calls.
 vi.mock("./ejendomsvurdering.js", () => ({ lookupEjendomsvurdering: vi.fn(async () => ({ ok: false, error: "outside this test" })) }));
@@ -143,14 +140,6 @@ describe("lookupBbr using the published entity response shape", () => {
     for (const value of [null, "", "address text", 'uuid" ) {']) expect((await lookupBbr(value)).ok).toBe(false);
     vi.stubEnv("DATAFORDELER_API_KEY", ""); expect(await lookupBbr(HUSNUMMER)).toMatchObject({ ok: false, error: expect.stringContaining("not configured") });
     expect(stub.urls).toHaveLength(0);
-  });
-  it("keeps unit-only values unknown as real building facts pass through enrichment", async () => {
-    setup(graphQlBody([{ ...house, byg039BygningensSamledeBoligAreal: 1_200, byg038SamletBygningsareal: 1_800 }]));
-    const result = await enrichProperty({ data_mode: "real", price: 3_850_000, sqm: 140, lat: 57, lon: 10, municipality: "Aalborg" } as RawListing,
-      { idLokalid: HUSNUMMER } as AddressCadastral);
-    expect(result.source_status.bbr).toMatchObject({ dataMode: "real", verificationStatus: "unverified" });
-    expect(result.bbr_data).toMatchObject({ yearBuilt: 1962, areaSqm: null, energyLabel: null, toiletCount: null, bathroomCount: null });
-    expect(result.risk_flags.oilTankRiskSource).toBe("bbr");
   });
 });
 

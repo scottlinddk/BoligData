@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useState, type MouseEvent } from "react";
 import type { ListingImage, Property } from "@shared/types/index";
 import { overallRisk } from "@shared/utils/risk-status";
-import { formatDkk, pricePerSqm, daysBetween } from "@shared/utils/price";
+import { pricePerSqm, daysBetween, formatAskingPrice } from "@shared/utils/price";
 import { getImageSrcSet, getImageUrl, getPhotos } from "@shared/utils/image";
 import { useI18n } from "@/i18n/i18n";
 import { useSavedProperties } from "@/hooks/use-saved-properties";
@@ -98,13 +98,13 @@ export function PropertyCard({ property, selectable, selected, onToggleSelect, s
         {!active && <p className="mb-2"><span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning-text">{t(`property.status.${property.status}`)}</span></p>}
         {!active && <p className="mb-1 text-[11px] text-ink-soft">{t("property.lastAskingPrice")}</p>}
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-          <p className="text-[17px] font-semibold leading-6 tracking-[-0.035em] sm:text-[19px]">{formatDkk(property.price)}</p>
+          <p className="text-[17px] font-semibold leading-6 tracking-[-0.035em] sm:text-[19px]">{formatAskingPrice(property.price)}</p>
           <p className={`shrink-0 items-center gap-1.5 text-xs text-ink-soft ${extra}`}><span>{t("property.sqm", { sqm: property.sqm })}</span>{property.rooms != null && property.rooms > 0 && <><span aria-hidden="true">·</span><span title={language === "da" ? "Annoncerede rum, ikke dokumenterede soveværelser" : "Advertised rooms, not documented bedrooms"}>{property.rooms} {language === "da" ? "rum" : "rooms"}</span></>}</p>
         </div>
         <h3 className={`mt-1 text-sm font-medium leading-5 transition-colors group-hover:text-brand-text sm:mt-2 ${compact ? "truncate sm:overflow-visible sm:whitespace-normal" : ""}`}>{displayAddress}</h3>
         {compact && <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-soft sm:hidden"><span>{t("property.sqm", { sqm: property.sqm })}</span>{property.rooms != null && property.rooms > 0 && <><span aria-hidden="true">·</span><span>{property.rooms} {language === "da" ? "rum" : "rooms"}</span></>}</p>}
         <div className={`mt-1.5 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-ink-soft ${extra}`}>
-          <span>{t("property.pricePerSqm", { price: formatDkk(pricePerSqm(property.price, property.sqm)) })}</span>{active && <><span aria-hidden="true">·</span><span>{daysLabel}</span></>}
+          <span>{t("property.pricePerSqm", { price: formatAskingPrice(pricePerSqm(property.price, property.sqm)) })}</span>{active && <><span aria-hidden="true">·</span><span>{daysLabel}</span></>}
           {property.bbrData?.energyLabel && <span title={t("property.bbr.energyLabelTitle")} className="rounded border border-border px-1.5 font-semibold">{property.bbrData.energyLabel}</span>}
           {property.bbrData?.heatingInstallation && <span title={t("property.bbr.heatingTitle")}>{property.bbrData.heatingInstallation}</span>}
         </div>

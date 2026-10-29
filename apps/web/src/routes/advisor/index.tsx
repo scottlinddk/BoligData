@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { approveListing, listAdvisorFavorites, listMyConnections } from "@/lib/api";
 import { ConnectionList } from "@/components/connection-list";
 import { useI18n } from "@/i18n/i18n";
-import { formatDkk } from "@shared/utils/price";
+import { formatAskingPrice } from "@shared/utils/price";
 
 export function AdvisorPage() {
   const { t } = useI18n();
@@ -43,7 +43,7 @@ export function AdvisorPage() {
             >
               <div>
                 <div className="font-bold text-ink">{property.address}</div>
-                <div className="text-xs font-semibold text-ink-soft">{formatDkk(property.price)}</div>
+                <div className="text-xs font-semibold text-ink-soft">{formatAskingPrice(property.price)}</div>
               </div>
               <button
                 onClick={() => approveMutation.mutate({ propertyId: property.id, userId: fav.userId })}

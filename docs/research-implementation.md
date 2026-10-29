@@ -74,4 +74,4 @@ Tests cover the specified arithmetic, negative reductions, missing first price, 
 
 Migration verification uses an isolated local PostgreSQL-compatible database and synthetic auth roles. It exercises row-level isolation, revision triggers, protected import staging, cross-user commit denial, idempotent atomic import and per-account rate limits. No production database, external account, broker message or deployment has been changed by this implementation task.
 
-Reusable optional checks are `scripts/research-browser-smoke.cjs` (a local Vite server plus Playwright/Chromium) and `scripts/verify-research-migration.mjs` (PGlite). Both document their runtime inputs and operate entirely on local fixtures. The browser script intercepts or blocks every external request.
+The reusable optional check is `scripts/verify-research-migration.mjs` (PGlite). It documents its runtime inputs and operates entirely on local fixtures.
