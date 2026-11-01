@@ -20,8 +20,21 @@ export function levelOf(z: number): Level {
   return z >= FAVOURABLE_Z ? "high" : z <= -FAVOURABLE_Z ? "low" : "middle";
 }
 
+/** What a calendar month means for a buyer, in one word. */
+export type MonthCategory = "negotiate" | "balance" | "choice" | "fast" | "neutral";
+
+export function monthCategory(month: TimingMonth): MonthCategory {
+  const leverage = levelOf(month.leverage);
+  const selection = levelOf(month.selection);
+  if (leverage === "high") return month.selection >= 0 ? "balance" : "negotiate";
+  if (selection === "high") return "choice";
+  if (leverage === "low") return "fast";
+  return "neutral";
+}
+
 export interface TimingView {
   months: TimingMonth[];
+  categories: MonthCategory[];
   /** Months with strong negotiating leverage, grouped into runs (December and January are adjacent). */
   leverageRuns: number[][];
   /** Months with the widest choice of homes. */
@@ -48,6 +61,7 @@ export function buildTimingView(): TimingView {
   const best = [...months].sort((a, b) => b.leverage - a.leverage)[0]!;
   return {
     months,
+    categories: months.map(monthCategory),
     leverageRuns: monthRuns(leverageMonths),
     selectionRuns: monthRuns(selectionMonths),
     sellerRuns: monthRuns(monthsAtOrAbove(months, (m) => -m.leverage, FAVOURABLE_Z)),

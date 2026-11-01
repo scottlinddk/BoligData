@@ -8,6 +8,7 @@ import {
   describeRuns,
   levelOf,
   type Level,
+  type MonthCategory,
 } from "@/lib/zip-market-timing-view";
 import type { TimingSignalKey } from "@shared/analysis/zip-market-timing";
 
@@ -19,6 +20,21 @@ function cellStyle(z: number): React.CSSProperties {
   return z >= 0
     ? { background: `color-mix(in srgb, var(--color-success) ${Math.round(strength * 38)}%, transparent)` }
     : { background: `color-mix(in srgb, var(--color-text-secondary) ${Math.round(strength * 12)}%, transparent)` };
+}
+
+function categoryStyle(category: MonthCategory): React.CSSProperties {
+  switch (category) {
+    case "negotiate":
+      return { background: "color-mix(in srgb, var(--color-success) 28%, transparent)" };
+    case "balance":
+      return { background: "color-mix(in srgb, var(--color-success) 48%, transparent)" };
+    case "choice":
+      return { background: "color-mix(in srgb, var(--color-brand) 22%, transparent)" };
+    case "fast":
+      return { background: "color-mix(in srgb, var(--color-text-secondary) 14%, transparent)" };
+    default:
+      return {};
+  }
 }
 
 export function TimingGuide() {
@@ -46,6 +62,15 @@ export function TimingGuide() {
   const best = longNames[view.bestLeverageMonth - 1]!;
   const balanced = view.balancedMonths.map((m) => longNames[m - 1]!);
   const balancedIsTentative = view.balancedMonths.some((m) => !view.solidLeverageMonths.includes(m));
+
+  const currentMonth = useMemo(() => new Date().getMonth() + 1, []);
+  const categoryLabel: Record<MonthCategory, string> = {
+    negotiate: tx("Forhandl", "Negotiate"),
+    balance: tx("Balance", "Balance"),
+    choice: tx("Udvalg", "Choice"),
+    fast: tx("Hurtigt", "Fast"),
+    neutral: tx("Middel", "Middle"),
+  };
 
   const levelLabel: Record<Level, string> = {
     high: tx("Høj", "High"),
@@ -77,41 +102,68 @@ export function TimingGuide() {
         {tx("Hvornår er det bedste tidspunkt at købe?", "When is the best time to buy?")}
       </h2>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">{tx("Bedst til at forhandle", "Best for negotiating")}</p>
-          <p className="mt-1 text-lg font-semibold">{capitalize(leverageText)}</p>
-          <p className="mt-2 text-sm text-ink-soft">
+      <div className="mt-4 rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6">
+        <p className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {tx(`Køb helst i ${leverageText}.`, `Buy in ${leverageText} if you can.`)}
+        </p>
+        <p className="mt-2 max-w-3xl text-base">
+          {tx(
+            `Her er salgstiden længst og afslaget størst, så du kan forhandle. ${capitalize(best)} er stærkest.`,
+            `Homes take longest to sell and discounts are largest, so you can negotiate. ${capitalize(best)} is the strongest.`,
+          )}
+        </p>
+        <ul className="mt-3 max-w-3xl space-y-1.5 text-sm text-ink-soft">
+          <li>
             {tx(
-              `Salgstiden er længere og afslaget større, så køberen har mere at forhandle med. ${capitalize(best)} er stærkest. ${solidText ? `Mønstret er statistisk solidt for ${solidText}.` : ""} ${view.tentativeLeverageMonths.length ? "De øvrige måneder peger samme vej, men med mere usikkerhed." : ""}`,
-              `Homes take longer to sell and discounts are larger, so a buyer has more to negotiate with. ${capitalize(best)} is the strongest. ${solidText ? `The pattern is statistically solid for ${solidText}.` : ""} ${view.tentativeLeverageMonths.length ? "The other months point the same way but with more uncertainty." : ""}`,
+              `Du vil have mest at vælge imellem i ${selectionText}, men så sælges boligerne hurtigt, og afslaget er mindst.`,
+              `You get the most to choose from in ${selectionText}, but homes sell fast and discounts are smallest.`,
             )}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-soft">{tx("Størst udvalg", "Widest choice")}</p>
-          <p className="mt-1 text-lg font-semibold">{capitalize(selectionText)}</p>
-          <p className="mt-2 text-sm text-ink-soft">
+          </li>
+          {balanced.length > 0 && (
+            <li>
+              {tx(
+                `Bedste kompromis: ${balanced.join(", ")}. Høj forhandlingsstyrke og normalt udbud.${balancedIsTentative ? " Evidensen er svagere end for januar til marts." : ""}`,
+                `Best compromise: ${balanced.join(", ")}. High negotiating power and normal supply.${balancedIsTentative ? " The evidence is weaker than for January to March." : ""}`,
+              )}
+            </li>
+          )}
+          <li>
             {tx(
-              "Flest boliger til salg, men også kortest salgstid og mindst afslag. Der er mange at vælge imellem, og de sælges hurtigt.",
-              "The most homes for sale, but also the shortest time to sell and the smallest discounts. There is plenty to choose from, and it sells fast.",
+              `Sikrest er ${solidText}. Der er mønstret statistisk solidt. De øvrige vintermåneder peger samme vej, men med mere usikkerhed.`,
+              `Most certain is ${solidText}, where the pattern is statistically solid. The other winter months point the same way with more uncertainty.`,
             )}
-          </p>
-        </div>
+          </li>
+        </ul>
+
+        <ol className="mt-5 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-12" aria-label={tx("De tolv måneder", "The twelve months")}>
+          {view.months.map((m, i) => {
+            const category = view.categories[i]!;
+            const isNow = m.month === currentMonth;
+            return (
+              <li
+                key={m.month}
+                className={`rounded-xl border px-1.5 py-2 text-center ${isNow ? "border-brand ring-2 ring-brand" : "border-border"}`}
+                style={categoryStyle(category)}
+              >
+                <span className="block text-[11px] text-ink-soft">{isNow ? tx("Nu", "Now") : "\u00a0"}</span>
+                <span className="block text-sm font-semibold">{capitalize(shortNames[i]!)}</span>
+                <span className="mt-0.5 block text-[11px] font-semibold">{categoryLabel[category]}</span>
+              </li>
+            );
+          })}
+        </ol>
+        <dl className="mt-3 grid gap-x-6 gap-y-1 text-[12px] text-ink-soft sm:grid-cols-2">
+          <div><dt className="inline font-semibold text-ink">{categoryLabel.negotiate}: </dt><dd className="inline">{tx("godt at forhandle, begrænset udvalg", "good for negotiating, limited choice")}</dd></div>
+          <div><dt className="inline font-semibold text-ink">{categoryLabel.balance}: </dt><dd className="inline">{tx("godt at forhandle og normalt udbud", "good for negotiating and normal supply")}</dd></div>
+          <div><dt className="inline font-semibold text-ink">{categoryLabel.choice}: </dt><dd className="inline">{tx("mange boliger, men de sælges hurtigt", "many homes, but they sell fast")}</dd></div>
+          <div><dt className="inline font-semibold text-ink">{categoryLabel.fast}: </dt><dd className="inline">{tx("hurtigt marked, lidt at forhandle med", "fast market, little room to negotiate")}</dd></div>
+        </dl>
       </div>
 
-      <p className="mt-4 max-w-3xl rounded-xl border border-border bg-surface-alt px-3.5 py-2.5 text-sm" role="note">
-        {balanced.length > 0
-          ? tx(
-              `Bedste kompromis mellem forhandling og udvalg: ${balanced.join(", ")}. Her er forhandlingsstyrken høj, mens udbuddet stadig er på normalt niveau eller derover.${balancedIsTentative ? " Evidensen er svagere end for januar til marts." : ""}`,
-              `Best compromise between negotiating power and choice: ${balanced.join(", ")}. Negotiating power is high while supply is still at or above its normal level.${balancedIsTentative ? " The evidence is weaker than for January to March." : ""}`,
-            )
-          : tx(
-              "Forhandlingsstyrke og udvalg trækker i hver sin retning hele året. Der er ingen måned, hvor begge er gode.",
-              "Negotiating power and choice pull in opposite directions all year. No month is good on both.",
-            )}
-      </p>
-
+      <details className="mt-6 group">
+        <summary className="cursor-pointer text-sm font-semibold underline-offset-2 hover:underline">
+          {tx("Se tallene bag, måned for måned", "See the numbers behind it, month by month")}
+        </summary>
       <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-surface shadow-card">
         <table className="w-full min-w-[720px] border-collapse text-[12.5px]">
           <caption className="sr-only">{tx("Måned for måned: hvor gunstig tidspunktet er for en køber", "Month by month: how favourable the timing is for a buyer")}</caption>
@@ -172,6 +224,7 @@ export function TimingGuide() {
           "● the pattern repeats in at least 70% of years and is clearly larger than the year-to-year swings. ○ the pattern is uncertain. Green means favourable for a buyer, grey means unfavourable. Based on 14-15 years per month, after removing the market's own trend.",
         )}
       </p>
+      </details>
 
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-card">

@@ -29,6 +29,13 @@ describe("timing view", () => {
     expect(view.latest[0]!.difference).toBeGreaterThan(50);
   });
 
+  it("labels every month with one plain category", () => {
+    expect(view.categories).toEqual([
+      "negotiate", "negotiate", "negotiate", "neutral", "fast", "choice",
+      "choice", "choice", "choice", "choice", "balance", "negotiate",
+    ]);
+  });
+
   it("classifies z-scores", () => {
     expect(levelOf(0.5)).toBe("high");
     expect(levelOf(0)).toBe("middle");
