@@ -109,8 +109,8 @@ export function StatsPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{tx("Postnummer 9000 Aalborg", "Postcode 9000 Aalborg")}</h1>
         <p className="mt-2 max-w-3xl text-sm text-ink-soft">
           {tx(
-            `Månedlige tal fra Boligsidens Markedsindeks, ${f.month(view.firstMonth)} til ${f.month(view.latestMonth)}: ${view.monthCount} måneder og fem serier. Siden viser, hvordan markedet har bevæget sig, og hvordan udbud, priser, salgstid og afslag hænger sammen.`,
-            `Monthly figures from the Boligsiden Markedsindeks, ${f.month(view.firstMonth)} to ${f.month(view.latestMonth)}: ${view.monthCount} months and five series. The page shows how the market has moved and how supply, prices, days on market and discounts relate.`,
+            `Månedlige tal fra Markedsindeks, ${f.month(view.firstMonth)} til ${f.month(view.latestMonth)}: ${view.monthCount} måneder og fem serier. Siden viser, hvordan markedet har bevæget sig, og hvordan udbud, priser, salgstid og afslag hænger sammen.`,
+            `Monthly figures from the Markedsindeks, ${f.month(view.firstMonth)} to ${f.month(view.latestMonth)}: ${view.monthCount} months and five series. The page shows how the market has moved and how supply, prices, days on market and discounts relate.`,
           )}
         </p>
         <p className="mt-3 max-w-3xl rounded-xl border border-border bg-surface-alt px-3.5 py-2.5 text-[12px] text-ink-soft" role="note">
@@ -423,8 +423,8 @@ export function StatsPage() {
         <ul className="mt-3 grid max-w-4xl list-disc gap-2 pl-5 text-[13.5px] leading-relaxed text-ink-soft">
           <li>
             {tx(
-              `Kilden er Boligsidens Markedsindeks for postnummer ${zipMarketSnapshot.source.locationName}. Datasættet er indsat manuelt og er ikke hentet af en importer. Hentetidspunktet kendes ikke.`,
-              `The source is the Boligsiden Markedsindeks for postcode ${zipMarketSnapshot.source.locationName}. The data was pasted in by hand, not fetched by an importer. Its capture time is unknown.`,
+              `Kilden er Markedsindeks for postnummer ${zipMarketSnapshot.source.locationName}. Datasættet er indsat manuelt og er ikke hentet af en importer. Hentetidspunktet kendes ikke.`,
+              `The source is the Markedsindeks for postcode ${zipMarketSnapshot.source.locationName}. The data was pasted in by hand, not fetched by an importer. Its capture time is unknown.`,
             )}
           </li>
           <li>

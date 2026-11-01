@@ -1,8 +1,8 @@
 # Postcode 9000 Aalborg market statistics
 
-Monthly Boligsiden Markedsindeks statistics for postcode 9000 (Aalborg), January
+Monthly Markedsindeks statistics for postcode 9000 (Aalborg), January
 2011 to September 2026: 189 months, five series, no gaps. The snapshot is
-`packages/shared/src/data/boligsiden-zip-9000-stats.json`. The calculations are in
+`packages/shared/src/data/zip-9000-stats.json`. The calculations are in
 `packages/shared/src/analysis/zip-market-stats.ts` and are tested in
 `apps/web/src/lib/zip-market-stats.test.ts`.
 
@@ -76,8 +76,7 @@ relationship would need differenced or detrended series.
 - **Sample size.** The paste gives no transaction counts, so single months can swing
   a lot. For example, July 2026 rose 8.2% in one month. Read single-month moves
   against the trailing averages.
-- **Gap to the municipal series.** The municipal Aalborg series in
-  `boligsiden-market-index.json` is 17,109 DKK/m² for August 2026 (villa and terraced
+- **Gap to the municipal series.** The municipal Aalborg series is 17,109 DKK/m² for August 2026 (villa and terraced
   house). Postcode 9000 shows 27,754 for the same month, 1.62 times as high. The
   ratio has ranged from 1.20 (April 2013) to 1.62, and it has risen over time, so it
   is not a fixed offset. Check this against the live Markedsindeks before using the postcode figures

@@ -1,7 +1,7 @@
-import snapshotJson from "../data/boligsiden-zip-9000-stats.json" with { type: "json" };
+import snapshotJson from "../data/zip-9000-stats.json" with { type: "json" };
 
 /**
- * Monthly Boligsiden Markedsindeks statistics for one postcode (9000 Aalborg).
+ * Monthly Markedsindeks statistics for one postcode (9000 Aalborg).
  * Pure functions only: the snapshot is imported, never fetched, so the numbers
  * stay reproducible and the module is safe to use in both server and browser code.
  */

@@ -1,7 +1,7 @@
 {
   "source": {
-    "name": "Boligsiden Markedsindeks (supplied extract)",
-    "endpoint": "https://api.boligsiden.dk/cases/stats",
+    "name": "Markedsindeks (supplied extract)",
+    "endpoint": "",
     "locationType": "zip_code",
     "locationName": "9000",
     "municipality": "Aalborg",
