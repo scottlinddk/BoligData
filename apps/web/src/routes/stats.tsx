@@ -23,6 +23,7 @@ import { buildSeasonality, buildStatsView, buildYearlyRows } from "@/lib/zip-mar
 import { MarketTimeline, type TimelinePanel } from "@/components/stats/market-timeline";
 import { KpiCard } from "@/components/stats/kpi-card";
 import { TimingGuide } from "@/components/stats/timing-guide";
+import { AiPrompt } from "@/components/stats/ai-prompt";
 import { CorrelationMatrix } from "@/components/stats/correlation-matrix";
 import { DivergingBars } from "@/components/stats/diverging-bars";
 import { RelationshipMap } from "@/components/stats/relationship-map";
@@ -157,6 +158,8 @@ export function StatsPage() {
       </section>
 
       <TimingGuide />
+
+      <AiPrompt />
 
       <section aria-labelledby="timeline-heading" className="mb-12">
         <h2 id="timeline-heading" className="text-xl font-semibold tracking-tight">{tx("Udviklingen måned for måned", "Month by month")}</h2>
