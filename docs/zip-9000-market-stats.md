@@ -131,3 +131,24 @@ not use this snapshot yet. See the module for the available calculations.
 pnpm --filter web test -- zip-market-stats
 pnpm typecheck
 ```
+
+## Buyer timing guide
+
+The "best time to buy" section on `/stats` is built by
+`packages/shared/src/analysis/zip-market-timing.ts` and tested in
+`apps/web/src/lib/zip-market-timing.test.ts`.
+
+- Each series is detrended against a centred 2x12 moving average, so a rising market
+  is not read as a season. The first and last six months have no trend value, which
+  leaves 14-15 observations per calendar month.
+- A month's signal is **reliable** when at least 10 years back it, at least 70% of
+  the years agree on the direction, and the mean is at least two standard errors
+  from zero. Everything else is shown but marked uncertain.
+- **Negotiating power** averages the favourability of days on market and discount.
+  **Choice** is the favourability of homes for sale. Favourability is the z-score of
+  the month's mean across the twelve calendar months, signed so higher is better
+  for a buyer. A month counts as high or low at a z-score of +/-0.5.
+- Prices are shown but not scored: the sold-price season is about 3% peak to trough
+  and fails the reliability test.
+- Days on market is measured at the sale, so winter figures partly reflect homes
+  listed in the autumn.
