@@ -15,6 +15,7 @@ import { RouteErrorBoundary } from "@/components/error-boundary";
 import { SearchPage } from "@/routes/search";
 import { PropertyDetailPage } from "@/routes/property/[id]";
 import { ResearchPage } from "@/routes/research";
+import { HouseSearchPage } from "@/routes/house-search";
 import { DashboardPage } from "@/routes/dashboard";
 import { ComparePage } from "@/routes/compare";
 import { PropertyEstimatePage } from "@/routes/property/estimate";
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <SearchPage /> },
       { path: "/research", element: <AuthGuard><ResearchPage /></AuthGuard> },
+      { path: "/house-search", element: <AuthGuard><HouseSearchPage /></AuthGuard> },
       {
         path: "/property/:id",
         element: (
