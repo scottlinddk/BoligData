@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   LAG_RANGE,
   MARKET_PHASES,
@@ -27,8 +27,14 @@ import { AiPrompt } from "@/components/stats/ai-prompt";
 import { CorrelationMatrix } from "@/components/stats/correlation-matrix";
 import { DivergingBars } from "@/components/stats/diverging-bars";
 import { RelationshipMap } from "@/components/stats/relationship-map";
+import { AnalysisTab } from "@/components/stats/analysis/analysis-tab";
 
 type MatrixMode = "changes" | "annual";
+type StatsTab = "overview" | "analyse";
+const TABS: { id: StatsTab; label: string }[] = [
+  { id: "overview", label: "Oversigt" },
+  { id: "analyse", label: "Analyse" },
+];
 
 export function StatsPage() {
   const { t, language } = useI18n();
@@ -42,6 +48,19 @@ export function StatsPage() {
   const summaries = useMemo(() => summarizePhases(), []);
   const phaseRemarks = useMemo(() => buildPhaseRemarks(language, summaries), [language, summaries]);
   const relationshipRemarks = useMemo(() => buildRelationshipRemarks(language, report), [language, report]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: StatsTab = searchParams.get("tab") === "analyse" ? "analyse" : "overview";
+  const selectTab = (next: StatsTab) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === "overview") params.delete("tab");
+        else params.set("tab", next);
+        return params;
+      },
+      { replace: true },
+    );
 
   const [matrixMode, setMatrixMode] = useState<MatrixMode>("changes");
   const [leadIndex, setLeadIndex] = useState(0);
@@ -106,6 +125,29 @@ export function StatsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">
+      <div role="tablist" aria-label="Visning" className="mb-6 inline-flex rounded-xl border border-border p-1 text-sm">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`stats-tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`stats-panel-${item.id}`}
+            onClick={() => selectTab(item.id)}
+            className={`min-h-9 rounded-lg px-4 font-medium transition-colors ${tab === item.id ? "bg-cta text-cta-text" : "text-ink-soft hover:bg-surface-alt"}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "analyse" ? (
+        <div role="tabpanel" id="stats-panel-analyse" aria-labelledby="stats-tab-analyse">
+          <AnalysisTab />
+        </div>
+      ) : (
+      <div role="tabpanel" id="stats-panel-overview" aria-labelledby="stats-tab-overview">
       <header className="mb-8">
         <p className="text-[12px] font-semibold uppercase tracking-wide text-brand-text">{tx("Markedsstatistik", "Market statistics")}</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{tx("Postnummer 9000 Aalborg", "Postcode 9000 Aalborg")}</h1>
@@ -477,6 +519,8 @@ export function StatsPage() {
           <Link to="/" className="underline underline-offset-2 hover:text-ink">{tx("Tilbage til søgning", "Back to search")}</Link>
         </p>
       </section>
+      </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,213 @@
+{
+ "meta": {
+  "as_of": "2026-11-02",
+  "index_month_wanted": "2026-10",
+  "index_month_used": "2026-09",
+  "index_months_stale": 1,
+  "index_value": 27690.0
+ },
+ "segments": {
+  "house": {
+   "method": "a1",
+   "listings": 260,
+   "assessable": 113,
+   "not_assessable": {
+    "missing_inputs": 0,
+    "area_out_of_range": 6,
+    "few_comparables": 141,
+    "no_interval": 0
+   },
+   "low_confidence_year_missing": 29,
+   "ratio_quantiles": {
+    "0.1": 1.10515,
+    "0.25": 1.33172,
+    "0.5": 1.61628,
+    "0.75": 2.08065,
+    "0.9": 2.81588
+   },
+   "position_shares": {
+    "under intervallet": 0.0,
+    "i intervallet": 0.69027,
+    "over intervallet": 0.30973
+   },
+   "median_rel_halfwidth": 0.72056,
+   "model_spread_median": 0.5409,
+   "n_calibration": 23,
+   "calibration_window_months": 48,
+   "n_train": 157,
+   "with_point_estimate": 254,
+   "median_asking_over_estimate_by_method": {
+    "a1": 1.76675,
+    "a2": 1.01662,
+    "ridge": 1.11338,
+    "gbm": 1.035,
+    "recommended": 1.76675
+   },
+   "median_comparables": 3.0
+  },
+  "apartment": {
+   "method": "a2",
+   "listings": 534,
+   "assessable": 484,
+   "not_assessable": {
+    "missing_inputs": 0,
+    "area_out_of_range": 9,
+    "few_comparables": 41,
+    "no_interval": 0
+   },
+   "low_confidence_year_missing": 84,
+   "ratio_quantiles": {
+    "0.1": 0.54609,
+    "0.25": 0.66093,
+    "0.5": 0.78252,
+    "0.75": 0.89164,
+    "0.9": 1.13624
+   },
+   "position_shares": {
+    "under intervallet": 0.13843,
+    "i intervallet": 0.84711,
+    "over intervallet": 0.01446
+   },
+   "median_rel_halfwidth": 0.57419,
+   "model_spread_median": 0.46322,
+   "n_calibration": 22,
+   "calibration_window_months": 24,
+   "n_train": 658,
+   "with_point_estimate": 525,
+   "median_asking_over_estimate_by_method": {
+    "a1": 1.31805,
+    "a2": 0.77841,
+    "ridge": 0.84492,
+    "gbm": 0.79652,
+    "recommended": 0.77841
+   },
+   "median_comparables": 23.0
+  }
+ },
+ "reasons": {
+  "missing_inputs": "Areal eller placering mangler",
+  "area_out_of_range": "Areal uden for træningsdatas spænd",
+  "few_comparables": "For få sammenlignelige salg",
+  "no_interval": "Intervallet er ikke informativt (for få kalibreringshandler)"
+ },
+ "post_hoc_relative_level": {
+  "apartment": [
+   {
+    "year": 2017,
+    "n": 72,
+    "unique_properties": 68,
+    "median_price_vs_index_area": 1.02872
+   },
+   {
+    "year": 2018,
+    "n": 55,
+    "unique_properties": 53,
+    "median_price_vs_index_area": 1.0616
+   },
+   {
+    "year": 2019,
+    "n": 40,
+    "unique_properties": 40,
+    "median_price_vs_index_area": 0.95926
+   },
+   {
+    "year": 2020,
+    "n": 58,
+    "unique_properties": 55,
+    "median_price_vs_index_area": 0.91789
+   },
+   {
+    "year": 2021,
+    "n": 76,
+    "unique_properties": 75,
+    "median_price_vs_index_area": 0.96805
+   },
+   {
+    "year": 2022,
+    "n": 39,
+    "unique_properties": 39,
+    "median_price_vs_index_area": 0.89279
+   },
+   {
+    "year": 2023,
+    "n": 35,
+    "unique_properties": 35,
+    "median_price_vs_index_area": 0.89431
+   },
+   {
+    "year": 2024,
+    "n": 14,
+    "unique_properties": 14,
+    "median_price_vs_index_area": 0.83723
+   },
+   {
+    "year": 2025,
+    "n": 19,
+    "unique_properties": 17,
+    "median_price_vs_index_area": 0.68706
+   },
+   {
+    "year": 2026,
+    "n": 3,
+    "unique_properties": 3,
+    "median_price_vs_index_area": 0.92192
+   }
+  ],
+  "house": [
+   {
+    "year": 2017,
+    "n": 15,
+    "unique_properties": 15,
+    "median_price_vs_index_area": 0.97752
+   },
+   {
+    "year": 2018,
+    "n": 6,
+    "unique_properties": 6,
+    "median_price_vs_index_area": 0.91372
+   },
+   {
+    "year": 2019,
+    "n": 12,
+    "unique_properties": 12,
+    "median_price_vs_index_area": 0.91257
+   },
+   {
+    "year": 2020,
+    "n": 11,
+    "unique_properties": 11,
+    "median_price_vs_index_area": 0.99151
+   },
+   {
+    "year": 2021,
+    "n": 20,
+    "unique_properties": 19,
+    "median_price_vs_index_area": 0.92472
+   },
+   {
+    "year": 2022,
+    "n": 13,
+    "unique_properties": 13,
+    "median_price_vs_index_area": 0.93556
+   },
+   {
+    "year": 2023,
+    "n": 8,
+    "unique_properties": 8,
+    "median_price_vs_index_area": 1.04459
+   },
+   {
+    "year": 2024,
+    "n": 11,
+    "unique_properties": 11,
+    "median_price_vs_index_area": 0.91164
+   },
+   {
+    "year": 2025,
+    "n": 3,
+    "unique_properties": 3,
+    "median_price_vs_index_area": 0.68838
+   }
+  ]
+ }
+}

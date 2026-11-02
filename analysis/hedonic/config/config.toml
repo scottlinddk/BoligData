@@ -1,0 +1,85 @@
+# Konfiguration for den hedoniske prisanalyse (postnummer 9000 Aalborg).
+# Alt her er fastlagt FØR modelresultater er set. Ændres noget bagefter, skal det stå i README under "Ændringslog".
+
+[project]
+seed = 20261102
+postcode = "9000"
+# Aalborg centrum, cirka. Bruges kun til afstand og retningsblokke.
+center_lat = 57.0488
+center_lon = 9.9217
+
+[data]
+sales_csv = "data/raw/sales_9000.csv"
+listings_csv = "data/raw/listings_9000.csv"
+stats_snapshot = "../../packages/shared/src/data/zip-9000-stats.json"
+market_index_series = "sold_per_area_price"
+outputs_dir = "outputs"
+shared_results_json = "../../packages/shared/src/data/hedonic-results.json"
+
+[filters]
+# Kun almindelig fri handel i den primære analyse. Familie, auktion og øvrige vises i auditten.
+sale_types = ["normal"]
+dedupe_window_days = 60
+area_m2_min = 20
+area_m2_max = 600
+rooms_max = 15
+year_min = 1600
+# Flag (ikke sletning): robust z for log(pris pr. m²) relativt til markedsindeks.
+outlier_robust_z = 3.5
+area_drift_tolerance = 0.10
+
+[filters.segments]
+house = ["villa", "terraced_house", "villa_apartment"]
+apartment = ["apartment"]
+
+[splits]
+# Rolling-origin: træn på alt før 1. januar i testået, test på testået.
+rolling_test_years = [2021, 2022, 2023, 2024]
+calibration_months = 12
+min_train_rows = 40
+# Urørt testsæt. Rolling-origin og geografi-test ser ikke disse handler.
+final_holdout_from = "2025-01-01"
+
+[baselines]
+trailing_windows_months = [12, 24, 36]
+trailing_min_n = 5
+vur_ratio_window_months = 36
+vur_ratio_min_n = 8
+
+[models]
+features = ["log_area", "rooms", "age", "dist_km", "dlat", "dlon", "sub_terraced", "sub_villaapt"]
+ridge_alphas = [0.1, 1.0, 10.0, 100.0]
+gbm_max_depth = [2, 3]
+gbm_max_iter = [60, 150]
+gbm_learning_rate = 0.05
+gbm_min_samples_leaf = 8
+gbm_l2 = 1.0
+
+[intervals]
+# Mål-dækning 80 %. Det er et mål, ikke en garanti. Den faktiske dækning rapporteres på testdata.
+alpha = 0.2
+
+[decision]
+# Regel for at anbefale en challenger frem for bedste baseline, fastlagt på forhånd.
+min_relative_improvement = 0.10
+bootstrap_reps = 2000
+bootstrap_ci = 0.90
+
+[reporting]
+# Celler med færre testhandler end dette markeres som vejledende.
+min_cell_n = 30
+price_class_bounds_dkk = [1000000, 2000000]
+age_class_bounds_year = [1950, 1990]
+
+[scoring]
+as_of = "2026-11-02"
+comparables_radius_km = 1.5
+comparables_years = 5
+comparables_area_tolerance = 0.30
+comparables_min_n = 5
+# Tilføjet 2026-11-02 EFTER udviklingsresultaterne var set (se README, ændringslog): et interval bygget på under 20
+# kalibreringsresidualer hviler på 3-4 observationer i halen og er ikke informativt. Vinduet udvides trinvis.
+min_calibration_n = 20
+calibration_windows_months = [12, 24, 36, 48]
+# Annoncer uden for træningsdata (laveste/højeste percentil) markeres som ikke vurderbare.
+area_range_percentiles = [1, 99]
