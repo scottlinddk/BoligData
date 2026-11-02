@@ -1,4 +1,4 @@
-import type { PublicValuation } from "../../../../../packages/shared/src/types/index.js";
+import type { PublicValuation, SoldPriceEntry } from "../../../../../packages/shared/src/types/index.js";
 import type {
   PropertyLookupDataMode,
   PropertyLookupInput,
@@ -10,6 +10,8 @@ import { lookupAddressCadastral } from "../enrichment-sources/address-lookup.js"
 import { lookupHusnummerById } from "../enrichment-sources/adressevaelger.js";
 import { lookupBbr } from "../enrichment-sources/bbr.js";
 import { lookupBbrTanks } from "../enrichment-sources/bbr-tanks.js";
+import { lookupBbrAtDate } from "../enrichment-sources/bbr-at-date.js";
+import { lookupRegisteredSales } from "../enrichment-sources/ejf-sales.js";
 import { lookupEjendomsvurdering, valuationFromYears } from "../enrichment-sources/ejendomsvurdering.js";
 import { lookupLand } from "../enrichment-sources/matrikel.js";
 import { lookupHouseValuation } from "../enrichment-sources/vur-valuations.js";
@@ -17,6 +19,7 @@ import { buildAddressRiskFlags } from "./address-risk-flags.js";
 import { lookupNoiseExposure } from "../enrichment-sources/stoejkort.js";
 import { lookupSoilContamination } from "../enrichment-sources/miljoeportalen-v1v2.js";
 import { mockModeEnabled, type SourceResult } from "../enrichment-sources/types.js";
+import { mapConcurrent } from "../shared/concurrency.js";
 import { isDanishCoordinate } from "../shared/map-utils.js";
 import { DEFAULT_FINANCING_ASSUMPTIONS, type FinancingAssumptions } from "../screening/config/financing-assumptions.js";
 import { classifyRenovationCategory } from "../screening/renovation-category.js";
@@ -47,6 +50,52 @@ function worstMode(statuses: PropertyLookupSourceStatus[]): PropertyLookupDataMo
     (worst, s) => (MODE_SEVERITY[s.mode] > MODE_SEVERITY[worst] ? s.mode : worst),
     "live",
   );
+}
+
+/** How many of the newest sales get a BBR reading for their sale date. Each one is a register call. */
+const BBR_AT_SALE_LIMIT = 6;
+
+/**
+ * Registered sales for an address picked by id, each with BBR as of its sale date.
+ *
+ * Houses only, like the valuation: EJF is keyed by BFE, and an apartment has a BFE of its own that this
+ * pipeline does not resolve. Using the parcel's BFE for an apartment would show the sales of the whole
+ * building as if they were the apartment's. A listing lookup (no husnummer id) has no verified BFE either,
+ * so it reports sales as unavailable rather than guess.
+ *
+ * The BBR reading is best-effort: when it fails the sale is still shown, without it.
+ */
+async function lookupSalesHistory(args: {
+  byId: boolean;
+  husnummerId: string | null;
+  propertyClass: "house" | "other" | null;
+  bfeNummer: string | null;
+}): Promise<SourceResult<SoldPriceEntry[]>> {
+  if (!args.byId) return { ok: false, error: "sales are looked up only for an address picked by id" };
+  if (args.propertyClass !== "house") {
+    return { ok: false, error: args.propertyClass === "other" ? "not a house: an apartment's sales are keyed by its own BFE, which address lookup does not resolve" : "the building use is unknown, so the BFE cannot be attributed to this home" };
+  }
+  if (!args.bfeNummer || !args.husnummerId) return { ok: false, error: "no BFE number for this address" };
+
+  const sales = await lookupRegisteredSales(args.bfeNummer);
+  if (!sales.ok) return sales;
+
+  const husnummerId = args.husnummerId;
+  const indexed = sales.data.entries.map((entry, index) => ({ entry, index }));
+  const entries: SoldPriceEntry[] = await mapConcurrent(indexed, 3, async ({ entry, index }): Promise<SoldPriceEntry> => {
+    if (index >= BBR_AT_SALE_LIMIT) return entry;
+    const bbr = await lookupBbrAtDate(husnummerId, entry.soldDate);
+    if (!bbr.ok) return entry;
+    const area = bbr.data.residentialAreaSqm;
+    return {
+      ...entry,
+      bbrAtSale: bbr.data,
+      // Price per m² is only stated when BBR had a residential area on that day: no area, no figure.
+      pricePerSqm: area !== null ? Math.round(entry.price / area) : null,
+      ...(area !== null ? { residentialArea: area, areaDefinition: "residential" as const } : {}),
+    };
+  });
+  return { ok: true, data: entries };
 }
 
 /**
@@ -141,8 +190,10 @@ export async function lookupProperty(
   const noise = noiseResult?.ok && !mockModeEnabled("STOEJKORT_MOCK_MODE") ? noiseResult.data : null;
   const noiseExposureLden = noise?.ldenDb ?? null;
   const soil = soilResult?.ok && !mockModeEnabled("MILJOEPORTALEN_MOCK_MODE") ? soilResult.data : null;
-  // No licensed source for registered sales is connected. Sales history needs an agreement (EJF/Datafordeler).
-  const sales = null as null | { priceHistory: never[]; historyMatch: null; nearbySales: never[] };
+  // A listing lookup does not attempt sales (no verified BFE), so it reports no sales source at all rather than
+  // an "unavailable" one that would pull the whole report's data mode down for a source nobody asked.
+  const salesResult = !byId ? null : await lookupSalesHistory({ byId, husnummerId, propertyClass: houseLookup?.propertyClass ?? null, bfeNummer: houseLookup?.bfeNummer ?? null });
+  const sales = salesResult?.ok ? { priceHistory: salesResult.data, historyMatch: "matched" as const, nearbySales: [] } : null;
 
   const addressRegisterLabel = input.husnummerId
     ? "DAR via Adressevælger (adressevaelger.dk)"
@@ -156,6 +207,7 @@ export async function lookupProperty(
     status("oilTanks", "BBR tekniske anlæg via Datafordeler GraphQL", "BBR_MOCK_MODE", tanksResult),
     status("land", "MAT via Datafordeler GraphQL", "MATRIKEL_MOCK_MODE", landResult),
     status("publicValuation", "VUR via Datafordeler GraphQL", valuationMockFlag, valuationResult),
+    ...(salesResult ? [status("sales", "EJF via Datafordeler GraphQL, BBR på salgsdatoen", null, salesResult)] : []),
     noiseResult === null
       ? {
           key: "noise" as const,

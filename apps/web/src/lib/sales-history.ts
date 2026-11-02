@@ -1,6 +1,6 @@
-import type { SoldPriceEntry } from "@shared/types/index";
+import type { BbrAtSale, SoldPriceEntry } from "@shared/types/index";
 
-export type SaleKind = "normal" | "family" | "auction" | "other";
+export type SaleKind = "normal" | "family" | "auction" | "other" | "unknown";
 
 export interface SaleRow {
   /** ISO date, YYYY-MM-DD. */
@@ -9,6 +9,8 @@ export interface SaleRow {
   price: number;
   pricePerSqm: number | null;
   saleType: SaleKind;
+  /** BBR as of the sale date, when the register gave it. */
+  bbr: BbrAtSale | null;
 }
 
 export interface SalesSummary {
@@ -35,6 +37,7 @@ function toRow(entry: SoldPriceEntry): SaleRow | null {
     pricePerSqm: perSqm !== null && Number.isFinite(perSqm) && perSqm > 0 ? perSqm : null,
     // Same reading as the comparables panel: a sale with no recorded type is shown as an ordinary one.
     saleType: entry.saleType ?? "normal",
+    bbr: entry.bbrAtSale ?? null,
   };
 }
 

@@ -105,7 +105,7 @@ export interface Property {
  * the property is worth, so the UI must be able to tell them apart rather
  * than averaging them together. Optional because older rows don't carry it.
  */
-export type SaleType = "normal" | "family" | "auction" | "other";
+export type SaleType = "normal" | "family" | "auction" | "other" | "unknown";
 
 export interface SoldPriceEntry {
   soldDate: string; // ISO date
@@ -115,6 +115,37 @@ export interface SoldPriceEntry {
   registrationId?: string;
   residentialArea?: number;
   areaDefinition?: "residential" | "weighted" | "unknown";
+  /** BBR building facts effective on the sale date. Absent when BBR gave none for that date. */
+  bbrAtSale?: BbrAtSale;
+}
+
+/**
+ * What BBR registered about a home's main building on the day of a sale (effective time = the sale date).
+ * Areas are building totals from the register, not a housing unit's. Rooms are not here: they live on the
+ * unit (Enhed), which an address lookup does not resolve.
+ */
+export interface BbrAtSale {
+  /** The sale date this was read for (ISO date). */
+  asOf: string;
+  /**
+   * `effective`: the building as it was on the sale date, read with BBR's knowledge today, so a later correction
+   * of an old registration is included. That is the best estimate of what the buyer got, but not what a model
+   * could have known then.
+   */
+  knowledge: "effective";
+  /** Built buildings registered on the husnummer on that date, outbuildings included. */
+  buildingCount: number;
+  /** Raw BBR bygningsanvendelse code of the main (largest residential area) building. */
+  buildingUse: string | null;
+  yearBuilt: number | null;
+  /** BBR's year of the latest extension or conversion, when it was on record that day. */
+  extensionYear: number | null;
+  /** byg039, the main building's residential area in m². */
+  residentialAreaSqm: number | null;
+  /** byg038, the main building's total area in m². */
+  totalAreaSqm: number | null;
+  floors: number | null;
+  heating: string | null;
 }
 
 export interface CalculatedMetrics {

@@ -39,9 +39,24 @@ Every entity, field and type in the chain was checked against Datafordeler's pub
 
 ## Sales history and latest sale
 
-When a sales source is connected, the report opens with the address's own registered sales: the **latest sale** (price, full date and year), then a table of every sale (year, date, price, price per m², type). A family transfer or auction is labelled, and when it is the newest sale the newest arm's-length sale is shown beside it, since such a price is easy to read as a market price. `lib/sales-history.ts` does the sorting and formatting.
+The report opens with the address's own registered sales: the **latest sale** (price, full date and year), then a table of every sale (year, date, price, price per m², type). A family transfer or auction is labelled, and when it is the newest sale the newest arm's-length sale is shown beside it, since such a price is easy to read as a market price. `lib/sales-history.ts` does the sorting and formatting.
 
-No sale history is shown today. It used to come from Boligsiden's address search, which has been removed because Boligsiden prohibits automated collection. Registered sales (tinglysning) need a licensed source, for example the Ejerfortegnelsen/EJF or a data agreement; until one is connected the lookup returns an empty history and the page says it is unavailable. `lib/sales-history.ts` still does the sorting and formatting for when a source returns.
+### Where the sales come from now
+
+Registered sales are read from **EJF (Ejerfortegnelsen)** on Datafordeler (`server/lib/enrichment-sources/ejf-sales.ts`), by BFE number: `EJF_Ejerskifte` (filtered by `bestemtFastEjendomBFENr`) and its `EJF_Handelsoplysninger` (`koebsaftaledato`, `samletKoebesum`). The date is the purchase-agreement date, the same target the hedonic analysis uses. Trades with no date or a price of 0 (gifts, some family transfers) are dropped.
+
+Only for **houses on an address picked by id**. EJF is keyed by BFE, and an apartment has its own BFE that address lookup does not resolve; using the parcel's would show the building's sales as the apartment's. A listing lookup does not attempt sales and reports no sales source.
+
+**BBR on the sale date** (`bbr-at-date.ts`): for the newest six sales, BBR's buildings on the husnummer are read with `virkningstid` = the sale date and `registreringstid` = now. That is the building as it was that day with today's knowledge, including later corrections. It is not what BBR showed on that day, since BBR was often filled in late, so it must not be used as a "known at the time" feature without pinning `registreringstid` too. The home is the building with the most residential area (`byg039`). Price per m² is stated only when BBR had a residential area that day. Rooms are not included: they live on the unit (Enhed).
+
+**Not verified live (no key in development), and the first thing to check after deploying:**
+
+1. **Access.** EJF is licensed separately; the README records that it may need MitID Erhverv + OAuth rather than an API key. A key without it gets 401/403 and the Registerkilder row says so, instead of "no sales". If that is the answer, EJF needs the access application first and this code stays dormant.
+2. **The link between the two entities.** Only `bestemtFastEjendomBFENr`, `anmeldelsesdato`, `samletKoebesum` and `koebsaftaledato` are known from the schema dump the discovery script printed. The field that ties a trade to its ownership change is read off the schema (`GET .../EJF/v1/schema`) by name pattern. If none matches, the lookup fails and lists the fields it saw. Run the *Discover Datafordeler schema* workflow and compare.
+3. **Sale type** is always `unknown` (shown as "ukendt type"). The code list behind the kind of trade is not verified, so no sale is called arm's-length.
+4. **BBR field names** `byg038`, `byg039`, `byg054`, `byg056`/`byg057` follow BBR's field list and are filtered against the schema, with a smaller field set as fallback. Pinned by tests, not by a live answer.
+
+Optional overrides: `DATAFORDELER_EJF_VERSION` (default `v1`) and `DATAFORDELER_EJF_API_BASE`.
 
 ## Due-diligence checklist
 
