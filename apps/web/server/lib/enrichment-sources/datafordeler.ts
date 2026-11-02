@@ -72,6 +72,7 @@ const MEMO_TTL_MS = 10 * 60 * 1000;
 export function resetDatafordelerCache(): void {
   resolvedBase.clear();
   fieldCache.clear();
+  sdlCache.clear();
   memo.clear();
 }
 
@@ -259,4 +260,76 @@ export function pickField(fields: Iterable<string>, ...terms: string[]): string 
   }
 
   return null;
+}
+
+/** SDL per `<register>`, fetched once per process. `null` = the service would not hand its schema out. */
+const sdlCache = new Map<string, Promise<string | null>>();
+
+/**
+ * Field names per type from the service's published schema (`GET <endpoint>/schema`). Datafordeler
+ * switched GraphQL introspection off (error HC0046) on some registers, but the SDL download still works
+ * with the same key, so this is the way to read real field names without a guess.
+ *
+ * Returns `null` for a type that is not in the schema, and throws when the schema itself cannot be read.
+ */
+export async function schemaTypeFields(service: DatafordelerService, apiKey: string, typeName: string): Promise<Set<string> | null> {
+  const sdl = await loadSchemaSdl(service, apiKey);
+  return sdl === null ? null : sdlTypeFields(sdl, typeName);
+}
+
+async function loadSchemaSdl(service: DatafordelerService, apiKey: string): Promise<string | null> {
+  const cached = sdlCache.get(service.register);
+  if (cached) return cached;
+  const load = (async () => {
+    const known = resolvedBase.get(service.register);
+    const bases = known ? [known, ...candidateBases(service).filter((base) => base !== known)] : candidateBases(service);
+    let last: unknown = null;
+    for (const base of bases) {
+      const url = `${base}/schema?${new URLSearchParams({ apiKey })}`;
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+        if (res.status === 404) {
+          last = new HttpError(404, url);
+          continue;
+        }
+        if (!res.ok) throw new HttpError(res.status, url);
+        resolvedBase.set(service.register, base);
+        return await res.text();
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 404) continue;
+        throw err instanceof HttpError ? err : new HttpError(0, url, "could not fetch the schema");
+      }
+    }
+    if (last instanceof Error) throw last;
+    return null;
+  })();
+  sdlCache.set(service.register, load);
+  // A failure is not remembered: the next caller asks again.
+  load.catch(() => {
+    if (sdlCache.get(service.register) === load) sdlCache.delete(service.register);
+  });
+  return load;
+}
+
+/** Field names of `type <typeName> ... { ... }` in a GraphQL SDL document. Exported for tests. */
+export function sdlTypeFields(sdl: string, typeName: string): Set<string> | null {
+  const header = new RegExp(`(^|\\n)\\s*type\\s+${typeName}\\b[^{]*\\{`);
+  const match = header.exec(sdl);
+  if (!match) return null;
+  const rest = sdl.slice(match.index + match[0].length);
+  const end = rest.indexOf("\n}");
+  const body = end === -1 ? rest : rest.slice(0, end);
+  const names = new Set<string>();
+  let inDescription = false;
+  for (const line of body.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.includes('"""')) {
+      if ((trimmed.match(/"""/g) ?? []).length === 1) inDescription = !inDescription;
+      continue;
+    }
+    if (inDescription || trimmed.startsWith("#") || trimmed.startsWith('"')) continue;
+    const field = /^([A-Za-z_]\w*)\s*[(:]/.exec(trimmed);
+    if (field) names.add(field[1]!);
+  }
+  return names.size > 0 ? names : null;
 }

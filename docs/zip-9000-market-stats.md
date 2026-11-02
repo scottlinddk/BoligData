@@ -152,3 +152,19 @@ The "best time to buy" section on `/stats` is built by
   and fails the reliability test.
 - Days on market is measured at the sale, so winter figures partly reflect homes
   listed in the autumn.
+
+## Forecast tab (`/stats?tab=forecast`)
+
+A 12-month outlook for the sold price per m², from the monthly history alone. Code: `packages/shared/src/analysis/zip-market-forecast.ts`, tests in `apps/web/src/lib/zip-market-forecast.test.ts`.
+
+- **Three simple candidates** share one skeleton, level (last three months, season removed) x growth x season. Growth is 0 (*flat*), the long-run compound growth (*longrun*), or half the latest 12-month change plus half the long run (*momentum*). Their **plain average** (*blend*) is the fourth.
+- **Backtest.** Rolling origin, expanding window: from each month (from 72 months of history) the method sees only earlier data and forecasts the next 12 months. 106 origins, but they overlap, so roughly 8 independent years.
+- **Which one is shown** is fixed in advance: the blend, unless a single method has at least 10% lower mean absolute error. On the current snapshot the three are within 0.6 percentage points, and *flat* is as good as the others, so the forecast is **not clearly better than "prices stay where they are now"**. The page says so.
+- **The range** is the 10th to 90th percentile of the errors the shown method made in the backtest, per distance ahead. It is empirical, not a model assumption.
+- **Two changes are reported** because they answer different questions: against the last 12 months' average (+11.0%, mostly already happened) and against today's seasonally adjusted level (+2.3%, range -5.5% to +10.2%).
+
+Not included: interest rates, income, construction, tax changes. Two regimes (the 2020 to 2022 boom and the 2022 to 2023 rate shock) dominate the history. Re-run the tests after refreshing the snapshot: the text on the page is generated from the numbers, but the "not clearly better than flat" wording is conditional and will change if the backtest does.
+
+## Findings added to "best time to buy"
+
+`apps/web/src/lib/zip-market-findings.ts` reads the hedonic results and the forecast: family sales sit far below the market level (houses 56%, ordinary sales 94%), houses sold at a median 1.5 times the public valuation, no model beat the simple baseline, and the forecast change from today's level next to the seasonal spread. Descriptive, from 815 cleaned sales, small samples for family sales.

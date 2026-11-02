@@ -12,7 +12,7 @@ import { EstimateChart } from "@/components/estimate/estimate-chart";
 import { LoadingStatus, Skeleton } from "@/components/ui/loading";
 
 const INITIAL_ROWS = 5;
-const SALE_TYPE_LABEL = { family: ["familiehandel", "family sale"], auction: ["auktion", "auction"], other: ["anden handel", "other transfer"] } as const;
+const SALE_TYPE_LABEL = { family: ["familiehandel", "family sale"], auction: ["auktion", "auction"], other: ["anden handel", "other transfer"], unknown: ["ukendt type", "unknown type"] } as const;
 
 /**
  * Phone-first full page for the estimate: a dark hero with the number, then a sheet with the history

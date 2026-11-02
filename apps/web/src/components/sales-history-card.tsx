@@ -25,6 +25,14 @@ export function SalesHistoryCard({ history, available, match }: SalesHistoryCard
   const tag = (row: SaleRow) => row.saleType === "normal" ? null
     : <span className="ds-mono ml-1.5 rounded-[5px] bg-warning-soft px-1.5 py-0.5 text-[9px] text-warning-text">{typeLabel(row)}</span>;
 
+  /** "142 m² · 1962": the residential area and build year BBR had on the sale date, or a dash when it had neither. */
+  const bbrCell = (row: SaleRow) => {
+    const area = row.bbr?.residentialAreaSqm ?? null;
+    const year = row.bbr?.yearBuilt ?? null;
+    if (area === null && year === null) return "–";
+    return [area !== null ? `${area} m²` : null, year !== null ? String(year) : null].filter(Boolean).join(" · ");
+  };
+
   const emptyText = !available ? t("address.sales.unavailable")
     : match === "not_found" ? t("address.sales.notFound")
       : match === "ambiguous" ? t("address.sales.ambiguous")
@@ -57,7 +65,7 @@ export function SalesHistoryCard({ history, available, match }: SalesHistoryCard
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-left text-[13px]">
+            <table className="w-full min-w-[520px] border-collapse text-left text-[13px]">
               <caption className="sr-only">{t("address.sales.title")}</caption>
               <thead>
                 <tr className="border-b border-border text-xs font-medium text-ink-soft">
@@ -65,7 +73,8 @@ export function SalesHistoryCard({ history, available, match }: SalesHistoryCard
                   <th scope="col" className="py-2 pr-3 font-medium">{t("address.sales.col.date")}</th>
                   <th scope="col" className="py-2 pr-3 text-right font-medium">{t("address.sales.col.price")}</th>
                   <th scope="col" className="py-2 pr-3 text-right font-medium">{t("address.sales.col.perSqm")}</th>
-                  <th scope="col" className="py-2 font-medium">{t("address.sales.col.type")}</th>
+                  <th scope="col" className="py-2 pr-3 font-medium">{t("address.sales.col.type")}</th>
+                  <th scope="col" className="py-2 font-medium">{t("address.sales.col.bbr")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,7 +88,8 @@ export function SalesHistoryCard({ history, available, match }: SalesHistoryCard
                     <td className="py-2 pr-3 text-ink-soft"><time dateTime={row.soldDate}>{formatSaleDate(row.soldDate, language, "short")}</time></td>
                     <td className="py-2 pr-3 text-right font-semibold tabular-nums text-ink">{formatDkk(row.price)}</td>
                     <td className="py-2 pr-3 text-right tabular-nums text-ink-soft">{row.pricePerSqm !== null ? formatDkk(row.pricePerSqm) : "–"}</td>
-                    <td className="py-2 text-ink-soft">{typeLabel(row)}</td>
+                    <td className="py-2 pr-3 text-ink-soft">{typeLabel(row)}</td>
+                    <td className="py-2 text-ink-soft">{bbrCell(row)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -93,6 +93,20 @@ const BYGNING_FIELDS = [
   "byg057Opvarmningsmiddel",
 ];
 
+const EJF_SDL = `
+type EJF_Ejerskifte {
+  id_lokalId: String
+  bestemtFastEjendomBFENr: Long
+  anmeldelsesdato: DateTime
+}
+type EJF_Handelsoplysninger {
+  id_lokalId: String
+  ejerskifteLokalId: String
+  koebsaftaledato: LocalDate
+  samletKoebesum: Float
+}
+`;
+
 const VALUATION_FIELDS = ["bfeNummer", "ejendomsvaerdi", "grundvaerdi", "vurderingsaar"];
 
 /**
@@ -118,9 +132,12 @@ const HOUSE_CHAIN: Record<string, unknown[]> = {
 const MAT_ESTATE = { id_lokalId: "e1", BFEnummer: 2_340_871, landbrugsnotering: null, erFaelleslod: false, hovedejendomOpdeltIEjerlejligh: false };
 const MAT_PARCEL = { id_lokalId: "p1", registreretAreal: 812, fredskov_areal: null, strandbeskyttelse_areal: null, klitfredning_areal: null, majoratsskov_nummer: null, faelleslod: false };
 
-function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; matParcels?: unknown[] } = {}) {
+function stubPipeline(overrides: { bbr?: unknown; valuation?: unknown; noise?: unknown; soil?: unknown; chain?: Record<string, unknown[]>; matParcels?: unknown[]; ejfSchemaStatus?: number } = {}) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((async (url: unknown, init?: { body?: unknown }) => {
     const href = String(url);
+    // EJF's schema is downloaded as SDL, and it is the only GET the pipeline makes to Datafordeler.
+    if (href.includes("/EJF/") && href.includes("/schema") && overrides.ejfSchemaStatus) return { ok: false, status: overrides.ejfSchemaStatus, headers: new Headers(), text: async () => "" };
+    if (href.includes("/EJF/") && href.includes("/schema")) return { ok: true, status: 200, headers: new Headers(), text: async () => EJF_SDL };
     const introspecting = typeof init?.body === "string" && init.body.includes("__type");
     // The by-id valuation chain sends `query Q { Entity(...) }` documents; BBR's building facts use a named query.
     const chainEntity = typeof init?.body === "string" ? init.body.match(/query Q \{ (\w+)/)?.[1] : undefined;
@@ -195,7 +212,7 @@ describe("lookupProperty (live)", () => {
     expect(result.source).toBe("ai");
   });
 
-  it("returns no sale history, because no licensed sales source is connected", async () => {
+  it("returns no sale history for a listing lookup, which does not attempt sales", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     stubPipeline();
 
@@ -291,6 +308,71 @@ describe("lookupProperty (mock mode)", () => {
 
 describe("lookupProperty by husnummer id (an address that is not a listing)", () => {
   const byId: PropertyLookupInput = { address: "", husnummerId: floravej6.id };
+
+  /** BBR buildings as the register answers a husnummer: the dwelling is 142 m² residential, and 168 m² in all. */
+  const BUILDING = {
+    id_lokalId: "a49ca297-725b-4510-ae12-000000000001", husnummer: floravej6.id, status: "6",
+    virkningFra: "1962-01-01T00:00:00Z", virkningTil: null, byg021BygningensAnvendelse: 120, byg026Opfoerelsesaar: 1962,
+    byg038SamletBygningsareal: 168, byg039BygningensSamledeBoligAreal: 142,
+  };
+  const SALES_CHAIN = {
+    ...HOUSE_CHAIN,
+    BBR_Bygning: [BUILDING],
+    EJF_Ejerskifte: [{ id_lokalId: "o1", anmeldelsesdato: "2021-04-01" }, { id_lokalId: "o2", anmeldelsesdato: "2015-07-01" }],
+    EJF_Handelsoplysninger: [
+      { id_lokalId: "h1", ejerskifteLokalId: "o1", koebsaftaledato: "2021-03-15", samletKoebesum: 3_100_000 },
+      { id_lokalId: "h2", ejerskifteLokalId: "o2", koebsaftaledato: "2015-06-01", samletKoebesum: 2_000_000 },
+    ],
+  };
+
+  it("shows the registered sales, each with the BBR area on its sale date and a price per m² from it", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: SALES_CHAIN });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.sources.find((s) => s.key === "sales")).toMatchObject({ mode: "live", error: null });
+    expect(result.priceHistoryMatch).toBe("matched");
+    expect(result.priceHistory.map((e) => [e.soldDate, e.price, e.pricePerSqm, e.saleType])).toEqual([
+      ["2021-03-15", 3_100_000, Math.round(3_100_000 / 142), "unknown"],
+      ["2015-06-01", 2_000_000, Math.round(2_000_000 / 142), "unknown"],
+    ]);
+    expect(result.priceHistory[0]!.bbrAtSale).toMatchObject({ asOf: "2021-03-15", residentialAreaSqm: 142, yearBuilt: 1962, knowledge: "effective" });
+  });
+
+  it("keeps the sale, without a price per m², when BBR has no building on its sale date", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: { ...SALES_CHAIN, BBR_Bygning: [{ ...BUILDING, virkningFra: "2030-01-01T00:00:00Z" }] } });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.priceHistory).toHaveLength(2);
+    expect(result.priceHistory.every((e) => e.pricePerSqm === null && e.bbrAtSale === undefined)).toBe(true);
+  });
+
+  it("says why when EJF cannot be read, and returns no history instead of an empty 'never sold'", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: { ...SALES_CHAIN, EJF_Ejerskifte: [] } });
+    const none = await lookupProperty(byId);
+    expect(none.sources.find((s) => s.key === "sales")?.mode).toBe("live");
+    expect(none.priceHistory).toEqual([]);
+
+    resetDatafordelerCache();
+    stubPipeline({ chain: SALES_CHAIN, ejfSchemaStatus: 403 });
+    const result = await lookupProperty(byId);
+    expect(result.sources.find((s) => s.key === "sales")).toMatchObject({ mode: "unavailable", error: expect.stringContaining("licensed separately") });
+    expect(result.priceHistoryMatch).toBeNull();
+  });
+
+  it("does not attribute an apartment building's sales to one apartment", async () => {
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    stubPipeline({ chain: { ...SALES_CHAIN, BBR_Bygning: [{ ...BUILDING, byg021BygningensAnvendelse: 140 }] } });
+
+    const result = await lookupProperty(byId);
+
+    expect(result.sources.find((s) => s.key === "sales")).toMatchObject({ mode: "unavailable", error: expect.stringContaining("not a house") });
+    expect(result.priceHistory).toEqual([]);
+  });
 
   it("resolves from the id alone, never searching by free text", async () => {
     vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
