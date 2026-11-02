@@ -40,6 +40,11 @@ export function buildSearchUrl(text: string): string {
   return `${BASE_URL}/husnumre/soeg?${params}`;
 }
 
+/** URL of one husnummer record (identity, postcode and access-point coordinates in EPSG:25832). */
+export function buildHusnummerUrl(id: string): string {
+  return `${BASE_URL}/husnumre/${encodeURIComponent(id)}?${new URLSearchParams({ token: TOKEN })}`;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
