@@ -66,3 +66,22 @@ describe("formatSaleDate", () => {
     expect(formatSaleDate("garbage", "en")).toBe("garbage");
   });
 });
+
+describe("BBR on the sale date", () => {
+  const bbrAtSale = { asOf: "2021-03-15", knowledge: "effective" as const, buildingCount: 2, buildingUse: "120", yearBuilt: 1962, extensionYear: null, residentialAreaSqm: 142, totalAreaSqm: 168, floors: 2, heating: null };
+
+  it("carries the reading through to the row, and null when there is none", () => {
+    const { rows } = summarizeSales([
+      { soldDate: "2021-03-15", price: 3_100_000, pricePerSqm: 21_831, saleType: "unknown", bbrAtSale },
+      { soldDate: "2015-06-01", price: 2_000_000, pricePerSqm: null, saleType: "unknown" },
+    ]);
+    expect(rows[0]!.bbr?.residentialAreaSqm).toBe(142);
+    expect(rows[1]!.bbr).toBeNull();
+  });
+
+  it("does not present a sale of unknown type as an arm's-length one", () => {
+    const { latest, latestFreeTrade } = summarizeSales([{ soldDate: "2021-03-15", price: 3_100_000, pricePerSqm: null, saleType: "unknown" }]);
+    expect(latest?.saleType).toBe("unknown");
+    expect(latestFreeTrade).toBeNull();
+  });
+});
