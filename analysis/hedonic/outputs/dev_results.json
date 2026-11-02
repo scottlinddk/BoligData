@@ -1,0 +1,6247 @@
+{
+ "schema_version": 1,
+ "audit": {
+  "steps": [
+   {
+    "step": "Rå eksport (9000, handler fra 2011-01-01, fire boligtyper)",
+    "removed": 0,
+    "remaining": 927
+   },
+   {
+    "step": "Kun almindelig fri handel (fjerner familie, auktion, øvrige)",
+    "removed": 98,
+    "remaining": 829,
+    "dropped_by_type": {
+     "family": 74,
+     "other": 21,
+     "auction": 3
+    }
+   },
+   {
+    "step": "Ugyldig pris eller areal (areal uden for 20-600 m²)",
+    "removed": 0,
+    "remaining": 829
+   },
+   {
+    "step": "Dubletter og tvetydige salg",
+    "removed": 0,
+    "remaining": 829,
+    "ambiguous_same_day_diff_price": 0,
+    "near_duplicates": 0
+   },
+   {
+    "step": "Nuværende bygning er opført efter salget (areal og byggeår hører til en anden bygning)",
+    "removed": 11,
+    "remaining": 818
+   },
+   {
+    "step": "Intet markedsindeks for måneden før salget (salg i januar 2011)",
+    "removed": 3,
+    "remaining": 815
+   }
+  ],
+  "sale_type_diagnostic": [
+   {
+    "segment": "apartment",
+    "sale_type": "auction",
+    "n": 2,
+    "median_rel_to_index": 1.39237
+   },
+   {
+    "segment": "apartment",
+    "sale_type": "family",
+    "n": 60,
+    "median_rel_to_index": 0.66228
+   },
+   {
+    "segment": "apartment",
+    "sale_type": "normal",
+    "n": 663,
+    "median_rel_to_index": 0.95546
+   },
+   {
+    "segment": "apartment",
+    "sale_type": "other",
+    "n": 17,
+    "median_rel_to_index": 0.80708
+   },
+   {
+    "segment": "house",
+    "sale_type": "auction",
+    "n": 1,
+    "median_rel_to_index": 0.6969
+   },
+   {
+    "segment": "house",
+    "sale_type": "family",
+    "n": 14,
+    "median_rel_to_index": 0.56288
+   },
+   {
+    "segment": "house",
+    "sale_type": "normal",
+    "n": 163,
+    "median_rel_to_index": 0.93597
+   },
+   {
+    "segment": "house",
+    "sale_type": "other",
+    "n": 4,
+    "median_rel_to_index": 0.8314
+   }
+  ],
+  "flags": {
+   "ppsqm_outlier": 17,
+   "area_drift": 71,
+   "any": 87,
+   "robust_z_threshold": 3.5,
+   "note": "Flagges og beholdes i den primære analyse. Følsomhedsanalysen fjerner dem fra træningsdata."
+  },
+  "missing": {
+   "apartment": {
+    "n": 658,
+    "rooms_missing": 0,
+    "year_missing": 8,
+    "vur_missing": 556
+   },
+   "house": {
+    "n": 157,
+    "rooms_missing": 0,
+    "year_missing": 2,
+    "vur_missing": 52
+   }
+  },
+  "area_drift": {
+   "n_with_area_at_sale": 653,
+   "share_of_clean": 0.80123,
+   "median_abs_deviation": 0.0,
+   "share_beyond_tolerance": 0.10873,
+   "tolerance": 0.1
+  },
+  "vur": {
+   "apartment": {
+    "n": 658,
+    "with_asof_valuation": 102,
+    "share": 0.15502,
+    "price_to_valuation_median": 1.88225,
+    "price_to_valuation_p10_p90": [
+     1.14321,
+     2.49886
+    ],
+    "share_by_year": {
+     "2011": 0.08,
+     "2012": 0.0,
+     "2013": 0.0,
+     "2014": 0.16279,
+     "2015": 0.14035,
+     "2016": 0.25,
+     "2017": 0.13889,
+     "2018": 0.2,
+     "2019": 0.15,
+     "2020": 0.12069,
+     "2021": 0.18421,
+     "2022": 0.23077,
+     "2023": 0.17143,
+     "2024": 0.07143,
+     "2025": 0.31579,
+     "2026": 0.0
+    }
+   },
+   "house": {
+    "n": 157,
+    "with_asof_valuation": 105,
+    "share": 0.66879,
+    "price_to_valuation_median": 1.48387,
+    "price_to_valuation_p10_p90": [
+     0.84576,
+     1.98099
+    ],
+    "share_by_year": {
+     "2011": 0.0,
+     "2012": 0.125,
+     "2013": 0.42857,
+     "2014": 0.88889,
+     "2015": 0.8,
+     "2016": 0.6,
+     "2017": 0.93333,
+     "2018": 0.5,
+     "2019": 0.83333,
+     "2020": 0.63636,
+     "2021": 0.65,
+     "2022": 0.84615,
+     "2023": 0.75,
+     "2024": 0.90909,
+     "2025": 0.66667
+    }
+   }
+  },
+  "sales_per_year": {
+   "apartment": {
+    "2011": 25,
+    "2012": 36,
+    "2013": 26,
+    "2014": 43,
+    "2015": 57,
+    "2016": 60,
+    "2017": 72,
+    "2018": 55,
+    "2019": 40,
+    "2020": 58,
+    "2021": 76,
+    "2022": 39,
+    "2023": 35,
+    "2024": 14,
+    "2025": 19,
+    "2026": 3
+   },
+   "house": {
+    "2011": 7,
+    "2012": 8,
+    "2013": 14,
+    "2014": 9,
+    "2015": 10,
+    "2016": 10,
+    "2017": 15,
+    "2018": 6,
+    "2019": 12,
+    "2020": 11,
+    "2021": 20,
+    "2022": 13,
+    "2023": 8,
+    "2024": 11,
+    "2025": 3
+   }
+  },
+  "properties": {
+   "apartment": {
+    "sales": 658,
+    "unique_properties": 350,
+    "repeat_sale_properties": 209
+   },
+   "house": {
+    "sales": 157,
+    "unique_properties": 102,
+    "repeat_sale_properties": 42
+   }
+  }
+ },
+ "descriptive": {
+  "yearly": {
+   "apartment": [
+    {
+     "year": 2011,
+     "n": 25,
+     "unique_properties": 24,
+     "median_price": 1000000.0,
+     "p25_price": 810000.0,
+     "p75_price": 1325000.0,
+     "median_ppsqm": 12857.14286,
+     "p25_ppsqm": 11581.39535,
+     "p75_ppsqm": 15492.95775,
+     "median_area": 72.0,
+     "median_building_year": 1927.0,
+     "share_terraced": null,
+     "stats_index_mean": 15690.66667,
+     "relative_to_index_median": 0.7899
+    },
+    {
+     "year": 2012,
+     "n": 36,
+     "unique_properties": 35,
+     "median_price": 894000.0,
+     "p25_price": 807500.0,
+     "p75_price": 1052500.0,
+     "median_ppsqm": 13969.01893,
+     "p25_ppsqm": 11456.63702,
+     "p75_ppsqm": 15295.52469,
+     "median_area": 63.5,
+     "median_building_year": 1939.0,
+     "share_terraced": null,
+     "stats_index_mean": 15502.41667,
+     "relative_to_index_median": 0.91476
+    },
+    {
+     "year": 2013,
+     "n": 26,
+     "unique_properties": 26,
+     "median_price": 1105000.0,
+     "p25_price": 804750.0,
+     "p75_price": 1288750.0,
+     "median_ppsqm": 15190.8843,
+     "p25_ppsqm": 10939.05716,
+     "p75_ppsqm": 17658.89831,
+     "median_area": 73.0,
+     "median_building_year": 1920.5,
+     "share_terraced": null,
+     "stats_index_mean": 15173.66667,
+     "relative_to_index_median": 1.01188
+    },
+    {
+     "year": 2014,
+     "n": 43,
+     "unique_properties": 42,
+     "median_price": 1030000.0,
+     "p25_price": 762500.0,
+     "p75_price": 1442500.0,
+     "median_ppsqm": 13559.32203,
+     "p25_ppsqm": 11276.64109,
+     "p75_ppsqm": 17639.45056,
+     "median_area": 79.0,
+     "median_building_year": 1931.5,
+     "share_terraced": null,
+     "stats_index_mean": 16392.41667,
+     "relative_to_index_median": 0.85554
+    },
+    {
+     "year": 2015,
+     "n": 57,
+     "unique_properties": 57,
+     "median_price": 1250000.0,
+     "p25_price": 1070000.0,
+     "p75_price": 1540000.0,
+     "median_ppsqm": 17500.0,
+     "p25_ppsqm": 15156.25,
+     "p75_ppsqm": 20283.01887,
+     "median_area": 77.0,
+     "median_building_year": 1938.5,
+     "share_terraced": null,
+     "stats_index_mean": 17611.83333,
+     "relative_to_index_median": 0.99795
+    },
+    {
+     "year": 2016,
+     "n": 60,
+     "unique_properties": 59,
+     "median_price": 1305000.0,
+     "p25_price": 1140000.0,
+     "p75_price": 1575000.0,
+     "median_ppsqm": 19538.66693,
+     "p25_ppsqm": 16576.21951,
+     "p75_ppsqm": 21667.57246,
+     "median_area": 72.0,
+     "median_building_year": 1939.0,
+     "share_terraced": null,
+     "stats_index_mean": 19368.66667,
+     "relative_to_index_median": 1.01268
+    },
+    {
+     "year": 2017,
+     "n": 72,
+     "unique_properties": 68,
+     "median_price": 1438097.0,
+     "p25_price": 1250000.0,
+     "p75_price": 1742000.0,
+     "median_ppsqm": 20587.6943,
+     "p25_ppsqm": 17993.24324,
+     "p75_ppsqm": 22716.97291,
+     "median_area": 71.0,
+     "median_building_year": 1939.0,
+     "share_terraced": null,
+     "stats_index_mean": 20090.25,
+     "relative_to_index_median": 1.02872
+    },
+    {
+     "year": 2018,
+     "n": 55,
+     "unique_properties": 53,
+     "median_price": 1498000.0,
+     "p25_price": 1295000.0,
+     "p75_price": 1937500.0,
+     "median_ppsqm": 21212.12121,
+     "p25_ppsqm": 18349.24288,
+     "p75_ppsqm": 24464.20681,
+     "median_area": 72.0,
+     "median_building_year": 1934.0,
+     "share_terraced": null,
+     "stats_index_mean": 20221.16667,
+     "relative_to_index_median": 1.0616
+    },
+    {
+     "year": 2019,
+     "n": 40,
+     "unique_properties": 40,
+     "median_price": 1418500.0,
+     "p25_price": 1195750.0,
+     "p75_price": 1850000.0,
+     "median_ppsqm": 20531.01504,
+     "p25_ppsqm": 17847.98535,
+     "p75_ppsqm": 23675.84353,
+     "median_area": 73.0,
+     "median_building_year": 1934.0,
+     "share_terraced": null,
+     "stats_index_mean": 21363.25,
+     "relative_to_index_median": 0.95926
+    },
+    {
+     "year": 2020,
+     "n": 58,
+     "unique_properties": 55,
+     "median_price": 1365000.0,
+     "p25_price": 1079250.0,
+     "p75_price": 1768750.0,
+     "median_ppsqm": 19268.02561,
+     "p25_ppsqm": 15861.71969,
+     "p75_ppsqm": 23609.88451,
+     "median_area": 69.0,
+     "median_building_year": 1943.0,
+     "share_terraced": null,
+     "stats_index_mean": 20304.58333,
+     "relative_to_index_median": 0.91789
+    },
+    {
+     "year": 2021,
+     "n": 76,
+     "unique_properties": 75,
+     "median_price": 1620000.0,
+     "p25_price": 1245000.0,
+     "p75_price": 2025000.0,
+     "median_ppsqm": 21947.86238,
+     "p25_ppsqm": 19757.73994,
+     "p75_ppsqm": 25790.22989,
+     "median_area": 72.5,
+     "median_building_year": 1938.0,
+     "share_terraced": null,
+     "stats_index_mean": 22926.25,
+     "relative_to_index_median": 0.96805
+    },
+    {
+     "year": 2022,
+     "n": 39,
+     "unique_properties": 39,
+     "median_price": 1600000.0,
+     "p25_price": 1329000.0,
+     "p75_price": 2253750.0,
+     "median_ppsqm": 22580.64516,
+     "p25_ppsqm": 18771.52015,
+     "p75_ppsqm": 25776.0908,
+     "median_area": 73.0,
+     "median_building_year": 1942.5,
+     "share_terraced": null,
+     "stats_index_mean": 24465.33333,
+     "relative_to_index_median": 0.89279
+    },
+    {
+     "year": 2023,
+     "n": 35,
+     "unique_properties": 35,
+     "median_price": 1375000.0,
+     "p25_price": 1075000.0,
+     "p75_price": 1825000.0,
+     "median_ppsqm": 20104.16667,
+     "p25_ppsqm": 16216.6405,
+     "p75_ppsqm": 22309.2827,
+     "median_area": 77.0,
+     "median_building_year": 1931.0,
+     "share_terraced": null,
+     "stats_index_mean": 22805.58333,
+     "relative_to_index_median": 0.89431
+    },
+    {
+     "year": 2024,
+     "n": 14,
+     "unique_properties": 14,
+     "median_price": 2147500.0,
+     "p25_price": 1196250.0,
+     "p75_price": 2837500.0,
+     "median_ppsqm": 19781.28991,
+     "p25_ppsqm": 17632.74629,
+     "p75_ppsqm": 23819.94048,
+     "median_area": 94.5,
+     "median_building_year": 1937.0,
+     "share_terraced": null,
+     "stats_index_mean": 23329.83333,
+     "relative_to_index_median": 0.83723
+    }
+   ],
+   "house": [
+    {
+     "year": 2011,
+     "n": 7,
+     "unique_properties": 6,
+     "median_price": 1465000.0,
+     "p25_price": 1285000.0,
+     "p75_price": 4237500.0,
+     "median_ppsqm": 13198.1982,
+     "p25_ppsqm": 11898.3269,
+     "p75_ppsqm": 21923.20198,
+     "median_area": 111.0,
+     "median_building_year": 1964.0,
+     "share_terraced": 0.42857,
+     "stats_index_mean": 15690.66667,
+     "relative_to_index_median": 0.87521
+    },
+    {
+     "year": 2012,
+     "n": 8,
+     "unique_properties": 8,
+     "median_price": 1790000.0,
+     "p25_price": 1247500.0,
+     "p75_price": 4300000.0,
+     "median_ppsqm": 14620.91778,
+     "p25_ppsqm": 12089.48586,
+     "p75_ppsqm": 25503.53925,
+     "median_area": 150.0,
+     "median_building_year": 1941.5,
+     "share_terraced": 0.125,
+     "stats_index_mean": 15502.41667,
+     "relative_to_index_median": 0.89101
+    },
+    {
+     "year": 2013,
+     "n": 14,
+     "unique_properties": 14,
+     "median_price": 2147500.0,
+     "p25_price": 1618750.0,
+     "p75_price": 2775000.0,
+     "median_ppsqm": 14954.56637,
+     "p25_ppsqm": 12778.68852,
+     "p75_ppsqm": 17191.16985,
+     "median_area": 153.0,
+     "median_building_year": 1964.0,
+     "share_terraced": 0.35714,
+     "stats_index_mean": 15173.66667,
+     "relative_to_index_median": 0.99888
+    },
+    {
+     "year": 2014,
+     "n": 9,
+     "unique_properties": 9,
+     "median_price": 2250000.0,
+     "p25_price": 1900000.0,
+     "p75_price": 3350000.0,
+     "median_ppsqm": 15801.88679,
+     "p25_ppsqm": 12054.05405,
+     "p75_ppsqm": 17750.0,
+     "median_area": 157.0,
+     "median_building_year": 1939.0,
+     "share_terraced": 0.22222,
+     "stats_index_mean": 16392.41667,
+     "relative_to_index_median": 0.99481
+    },
+    {
+     "year": 2015,
+     "n": 10,
+     "unique_properties": 10,
+     "median_price": 1982500.0,
+     "p25_price": 1353245.0,
+     "p75_price": 2618750.0,
+     "median_ppsqm": 14706.22476,
+     "p25_ppsqm": 11323.41209,
+     "p75_ppsqm": 22069.47162,
+     "median_area": 141.0,
+     "median_building_year": 1962.5,
+     "share_terraced": 0.3,
+     "stats_index_mean": 17611.83333,
+     "relative_to_index_median": 0.8689
+    },
+    {
+     "year": 2016,
+     "n": 10,
+     "unique_properties": 10,
+     "median_price": 1759500.0,
+     "p25_price": 1477500.0,
+     "p75_price": 2223750.0,
+     "median_ppsqm": 17800.69078,
+     "p25_ppsqm": 16308.40142,
+     "p75_ppsqm": 22852.82905,
+     "median_area": 109.0,
+     "median_building_year": 1960.5,
+     "share_terraced": 0.5,
+     "stats_index_mean": 19368.66667,
+     "relative_to_index_median": 0.91903
+    },
+    {
+     "year": 2017,
+     "n": 15,
+     "unique_properties": 15,
+     "median_price": 2300000.0,
+     "p25_price": 1892500.0,
+     "p75_price": 3137500.0,
+     "median_ppsqm": 19658.11966,
+     "p25_ppsqm": 15858.17805,
+     "p75_ppsqm": 23800.52701,
+     "median_area": 126.0,
+     "median_building_year": 1957.0,
+     "share_terraced": 0.33333,
+     "stats_index_mean": 20090.25,
+     "relative_to_index_median": 0.97752
+    },
+    {
+     "year": 2018,
+     "n": 6,
+     "unique_properties": 6,
+     "median_price": 2825000.0,
+     "p25_price": 1583750.0,
+     "p75_price": 4887500.0,
+     "median_ppsqm": 18173.7489,
+     "p25_ppsqm": 13904.73048,
+     "p75_ppsqm": 18846.76145,
+     "median_area": 166.5,
+     "median_building_year": 1953.0,
+     "share_terraced": 0.16667,
+     "stats_index_mean": 20221.16667,
+     "relative_to_index_median": 0.91372
+    },
+    {
+     "year": 2019,
+     "n": 12,
+     "unique_properties": 12,
+     "median_price": 2175000.0,
+     "p25_price": 1787500.0,
+     "p75_price": 2886250.0,
+     "median_ppsqm": 20126.58228,
+     "p25_ppsqm": 15446.26168,
+     "p75_ppsqm": 26242.34694,
+     "median_area": 130.5,
+     "median_building_year": 1949.5,
+     "share_terraced": 0.33333,
+     "stats_index_mean": 21363.25,
+     "relative_to_index_median": 0.91257
+    },
+    {
+     "year": 2020,
+     "n": 11,
+     "unique_properties": 11,
+     "median_price": 2200000.0,
+     "p25_price": 1900000.0,
+     "p75_price": 3562500.0,
+     "median_ppsqm": 19405.59441,
+     "p25_ppsqm": 17934.78261,
+     "p75_ppsqm": 20873.12734,
+     "median_area": 129.0,
+     "median_building_year": 1950.0,
+     "share_terraced": 0.45455,
+     "stats_index_mean": 20304.58333,
+     "relative_to_index_median": 0.99151
+    },
+    {
+     "year": 2021,
+     "n": 20,
+     "unique_properties": 19,
+     "median_price": 2410000.0,
+     "p25_price": 1971250.0,
+     "p75_price": 2875000.0,
+     "median_ppsqm": 20943.40141,
+     "p25_ppsqm": 16401.51515,
+     "p75_ppsqm": 28340.22216,
+     "median_area": 115.0,
+     "median_building_year": 1943.5,
+     "share_terraced": 0.3,
+     "stats_index_mean": 22926.25,
+     "relative_to_index_median": 0.92472
+    },
+    {
+     "year": 2022,
+     "n": 13,
+     "unique_properties": 13,
+     "median_price": 3195000.0,
+     "p25_price": 2580000.0,
+     "p75_price": 4445000.0,
+     "median_ppsqm": 22660.09852,
+     "p25_ppsqm": 20213.41463,
+     "p75_ppsqm": 27783.50515,
+     "median_area": 122.0,
+     "median_building_year": 1952.0,
+     "share_terraced": 0.38462,
+     "stats_index_mean": 24465.33333,
+     "relative_to_index_median": 0.93556
+    },
+    {
+     "year": 2023,
+     "n": 8,
+     "unique_properties": 8,
+     "median_price": 3950000.0,
+     "p25_price": 2773500.0,
+     "p75_price": 5375000.0,
+     "median_ppsqm": 23428.14407,
+     "p25_ppsqm": 18930.39825,
+     "p75_ppsqm": 30038.85095,
+     "median_area": 143.0,
+     "median_building_year": 1952.0,
+     "share_terraced": 0.0,
+     "stats_index_mean": 22805.58333,
+     "relative_to_index_median": 1.04459
+    },
+    {
+     "year": 2024,
+     "n": 11,
+     "unique_properties": 11,
+     "median_price": 2660000.0,
+     "p25_price": 2156250.0,
+     "p75_price": 3100000.0,
+     "median_ppsqm": 20740.74074,
+     "p25_ppsqm": 14986.03547,
+     "p75_ppsqm": 25773.80952,
+     "median_area": 126.0,
+     "median_building_year": 1958.0,
+     "share_terraced": 0.27273,
+     "stats_index_mean": 23329.83333,
+     "relative_to_index_median": 0.91164
+    }
+   ]
+  },
+  "quarterly": {
+   "apartment": [
+    {
+     "quarter": "2011Q1",
+     "n": 3,
+     "median_ppsqm": 13769.23077
+    },
+    {
+     "quarter": "2011Q2",
+     "n": 6,
+     "median_ppsqm": 15599.38525
+    },
+    {
+     "quarter": "2011Q3",
+     "n": 11,
+     "median_ppsqm": 11754.96689
+    },
+    {
+     "quarter": "2011Q4",
+     "n": 5,
+     "median_ppsqm": 12142.85714
+    },
+    {
+     "quarter": "2012Q1",
+     "n": 6,
+     "median_ppsqm": 14608.44749
+    },
+    {
+     "quarter": "2012Q2",
+     "n": 10,
+     "median_ppsqm": 12581.13467
+    },
+    {
+     "quarter": "2012Q3",
+     "n": 10,
+     "median_ppsqm": 13600.0
+    },
+    {
+     "quarter": "2012Q4",
+     "n": 10,
+     "median_ppsqm": 14450.0
+    },
+    {
+     "quarter": "2013Q1",
+     "n": 8,
+     "median_ppsqm": 15540.14273
+    },
+    {
+     "quarter": "2013Q2",
+     "n": 4,
+     "median_ppsqm": 14078.23529
+    },
+    {
+     "quarter": "2013Q3",
+     "n": 8,
+     "median_ppsqm": 16810.86519
+    },
+    {
+     "quarter": "2013Q4",
+     "n": 6,
+     "median_ppsqm": 13527.76978
+    },
+    {
+     "quarter": "2014Q1",
+     "n": 9,
+     "median_ppsqm": 11818.18182
+    },
+    {
+     "quarter": "2014Q2",
+     "n": 9,
+     "median_ppsqm": 12000.0
+    },
+    {
+     "quarter": "2014Q3",
+     "n": 16,
+     "median_ppsqm": 15085.65429
+    },
+    {
+     "quarter": "2014Q4",
+     "n": 9,
+     "median_ppsqm": 15231.70732
+    },
+    {
+     "quarter": "2015Q1",
+     "n": 10,
+     "median_ppsqm": 16363.26861
+    },
+    {
+     "quarter": "2015Q2",
+     "n": 12,
+     "median_ppsqm": 17198.57205
+    },
+    {
+     "quarter": "2015Q3",
+     "n": 22,
+     "median_ppsqm": 17651.81159
+    },
+    {
+     "quarter": "2015Q4",
+     "n": 13,
+     "median_ppsqm": 18500.0
+    },
+    {
+     "quarter": "2016Q1",
+     "n": 20,
+     "median_ppsqm": 18965.7444
+    },
+    {
+     "quarter": "2016Q2",
+     "n": 9,
+     "median_ppsqm": 20234.375
+    },
+    {
+     "quarter": "2016Q3",
+     "n": 15,
+     "median_ppsqm": 18886.76923
+    },
+    {
+     "quarter": "2016Q4",
+     "n": 16,
+     "median_ppsqm": 20039.31124
+    },
+    {
+     "quarter": "2017Q1",
+     "n": 15,
+     "median_ppsqm": 18895.34884
+    },
+    {
+     "quarter": "2017Q2",
+     "n": 18,
+     "median_ppsqm": 20735.0
+    },
+    {
+     "quarter": "2017Q3",
+     "n": 20,
+     "median_ppsqm": 21011.17959
+    },
+    {
+     "quarter": "2017Q4",
+     "n": 19,
+     "median_ppsqm": 21538.46154
+    },
+    {
+     "quarter": "2018Q1",
+     "n": 12,
+     "median_ppsqm": 20328.19937
+    },
+    {
+     "quarter": "2018Q2",
+     "n": 18,
+     "median_ppsqm": 21856.06061
+    },
+    {
+     "quarter": "2018Q3",
+     "n": 16,
+     "median_ppsqm": 22166.31356
+    },
+    {
+     "quarter": "2018Q4",
+     "n": 9,
+     "median_ppsqm": 23275.86207
+    },
+    {
+     "quarter": "2019Q1",
+     "n": 8,
+     "median_ppsqm": 19752.82486
+    },
+    {
+     "quarter": "2019Q2",
+     "n": 12,
+     "median_ppsqm": 19467.98493
+    },
+    {
+     "quarter": "2019Q3",
+     "n": 10,
+     "median_ppsqm": 20769.58106
+    },
+    {
+     "quarter": "2019Q4",
+     "n": 10,
+     "median_ppsqm": 21696.42857
+    },
+    {
+     "quarter": "2020Q1",
+     "n": 17,
+     "median_ppsqm": 19805.19481
+    },
+    {
+     "quarter": "2020Q2",
+     "n": 12,
+     "median_ppsqm": 17732.67134
+    },
+    {
+     "quarter": "2020Q3",
+     "n": 11,
+     "median_ppsqm": 17338.70968
+    },
+    {
+     "quarter": "2020Q4",
+     "n": 18,
+     "median_ppsqm": 20900.4884
+    },
+    {
+     "quarter": "2021Q1",
+     "n": 31,
+     "median_ppsqm": 21666.66667
+    },
+    {
+     "quarter": "2021Q2",
+     "n": 17,
+     "median_ppsqm": 22676.76768
+    },
+    {
+     "quarter": "2021Q3",
+     "n": 19,
+     "median_ppsqm": 21538.46154
+    },
+    {
+     "quarter": "2021Q4",
+     "n": 9,
+     "median_ppsqm": 24409.44882
+    },
+    {
+     "quarter": "2022Q1",
+     "n": 12,
+     "median_ppsqm": 22991.07143
+    },
+    {
+     "quarter": "2022Q2",
+     "n": 10,
+     "median_ppsqm": 23025.01646
+    },
+    {
+     "quarter": "2022Q3",
+     "n": 10,
+     "median_ppsqm": 21980.93059
+    },
+    {
+     "quarter": "2022Q4",
+     "n": 7,
+     "median_ppsqm": 20634.92063
+    },
+    {
+     "quarter": "2023Q1",
+     "n": 10,
+     "median_ppsqm": 19683.49929
+    },
+    {
+     "quarter": "2023Q2",
+     "n": 6,
+     "median_ppsqm": 18605.38003
+    },
+    {
+     "quarter": "2023Q3",
+     "n": 10,
+     "median_ppsqm": 20645.30367
+    },
+    {
+     "quarter": "2023Q4",
+     "n": 9,
+     "median_ppsqm": 21584.15842
+    },
+    {
+     "quarter": "2024Q1",
+     "n": 4,
+     "median_ppsqm": 20383.85686
+    },
+    {
+     "quarter": "2024Q2",
+     "n": 5,
+     "median_ppsqm": 17796.61017
+    },
+    {
+     "quarter": "2024Q3",
+     "n": 3,
+     "median_ppsqm": 28282.82828
+    },
+    {
+     "quarter": "2024Q4",
+     "n": 2,
+     "median_ppsqm": 21870.37037
+    }
+   ],
+   "house": [
+    {
+     "quarter": "2011Q1",
+     "n": 1,
+     "median_ppsqm": 11891.89189
+    },
+    {
+     "quarter": "2011Q2",
+     "n": 4,
+     "median_ppsqm": 12551.48005
+    },
+    {
+     "quarter": "2011Q4",
+     "n": 2,
+     "median_ppsqm": 23953.50501
+    },
+    {
+     "quarter": "2012Q1",
+     "n": 2,
+     "median_ppsqm": 25216.76231
+    },
+    {
+     "quarter": "2012Q2",
+     "n": 2,
+     "median_ppsqm": 14244.97504
+    },
+    {
+     "quarter": "2012Q3",
+     "n": 2,
+     "median_ppsqm": 12563.96588
+    },
+    {
+     "quarter": "2012Q4",
+     "n": 2,
+     "median_ppsqm": 21526.55903
+    },
+    {
+     "quarter": "2013Q1",
+     "n": 5,
+     "median_ppsqm": 15441.17647
+    },
+    {
+     "quarter": "2013Q2",
+     "n": 1,
+     "median_ppsqm": 14565.21739
+    },
+    {
+     "quarter": "2013Q3",
+     "n": 3,
+     "median_ppsqm": 13000.0
+    },
+    {
+     "quarter": "2013Q4",
+     "n": 5,
+     "median_ppsqm": 15343.91534
+    },
+    {
+     "quarter": "2014Q1",
+     "n": 3,
+     "median_ppsqm": 15573.77049
+    },
+    {
+     "quarter": "2014Q2",
+     "n": 1,
+     "median_ppsqm": 15801.88679
+    },
+    {
+     "quarter": "2014Q3",
+     "n": 3,
+     "median_ppsqm": 16388.53503
+    },
+    {
+     "quarter": "2014Q4",
+     "n": 2,
+     "median_ppsqm": 13766.43116
+    },
+    {
+     "quarter": "2015Q1",
+     "n": 1,
+     "median_ppsqm": 14890.71038
+    },
+    {
+     "quarter": "2015Q2",
+     "n": 3,
+     "median_ppsqm": 12120.57143
+    },
+    {
+     "quarter": "2015Q3",
+     "n": 3,
+     "median_ppsqm": 14521.73913
+    },
+    {
+     "quarter": "2015Q4",
+     "n": 3,
+     "median_ppsqm": 21849.31507
+    },
+    {
+     "quarter": "2016Q1",
+     "n": 2,
+     "median_ppsqm": 20531.8323
+    },
+    {
+     "quarter": "2016Q2",
+     "n": 1,
+     "median_ppsqm": 9354.83871
+    },
+    {
+     "quarter": "2016Q3",
+     "n": 2,
+     "median_ppsqm": 13186.27185
+    },
+    {
+     "quarter": "2016Q4",
+     "n": 5,
+     "median_ppsqm": 18644.85981
+    },
+    {
+     "quarter": "2017Q1",
+     "n": 2,
+     "median_ppsqm": 18307.45342
+    },
+    {
+     "quarter": "2017Q2",
+     "n": 6,
+     "median_ppsqm": 19291.15547
+    },
+    {
+     "quarter": "2017Q3",
+     "n": 5,
+     "median_ppsqm": 20967.74194
+    },
+    {
+     "quarter": "2017Q4",
+     "n": 2,
+     "median_ppsqm": 19590.96459
+    },
+    {
+     "quarter": "2018Q1",
+     "n": 2,
+     "median_ppsqm": 18258.00377
+    },
+    {
+     "quarter": "2018Q3",
+     "n": 1,
+     "median_ppsqm": 12663.93443
+    },
+    {
+     "quarter": "2018Q4",
+     "n": 3,
+     "median_ppsqm": 18720.37915
+    },
+    {
+     "quarter": "2019Q1",
+     "n": 3,
+     "median_ppsqm": 13785.04673
+    },
+    {
+     "quarter": "2019Q2",
+     "n": 4,
+     "median_ppsqm": 29718.41901
+    },
+    {
+     "quarter": "2019Q3",
+     "n": 2,
+     "median_ppsqm": 28896.94656
+    },
+    {
+     "quarter": "2019Q4",
+     "n": 3,
+     "median_ppsqm": 20000.0
+    },
+    {
+     "quarter": "2020Q2",
+     "n": 6,
+     "median_ppsqm": 18939.50088
+    },
+    {
+     "quarter": "2020Q3",
+     "n": 3,
+     "median_ppsqm": 19405.59441
+    },
+    {
+     "quarter": "2020Q4",
+     "n": 2,
+     "median_ppsqm": 21686.76611
+    },
+    {
+     "quarter": "2021Q1",
+     "n": 6,
+     "median_ppsqm": 25459.40971
+    },
+    {
+     "quarter": "2021Q2",
+     "n": 4,
+     "median_ppsqm": 19296.9056
+    },
+    {
+     "quarter": "2021Q3",
+     "n": 9,
+     "median_ppsqm": 18067.22689
+    },
+    {
+     "quarter": "2021Q4",
+     "n": 1,
+     "median_ppsqm": 37480.62016
+    },
+    {
+     "quarter": "2022Q1",
+     "n": 5,
+     "median_ppsqm": 27741.93548
+    },
+    {
+     "quarter": "2022Q2",
+     "n": 1,
+     "median_ppsqm": 25573.77049
+    },
+    {
+     "quarter": "2022Q3",
+     "n": 6,
+     "median_ppsqm": 21619.40111
+    },
+    {
+     "quarter": "2022Q4",
+     "n": 1,
+     "median_ppsqm": 22103.22581
+    },
+    {
+     "quarter": "2023Q1",
+     "n": 3,
+     "median_ppsqm": 23102.18978
+    },
+    {
+     "quarter": "2023Q2",
+     "n": 3,
+     "median_ppsqm": 23754.09836
+    },
+    {
+     "quarter": "2023Q3",
+     "n": 1,
+     "median_ppsqm": 34671.53285
+    },
+    {
+     "quarter": "2023Q4",
+     "n": 1,
+     "median_ppsqm": 20168.06723
+    },
+    {
+     "quarter": "2024Q1",
+     "n": 3,
+     "median_ppsqm": 25555.55556
+    },
+    {
+     "quarter": "2024Q2",
+     "n": 3,
+     "median_ppsqm": 20740.74074
+    },
+    {
+     "quarter": "2024Q3",
+     "n": 2,
+     "median_ppsqm": 18581.47798
+    },
+    {
+     "quarter": "2024Q4",
+     "n": 3,
+     "median_ppsqm": 19166.66667
+    }
+   ]
+  },
+  "price_distribution": {
+   "apartment": {
+    "n": 636,
+    "price_quantiles": {
+     "0.05": 694750.0,
+     "0.25": 1067500.0,
+     "0.5": 1350000.0,
+     "0.75": 1795000.0,
+     "0.95": 3172812.5
+    },
+    "ppsqm_quantiles": {
+     "0.05": 10292.19973,
+     "0.25": 15420.89312,
+     "0.5": 18898.12487,
+     "0.75": 22500.0,
+     "0.95": 29487.39496
+    }
+   },
+   "house": {
+    "n": 154,
+    "price_quantiles": {
+     "0.05": 1215000.0,
+     "0.25": 1700000.0,
+     "0.5": 2302500.0,
+     "0.75": 3322500.0,
+     "0.95": 7477500.0
+    },
+    "ppsqm_quantiles": {
+     "0.05": 9633.05406,
+     "0.25": 14416.95164,
+     "0.5": 18804.63402,
+     "0.75": 24036.2395,
+     "0.95": 35748.65638
+    }
+   }
+  }
+ },
+ "rolling": {
+  "test_years": [
+   2021,
+   2022,
+   2023,
+   2024
+  ],
+  "pooled": [
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "n_total": 164,
+    "n": 164,
+    "mdape": 0.17229,
+    "bias": -0.0146,
+    "p90_ape": 0.50476,
+    "coverage": 0.83537,
+    "n_interval": 164,
+    "median_rel_width": 0.78633,
+    "coverage_ci90": [
+     0.78236,
+     0.87748
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "n_total": 164,
+    "n": 164,
+    "mdape": 0.15524,
+    "bias": 0.07189,
+    "p90_ape": 0.60308,
+    "coverage": 0.79878,
+    "n_interval": 164,
+    "median_rel_width": 0.79667,
+    "coverage_ci90": [
+     0.74262,
+     0.84524
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "n_total": 164,
+    "n": 30,
+    "mdape": 0.19086,
+    "bias": -0.02036,
+    "p90_ape": 0.80681,
+    "coverage": 0.7,
+    "n_interval": 30,
+    "median_rel_width": 0.90402,
+    "coverage_ci90": [
+     0.5506,
+     0.8163
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "n_total": 164,
+    "n": 164,
+    "mdape": 0.1373,
+    "bias": 0.05259,
+    "p90_ape": 0.45,
+    "coverage": 0.75,
+    "n_interval": 164,
+    "median_rel_width": 0.49438,
+    "coverage_ci90": [
+     0.69062,
+     0.80126
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "n_total": 164,
+    "n": 164,
+    "mdape": 0.13346,
+    "bias": 0.02206,
+    "p90_ape": 0.42512,
+    "coverage": 0.72561,
+    "n_interval": 164,
+    "median_rel_width": 0.51518,
+    "coverage_ci90": [
+     0.66498,
+     0.77891
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "n_total": 52,
+    "n": 52,
+    "mdape": 0.23508,
+    "bias": -0.05917,
+    "p90_ape": 0.56929,
+    "coverage": 0.69231,
+    "n_interval": 52,
+    "median_rel_width": 0.84073,
+    "coverage_ci90": [
+     0.57971,
+     0.78588
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "n_total": 52,
+    "n": 52,
+    "mdape": 0.2638,
+    "bias": 0.06865,
+    "p90_ape": 0.6822,
+    "coverage": 0.61538,
+    "n_interval": 52,
+    "median_rel_width": 1.02308,
+    "coverage_ci90": [
+     0.50132,
+     0.71803
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "n_total": 52,
+    "n": 40,
+    "mdape": 0.19154,
+    "bias": 0.0109,
+    "p90_ape": 0.69328,
+    "coverage": 0.775,
+    "n_interval": 40,
+    "median_rel_width": 0.71886,
+    "coverage_ci90": [
+     0.65103,
+     0.86412
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "n_total": 52,
+    "n": 52,
+    "mdape": 0.21434,
+    "bias": -0.01082,
+    "p90_ape": 0.74377,
+    "coverage": 0.69231,
+    "n_interval": 52,
+    "median_rel_width": 0.80863,
+    "coverage_ci90": [
+     0.57971,
+     0.78588
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "n_total": 52,
+    "n": 52,
+    "mdape": 0.23068,
+    "bias": 0.0312,
+    "p90_ape": 0.52705,
+    "coverage": 0.82692,
+    "n_interval": 52,
+    "median_rel_width": 1.05226,
+    "coverage_ci90": [
+     0.72507,
+     0.89643
+    ],
+    "indicative": false
+   }
+  ],
+  "per_fold": [
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "a1",
+    "n_total": 76,
+    "n": 76,
+    "mdape": 0.14927,
+    "bias": -0.04668,
+    "p90_ape": 0.41194,
+    "coverage": 0.92105,
+    "n_interval": 76,
+    "median_rel_width": 0.91373,
+    "coverage_ci90": [
+     0.85452,
+     0.95863
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "a2",
+    "n_total": 76,
+    "n": 76,
+    "mdape": 0.11871,
+    "bias": 0.03302,
+    "p90_ape": 0.47282,
+    "coverage": 0.86842,
+    "n_interval": 76,
+    "median_rel_width": 0.79667,
+    "coverage_ci90": [
+     0.79181,
+     0.9197
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "b",
+    "n_total": 76,
+    "n": 14,
+    "mdape": 0.19086,
+    "bias": -0.11808,
+    "p90_ape": 0.42618,
+    "coverage": 0.57143,
+    "n_interval": 14,
+    "median_rel_width": 0.46239,
+    "coverage_ci90": [
+     0.36035,
+     0.75936
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "gbm",
+    "n_total": 76,
+    "n": 76,
+    "mdape": 0.12994,
+    "bias": 0.00096,
+    "p90_ape": 0.44444,
+    "coverage": 0.72368,
+    "n_interval": 76,
+    "median_rel_width": 0.38675,
+    "coverage_ci90": [
+     0.63272,
+     0.79927
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "ridge",
+    "n_total": 76,
+    "n": 76,
+    "mdape": 0.12584,
+    "bias": -0.0066,
+    "p90_ape": 0.3229,
+    "coverage": 0.68421,
+    "n_interval": 76,
+    "median_rel_width": 0.44066,
+    "coverage_ci90": [
+     0.59145,
+     0.7643
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "a1",
+    "n_total": 39,
+    "n": 39,
+    "mdape": 0.19906,
+    "bias": 0.00407,
+    "p90_ape": 0.51492,
+    "coverage": 0.76923,
+    "n_interval": 39,
+    "median_rel_width": 0.71913,
+    "coverage_ci90": [
+     0.64303,
+     0.8605
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "a2",
+    "n_total": 39,
+    "n": 39,
+    "mdape": 0.18817,
+    "bias": 0.12009,
+    "p90_ape": 0.54499,
+    "coverage": 0.66667,
+    "n_interval": 39,
+    "median_rel_width": 0.59347,
+    "coverage_ci90": [
+     0.53529,
+     0.77642
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "b",
+    "n_total": 39,
+    "n": 9,
+    "mdape": 0.17569,
+    "bias": 0.00569,
+    "p90_ape": 0.39887,
+    "coverage": 1.0,
+    "n_interval": 9,
+    "median_rel_width": 1.15163,
+    "coverage_ci90": [
+     0.76883,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "gbm",
+    "n_total": 39,
+    "n": 39,
+    "mdape": 0.13517,
+    "bias": 0.11023,
+    "p90_ape": 0.45801,
+    "coverage": 0.76923,
+    "n_interval": 39,
+    "median_rel_width": 0.49438,
+    "coverage_ci90": [
+     0.64303,
+     0.8605
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "ridge",
+    "n_total": 39,
+    "n": 39,
+    "mdape": 0.12167,
+    "bias": 0.06647,
+    "p90_ape": 0.43731,
+    "coverage": 0.71795,
+    "n_interval": 39,
+    "median_rel_width": 0.51518,
+    "coverage_ci90": [
+     0.58831,
+     0.8193
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "a1",
+    "n_total": 35,
+    "n": 35,
+    "mdape": 0.2004,
+    "bias": 0.07302,
+    "p90_ape": 0.66101,
+    "coverage": 0.77143,
+    "n_interval": 35,
+    "median_rel_width": 0.75733,
+    "coverage_ci90": [
+     0.63778,
+     0.86611
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "a2",
+    "n_total": 35,
+    "n": 35,
+    "mdape": 0.21257,
+    "bias": 0.11818,
+    "p90_ape": 0.76953,
+    "coverage": 0.77143,
+    "n_interval": 35,
+    "median_rel_width": 0.79633,
+    "coverage_ci90": [
+     0.63778,
+     0.86611
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "b",
+    "n_total": 35,
+    "n": 6,
+    "mdape": 0.5035,
+    "bias": 0.40317,
+    "p90_ape": 5.17243,
+    "coverage": 0.5,
+    "n_interval": 6,
+    "median_rel_width": 0.90402,
+    "coverage_ci90": [
+     0.22124,
+     0.77876
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "gbm",
+    "n_total": 35,
+    "n": 35,
+    "mdape": 0.14875,
+    "bias": 0.1081,
+    "p90_ape": 0.45919,
+    "coverage": 0.8,
+    "n_interval": 35,
+    "median_rel_width": 0.55175,
+    "coverage_ci90": [
+     0.66917,
+     0.88777
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "ridge",
+    "n_total": 35,
+    "n": 35,
+    "mdape": 0.16176,
+    "bias": 0.0374,
+    "p90_ape": 0.50897,
+    "coverage": 0.82857,
+    "n_interval": 35,
+    "median_rel_width": 0.63477,
+    "coverage_ci90": [
+     0.70131,
+     0.90867
+    ],
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "a1",
+    "n_total": 14,
+    "n": 14,
+    "mdape": 0.16492,
+    "bias": 0.01287,
+    "p90_ape": 0.48175,
+    "coverage": 0.71429,
+    "n_interval": 14,
+    "median_rel_width": 0.78633,
+    "coverage_ci90": [
+     0.49448,
+     0.86468
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "a2",
+    "n_total": 14,
+    "n": 14,
+    "mdape": 0.2952,
+    "bias": 0.19563,
+    "p90_ape": 0.40098,
+    "coverage": 0.85714,
+    "n_interval": 14,
+    "median_rel_width": 0.99015,
+    "coverage_ci90": [
+     0.64704,
+     0.95155
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "b",
+    "n_total": 14,
+    "n": 1,
+    "mdape": 0.15019,
+    "bias": 0.15019,
+    "p90_ape": 0.15019,
+    "coverage": 1.0,
+    "n_interval": 1,
+    "median_rel_width": 9.9563,
+    "coverage_ci90": [
+     0.26983,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "gbm",
+    "n_total": 14,
+    "n": 14,
+    "mdape": 0.17286,
+    "bias": 0.07405,
+    "p90_ape": 0.39447,
+    "coverage": 0.71429,
+    "n_interval": 14,
+    "median_rel_width": 0.60663,
+    "coverage_ci90": [
+     0.49448,
+     0.86468
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "ridge",
+    "n_total": 14,
+    "n": 14,
+    "mdape": 0.15288,
+    "bias": -0.00546,
+    "p90_ape": 0.35458,
+    "coverage": 0.71429,
+    "n_interval": 14,
+    "median_rel_width": 0.54308,
+    "coverage_ci90": [
+     0.49448,
+     0.86468
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "a1",
+    "n_total": 20,
+    "n": 20,
+    "mdape": 0.25276,
+    "bias": -0.0714,
+    "p90_ape": 0.43519,
+    "coverage": 0.55,
+    "n_interval": 20,
+    "median_rel_width": 0.49452,
+    "coverage_ci90": [
+     0.37219,
+     0.71589
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "a2",
+    "n_total": 20,
+    "n": 20,
+    "mdape": 0.30274,
+    "bias": 0.08157,
+    "p90_ape": 0.64606,
+    "coverage": 0.3,
+    "n_interval": 20,
+    "median_rel_width": 0.41269,
+    "coverage_ci90": [
+     0.16385,
+     0.48382
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "b",
+    "n_total": 20,
+    "n": 13,
+    "mdape": 0.09152,
+    "bias": 0.04762,
+    "p90_ape": 0.26836,
+    "coverage": 1.0,
+    "n_interval": 13,
+    "median_rel_width": 1.63114,
+    "coverage_ci90": [
+     0.82771,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "gbm",
+    "n_total": 20,
+    "n": 20,
+    "mdape": 0.20852,
+    "bias": 0.11489,
+    "p90_ape": 0.4972,
+    "coverage": 0.5,
+    "n_interval": 20,
+    "median_rel_width": 0.4342,
+    "coverage_ci90": [
+     0.32739,
+     0.67261
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "ridge",
+    "n_total": 20,
+    "n": 20,
+    "mdape": 0.20712,
+    "bias": 0.0312,
+    "p90_ape": 0.62553,
+    "coverage": 0.9,
+    "n_interval": 20,
+    "median_rel_width": 1.10111,
+    "coverage_ci90": [
+     0.73832,
+     0.96634
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "a1",
+    "n_total": 13,
+    "n": 13,
+    "mdape": 0.2779,
+    "bias": -0.18887,
+    "p90_ape": 0.5764,
+    "coverage": 0.69231,
+    "n_interval": 13,
+    "median_rel_width": 0.84073,
+    "coverage_ci90": [
+     0.46475,
+     0.85359
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "a2",
+    "n_total": 13,
+    "n": 13,
+    "mdape": 0.18884,
+    "bias": 0.06888,
+    "p90_ape": 0.54292,
+    "coverage": 0.76923,
+    "n_interval": 13,
+    "median_rel_width": 1.02308,
+    "coverage_ci90": [
+     0.54191,
+     0.90378
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "b",
+    "n_total": 13,
+    "n": 11,
+    "mdape": 0.19779,
+    "bias": -0.19779,
+    "p90_ape": 0.3849,
+    "coverage": 0.54545,
+    "n_interval": 11,
+    "median_rel_width": 0.48045,
+    "coverage_ci90": [
+     0.31505,
+     0.75791
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "gbm",
+    "n_total": 13,
+    "n": 13,
+    "mdape": 0.24204,
+    "bias": -0.10684,
+    "p90_ape": 0.6146,
+    "coverage": 0.76923,
+    "n_interval": 13,
+    "median_rel_width": 0.80863,
+    "coverage_ci90": [
+     0.54191,
+     0.90378
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "ridge",
+    "n_total": 13,
+    "n": 13,
+    "mdape": 0.29767,
+    "bias": 0.02401,
+    "p90_ape": 0.4447,
+    "coverage": 0.69231,
+    "n_interval": 13,
+    "median_rel_width": 0.91715,
+    "coverage_ci90": [
+     0.46475,
+     0.85359
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "a1",
+    "n_total": 8,
+    "n": 8,
+    "mdape": 0.28938,
+    "bias": -0.04432,
+    "p90_ape": 0.48868,
+    "coverage": 1.0,
+    "n_interval": 8,
+    "median_rel_width": 1.67682,
+    "coverage_ci90": [
+     0.74724,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "a2",
+    "n_total": 8,
+    "n": 8,
+    "mdape": 0.27677,
+    "bias": -0.04095,
+    "p90_ape": 0.48452,
+    "coverage": 1.0,
+    "n_interval": 8,
+    "median_rel_width": 1.34403,
+    "coverage_ci90": [
+     0.74724,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "b",
+    "n_total": 8,
+    "n": 6,
+    "mdape": 0.17175,
+    "bias": 0.06683,
+    "p90_ape": 0.35735,
+    "coverage": 1.0,
+    "n_interval": 6,
+    "median_rel_width": 1.01494,
+    "coverage_ci90": [
+     0.68918,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "gbm",
+    "n_total": 8,
+    "n": 8,
+    "mdape": 0.21626,
+    "bias": -0.06365,
+    "p90_ape": 0.40457,
+    "coverage": 1.0,
+    "n_interval": 8,
+    "median_rel_width": 1.20595,
+    "coverage_ci90": [
+     0.74724,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "ridge",
+    "n_total": 8,
+    "n": 8,
+    "mdape": 0.23068,
+    "bias": -0.05412,
+    "p90_ape": 0.39508,
+    "coverage": 1.0,
+    "n_interval": 8,
+    "median_rel_width": 1.05226,
+    "coverage_ci90": [
+     0.74724,
+     1.0
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "a1",
+    "n_total": 11,
+    "n": 11,
+    "mdape": 0.18666,
+    "bias": 0.09254,
+    "p90_ape": 1.06807,
+    "coverage": 0.72727,
+    "n_interval": 11,
+    "median_rel_width": 1.11228,
+    "coverage_ci90": [
+     0.47949,
+     0.88531
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "a2",
+    "n_total": 11,
+    "n": 11,
+    "mdape": 0.19686,
+    "bias": 0.09692,
+    "p90_ape": 1.16482,
+    "coverage": 0.72727,
+    "n_interval": 11,
+    "median_rel_width": 1.03565,
+    "coverage_ci90": [
+     0.47949,
+     0.88531
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "b",
+    "n_total": 11,
+    "n": 10,
+    "mdape": 0.21492,
+    "bias": 0.21492,
+    "p90_ape": 2.76414,
+    "coverage": 0.6,
+    "n_interval": 10,
+    "median_rel_width": 0.71886,
+    "coverage_ci90": [
+     0.35162,
+     0.80579
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "gbm",
+    "n_total": 11,
+    "n": 11,
+    "mdape": 0.07936,
+    "bias": 0.05829,
+    "p90_ape": 1.07177,
+    "coverage": 0.72727,
+    "n_interval": 11,
+    "median_rel_width": 1.05552,
+    "coverage_ci90": [
+     0.47949,
+     0.88531
+    ],
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "ridge",
+    "n_total": 11,
+    "n": 11,
+    "mdape": 0.24749,
+    "bias": 0.04973,
+    "p90_ape": 0.99775,
+    "coverage": 0.72727,
+    "n_interval": 11,
+    "median_rel_width": 1.00111,
+    "coverage_ci90": [
+     0.47949,
+     0.88531
+    ],
+    "indicative": true
+   }
+  ],
+  "cells": {
+   "price_class": [
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "price_class": "1-2 mio.",
+     "n_total": 96,
+     "n": 96,
+     "mdape": 0.15065,
+     "bias": -0.00833,
+     "p90_ape": 0.43066,
+     "coverage": 0.89583,
+     "n_interval": 96,
+     "median_rel_width": 0.78633,
+     "coverage_ci90": [
+      0.83325,
+      0.93671
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "price_class": "over 2 mio.",
+     "n_total": 50,
+     "n": 50,
+     "mdape": 0.16075,
+     "bias": -0.06585,
+     "p90_ape": 0.40949,
+     "coverage": 0.84,
+     "n_interval": 50,
+     "median_rel_width": 0.78633,
+     "coverage_ci90": [
+      0.73766,
+      0.90743
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "price_class": "under 1 mio.",
+     "n_total": 18,
+     "n": 18,
+     "mdape": 0.47214,
+     "bias": 0.47214,
+     "p90_ape": 1.20606,
+     "coverage": 0.5,
+     "n_interval": 18,
+     "median_rel_width": 0.78633,
+     "coverage_ci90": [
+      0.31925,
+      0.68075
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "price_class": "1-2 mio.",
+     "n_total": 96,
+     "n": 96,
+     "mdape": 0.13683,
+     "bias": 0.06934,
+     "p90_ape": 0.5093,
+     "coverage": 0.85417,
+     "n_interval": 96,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.78522,
+      0.9037
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "price_class": "over 2 mio.",
+     "n_total": 50,
+     "n": 50,
+     "mdape": 0.15254,
+     "bias": 0.02896,
+     "p90_ape": 0.35686,
+     "coverage": 0.84,
+     "n_interval": 50,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.73766,
+      0.90743
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "price_class": "under 1 mio.",
+     "n_total": 18,
+     "n": 18,
+     "mdape": 0.55685,
+     "bias": 0.55685,
+     "p90_ape": 1.58343,
+     "coverage": 0.38889,
+     "n_interval": 18,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.22658,
+      0.58024
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "price_class": "1-2 mio.",
+     "n_total": 96,
+     "n": 14,
+     "mdape": 0.1338,
+     "bias": -0.01834,
+     "p90_ape": 0.3349,
+     "coverage": 0.78571,
+     "n_interval": 14,
+     "median_rel_width": 0.6832,
+     "coverage_ci90": [
+      0.56793,
+      0.91094
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "price_class": "over 2 mio.",
+     "n_total": 50,
+     "n": 10,
+     "mdape": 0.19712,
+     "bias": -0.09116,
+     "p90_ape": 0.42497,
+     "coverage": 0.9,
+     "n_interval": 10,
+     "median_rel_width": 1.15163,
+     "coverage_ci90": [
+      0.65225,
+      0.97737
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "price_class": "under 1 mio.",
+     "n_total": 18,
+     "n": 6,
+     "mdape": 0.90526,
+     "bias": 0.90526,
+     "p90_ape": 5.28664,
+     "coverage": 0.16667,
+     "n_interval": 6,
+     "median_rel_width": 0.6832,
+     "coverage_ci90": [
+      0.0381,
+      0.50245
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "price_class": "1-2 mio.",
+     "n_total": 96,
+     "n": 96,
+     "mdape": 0.13304,
+     "bias": 0.08777,
+     "p90_ape": 0.41056,
+     "coverage": 0.79167,
+     "n_interval": 96,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.71595,
+      0.85139
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "price_class": "over 2 mio.",
+     "n_total": 50,
+     "n": 50,
+     "mdape": 0.11563,
+     "bias": -0.03962,
+     "p90_ape": 0.29945,
+     "coverage": 0.82,
+     "n_interval": 50,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.71498,
+      0.89216
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "price_class": "under 1 mio.",
+     "n_total": 18,
+     "n": 18,
+     "mdape": 0.36524,
+     "bias": 0.36524,
+     "p90_ape": 1.06246,
+     "coverage": 0.33333,
+     "n_interval": 18,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.18331,
+      0.52692
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "price_class": "1-2 mio.",
+     "n_total": 96,
+     "n": 96,
+     "mdape": 0.118,
+     "bias": 0.03924,
+     "p90_ape": 0.36179,
+     "coverage": 0.8125,
+     "n_interval": 96,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.73874,
+      0.86912
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "price_class": "over 2 mio.",
+     "n_total": 50,
+     "n": 50,
+     "mdape": 0.10885,
+     "bias": -0.08597,
+     "p90_ape": 0.25285,
+     "coverage": 0.74,
+     "n_interval": 50,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.62753,
+      0.82783
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "price_class": "under 1 mio.",
+     "n_total": 18,
+     "n": 18,
+     "mdape": 0.47148,
+     "bias": 0.47148,
+     "p90_ape": 1.1063,
+     "coverage": 0.22222,
+     "n_interval": 18,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.10391,
+      0.41314
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "price_class": "1-2 mio.",
+     "n_total": 12,
+     "n": 12,
+     "mdape": 0.27951,
+     "bias": 0.27951,
+     "p90_ape": 1.01994,
+     "coverage": 0.58333,
+     "n_interval": 12,
+     "median_rel_width": 0.66762,
+     "coverage_ci90": [
+      0.35596,
+      0.78004
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "price_class": "over 2 mio.",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.23508,
+     "bias": -0.11002,
+     "p90_ape": 0.45547,
+     "coverage": 0.725,
+     "n_interval": 40,
+     "median_rel_width": 0.84073,
+     "coverage_ci90": [
+      0.59745,
+      0.82404
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "price_class": "1-2 mio.",
+     "n_total": 12,
+     "n": 12,
+     "mdape": 0.58285,
+     "bias": 0.58285,
+     "p90_ape": 1.13602,
+     "coverage": 0.41667,
+     "n_interval": 12,
+     "median_rel_width": 0.71789,
+     "coverage_ci90": [
+      0.21996,
+      0.64404
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "price_class": "over 2 mio.",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.19918,
+     "bias": -0.02808,
+     "p90_ape": 0.47198,
+     "coverage": 0.675,
+     "n_interval": 40,
+     "median_rel_width": 1.02308,
+     "coverage_ci90": [
+      0.54549,
+      0.78233
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "price_class": "1-2 mio.",
+     "n_total": 12,
+     "n": 7,
+     "mdape": 0.42206,
+     "bias": 0.42206,
+     "p90_ape": 2.88787,
+     "coverage": 0.71429,
+     "n_interval": 7,
+     "median_rel_width": 1.01494,
+     "coverage_ci90": [
+      0.40864,
+      0.90044
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "price_class": "over 2 mio.",
+     "n_total": 40,
+     "n": 33,
+     "mdape": 0.19001,
+     "bias": -0.02857,
+     "p90_ape": 0.36644,
+     "coverage": 0.78788,
+     "n_interval": 33,
+     "median_rel_width": 0.71886,
+     "coverage_ci90": [
+      0.65142,
+      0.8807
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "price_class": "1-2 mio.",
+     "n_total": 12,
+     "n": 12,
+     "mdape": 0.51987,
+     "bias": 0.51987,
+     "p90_ape": 1.05216,
+     "coverage": 0.41667,
+     "n_interval": 12,
+     "median_rel_width": 0.62141,
+     "coverage_ci90": [
+      0.21996,
+      0.64404
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "price_class": "over 2 mio.",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.2005,
+     "bias": -0.05676,
+     "p90_ape": 0.34785,
+     "coverage": 0.775,
+     "n_interval": 40,
+     "median_rel_width": 0.80863,
+     "coverage_ci90": [
+      0.65103,
+      0.86412
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "price_class": "1-2 mio.",
+     "n_total": 12,
+     "n": 12,
+     "mdape": 0.30177,
+     "bias": 0.30177,
+     "p90_ape": 0.52705,
+     "coverage": 0.91667,
+     "n_interval": 12,
+     "median_rel_width": 1.07669,
+     "coverage_ci90": [
+      0.69881,
+      0.98119
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "price_class": "over 2 mio.",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.19469,
+     "bias": -0.03512,
+     "p90_ape": 0.46433,
+     "coverage": 0.8,
+     "n_interval": 40,
+     "median_rel_width": 1.05226,
+     "coverage_ci90": [
+      0.67852,
+      0.88346
+     ],
+     "indicative": false
+    }
+   ],
+   "age_class": [
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "age_class": "byggeår ukendt",
+     "n_total": 3,
+     "n": 3,
+     "mdape": 0.13759,
+     "bias": 0.06371,
+     "p90_ape": 0.22289,
+     "coverage": 1.0,
+     "n_interval": 3,
+     "median_rel_width": 0.71913,
+     "coverage_ci90": [
+      0.52576,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "age_class": "opført 1950-1989",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.23971,
+     "bias": 0.23543,
+     "p90_ape": 0.7581,
+     "coverage": 0.725,
+     "n_interval": 40,
+     "median_rel_width": 0.75733,
+     "coverage_ci90": [
+      0.59745,
+      0.82404
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 14,
+     "n": 14,
+     "mdape": 0.30751,
+     "bias": -0.30751,
+     "p90_ape": 0.42064,
+     "coverage": 0.57143,
+     "n_interval": 14,
+     "median_rel_width": 0.91373,
+     "coverage_ci90": [
+      0.36035,
+      0.75936
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "age_class": "opført før 1950",
+     "n_total": 107,
+     "n": 107,
+     "mdape": 0.13025,
+     "bias": -0.01886,
+     "p90_ape": 0.33009,
+     "coverage": 0.90654,
+     "n_interval": 107,
+     "median_rel_width": 0.91373,
+     "coverage_ci90": [
+      0.84971,
+      0.94332
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "age_class": "byggeår ukendt",
+     "n_total": 3,
+     "n": 3,
+     "mdape": 0.0555,
+     "bias": 0.0555,
+     "p90_ape": 0.30172,
+     "coverage": 0.66667,
+     "n_interval": 3,
+     "median_rel_width": 0.59347,
+     "coverage_ci90": [
+      0.25351,
+      0.92174
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "age_class": "opført 1950-1989",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.31951,
+     "bias": 0.31951,
+     "p90_ape": 0.85148,
+     "coverage": 0.575,
+     "n_interval": 40,
+     "median_rel_width": 0.79633,
+     "coverage_ci90": [
+      0.44572,
+      0.69478
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 14,
+     "n": 14,
+     "mdape": 0.2589,
+     "bias": -0.2589,
+     "p90_ape": 0.35281,
+     "coverage": 0.71429,
+     "n_interval": 14,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.49448,
+      0.86468
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "age_class": "opført før 1950",
+     "n_total": 107,
+     "n": 107,
+     "mdape": 0.13198,
+     "bias": 0.07115,
+     "p90_ape": 0.37316,
+     "coverage": 0.8972,
+     "n_interval": 107,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.83871,
+      0.93609
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "age_class": "byggeår ukendt",
+     "n_total": 3,
+     "n": 0,
+     "mdape": null,
+     "bias": null,
+     "p90_ape": null,
+     "coverage": null,
+     "median_rel_width": null,
+     "n_interval": 0,
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "age_class": "opført 1950-1989",
+     "n_total": 40,
+     "n": 9,
+     "mdape": 0.18407,
+     "bias": 0.15019,
+     "p90_ape": 0.83142,
+     "coverage": 0.77778,
+     "n_interval": 9,
+     "median_rel_width": 1.15163,
+     "coverage_ci90": [
+      0.50362,
+      0.92351
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 14,
+     "n": 1,
+     "mdape": 0.11499,
+     "bias": -0.11499,
+     "p90_ape": 0.11499,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 0.46239,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "age_class": "opført før 1950",
+     "n_total": 107,
+     "n": 20,
+     "mdape": 0.21122,
+     "bias": -0.06353,
+     "p90_ape": 0.51293,
+     "coverage": 0.65,
+     "n_interval": 20,
+     "median_rel_width": 0.46239,
+     "coverage_ci90": [
+      0.4665,
+      0.79775
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "age_class": "byggeår ukendt",
+     "n_total": 3,
+     "n": 3,
+     "mdape": 0.03904,
+     "bias": 0.03904,
+     "p90_ape": 0.18362,
+     "coverage": 1.0,
+     "n_interval": 3,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.52576,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "age_class": "opført 1950-1989",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.16694,
+     "bias": 0.15264,
+     "p90_ape": 0.52472,
+     "coverage": 0.675,
+     "n_interval": 40,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.54549,
+      0.78233
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 14,
+     "n": 14,
+     "mdape": 0.17802,
+     "bias": -0.16261,
+     "p90_ape": 0.34656,
+     "coverage": 0.64286,
+     "n_interval": 14,
+     "median_rel_width": 0.38675,
+     "coverage_ci90": [
+      0.42549,
+      0.81395
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "age_class": "opført før 1950",
+     "n_total": 107,
+     "n": 107,
+     "mdape": 0.12961,
+     "bias": 0.03408,
+     "p90_ape": 0.41008,
+     "coverage": 0.78505,
+     "n_interval": 107,
+     "median_rel_width": 0.38675,
+     "coverage_ci90": [
+      0.71312,
+      0.84291
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "age_class": "byggeår ukendt",
+     "n_total": 3,
+     "n": 3,
+     "mdape": 0.08106,
+     "bias": 0.08106,
+     "p90_ape": 0.14335,
+     "coverage": 1.0,
+     "n_interval": 3,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.52576,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "age_class": "opført 1950-1989",
+     "n_total": 40,
+     "n": 40,
+     "mdape": 0.2017,
+     "bias": 0.16115,
+     "p90_ape": 0.54401,
+     "coverage": 0.6,
+     "n_interval": 40,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.47018,
+      0.71714
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 14,
+     "n": 14,
+     "mdape": 0.13583,
+     "bias": -0.0951,
+     "p90_ape": 0.2993,
+     "coverage": 0.64286,
+     "n_interval": 14,
+     "median_rel_width": 0.44066,
+     "coverage_ci90": [
+      0.42549,
+      0.81395
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "age_class": "opført før 1950",
+     "n_total": 107,
+     "n": 107,
+     "mdape": 0.11994,
+     "bias": 0.00981,
+     "p90_ape": 0.34253,
+     "coverage": 0.7757,
+     "n_interval": 107,
+     "median_rel_width": 0.44066,
+     "coverage_ci90": [
+      0.70304,
+      0.83476
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "age_class": "byggeår ukendt",
+     "n_total": 2,
+     "n": 2,
+     "mdape": 0.32956,
+     "bias": 0.24355,
+     "p90_ape": 0.5244,
+     "coverage": 1.0,
+     "n_interval": 2,
+     "median_rel_width": 1.25878,
+     "coverage_ci90": [
+      0.42499,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "age_class": "opført 1950-1989",
+     "n_total": 27,
+     "n": 27,
+     "mdape": 0.1958,
+     "bias": 0.05782,
+     "p90_ape": 0.68468,
+     "coverage": 0.74074,
+     "n_interval": 27,
+     "median_rel_width": 0.84073,
+     "coverage_ci90": [
+      0.58474,
+      0.85288
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.30846,
+     "bias": -0.30846,
+     "p90_ape": 0.30846,
+     "coverage": 0.0,
+     "n_interval": 1,
+     "median_rel_width": 0.49452,
+     "coverage_ci90": [
+      0.0,
+      0.73017
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "age_class": "opført før 1950",
+     "n_total": 22,
+     "n": 22,
+     "mdape": 0.24198,
+     "bias": -0.15708,
+     "p90_ape": 0.52439,
+     "coverage": 0.63636,
+     "n_interval": 22,
+     "median_rel_width": 0.66762,
+     "coverage_ci90": [
+      0.46153,
+      0.78133
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "age_class": "byggeår ukendt",
+     "n_total": 2,
+     "n": 2,
+     "mdape": 0.35347,
+     "bias": 0.35347,
+     "p90_ape": 0.55405,
+     "coverage": 1.0,
+     "n_interval": 2,
+     "median_rel_width": 1.18356,
+     "coverage_ci90": [
+      0.42499,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "age_class": "opført 1950-1989",
+     "n_total": 27,
+     "n": 27,
+     "mdape": 0.29155,
+     "bias": 0.17699,
+     "p90_ape": 0.8657,
+     "coverage": 0.66667,
+     "n_interval": 27,
+     "median_rel_width": 1.02308,
+     "coverage_ci90": [
+      0.5084,
+      0.79457
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.18054,
+     "bias": -0.18054,
+     "p90_ape": 0.18054,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 0.41269,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "age_class": "opført før 1950",
+     "n_total": 22,
+     "n": 22,
+     "mdape": 0.21348,
+     "bias": -0.04397,
+     "p90_ape": 0.50796,
+     "coverage": 0.5,
+     "n_interval": 22,
+     "median_rel_width": 0.71789,
+     "coverage_ci90": [
+      0.33452,
+      0.66548
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "age_class": "byggeår ukendt",
+     "n_total": 2,
+     "n": 2,
+     "mdape": 0.33012,
+     "bias": 0.09194,
+     "p90_ape": 0.40368,
+     "coverage": 0.5,
+     "n_interval": 2,
+     "median_rel_width": 0.7477,
+     "coverage_ci90": [
+      0.12085,
+      0.87915
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "age_class": "opført 1950-1989",
+     "n_total": 27,
+     "n": 21,
+     "mdape": 0.19306,
+     "bias": 0.02354,
+     "p90_ape": 1.45471,
+     "coverage": 0.7619,
+     "n_interval": 21,
+     "median_rel_width": 0.71886,
+     "coverage_ci90": [
+      0.58504,
+      0.87898
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.02857,
+     "bias": -0.02857,
+     "p90_ape": 0.02857,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.63114,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "age_class": "opført før 1950",
+     "n_total": 22,
+     "n": 16,
+     "mdape": 0.17204,
+     "bias": 0.02264,
+     "p90_ape": 0.41261,
+     "coverage": 0.8125,
+     "n_interval": 16,
+     "median_rel_width": 0.8669,
+     "coverage_ci90": [
+      0.61211,
+      0.92248
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "age_class": "byggeår ukendt",
+     "n_total": 2,
+     "n": 2,
+     "mdape": 0.29825,
+     "bias": 0.27253,
+     "p90_ape": 0.51627,
+     "coverage": 1.0,
+     "n_interval": 2,
+     "median_rel_width": 1.00729,
+     "coverage_ci90": [
+      0.42499,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "age_class": "opført 1950-1989",
+     "n_total": 27,
+     "n": 27,
+     "mdape": 0.24488,
+     "bias": 0.07936,
+     "p90_ape": 0.83552,
+     "coverage": 0.62963,
+     "n_interval": 27,
+     "median_rel_width": 0.80863,
+     "coverage_ci90": [
+      0.4716,
+      0.76405
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.0887,
+     "bias": -0.0887,
+     "p90_ape": 0.0887,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 0.4342,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "age_class": "opført før 1950",
+     "n_total": 22,
+     "n": 22,
+     "mdape": 0.18655,
+     "bias": -0.03928,
+     "p90_ape": 0.43343,
+     "coverage": 0.72727,
+     "n_interval": 22,
+     "median_rel_width": 0.62141,
+     "coverage_ci90": [
+      0.5529,
+      0.85186
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "age_class": "byggeår ukendt",
+     "n_total": 2,
+     "n": 2,
+     "mdape": 0.28576,
+     "bias": 0.28576,
+     "p90_ape": 0.43884,
+     "coverage": 1.0,
+     "n_interval": 2,
+     "median_rel_width": 0.9847,
+     "coverage_ci90": [
+      0.42499,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "age_class": "opført 1950-1989",
+     "n_total": 27,
+     "n": 27,
+     "mdape": 0.2466,
+     "bias": 0.12301,
+     "p90_ape": 0.68313,
+     "coverage": 0.85185,
+     "n_interval": 27,
+     "median_rel_width": 1.00111,
+     "coverage_ci90": [
+      0.70789,
+      0.93171
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "age_class": "opført 1990 eller senere",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.03671,
+     "bias": 0.03671,
+     "p90_ape": 0.03671,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.10111,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "age_class": "opført før 1950",
+     "n_total": 22,
+     "n": 22,
+     "mdape": 0.21547,
+     "bias": -0.02565,
+     "p90_ape": 0.44556,
+     "coverage": 0.77273,
+     "n_interval": 22,
+     "median_rel_width": 1.07669,
+     "coverage_ci90": [
+      0.60098,
+      0.88473
+     ],
+     "indicative": true
+    }
+   ],
+   "block": [
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "block": "NV",
+     "n_total": 42,
+     "n": 42,
+     "mdape": 0.11589,
+     "bias": -0.06075,
+     "p90_ape": 0.40323,
+     "coverage": 0.90476,
+     "n_interval": 42,
+     "median_rel_width": 0.85003,
+     "coverage_ci90": [
+      0.804,
+      0.95652
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "block": "NØ",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.49977,
+     "bias": -0.49977,
+     "p90_ape": 0.49977,
+     "coverage": 0.0,
+     "n_interval": 1,
+     "median_rel_width": 0.71913,
+     "coverage_ci90": [
+      0.0,
+      0.73017
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "block": "SV",
+     "n_total": 49,
+     "n": 49,
+     "mdape": 0.21409,
+     "bias": 0.0835,
+     "p90_ape": 0.70608,
+     "coverage": 0.79592,
+     "n_interval": 49,
+     "median_rel_width": 0.78633,
+     "coverage_ci90": [
+      0.68694,
+      0.87392
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a1",
+     "block": "SØ",
+     "n_total": 72,
+     "n": 72,
+     "mdape": 0.17678,
+     "bias": -0.00825,
+     "p90_ape": 0.46357,
+     "coverage": 0.83333,
+     "n_interval": 72,
+     "median_rel_width": 0.78633,
+     "coverage_ci90": [
+      0.74931,
+      0.89321
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "block": "NV",
+     "n_total": 42,
+     "n": 42,
+     "mdape": 0.10091,
+     "bias": 0.02531,
+     "p90_ape": 0.35504,
+     "coverage": 0.85714,
+     "n_interval": 42,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.74676,
+      0.92429
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "block": "NØ",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.45164,
+     "bias": -0.45164,
+     "p90_ape": 0.45164,
+     "coverage": 0.0,
+     "n_interval": 1,
+     "median_rel_width": 0.59347,
+     "coverage_ci90": [
+      0.0,
+      0.73017
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "block": "SV",
+     "n_total": 49,
+     "n": 49,
+     "mdape": 0.19713,
+     "bias": 0.15259,
+     "p90_ape": 0.75914,
+     "coverage": 0.73469,
+     "n_interval": 49,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.62067,
+      0.82416
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "a2",
+     "block": "SØ",
+     "n_total": 72,
+     "n": 72,
+     "mdape": 0.17119,
+     "bias": 0.06934,
+     "p90_ape": 0.59245,
+     "coverage": 0.81944,
+     "n_interval": 72,
+     "median_rel_width": 0.79667,
+     "coverage_ci90": [
+      0.73376,
+      0.88199
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "block": "NV",
+     "n_total": 42,
+     "n": 9,
+     "mdape": 0.05972,
+     "bias": -0.01161,
+     "p90_ape": 2.04315,
+     "coverage": 0.88889,
+     "n_interval": 9,
+     "median_rel_width": 0.90402,
+     "coverage_ci90": [
+      0.62317,
+      0.97481
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "block": "NØ",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.24405,
+     "bias": -0.24405,
+     "p90_ape": 0.24405,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.15163,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "block": "SV",
+     "n_total": 49,
+     "n": 11,
+     "mdape": 0.19764,
+     "bias": 0.15019,
+     "p90_ape": 0.78219,
+     "coverage": 0.72727,
+     "n_interval": 11,
+     "median_rel_width": 0.90402,
+     "coverage_ci90": [
+      0.47949,
+      0.88531
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "b",
+     "block": "SØ",
+     "n_total": 72,
+     "n": 9,
+     "mdape": 0.24918,
+     "bias": -0.24617,
+     "p90_ape": 0.54989,
+     "coverage": 0.44444,
+     "n_interval": 9,
+     "median_rel_width": 0.46239,
+     "coverage_ci90": [
+      0.21803,
+      0.69654
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "block": "NV",
+     "n_total": 42,
+     "n": 42,
+     "mdape": 0.08777,
+     "bias": 0.0266,
+     "p90_ape": 0.42653,
+     "coverage": 0.83333,
+     "n_interval": 42,
+     "median_rel_width": 0.44057,
+     "coverage_ci90": [
+      0.71927,
+      0.90704
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "block": "NØ",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.49817,
+     "bias": -0.49817,
+     "p90_ape": 0.49817,
+     "coverage": 0.0,
+     "n_interval": 1,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.0,
+      0.73017
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "block": "SV",
+     "n_total": 49,
+     "n": 49,
+     "mdape": 0.13381,
+     "bias": 0.05116,
+     "p90_ape": 0.51169,
+     "coverage": 0.73469,
+     "n_interval": 49,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.62067,
+      0.82416
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "gbm",
+     "block": "SØ",
+     "n_total": 72,
+     "n": 72,
+     "mdape": 0.15541,
+     "bias": 0.10086,
+     "p90_ape": 0.406,
+     "coverage": 0.72222,
+     "n_interval": 72,
+     "median_rel_width": 0.49438,
+     "coverage_ci90": [
+      0.62855,
+      0.7998
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "block": "NV",
+     "n_total": 42,
+     "n": 42,
+     "mdape": 0.08597,
+     "bias": 0.02114,
+     "p90_ape": 0.34023,
+     "coverage": 0.80952,
+     "n_interval": 42,
+     "median_rel_width": 0.47792,
+     "coverage_ci90": [
+      0.69238,
+      0.8892
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "block": "NØ",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.59761,
+     "bias": -0.59761,
+     "p90_ape": 0.59761,
+     "coverage": 0.0,
+     "n_interval": 1,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.0,
+      0.73017
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "block": "SV",
+     "n_total": 49,
+     "n": 49,
+     "mdape": 0.16054,
+     "bias": 0.02676,
+     "p90_ape": 0.4569,
+     "coverage": 0.65306,
+     "n_interval": 49,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.53586,
+      0.75424
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "apartment",
+     "method": "ridge",
+     "block": "SØ",
+     "n_total": 72,
+     "n": 72,
+     "mdape": 0.15231,
+     "bias": 0.02499,
+     "p90_ape": 0.37711,
+     "coverage": 0.73611,
+     "n_interval": 72,
+     "median_rel_width": 0.51518,
+     "coverage_ci90": [
+      0.64324,
+      0.81188
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "block": "NV",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.35447,
+     "bias": -0.35447,
+     "p90_ape": 0.35447,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.67682,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "block": "SV",
+     "n_total": 21,
+     "n": 21,
+     "mdape": 0.1958,
+     "bias": -0.11118,
+     "p90_ape": 0.48225,
+     "coverage": 0.66667,
+     "n_interval": 21,
+     "median_rel_width": 0.84073,
+     "coverage_ci90": [
+      0.48724,
+      0.80804
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a1",
+     "block": "SØ",
+     "n_total": 30,
+     "n": 30,
+     "mdape": 0.26188,
+     "bias": 0.02235,
+     "p90_ape": 0.62536,
+     "coverage": 0.7,
+     "n_interval": 30,
+     "median_rel_width": 0.84073,
+     "coverage_ci90": [
+      0.5506,
+      0.8163
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "block": "NV",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.35163,
+     "bias": -0.35163,
+     "p90_ape": 0.35163,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.34403,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "block": "SV",
+     "n_total": 21,
+     "n": 21,
+     "mdape": 0.25602,
+     "bias": -0.0696,
+     "p90_ape": 0.51233,
+     "coverage": 0.57143,
+     "n_interval": 21,
+     "median_rel_width": 1.02308,
+     "coverage_ci90": [
+      0.39588,
+      0.73067
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "a2",
+     "block": "SØ",
+     "n_total": 30,
+     "n": 30,
+     "mdape": 0.24832,
+     "bias": 0.18716,
+     "p90_ape": 0.89026,
+     "coverage": 0.63333,
+     "n_interval": 30,
+     "median_rel_width": 1.02308,
+     "coverage_ci90": [
+      0.48325,
+      0.76135
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "block": "NV",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.29263,
+     "bias": -0.29263,
+     "p90_ape": 0.29263,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.01494,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "block": "SV",
+     "n_total": 21,
+     "n": 14,
+     "mdape": 0.12714,
+     "bias": 0.0106,
+     "p90_ape": 0.2682,
+     "coverage": 0.85714,
+     "n_interval": 14,
+     "median_rel_width": 1.01494,
+     "coverage_ci90": [
+      0.64704,
+      0.95155
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "b",
+     "block": "SØ",
+     "n_total": 30,
+     "n": 25,
+     "mdape": 0.19667,
+     "bias": 0.07519,
+     "p90_ape": 1.2351,
+     "coverage": 0.72,
+     "n_interval": 25,
+     "median_rel_width": 0.71886,
+     "coverage_ci90": [
+      0.55656,
+      0.84047
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "block": "NV",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.29071,
+     "bias": -0.29071,
+     "p90_ape": 0.29071,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.20595,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "block": "SV",
+     "n_total": 21,
+     "n": 21,
+     "mdape": 0.22695,
+     "bias": -0.04675,
+     "p90_ape": 0.44088,
+     "coverage": 0.61905,
+     "n_interval": 21,
+     "median_rel_width": 0.80863,
+     "coverage_ci90": [
+      0.44082,
+      0.77009
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "gbm",
+     "block": "SØ",
+     "n_total": 30,
+     "n": 30,
+     "mdape": 0.18617,
+     "bias": 0.02832,
+     "p90_ape": 0.82373,
+     "coverage": 0.73333,
+     "n_interval": 30,
+     "median_rel_width": 0.80863,
+     "coverage_ci90": [
+      0.58537,
+      0.84268
+     ],
+     "indicative": false
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "block": "NV",
+     "n_total": 1,
+     "n": 1,
+     "mdape": 0.30749,
+     "bias": -0.30749,
+     "p90_ape": 0.30749,
+     "coverage": 1.0,
+     "n_interval": 1,
+     "median_rel_width": 1.05226,
+     "coverage_ci90": [
+      0.26983,
+      1.0
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "block": "SV",
+     "n_total": 21,
+     "n": 21,
+     "mdape": 0.21715,
+     "bias": -0.02277,
+     "p90_ape": 0.62543,
+     "coverage": 0.80952,
+     "n_interval": 21,
+     "median_rel_width": 1.05226,
+     "coverage_ci90": [
+      0.6369,
+      0.91149
+     ],
+     "indicative": true
+    },
+    {
+     "segment": "house",
+     "method": "ridge",
+     "block": "SØ",
+     "n_total": 30,
+     "n": 30,
+     "mdape": 0.23705,
+     "bias": 0.04459,
+     "p90_ape": 0.46433,
+     "coverage": 0.83333,
+     "n_interval": 30,
+     "median_rel_width": 1.00111,
+     "coverage_ci90": [
+      0.69507,
+      0.91644
+     ],
+     "indicative": false
+    }
+   ]
+  },
+  "common_subset_with_valuation": [
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "n_total": 30,
+    "n": 30,
+    "mdape": 0.19806,
+    "bias": -0.00556,
+    "p90_ape": 0.87879,
+    "coverage": 0.73333,
+    "n_interval": 30,
+    "median_rel_width": 0.77183,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "n_total": 30,
+    "n": 30,
+    "mdape": 0.22452,
+    "bias": 0.09363,
+    "p90_ape": 1.02074,
+    "coverage": 0.7,
+    "n_interval": 30,
+    "median_rel_width": 0.7965,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "n_total": 30,
+    "n": 30,
+    "mdape": 0.19086,
+    "bias": -0.02036,
+    "p90_ape": 0.80681,
+    "coverage": 0.7,
+    "n_interval": 30,
+    "median_rel_width": 0.90402,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "n_total": 30,
+    "n": 30,
+    "mdape": 0.14172,
+    "bias": -0.00155,
+    "p90_ape": 0.81287,
+    "coverage": 0.7,
+    "n_interval": 30,
+    "median_rel_width": 0.49438,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "n_total": 30,
+    "n": 30,
+    "mdape": 0.17895,
+    "bias": -0.03566,
+    "p90_ape": 0.75067,
+    "coverage": 0.63333,
+    "n_interval": 30,
+    "median_rel_width": 0.51518,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "n_total": 40,
+    "n": 40,
+    "mdape": 0.26878,
+    "bias": -0.04413,
+    "p90_ape": 0.58737,
+    "coverage": 0.675,
+    "n_interval": 40,
+    "median_rel_width": 0.84073,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "n_total": 40,
+    "n": 40,
+    "mdape": 0.27527,
+    "bias": 0.06865,
+    "p90_ape": 0.77965,
+    "coverage": 0.625,
+    "n_interval": 40,
+    "median_rel_width": 1.02308,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "n_total": 40,
+    "n": 40,
+    "mdape": 0.19154,
+    "bias": 0.0109,
+    "p90_ape": 0.69328,
+    "coverage": 0.775,
+    "n_interval": 40,
+    "median_rel_width": 0.71886,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "n_total": 40,
+    "n": 40,
+    "mdape": 0.23642,
+    "bias": -0.02285,
+    "p90_ape": 0.8097,
+    "coverage": 0.65,
+    "n_interval": 40,
+    "median_rel_width": 0.80863,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "n_total": 40,
+    "n": 40,
+    "mdape": 0.24704,
+    "bias": 0.03808,
+    "p90_ape": 0.49194,
+    "coverage": 0.775,
+    "n_interval": 40,
+    "median_rel_width": 1.00111,
+    "indicative": false
+   }
+  ],
+  "paired_vs_baseline": [
+   {
+    "n": 164,
+    "diff": -0.03883,
+    "lo": -0.05926,
+    "hi": -0.00752,
+    "segment": "apartment",
+    "challenger": "ridge",
+    "baseline": "a1",
+    "relative_change": -0.22539
+   },
+   {
+    "n": 164,
+    "diff": -0.02178,
+    "lo": -0.06268,
+    "hi": 0.0052,
+    "segment": "apartment",
+    "challenger": "ridge",
+    "baseline": "a2",
+    "relative_change": -0.14031
+   },
+   {
+    "n": 30,
+    "diff": -0.0119,
+    "lo": -0.0811,
+    "hi": 0.05778,
+    "segment": "apartment",
+    "challenger": "ridge",
+    "baseline": "b",
+    "relative_change": -0.06236
+   },
+   {
+    "n": 164,
+    "diff": -0.03499,
+    "lo": -0.05319,
+    "hi": -0.00651,
+    "segment": "apartment",
+    "challenger": "gbm",
+    "baseline": "a1",
+    "relative_change": -0.20311
+   },
+   {
+    "n": 164,
+    "diff": -0.01795,
+    "lo": -0.05596,
+    "hi": 0.00275,
+    "segment": "apartment",
+    "challenger": "gbm",
+    "baseline": "a2",
+    "relative_change": -0.1156
+   },
+   {
+    "n": 30,
+    "diff": -0.04913,
+    "lo": -0.1157,
+    "hi": 0.03208,
+    "segment": "apartment",
+    "challenger": "gbm",
+    "baseline": "b",
+    "relative_change": -0.25744
+   },
+   {
+    "n": 52,
+    "diff": -0.0044,
+    "lo": -0.09512,
+    "hi": 0.0636,
+    "segment": "house",
+    "challenger": "ridge",
+    "baseline": "a1",
+    "relative_change": -0.01873
+   },
+   {
+    "n": 52,
+    "diff": -0.03312,
+    "lo": -0.09348,
+    "hi": 0.04557,
+    "segment": "house",
+    "challenger": "ridge",
+    "baseline": "a2",
+    "relative_change": -0.12556
+   },
+   {
+    "n": 40,
+    "diff": 0.05551,
+    "lo": 0.00403,
+    "hi": 0.14775,
+    "segment": "house",
+    "challenger": "ridge",
+    "baseline": "b",
+    "relative_change": 0.2898
+   },
+   {
+    "n": 52,
+    "diff": -0.02074,
+    "lo": -0.10765,
+    "hi": 0.04626,
+    "segment": "house",
+    "challenger": "gbm",
+    "baseline": "a1",
+    "relative_change": -0.08824
+   },
+   {
+    "n": 52,
+    "diff": -0.04946,
+    "lo": -0.09943,
+    "hi": 0.03351,
+    "segment": "house",
+    "challenger": "gbm",
+    "baseline": "a2",
+    "relative_change": -0.1875
+   },
+   {
+    "n": 40,
+    "diff": 0.04488,
+    "lo": 0.00393,
+    "hi": 0.11974,
+    "segment": "house",
+    "challenger": "gbm",
+    "baseline": "b",
+    "relative_change": 0.23433
+   }
+  ],
+  "calibration": [
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "a1",
+    "n_train": 91,
+    "n_calibration": 9,
+    "halfwidth_log": 0.24481
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "a2",
+    "n_train": 91,
+    "n_calibration": 9,
+    "halfwidth_log": 0.20491
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "b",
+    "n_train": 91,
+    "n_calibration": 6,
+    "halfwidth_log": 0.74478
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "ridge",
+    "n_train": 91,
+    "n_calibration": 9,
+    "halfwidth_log": 0.52597
+   },
+   {
+    "segment": "house",
+    "fold": "2021",
+    "method": "gbm",
+    "n_train": 91,
+    "n_calibration": 9,
+    "halfwidth_log": 0.21543
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "a1",
+    "n_train": 110,
+    "n_calibration": 20,
+    "halfwidth_log": 0.40888
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "a2",
+    "n_train": 110,
+    "n_calibration": 20,
+    "halfwidth_log": 0.49151
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "b",
+    "n_train": 110,
+    "n_calibration": 13,
+    "halfwidth_log": 0.23797
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "ridge",
+    "n_train": 110,
+    "n_calibration": 20,
+    "halfwidth_log": 0.44385
+   },
+   {
+    "segment": "house",
+    "fold": "2022",
+    "method": "gbm",
+    "n_train": 110,
+    "n_calibration": 20,
+    "halfwidth_log": 0.39404
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "a1",
+    "n_train": 132,
+    "n_calibration": 13,
+    "halfwidth_log": 0.76238
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "a2",
+    "n_train": 132,
+    "n_calibration": 13,
+    "halfwidth_log": 0.62959
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "b",
+    "n_train": 132,
+    "n_calibration": 11,
+    "halfwidth_log": 0.48789
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "ridge",
+    "n_train": 132,
+    "n_calibration": 13,
+    "halfwidth_log": 0.50446
+   },
+   {
+    "segment": "house",
+    "fold": "2023",
+    "method": "gbm",
+    "n_train": 132,
+    "n_calibration": 13,
+    "halfwidth_log": 0.57138
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "a1",
+    "n_train": 131,
+    "n_calibration": 7,
+    "halfwidth_log": 0.53085
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "a2",
+    "n_train": 131,
+    "n_calibration": 7,
+    "halfwidth_log": 0.4971
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "b",
+    "n_train": 131,
+    "n_calibration": 5,
+    "halfwidth_log": 0.35211
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "ridge",
+    "n_train": 131,
+    "n_calibration": 7,
+    "halfwidth_log": 0.48171
+   },
+   {
+    "segment": "house",
+    "fold": "2024",
+    "method": "gbm",
+    "n_train": 131,
+    "n_calibration": 7,
+    "halfwidth_log": 0.5059
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "a1",
+    "n_train": 391,
+    "n_calibration": 51,
+    "halfwidth_log": 0.4423
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "a2",
+    "n_train": 391,
+    "n_calibration": 51,
+    "halfwidth_log": 0.38849
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "b",
+    "n_train": 391,
+    "n_calibration": 7,
+    "halfwidth_log": 0.22918
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "ridge",
+    "n_train": 391,
+    "n_calibration": 51,
+    "halfwidth_log": 0.21858
+   },
+   {
+    "segment": "apartment",
+    "fold": "2021",
+    "method": "gbm",
+    "n_train": 391,
+    "n_calibration": 51,
+    "halfwidth_log": 0.19219
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "a1",
+    "n_train": 503,
+    "n_calibration": 72,
+    "halfwidth_log": 0.35224
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "a2",
+    "n_train": 503,
+    "n_calibration": 72,
+    "halfwidth_log": 0.29255
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "b",
+    "n_train": 503,
+    "n_calibration": 13,
+    "halfwidth_log": 0.54797
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "ridge",
+    "n_train": 503,
+    "n_calibration": 72,
+    "halfwidth_log": 0.25483
+   },
+   {
+    "segment": "apartment",
+    "fold": "2022",
+    "method": "gbm",
+    "n_train": 503,
+    "n_calibration": 72,
+    "halfwidth_log": 0.24474
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "a1",
+    "n_train": 535,
+    "n_calibration": 36,
+    "halfwidth_log": 0.37015
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "a2",
+    "n_train": 535,
+    "n_calibration": 36,
+    "halfwidth_log": 0.38833
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "b",
+    "n_train": 535,
+    "n_calibration": 9,
+    "halfwidth_log": 0.43788
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "ridge",
+    "n_train": 535,
+    "n_calibration": 36,
+    "halfwidth_log": 0.31228
+   },
+   {
+    "segment": "apartment",
+    "fold": "2023",
+    "method": "gbm",
+    "n_train": 535,
+    "n_calibration": 36,
+    "halfwidth_log": 0.27249
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "a1",
+    "n_train": 609,
+    "n_calibration": 34,
+    "halfwidth_log": 0.38368
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "a2",
+    "n_train": 609,
+    "n_calibration": 34,
+    "halfwidth_log": 0.4768
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "b",
+    "n_train": 609,
+    "n_calibration": 6,
+    "halfwidth_log": 2.30814
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "ridge",
+    "n_train": 609,
+    "n_calibration": 34,
+    "halfwidth_log": 0.26831
+   },
+   {
+    "segment": "apartment",
+    "fold": "2024",
+    "method": "gbm",
+    "n_train": 609,
+    "n_calibration": 34,
+    "halfwidth_log": 0.29885
+   }
+  ],
+  "scatter": {
+   "house": {
+    "method": "a1",
+    "points": [
+     [
+      2000000.0,
+      1920000.0
+     ],
+     [
+      1810000.0,
+      1530000.0
+     ],
+     [
+      2950000.0,
+      1960000.0
+     ],
+     [
+      11200000.0,
+      6380000.0
+     ],
+     [
+      1300000.0,
+      1940000.0
+     ],
+     [
+      5500000.0,
+      3800000.0
+     ],
+     [
+      3200000.0,
+      2680000.0
+     ],
+     [
+      2720000.0,
+      3730000.0
+     ],
+     [
+      2850000.0,
+      3590000.0
+     ],
+     [
+      2300000.0,
+      1530000.0
+     ],
+     [
+      2580000.0,
+      3210000.0
+     ],
+     [
+      1900000.0,
+      2620000.0
+     ],
+     [
+      2420000.0,
+      1540000.0
+     ],
+     [
+      2150000.0,
+      2310000.0
+     ],
+     [
+      2610000.0,
+      2760000.0
+     ],
+     [
+      2000000.0,
+      1790000.0
+     ],
+     [
+      1750000.0,
+      2040000.0
+     ],
+     [
+      1850000.0,
+      2160000.0
+     ],
+     [
+      2400000.0,
+      2140000.0
+     ],
+     [
+      4840000.0,
+      2500000.0
+     ],
+     [
+      10350000.0,
+      4810000.0
+     ],
+     [
+      1700000.0,
+      1840000.0
+     ],
+     [
+      2580000.0,
+      1860000.0
+     ],
+     [
+      7000000.0,
+      2850000.0
+     ],
+     [
+      3320000.0,
+      2990000.0
+     ],
+     [
+      3120000.0,
+      2220000.0
+     ],
+     [
+      1620000.0,
+      1910000.0
+     ],
+     [
+      2700000.0,
+      1780000.0
+     ],
+     [
+      4600000.0,
+      3730000.0
+     ],
+     [
+      3200000.0,
+      2140000.0
+     ],
+     [
+      4440000.0,
+      4330000.0
+     ],
+     [
+      1380000.0,
+      2180000.0
+     ],
+     [
+      3430000.0,
+      3130000.0
+     ],
+     [
+      9500000.0,
+      9310000.0
+     ],
+     [
+      5600000.0,
+      3330000.0
+     ],
+     [
+      1750000.0,
+      2750000.0
+     ],
+     [
+      5300000.0,
+      4110000.0
+     ],
+     [
+      2900000.0,
+      2700000.0
+     ],
+     [
+      3150000.0,
+      4580000.0
+     ],
+     [
+      4750000.0,
+      3070000.0
+     ],
+     [
+      2400000.0,
+      2870000.0
+     ],
+     [
+      2660000.0,
+      3490000.0
+     ],
+     [
+      2300000.0,
+      2350000.0
+     ],
+     [
+      5600000.0,
+      4550000.0
+     ],
+     [
+      2800000.0,
+      3060000.0
+     ],
+     [
+      1270000.0,
+      4690000.0
+     ],
+     [
+      2430000.0,
+      2310000.0
+     ],
+     [
+      1040000.0,
+      2150000.0
+     ],
+     [
+      3280000.0,
+      2910000.0
+     ],
+     [
+      2010000.0,
+      2460000.0
+     ],
+     [
+      4050000.0,
+      7990000.0
+     ],
+     [
+      2920000.0,
+      2540000.0
+     ]
+    ]
+   },
+   "apartment": {
+    "method": "a2",
+    "points": [
+     [
+      1580000.0,
+      2120000.0
+     ],
+     [
+      2250000.0,
+      2400000.0
+     ],
+     [
+      1820000.0,
+      1940000.0
+     ],
+     [
+      3720000.0,
+      3650000.0
+     ],
+     [
+      1800000.0,
+      1730000.0
+     ],
+     [
+      1960000.0,
+      1580000.0
+     ],
+     [
+      1300000.0,
+      1300000.0
+     ],
+     [
+      1140000.0,
+      1230000.0
+     ],
+     [
+      1250000.0,
+      1080000.0
+     ],
+     [
+      2400000.0,
+      3910000.0
+     ],
+     [
+      1340000.0,
+      1390000.0
+     ],
+     [
+      2020000.0,
+      1300000.0
+     ],
+     [
+      2800000.0,
+      2090000.0
+     ],
+     [
+      1310000.0,
+      1370000.0
+     ],
+     [
+      2350000.0,
+      2520000.0
+     ],
+     [
+      830000.0,
+      830000.0
+     ],
+     [
+      3160000.0,
+      2410000.0
+     ],
+     [
+      1900000.0,
+      1520000.0
+     ],
+     [
+      1080000.0,
+      1220000.0
+     ],
+     [
+      4840000.0,
+      3170000.0
+     ],
+     [
+      1120000.0,
+      1100000.0
+     ],
+     [
+      1920000.0,
+      2090000.0
+     ],
+     [
+      1820000.0,
+      1560000.0
+     ],
+     [
+      950000.0,
+      1540000.0
+     ],
+     [
+      4080000.0,
+      4690000.0
+     ],
+     [
+      1150000.0,
+      1220000.0
+     ],
+     [
+      2000000.0,
+      1470000.0
+     ],
+     [
+      2020000.0,
+      1890000.0
+     ],
+     [
+      1000000.0,
+      1290000.0
+     ],
+     [
+      1230000.0,
+      1750000.0
+     ],
+     [
+      1340000.0,
+      1470000.0
+     ],
+     [
+      1300000.0,
+      1120000.0
+     ],
+     [
+      800000.0,
+      1190000.0
+     ],
+     [
+      1600000.0,
+      1380000.0
+     ],
+     [
+      1420000.0,
+      1220000.0
+     ],
+     [
+      1500000.0,
+      1540000.0
+     ],
+     [
+      1350000.0,
+      1400000.0
+     ],
+     [
+      2100000.0,
+      2270000.0
+     ],
+     [
+      1460000.0,
+      1310000.0
+     ],
+     [
+      2240000.0,
+      2310000.0
+     ],
+     [
+      1720000.0,
+      1650000.0
+     ],
+     [
+      3300000.0,
+      3520000.0
+     ],
+     [
+      760000.0,
+      840000.0
+     ],
+     [
+      2800000.0,
+      2140000.0
+     ],
+     [
+      1720000.0,
+      2730000.0
+     ],
+     [
+      1800000.0,
+      2610000.0
+     ],
+     [
+      1450000.0,
+      1780000.0
+     ],
+     [
+      1360000.0,
+      1280000.0
+     ],
+     [
+      720000.0,
+      1850000.0
+     ],
+     [
+      1700000.0,
+      2130000.0
+     ],
+     [
+      1700000.0,
+      1710000.0
+     ],
+     [
+      1400000.0,
+      1270000.0
+     ],
+     [
+      1120000.0,
+      2040000.0
+     ],
+     [
+      1200000.0,
+      1310000.0
+     ],
+     [
+      1100000.0,
+      840000.0
+     ],
+     [
+      1640000.0,
+      1990000.0
+     ],
+     [
+      1720000.0,
+      2280000.0
+     ],
+     [
+      1680000.0,
+      1850000.0
+     ],
+     [
+      1900000.0,
+      1780000.0
+     ],
+     [
+      820000.0,
+      880000.0
+     ],
+     [
+      2050000.0,
+      1890000.0
+     ],
+     [
+      900000.0,
+      1480000.0
+     ],
+     [
+      2340000.0,
+      2010000.0
+     ],
+     [
+      1500000.0,
+      1340000.0
+     ],
+     [
+      3300000.0,
+      3480000.0
+     ],
+     [
+      1140000.0,
+      1540000.0
+     ],
+     [
+      1010000.0,
+      1290000.0
+     ],
+     [
+      1860000.0,
+      1570000.0
+     ],
+     [
+      1330000.0,
+      1310000.0
+     ],
+     [
+      2550000.0,
+      2790000.0
+     ],
+     [
+      1450000.0,
+      1140000.0
+     ],
+     [
+      1260000.0,
+      2470000.0
+     ],
+     [
+      3100000.0,
+      2910000.0
+     ],
+     [
+      1900000.0,
+      1720000.0
+     ],
+     [
+      1100000.0,
+      920000.0
+     ],
+     [
+      2760000.0,
+      2750000.0
+     ],
+     [
+      1170000.0,
+      1810000.0
+     ],
+     [
+      1600000.0,
+      1730000.0
+     ],
+     [
+      1700000.0,
+      2360000.0
+     ],
+     [
+      3300000.0,
+      2780000.0
+     ],
+     [
+      3400000.0,
+      4680000.0
+     ],
+     [
+      1600000.0,
+      1790000.0
+     ],
+     [
+      1640000.0,
+      1640000.0
+     ],
+     [
+      1500000.0,
+      1310000.0
+     ],
+     [
+      3880000.0,
+      3390000.0
+     ],
+     [
+      2170000.0,
+      2600000.0
+     ],
+     [
+      2220000.0,
+      2470000.0
+     ],
+     [
+      2020000.0,
+      2520000.0
+     ],
+     [
+      1930000.0,
+      1880000.0
+     ],
+     [
+      2290000.0,
+      3120000.0
+     ],
+     [
+      1080000.0,
+      1240000.0
+     ],
+     [
+      1440000.0,
+      1610000.0
+     ],
+     [
+      2800000.0,
+      3010000.0
+     ],
+     [
+      1400000.0,
+      1120000.0
+     ],
+     [
+      2300000.0,
+      2410000.0
+     ],
+     [
+      1350000.0,
+      1380000.0
+     ],
+     [
+      1370000.0,
+      1300000.0
+     ],
+     [
+      1150000.0,
+      2380000.0
+     ],
+     [
+      1450000.0,
+      1090000.0
+     ],
+     [
+      1500000.0,
+      1910000.0
+     ],
+     [
+      1450000.0,
+      1670000.0
+     ],
+     [
+      2080000.0,
+      1700000.0
+     ],
+     [
+      1310000.0,
+      1380000.0
+     ],
+     [
+      4500000.0,
+      3050000.0
+     ],
+     [
+      1100000.0,
+      1720000.0
+     ],
+     [
+      1360000.0,
+      2010000.0
+     ],
+     [
+      1000000.0,
+      1360000.0
+     ],
+     [
+      1630000.0,
+      1550000.0
+     ],
+     [
+      4000000.0,
+      4750000.0
+     ],
+     [
+      1180000.0,
+      2040000.0
+     ],
+     [
+      510000.0,
+      1070000.0
+     ],
+     [
+      1000000.0,
+      1390000.0
+     ],
+     [
+      1300000.0,
+      1540000.0
+     ],
+     [
+      3200000.0,
+      2560000.0
+     ],
+     [
+      8000000.0,
+      4380000.0
+     ],
+     [
+      1380000.0,
+      2240000.0
+     ],
+     [
+      2450000.0,
+      2560000.0
+     ],
+     [
+      1100000.0,
+      1490000.0
+     ],
+     [
+      760000.0,
+      1120000.0
+     ],
+     [
+      1800000.0,
+      1760000.0
+     ],
+     [
+      1300000.0,
+      1190000.0
+     ],
+     [
+      1550000.0,
+      1690000.0
+     ],
+     [
+      2000000.0,
+      1570000.0
+     ],
+     [
+      830000.0,
+      1070000.0
+     ],
+     [
+      1400000.0,
+      1730000.0
+     ],
+     [
+      410000.0,
+      4640000.0
+     ],
+     [
+      1950000.0,
+      1960000.0
+     ],
+     [
+      1300000.0,
+      1550000.0
+     ],
+     [
+      2100000.0,
+      2420000.0
+     ],
+     [
+      1600000.0,
+      1520000.0
+     ],
+     [
+      1050000.0,
+      1690000.0
+     ],
+     [
+      1250000.0,
+      1850000.0
+     ],
+     [
+      920000.0,
+      1800000.0
+     ],
+     [
+      2080000.0,
+      2160000.0
+     ],
+     [
+      1250000.0,
+      1340000.0
+     ],
+     [
+      1750000.0,
+      1800000.0
+     ],
+     [
+      1350000.0,
+      1350000.0
+     ],
+     [
+      2900000.0,
+      3240000.0
+     ],
+     [
+      520000.0,
+      970000.0
+     ],
+     [
+      1400000.0,
+      1800000.0
+     ],
+     [
+      1600000.0,
+      1390000.0
+     ],
+     [
+      1050000.0,
+      1130000.0
+     ],
+     [
+      1050000.0,
+      1440000.0
+     ],
+     [
+      1500000.0,
+      1840000.0
+     ],
+     [
+      620000.0,
+      1630000.0
+     ],
+     [
+      1250000.0,
+      2080000.0
+     ],
+     [
+      1850000.0,
+      1890000.0
+     ],
+     [
+      6500000.0,
+      4720000.0
+     ],
+     [
+      2180000.0,
+      2380000.0
+     ],
+     [
+      1250000.0,
+      920000.0
+     ],
+     [
+      990000.0,
+      1700000.0
+     ],
+     [
+      1410000.0,
+      1890000.0
+     ],
+     [
+      4000000.0,
+      3760000.0
+     ],
+     [
+      7800000.0,
+      4480000.0
+     ],
+     [
+      850000.0,
+      1140000.0
+     ],
+     [
+      2850000.0,
+      3300000.0
+     ],
+     [
+      1120000.0,
+      1510000.0
+     ],
+     [
+      1410000.0,
+      1440000.0
+     ],
+     [
+      1050000.0,
+      1390000.0
+     ],
+     [
+      2600000.0,
+      3290000.0
+     ],
+     [
+      3650000.0,
+      2430000.0
+     ],
+     [
+      2800000.0,
+      2420000.0
+     ],
+     [
+      2150000.0,
+      2650000.0
+     ],
+     [
+      2140000.0,
+      2210000.0
+     ]
+    ]
+   }
+  }
+ },
+ "sensitivity_exclude_flagged_train": [
+  {
+   "segment": "apartment",
+   "method": "a1",
+   "n_total": 164,
+   "n": 164,
+   "mdape": 0.16985,
+   "bias": -0.00504,
+   "p90_ape": 0.49705,
+   "coverage": 0.83537,
+   "n_interval": 164,
+   "median_rel_width": 0.76898,
+   "coverage_ci90": [
+    0.78236,
+    0.87748
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "apartment",
+   "method": "a2",
+   "n_total": 164,
+   "n": 164,
+   "mdape": 0.15524,
+   "bias": 0.07189,
+   "p90_ape": 0.60308,
+   "coverage": 0.78659,
+   "n_interval": 164,
+   "median_rel_width": 0.79667,
+   "coverage_ci90": [
+    0.72953,
+    0.83434
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "apartment",
+   "method": "b",
+   "n_total": 164,
+   "n": 30,
+   "mdape": 0.18485,
+   "bias": -0.0221,
+   "p90_ape": 0.785,
+   "coverage": 0.7,
+   "n_interval": 30,
+   "median_rel_width": 0.90402,
+   "coverage_ci90": [
+    0.5506,
+    0.8163
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "apartment",
+   "method": "gbm",
+   "n_total": 164,
+   "n": 164,
+   "mdape": 0.13589,
+   "bias": 0.062,
+   "p90_ape": 0.4349,
+   "coverage": 0.72561,
+   "n_interval": 164,
+   "median_rel_width": 0.37055,
+   "coverage_ci90": [
+    0.66498,
+    0.77891
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "apartment",
+   "method": "ridge",
+   "n_total": 164,
+   "n": 164,
+   "mdape": 0.14052,
+   "bias": 0.03659,
+   "p90_ape": 0.39916,
+   "coverage": 0.72561,
+   "n_interval": 164,
+   "median_rel_width": 0.47787,
+   "coverage_ci90": [
+    0.66498,
+    0.77891
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "house",
+   "method": "a1",
+   "n_total": 52,
+   "n": 52,
+   "mdape": 0.25962,
+   "bias": -0.13743,
+   "p90_ape": 0.50745,
+   "coverage": 0.76923,
+   "n_interval": 41,
+   "median_rel_width": 1.00099,
+   "coverage_ci90": [
+    0.66127,
+    0.85056
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "house",
+   "method": "a2",
+   "n_total": 52,
+   "n": 52,
+   "mdape": 0.2638,
+   "bias": 0.06865,
+   "p90_ape": 0.6822,
+   "coverage": 0.82692,
+   "n_interval": 41,
+   "median_rel_width": 0.9283,
+   "coverage_ci90": [
+    0.72507,
+    0.89643
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "house",
+   "method": "b",
+   "n_total": 52,
+   "n": 33,
+   "mdape": 0.15174,
+   "bias": -0.04156,
+   "p90_ape": 0.40682,
+   "coverage": 1.0,
+   "n_interval": 6,
+   "median_rel_width": 1.22703,
+   "coverage_ci90": [
+    0.92421,
+    1.0
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "house",
+   "method": "gbm",
+   "n_total": 52,
+   "n": 52,
+   "mdape": 0.19759,
+   "bias": 0.02798,
+   "p90_ape": 0.60139,
+   "coverage": 0.84615,
+   "n_interval": 41,
+   "median_rel_width": 0.93055,
+   "coverage_ci90": [
+    0.74698,
+    0.91108
+   ],
+   "indicative": false
+  },
+  {
+   "segment": "house",
+   "method": "ridge",
+   "n_total": 52,
+   "n": 52,
+   "mdape": 0.27296,
+   "bias": -0.02458,
+   "p90_ape": 0.59622,
+   "coverage": 0.90385,
+   "n_interval": 41,
+   "median_rel_width": 1.05242,
+   "coverage_ci90": [
+    0.81533,
+    0.95241
+   ],
+   "indicative": false
+  }
+ ],
+ "spatial_blocks_within_9000": {
+  "pooled": [
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "n_total": 636,
+    "n": 624,
+    "mdape": 0.16492,
+    "bias": -0.02687,
+    "p90_ape": 0.47726,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "n_total": 636,
+    "n": 636,
+    "mdape": 0.1511,
+    "bias": 0.0412,
+    "p90_ape": 0.54546,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "n_total": 636,
+    "n": 81,
+    "mdape": 0.12311,
+    "bias": -0.07586,
+    "p90_ape": 0.36675,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "n_total": 636,
+    "n": 636,
+    "mdape": 0.13203,
+    "bias": 0.03572,
+    "p90_ape": 0.49244,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "n_total": 636,
+    "n": 636,
+    "mdape": 0.14918,
+    "bias": 0.03315,
+    "p90_ape": 0.4775,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "n_total": 154,
+    "n": 141,
+    "mdape": 0.30255,
+    "bias": -0.00203,
+    "p90_ape": 0.81563,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "n_total": 154,
+    "n": 154,
+    "mdape": 0.22965,
+    "bias": 0.05651,
+    "p90_ape": 0.67317,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "n_total": 154,
+    "n": 90,
+    "mdape": 0.19522,
+    "bias": -0.03233,
+    "p90_ape": 0.78232,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "n_total": 154,
+    "n": 154,
+    "mdape": 0.28995,
+    "bias": 0.05187,
+    "p90_ape": 0.72998,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "n_total": 154,
+    "n": 154,
+    "mdape": 0.35625,
+    "bias": 0.02859,
+    "p90_ape": 0.84684,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   }
+  ],
+  "per_block": [
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "fold": "NV",
+    "n_total": 171,
+    "n": 168,
+    "mdape": 0.1489,
+    "bias": -0.11721,
+    "p90_ape": 0.32498,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "fold": "NØ",
+    "n_total": 6,
+    "n": 6,
+    "mdape": 0.42134,
+    "bias": -0.42134,
+    "p90_ape": 0.46293,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "fold": "SV",
+    "n_total": 195,
+    "n": 186,
+    "mdape": 0.17116,
+    "bias": 0.05163,
+    "p90_ape": 0.56471,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a1",
+    "fold": "SØ",
+    "n_total": 264,
+    "n": 264,
+    "mdape": 0.17524,
+    "bias": -0.01273,
+    "p90_ape": 0.47828,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "fold": "NV",
+    "n_total": 171,
+    "n": 171,
+    "mdape": 0.11277,
+    "bias": -0.0111,
+    "p90_ape": 0.28113,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "fold": "NØ",
+    "n_total": 6,
+    "n": 6,
+    "mdape": 0.40538,
+    "bias": -0.40538,
+    "p90_ape": 0.45832,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "fold": "SV",
+    "n_total": 195,
+    "n": 195,
+    "mdape": 0.16295,
+    "bias": 0.07455,
+    "p90_ape": 0.57109,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "a2",
+    "fold": "SØ",
+    "n_total": 264,
+    "n": 264,
+    "mdape": 0.16992,
+    "bias": 0.06068,
+    "p90_ape": 0.6273,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "fold": "NV",
+    "n_total": 171,
+    "n": 27,
+    "mdape": 0.08311,
+    "bias": -0.00406,
+    "p90_ape": 0.27281,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "fold": "NØ",
+    "n_total": 6,
+    "n": 3,
+    "mdape": 0.24325,
+    "bias": -0.24325,
+    "p90_ape": 0.25972,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "fold": "SV",
+    "n_total": 195,
+    "n": 29,
+    "mdape": 0.12311,
+    "bias": -0.01894,
+    "p90_ape": 0.53572,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "b",
+    "fold": "SØ",
+    "n_total": 264,
+    "n": 22,
+    "mdape": 0.14175,
+    "bias": -0.13076,
+    "p90_ape": 0.39896,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "fold": "NV",
+    "n_total": 171,
+    "n": 171,
+    "mdape": 0.09262,
+    "bias": -0.00274,
+    "p90_ape": 0.27495,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "fold": "NØ",
+    "n_total": 6,
+    "n": 6,
+    "mdape": 0.39009,
+    "bias": -0.39009,
+    "p90_ape": 0.51068,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "fold": "SV",
+    "n_total": 195,
+    "n": 195,
+    "mdape": 0.13701,
+    "bias": 0.04593,
+    "p90_ape": 0.50385,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "gbm",
+    "fold": "SØ",
+    "n_total": 264,
+    "n": 264,
+    "mdape": 0.16666,
+    "bias": 0.07724,
+    "p90_ape": 0.56083,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "fold": "NV",
+    "n_total": 171,
+    "n": 171,
+    "mdape": 0.11092,
+    "bias": 0.07236,
+    "p90_ape": 0.34401,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "fold": "NØ",
+    "n_total": 6,
+    "n": 6,
+    "mdape": 0.44217,
+    "bias": -0.44217,
+    "p90_ape": 0.60337,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "fold": "SV",
+    "n_total": 195,
+    "n": 195,
+    "mdape": 0.14373,
+    "bias": 0.01493,
+    "p90_ape": 0.43195,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "apartment",
+    "method": "ridge",
+    "fold": "SØ",
+    "n_total": 264,
+    "n": 264,
+    "mdape": 0.16974,
+    "bias": 0.02114,
+    "p90_ape": 0.51487,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "fold": "NV",
+    "n_total": 7,
+    "n": 7,
+    "mdape": 0.23894,
+    "bias": -0.05673,
+    "p90_ape": 3.6814,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "fold": "SV",
+    "n_total": 72,
+    "n": 61,
+    "mdape": 0.28968,
+    "bias": -0.20212,
+    "p90_ape": 0.57815,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a1",
+    "fold": "SØ",
+    "n_total": 75,
+    "n": 73,
+    "mdape": 0.31271,
+    "bias": 0.24827,
+    "p90_ape": 1.05635,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "fold": "NV",
+    "n_total": 7,
+    "n": 7,
+    "mdape": 0.14191,
+    "bias": 0.00936,
+    "p90_ape": 4.12327,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "fold": "SV",
+    "n_total": 72,
+    "n": 72,
+    "mdape": 0.26137,
+    "bias": -0.0707,
+    "p90_ape": 0.55964,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "a2",
+    "fold": "SØ",
+    "n_total": 75,
+    "n": 75,
+    "mdape": 0.2224,
+    "bias": 0.18663,
+    "p90_ape": 0.75534,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "fold": "NV",
+    "n_total": 7,
+    "n": 6,
+    "mdape": 0.20024,
+    "bias": 0.05525,
+    "p90_ape": 5.81139,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "fold": "SV",
+    "n_total": 72,
+    "n": 35,
+    "mdape": 0.18,
+    "bias": -0.01974,
+    "p90_ape": 1.50574,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "b",
+    "fold": "SØ",
+    "n_total": 75,
+    "n": 49,
+    "mdape": 0.19984,
+    "bias": -0.05377,
+    "p90_ape": 0.75699,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "fold": "NV",
+    "n_total": 7,
+    "n": 7,
+    "mdape": 0.26534,
+    "bias": 0.26534,
+    "p90_ape": 4.95352,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "fold": "SV",
+    "n_total": 72,
+    "n": 72,
+    "mdape": 0.29649,
+    "bias": -0.21718,
+    "p90_ape": 0.61663,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "gbm",
+    "fold": "SØ",
+    "n_total": 75,
+    "n": 75,
+    "mdape": 0.27017,
+    "bias": 0.17847,
+    "p90_ape": 0.84268,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "fold": "NV",
+    "n_total": 7,
+    "n": 7,
+    "mdape": 0.23447,
+    "bias": 0.23447,
+    "p90_ape": 4.77237,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": true
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "fold": "SV",
+    "n_total": 72,
+    "n": 72,
+    "mdape": 0.38426,
+    "bias": -0.33432,
+    "p90_ape": 0.72397,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   },
+   {
+    "segment": "house",
+    "method": "ridge",
+    "fold": "SØ",
+    "n_total": 75,
+    "n": 75,
+    "mdape": 0.3422,
+    "bias": 0.29131,
+    "p90_ape": 0.92797,
+    "coverage": null,
+    "median_rel_width": null,
+    "n_interval": 0,
+    "indicative": false
+   }
+  ],
+  "note": "Leave-one-block-out inden for postnummer 9000. Måler IKKE generalisering til nye byer eller postnumre."
+ },
+ "decision": {
+  "house": {
+   "recommended": "a1",
+   "best_baseline": "a1",
+   "reason": "Ingen challenger slår a1 med mindst 10% i MdAPE med et bootstrap-interval under 0. Baseline anbefales."
+  },
+  "apartment": {
+   "recommended": "a2",
+   "best_baseline": "a2",
+   "reason": "Ingen challenger slår a2 med mindst 10% i MdAPE med et bootstrap-interval under 0. Baseline anbefales."
+  }
+ },
+ "method_labels": {
+  "a1": "Baseline A1: median pris pr. m², seneste 12-36 mdr.",
+  "a2": "Baseline A2: /stats-indeks × areal",
+  "b": "Baseline B: offentlig vurdering × lokal salg/vurdering",
+  "ridge": "Challenger: regulariseret log-lineær (ridge)",
+  "gbm": "Challenger: gradient boosting"
+ }
+}

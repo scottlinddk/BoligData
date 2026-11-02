@@ -8,3 +8,10 @@ dist/
 .DS_Store
 coverage/
 apps/web/.crawl-build/
+analysis/hedonic/data/raw/
+analysis/hedonic/data/interim/
+analysis/hedonic/data/processed/
+analysis/hedonic/outputs/scoring_listings.csv
+__pycache__/
+*.pyc
+.pytest_cache/
