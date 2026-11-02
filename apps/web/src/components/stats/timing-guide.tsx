@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useI18n } from "@/i18n/i18n";
 import { makeStatsFormat } from "@/lib/stats-format";
+import { TimingFindings } from "./timing-findings";
 import { monthRuns } from "@shared/analysis/zip-market-timing";
 import {
   buildTimingView,
@@ -268,6 +269,8 @@ export function TimingGuide() {
           </p>
         </div>
       </div>
+
+      <TimingFindings />
 
       <p className="mt-4 max-w-3xl text-[12px] text-ink-soft">
         {tx(

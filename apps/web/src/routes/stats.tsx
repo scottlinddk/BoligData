@@ -28,11 +28,13 @@ import { CorrelationMatrix } from "@/components/stats/correlation-matrix";
 import { DivergingBars } from "@/components/stats/diverging-bars";
 import { RelationshipMap } from "@/components/stats/relationship-map";
 import { AnalysisTab } from "@/components/stats/analysis/analysis-tab";
+import { ForecastTab } from "@/components/stats/forecast/forecast-tab";
 
 type MatrixMode = "changes" | "annual";
-type StatsTab = "overview" | "analyse";
+type StatsTab = "overview" | "forecast" | "analyse";
 const TABS: { id: StatsTab; label: string }[] = [
   { id: "overview", label: "Oversigt" },
+  { id: "forecast", label: "Prognose" },
   { id: "analyse", label: "Analyse" },
 ];
 
@@ -50,7 +52,8 @@ export function StatsPage() {
   const relationshipRemarks = useMemo(() => buildRelationshipRemarks(language, report), [language, report]);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab: StatsTab = searchParams.get("tab") === "analyse" ? "analyse" : "overview";
+  const requestedTab = searchParams.get("tab");
+  const tab: StatsTab = requestedTab === "analyse" || requestedTab === "forecast" ? requestedTab : "overview";
   const selectTab = (next: StatsTab) =>
     setSearchParams(
       (prev) => {
@@ -137,12 +140,16 @@ export function StatsPage() {
             onClick={() => selectTab(item.id)}
             className={`min-h-9 rounded-lg px-4 font-medium transition-colors ${tab === item.id ? "bg-cta text-cta-text" : "text-ink-soft hover:bg-surface-alt"}`}
           >
-            {item.label}
+            {item.id === "forecast" ? tx("Prognose", "Forecast") : item.id === "analyse" ? tx("Analyse", "Analysis") : tx("Oversigt", "Overview")}
           </button>
         ))}
       </div>
 
-      {tab === "analyse" ? (
+      {tab === "forecast" ? (
+        <div role="tabpanel" id="stats-panel-forecast" aria-labelledby="stats-tab-forecast">
+          <ForecastTab />
+        </div>
+      ) : tab === "analyse" ? (
         <div role="tabpanel" id="stats-panel-analyse" aria-labelledby="stats-tab-analyse">
           <AnalysisTab />
         </div>
