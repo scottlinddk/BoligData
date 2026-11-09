@@ -1,5 +1,7 @@
 # Coolify deployment
 
+Production runs on Coolify at coolify.scottlind.dk and serves https://boligdata.scottlind.dk. Runtime logs are in Coolify; Vercel is no longer the host, so a red Vercel status on a PR is not a deploy signal.
+
 Build the repository root with Dockerfile on port 3000. The container serves the Vite build and all existing API handlers, retaining authentication and RLS in those handlers. /healthz is a process health endpoint.
 
 Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY as build arguments using the self-hosted Kong HTTPS API URL and its anon key. Set SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY at runtime using the same instance. The service-role key must never be prefixed VITE_. Set FRONTEND_URL to https://boligdata.scottlind.dk. Existing sessions need a new sign-in after switching Supabase instances.
