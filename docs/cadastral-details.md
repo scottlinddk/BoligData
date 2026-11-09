@@ -47,8 +47,11 @@ Unknown coordinate systems and malformed geometry are not drawn.
 
 ## Ownership and upstream failures
 
-The public Matriklen client uses `api/v3.3/BfeEjer?bfe=<BFE>` without a bearer
-token. The adapter copies only owner name/type, CVR, shares and dates. It does
+The public Matriklen client uses `api/<version>/BfeEjer?bfe=<BFE>` without a
+bearer token. Matriklen withdraws old versions with a 404 (v3.3 is gone; v3.4 and
+v3.5 answered on 2026-11-09), so the adapter tries v3.5 then v3.4 on a 404 and
+remembers the one that works. `MATRIKLEN_API_VERSION` pins a single version and
+disables the fallback. The adapter copies only owner name/type, CVR, shares and dates. It does
 not return CPR identifiers, home/contact addresses, or protected names.
 `BeskyttetPerson` is always redacted, and `Opdelt i ejerlejligheder` is treated
 as a subdivision marker, not an owner. Authentication-required and unavailable

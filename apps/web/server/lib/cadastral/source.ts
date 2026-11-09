@@ -5,7 +5,10 @@ import { fetchJson, HttpError } from "../shared/http.js";
 import { resolveHusnummerId } from "../enrichment-sources/address-lookup-dar.js";
 import { parseCadastralGeometry } from "./geometry.js";
 
-const API = "https://api.matriklen.dk/api/v3.3";
+const API = "https://api.matriklen.dk/api";
+/** Matriklen withdraws old API versions with a 404 (v3.3 is gone, v3.4 and v3.5 answer). Newest first; MATRIKLEN_API_VERSION pins one. */
+const API_VERSIONS = ["v3.5", "v3.4"] as const;
+let workingApiVersion: string | null = null;
 const GRAPHQL = "https://graphql.datafordeler.dk";
 const TIMEOUT = 6_000;
 /** Jordstykke -> DAR_Husnummer relation in Flexible v2. NOT verified against the live schema (the forward relation is `husnummerErPlaceretPaaJordstykke`); if addresses never appear, check this name first. */
@@ -37,7 +40,10 @@ async function query(root: string, selection: string, key: string): Promise<unkn
     method: "POST", body: JSON.stringify({ query: `query { ${selection} }` }),
     headers: { "Content-Type": "application/json" }, timeoutMs: TIMEOUT, attempts: 1,
   }));
-  if (result.errors || !record(result.data)[root]) throw new Error("Cadastral register unavailable");
+  if (result.errors || !record(result.data)[root]) {
+    const messages = Array.isArray(result.errors) ? result.errors.map(e => text(record(e).message) ?? "unknown error").join(" | ") : "no data for " + root;
+    throw new Error(`Cadastral register unavailable: ${messages}`);
+  }
   return record(result.data)[root];
 }
 
@@ -125,9 +131,28 @@ export async function getParcelOwners(bfe: string): Promise<CadastralReport["own
   } catch (error) { logFailure(`owner estate lookup for BFE ${bfe}`, error); return unavailable; }
 }
 
+/** Tries each known API version on a 404 only, and remembers the one that answered. A pinned version is never probed around. */
+async function fetchBfeEjer(bfe: string): Promise<unknown> {
+  const pinned = process.env.MATRIKLEN_API_VERSION?.trim();
+  const candidates = pinned ? [pinned] : [...new Set([workingApiVersion, ...API_VERSIONS].filter((v): v is string => v !== null))];
+  let lastError: unknown;
+  for (const version of candidates) {
+    try {
+      const raw = await fetchJson<unknown>(`${API}/${version}/BfeEjer?${new URLSearchParams({ bfe })}`, { timeoutMs: TIMEOUT, attempts: 1 });
+      workingApiVersion = version;
+      return raw;
+    } catch (error) {
+      lastError = error;
+      if (version === workingApiVersion) workingApiVersion = null;
+      if (!(error instanceof HttpError && error.status === 404)) throw error;
+    }
+  }
+  throw lastError;
+}
+
 async function owners(bfe: string): Promise<CadastralReport["owners"]> {
   try {
-    const raw = await fetchJson<unknown>(`${API}/BfeEjer?${new URLSearchParams({ bfe })}`, { timeoutMs: TIMEOUT, attempts: 1 });
+    const raw = await fetchBfeEjer(bfe);
     const items = mapOwners(raw);
     if (items.some(item => item.name === "Opdelt i ejerlejligheder")) return { status: "unavailable", items: [], reason: "condominium_parent" };
     return { status: items.length ? "available" : "not_found", items, reason: null };
