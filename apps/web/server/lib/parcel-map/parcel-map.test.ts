@@ -72,6 +72,21 @@ describe("parcel source", () => {
     expect(jordstykke).toHaveLength(2);
     for (const q of jordstykke) expect(q).not.toMatch(/\bb\d+\s*:/);
   });
+  it("skips a lodflade parcel that has no jordstykke row and keeps the rest", async () => {
+    vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const ring = "POLYGON((550000 6300000, 550010 6300000, 550010 6300010, 550000 6300010, 550000 6300000))";
+    const reply = (body: string) => {
+      if (body.includes("MAT_Lodflade")) return { MAT_Lodflade: { nodes: [{ jordstykkeLokalId: "111", geometri: { wkt: ring, crs: 25832 } }, { jordstykkeLokalId: "999", geometri: { wkt: ring, crs: 25832 } }] } };
+      if (body.includes("MAT_Jordstykke")) return { MAT_Jordstykke: { nodes: [{ id_lokalId: "111", matrikelnummer: "12a", ejerlavLokalId: null, samletFastEjendomLokalId: null }] } };
+      if (body.includes("MAT_SamletFastEjendom")) return { MAT_SamletFastEjendom: { nodes: [] } };
+      return { MAT_Ejerlav: { nodes: [] } };
+    };
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { body: string }) => new Response(JSON.stringify({ data: reply(JSON.parse(init.body).query) }), { status: 200 })));
+    const result = await getParcelsInView(parseParcelBbox(BBOX)!);
+    expect(result.status).toBe("available");
+    expect(result.parcels.map(p => p.id)).toEqual(["111"]);
+  });
   it("returns unavailable on a GraphQL error instead of partial data", async () => {
     vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false"); vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ errors: [{ message: "bad filter" }] }), { status: 200 })));
