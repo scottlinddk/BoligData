@@ -16,6 +16,11 @@ const text = (value: unknown): string | null => typeof value === "string" && val
 const number = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 const bool = (value: unknown): boolean | null => typeof value === "boolean" ? value : null;
 const id = (value: unknown): string | null => /^(?:[1-9]\d{0,14})$/.test(String(value)) ? String(value) : null;
+/** Server-side only. Responses stay generic, so without this the real cause (timeout, 4xx, schema drift) is invisible. */
+function logFailure(scope: string, error: unknown): void {
+  const detail = error instanceof HttpError ? `HttpError ${error.status}: ${error.message}` : error instanceof Error ? `${error.name}: ${error.message}` : "request failed";
+  console.warn(`[cadastral] ${scope} failed: ${detail.slice(0, 600)}`);
+}
 const nodes = (value: unknown): Record<string, unknown>[] => {
   const list = record(value).nodes;
   if (!Array.isArray(list) || list.some(item => !item || typeof item !== "object" || Array.isArray(item))) throw new Error("Invalid register response");
@@ -117,7 +122,7 @@ export async function getParcelOwners(bfe: string): Promise<CadastralReport["own
     const condominiumParent = bool(estates[0]!.hovedejendomOpdeltIEjerlejligh), commonLot = bool(estates[0]!.erFaelleslod);
     if (condominiumParent !== false || commonLot !== false) return { status: "unavailable", items: [], reason: condominiumParent ? "condominium_parent" : commonLot ? "common_lot" : "source_unavailable" };
     return await owners(bfe);
-  } catch { return unavailable; }
+  } catch (error) { logFailure(`owner estate lookup for BFE ${bfe}`, error); return unavailable; }
 }
 
 async function owners(bfe: string): Promise<CadastralReport["owners"]> {
@@ -127,6 +132,7 @@ async function owners(bfe: string): Promise<CadastralReport["owners"]> {
     if (items.some(item => item.name === "Opdelt i ejerlejligheder")) return { status: "unavailable", items: [], reason: "condominium_parent" };
     return { status: items.length ? "available" : "not_found", items, reason: null };
   } catch (error) {
+    logFailure(`BfeEjer lookup for BFE ${bfe}`, error);
     return { status: error instanceof HttpError && (error.status === 401 || error.status === 403) ? "requires_access" : "unavailable", items: [], reason: "source_unavailable" };
   }
 }
@@ -180,7 +186,7 @@ export async function getCadastralReport(property: Property): Promise<CadastralR
       } catch { /* A malformed parcel must not remove the map or ownership result. */ }
     }
     return report;
-  } catch { return report; }
+  } catch (error) { logFailure("cadastral report", error); return report; }
 }
 
 /**
@@ -210,5 +216,5 @@ export async function getParcelAddresses(bfe: string): Promise<ParcelAddress[]> 
       }
     }
     return [...seen.values()].slice(0, MAX_ADDRESSES);
-  } catch { return []; }
+  } catch (error) { logFailure(`address lookup for BFE ${bfe}`, error); return []; }
 }

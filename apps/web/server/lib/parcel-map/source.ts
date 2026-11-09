@@ -118,7 +118,8 @@ export async function getParcelsInView(bbox: Bbox): Promise<ParcelMapResponse> {
     const parcels: ParcelMapParcel[] = [];
     for (const [parcelId, polygons] of shapes) {
       const row = parcelRows.get(parcelId);
-      if (!row) { logUnavailable(`no MAT_Jordstykke for parcel ${parcelId}`); return unavailable; }
+      // Lodflade can reference a parcel with no current Jordstykke row. Drop that one parcel, not the whole map.
+      if (!row) { logUnavailable(`skipping parcel ${parcelId}: no MAT_Jordstykke row`); continue; }
       const geometry = toWgs84(polygons);
       if (!geometry) { logUnavailable(`coordinate conversion failed on parcel ${parcelId}`); return unavailable; }
       const estate = estates.get(id(row.samletFastEjendomLokalId) ?? ""), district = districts.get(id(row.ejerlavLokalId) ?? "");
