@@ -124,6 +124,23 @@ describe("owner endpoint", () => {
     const ok = await gate({ hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: false });
     expect(ok.result.items).toHaveLength(1);
   });
+  it("falls back to an older Matriklen API version when the newest answers 404, and remembers it", async () => {
+    vi.resetModules();
+    vi.stubEnv("DATAFORDELER_API_KEY", "test-key");
+    const fetchMock = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes("graphql")) return new Response(JSON.stringify({ data: { MAT_SamletFastEjendom: { nodes: [{ BFEnummer: 3299123, hovedejendomOpdeltIEjerlejligh: false, erFaelleslod: false }] } } }), { status: 200 });
+      if (u.includes("/v3.5/")) return new Response("gone", { status: 404 });
+      return new Response(JSON.stringify({ ejere: [{ navn: "Test Owner", type: "Person" }] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { getParcelOwners } = await import("../cadastral/source.js");
+    expect((await getParcelOwners("3299123")).items).toHaveLength(1);
+    const bfeCalls = () => fetchMock.mock.calls.map(([url]) => String(url)).filter(u => u.includes("BfeEjer"));
+    expect(bfeCalls().map(u => /\/(v[\d.]+)\//.exec(u)![1])).toEqual(["v3.5", "v3.4"]);
+    await getParcelOwners("3299123");
+    expect(bfeCalls().map(u => /\/(v[\d.]+)\//.exec(u)![1]).slice(2)).toEqual(["v3.4"]);
+  });
   it("caches definitive owner answers for a day, but never an inconclusive one", async () => {
     vi.stubEnv("PARCEL_MAP_MOCK_MODE", "false");
     const rpc = vi.fn(async () => ({ data: true, error: null }));
