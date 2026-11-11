@@ -26,7 +26,8 @@ describe("timing view", () => {
 
   it("reports the latest month against earlier years", () => {
     expect(view.latest.map((l) => l.key)).toEqual(["daysOnMarket", "supply", "discount"]);
-    expect(view.latest[0]!.difference).toBeGreaterThan(50);
+    // October 2026: 103 days against about 86 for the same month in earlier years. Still slower than typical.
+    expect(view.latest[0]!.difference).toBeGreaterThan(10);
   });
 
   it("labels every month with one plain category", () => {

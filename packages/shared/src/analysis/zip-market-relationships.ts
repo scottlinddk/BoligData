@@ -212,7 +212,7 @@ export const MARKET_PHASES: MarketPhase[] = [
   { id: "squeeze-boom", from: "2021-01", to: "2022-08" },
   { id: "cooling", from: "2022-09", to: "2023-12" },
   { id: "slow-high-supply", from: "2024-01", to: "2025-03" },
-  { id: "price-rebound", from: "2025-04", to: "2026-09" },
+  { id: "price-rebound", from: "2025-04", to: "2026-10" },
 ];
 
 export interface PhaseMetricSummary {

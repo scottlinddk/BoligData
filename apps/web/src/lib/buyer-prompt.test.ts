@@ -19,10 +19,10 @@ describe("buildBuyerPrompt for the example search", () => {
   });
 
   it("includes the postcode 9000 figures from the stats page", () => {
-    expect(da).toContain("27.690 kr./m²");
-    expect(da).toContain("150 dage");
-    expect(en).toContain("27,690 DKK/m²");
-    expect(en).toContain("150");
+    expect(da).toContain("25.417 kr./m²");
+    expect(da).toContain("103 dage");
+    expect(en).toContain("25,417 DKK/m²");
+    expect(en).toContain("103");
   });
 
   it("states the season and which month it is now", () => {
@@ -45,7 +45,7 @@ describe("buildBuyerPrompt outside postcode 9000", () => {
   const text = buildBuyerPrompt({ ...EXAMPLE_INPUT, location: "8000 Aarhus C" }, "en", TODAY);
 
   it("does not present the 9000 figures as the area's", () => {
-    expect(text).not.toContain("27,690");
+    expect(text).not.toContain("25,417");
     expect(text).not.toContain("Market data for postcode 9000");
     expect(text).toContain("I have no market figures for 8000 Aarhus C");
     expect(text).toContain("Do not use figures from other postcodes");
