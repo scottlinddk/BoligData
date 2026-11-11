@@ -95,16 +95,16 @@ describe("the 9000 Aalborg timing guide", () => {
 describe("waitingCost and latestVsTypical", () => {
   const cost = waitingCost(buildTimingMonths());
   it("sets the season against the market's own movement", () => {
-    expect(cost.latestMonth).toBe("2026-09");
-    expect(cost.yearOverYearPercent).toBeCloseTo(14.94, 2);
+    expect(cost.latestMonth).toBe("2026-10");
+    expect(cost.yearOverYearPercent).toBeCloseTo(4.6, 1);
     expect(cost.seasonalSpreadPercent).toBeLessThan(5);
     expect(cost.seasonalPriceReliable).toBe(false);
   });
 
   it("compares the latest month with the same month in earlier years", () => {
     const days = latestVsTypical("daysOnMarket")!;
-    expect(days.month).toBe("2026-09");
-    expect(days.value).toBe(150);
+    expect(days.month).toBe("2026-10");
+    expect(days.value).toBe(103);
     expect(days.years).toBe(5);
     expect(days.favoursBuyer).toBe(days.difference > 0);
     const discount = latestVsTypical("discount")!;

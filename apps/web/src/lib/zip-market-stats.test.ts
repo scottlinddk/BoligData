@@ -16,13 +16,13 @@ import {
 } from "@shared/analysis/zip-market-stats";
 
 describe("postcode 9000 market snapshot", () => {
-  it("covers every month from 2011-01 to 2026-09 for every series without gaps", () => {
+  it("covers every month from 2011-01 to 2026-10 for every series without gaps", () => {
     expect(() => assertSnapshotIntegrity()).not.toThrow();
     for (const metric of Object.keys(zipMarketSnapshot.series) as (keyof typeof zipMarketSnapshot.series)[]) {
       const months = monthlySeries(metric);
-      expect(months).toHaveLength(189);
+      expect(months).toHaveLength(190);
       expect(months[0]?.month).toBe("2011-01");
-      expect(months.at(-1)?.month).toBe("2026-09");
+      expect(months.at(-1)?.month).toBe("2026-10");
     }
   });
 
@@ -34,20 +34,20 @@ describe("postcode 9000 market snapshot", () => {
 
   it("reproduces the year-over-year figures reported by the source for the latest month", () => {
     const summary = summarizeZipMarket();
-    expect(summary.latestMonth).toBe("2026-09");
-    // Source: sold price 27,690 vs 24,091 a year earlier, previousYear.difference.percentage 14.94.
-    expect(summary.latest.sold_per_area_price.yoyPercent).toBeCloseTo(14.94, 2);
-    // Source: time on market 150 vs 98, percentage 53.06.
-    expect(summary.latest.sold_time_on_market.yoyPercent).toBeCloseTo(53.06, 2);
-    // Source: villas for sale 161 vs 193, absolute -32.
-    expect(summary.latest.amount_for_sale.yoyAbsolute).toBe(-32);
-    // Source: sold price previousMonth.difference.percentage -0.23.
-    expect(summary.latest.sold_per_area_price.momPercent).toBeCloseTo(-0.23, 2);
+    expect(summary.latestMonth).toBe("2026-10");
+    // Source: sold price 25,417 vs 24,300 a year earlier, previousYear.difference.percentage 4.6.
+    expect(summary.latest.sold_per_area_price.yoyPercent).toBeCloseTo(4.6, 1);
+    // Source: time on market 103 vs 95, percentage 8.42.
+    expect(summary.latest.sold_time_on_market.yoyPercent).toBeCloseTo(8.42, 2);
+    // Source: villas for sale 153 vs 203, absolute -50.
+    expect(summary.latest.amount_for_sale.yoyAbsolute).toBe(-50);
+    // Source: sold price previousMonth.difference.percentage -8.13.
+    expect(summary.latest.sold_per_area_price.momPercent).toBeCloseTo(-8.13, 2);
   });
 
   it("labels 2026 as a partial year and gives 2011-2025 as the full-year growth window", () => {
     const summary = summarizeZipMarket();
-    expect(summary.yearly.find((row) => row.year === 2026)?.months).toBe(9);
+    expect(summary.yearly.find((row) => row.year === 2026)?.months).toBe(10);
     expect(summary.yearly.find((row) => row.year === 2025)?.months).toBe(12);
     expect(summary.soldPriceCagr.fromYear).toBe(2011);
     expect(summary.soldPriceCagr.toYear).toBe(2025);

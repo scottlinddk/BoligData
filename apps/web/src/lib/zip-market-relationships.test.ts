@@ -88,7 +88,7 @@ describe("market phases", () => {
     MARKET_PHASES.slice(1).forEach((phase, i) => {
       expect(phase.from).toBe(shiftMonth(MARKET_PHASES[i]!.to, 1));
     });
-    expect(summarizePhases().reduce((sum, p) => sum + p.months, 0)).toBe(189);
+    expect(summarizePhases().reduce((sum, p) => sum + p.months, 0)).toBe(190);
   });
 
   // The page text states what happened in each phase. These pin the facts it relies on,
@@ -149,10 +149,13 @@ describe("market phases", () => {
     expect(phase("slow-high-supply").metrics.supply.max.value).toBe(227);
     const p = phase("price-rebound").metrics;
     expect(p.asking.changePercent).toBeGreaterThan(10);
-    expect(p.sold.changePercent).toBeGreaterThan(15);
+    // October 2026 fell 8.1% month on month, which lowers the phase gain from about 20% to 11%. It is still a clear rise.
+    expect(p.sold.changePercent).toBeGreaterThan(10);
     expect(p.supply.changePercent).toBeLessThan(0);
-    // Days on market rose in the same phase: the page flags this as the one series that did not follow prices.
-    expect(p.daysOnMarket.changePercent).toBeGreaterThan(0);
+    // Days on market rose during the phase (peak above the start), then fell sharply in October 2026, so the phase total is now negative.
+    // The page words this as swinging, not as not following prices. Do not read the net fall as a turn from one month.
+    expect(p.daysOnMarket.max.value).toBeGreaterThan(p.daysOnMarket.start);
+    expect(p.daysOnMarket.changePercent).toBeLessThan(0);
   });
 });
 
@@ -171,9 +174,9 @@ describe("relationships between the series", () => {
     expect(report.leadLag.every((l) => l.profile.length === 19 && l.best !== null)).toBe(true);
   });
 
-  it("reports all ten pairs, on 177 twelve-month changes (189 months less the first 12)", () => {
+  it("reports all ten pairs, on 178 twelve-month changes (190 months less the first 12)", () => {
     expect(report.changeCorrelations).toHaveLength(10);
-    expect(report.changeCorrelations.every((p) => p.n === 177)).toBe(true);
+    expect(report.changeCorrelations.every((p) => p.n === 178)).toBe(true);
     expect(report.annualCorrelations.every((p) => p.n === 14)).toBe(true);
   });
 

@@ -7,27 +7,27 @@ import { makeStatsFormat } from "@/lib/stats-format";
 describe("stats view model", () => {
   const view = buildStatsView();
 
-  it("covers 189 months and five KPIs for the latest month", () => {
-    expect(view.monthCount).toBe(189);
-    expect(view.latestMonth).toBe("2026-09");
+  it("covers 190 months and five KPIs for the latest month", () => {
+    expect(view.monthCount).toBe(190);
+    expect(view.latestMonth).toBe("2026-10");
     expect(view.kpis.map((k) => k.key)).toEqual(["asking", "sold", "supply", "daysOnMarket", "discount"]);
   });
 
-  it("matches the year-over-year figures the source reports for September 2026", () => {
+  it("matches the year-over-year figures the source reports for October 2026", () => {
     const kpi = (key: string) => view.kpis.find((k) => k.key === key)!;
-    expect(kpi("sold").value).toBe(27_690);
-    expect(kpi("sold").percentChange).toBeCloseTo(14.94, 2);
-    expect(kpi("daysOnMarket").percentChange).toBeCloseTo(53.06, 2);
-    expect(kpi("supply").absoluteChange).toBe(-32);
-    // The discount is shown as a size: 865 now against 825 a year earlier.
-    expect(kpi("discount").value).toBe(865);
-    expect(kpi("discount").absoluteChange).toBe(40);
+    expect(kpi("sold").value).toBe(25_417);
+    expect(kpi("sold").percentChange).toBeCloseTo(4.6, 1);
+    expect(kpi("daysOnMarket").percentChange).toBeCloseTo(8.42, 2);
+    expect(kpi("supply").absoluteChange).toBe(-50);
+    // The discount is shown as a size: 762 now against 792 a year earlier.
+    expect(kpi("discount").value).toBe(762);
+    expect(kpi("discount").absoluteChange).toBe(-30);
   });
 
   it("puts the latest asking and sold prices at or near the top of the history", () => {
     const kpi = (key: string) => view.kpis.find((k) => k.key === key)!;
     expect(kpi("asking").percentile).toBeGreaterThan(99);
-    expect(kpi("sold").percentile).toBeGreaterThan(98);
+    expect(kpi("sold").percentile).toBeGreaterThan(95);
     expect(kpi("sold").max.month).toBe("2026-07");
     expect(kpi("supply").min).toEqual({ value: 94, month: "2022-01" });
     expect(view.kpis.every((k) => k.trend.length === 60)).toBe(true);
@@ -37,7 +37,7 @@ describe("stats view model", () => {
     const rows = buildYearlyRows();
     expect(rows).toHaveLength(16);
     expect(rows[0]!.soldChangePercent).toBeNull();
-    expect(rows.at(-1)).toMatchObject({ year: 2026, months: 9, partial: true, soldChangePercent: null });
+    expect(rows.at(-1)).toMatchObject({ year: 2026, months: 10, partial: true, soldChangePercent: null });
     expect(rows.find((r) => r.year === 2025)!.soldChangePercent).toBeCloseTo((23_440 / 23_330 - 1) * 100, 0);
   });
 
@@ -103,8 +103,8 @@ describe("written remarks", () => {
   it("quotes figures from the data rather than typed-in numbers", () => {
     const f = makeStatsFormat("en");
     const rebound = buildPhaseRemarks("en", summaries).find((p) => p.id === "price-rebound")!;
-    expect(rebound.body).toContain(f.int(28_021));
-    expect(rebound.body).toContain(f.int(27_690));
+    expect(rebound.body).toContain(f.int(28_610));
+    expect(rebound.body).toContain(f.int(25_417));
     const cooling = buildPhaseRemarks("en", summaries).find((p) => p.id === "cooling")!;
     expect(cooling.body).toContain(f.int(21_719));
     expect(cooling.body).not.toMatch(/fell -|rose \+/);
