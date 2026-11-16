@@ -131,7 +131,7 @@ export function SoldMap({ rows, lookupAddresses, metric, onMetricChange }: {
     const row = rowsById.current.get(id);
     if (!row) return null;
     const root = document.createElement("div");
-    root.style.cssText = "font:13px/1.45 system-ui,sans-serif;color:#1e293b;max-width:240px";
+    root.style.cssText = "font:13px/1.45 system-ui,sans-serif;color:inherit;max-width:240px";
     const title = document.createElement("strong");
     title.textContent = row.address; // textContent, never innerHTML.
     root.append(title);
@@ -149,7 +149,7 @@ export function SoldMap({ rows, lookupAddresses, metric, onMetricChange }: {
     }
     if (row.outlierReason) {
       const div = document.createElement("div");
-      div.style.color = "#b45309";
+      div.style.color = "var(--color-warning)";
       div.textContent = row.outlierReason;
       root.append(div);
     }
