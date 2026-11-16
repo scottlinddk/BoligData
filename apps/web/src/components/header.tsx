@@ -24,6 +24,7 @@ export function Header() {
       { to: "/address", label: t("nav.address") },
       { to: "/map", label: language === "da" ? "Ejerkort" : "Owner map" },
       { to: "/house-search", label: t("nav.houseSearch") },
+      { to: "/sold", label: language === "da" ? "Solgte" : "Sold" },
       { to: "/research", label: language === "da" ? "Boligprojekt" : "Buying project" },
       { to: "/dashboard", label: t("nav.dashboard") },
       { to: "/recommendations", label: t("nav.recommendations") },
