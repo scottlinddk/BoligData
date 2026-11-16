@@ -90,7 +90,7 @@ export function HeatmapMap({ entries }: { entries: HouseSearchEntry[] }) {
   const describe = useRef<(p: HeatPointProperties) => HTMLElement>(() => document.createElement("div"));
   describe.current = (p) => {
     const root = document.createElement("div");
-    root.style.cssText = "font:13px/1.4 system-ui,sans-serif;color:#1e293b;max-width:220px";
+    root.style.cssText = "font:13px/1.4 system-ui,sans-serif;color:inherit;max-width:220px";
     const title = document.createElement("strong");
     title.textContent = p.label; // textContent, never innerHTML: the address and notes are user input.
     root.append(title);
