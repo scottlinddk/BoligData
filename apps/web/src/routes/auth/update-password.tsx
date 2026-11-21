@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
+import { Button, Field, Input, Notice } from "@scttlnd/ui";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/i18n/i18n";
 
@@ -56,23 +57,23 @@ export function UpdatePasswordPage() {
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.updatePassword.title")}</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          type="password"
-          required
-          minLength={8}
-          placeholder={t("auth.updatePassword.passwordPlaceholder")}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-ink"
-        />
-        {error && <p className="text-sm font-semibold text-danger">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
-        >
+        <Field label={t("auth.updatePassword.passwordPlaceholder")}>
+          {(control) => (
+            <Input
+              {...control}
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
+        </Field>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button type="submit" disabled={submitting}>
           {submitting ? t("auth.updatePassword.submitting") : t("auth.updatePassword.submit")}
-        </button>
+        </Button>
       </form>
     </div>
   );

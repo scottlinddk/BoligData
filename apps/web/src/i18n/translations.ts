@@ -25,6 +25,8 @@ const da = {
 
   "common.retry": "Prøv igen",
   "common.cancel": "Annuller",
+  "common.dismiss": "Luk",
+  "common.notifications": "Notifikationer",
 
   "search.loading": "Indlæser boliger...",
   "search.error": "Kunne ikke indlæse boliger.",
@@ -664,6 +666,8 @@ const en: Translations = {
 
   "common.retry": "Try again",
   "common.cancel": "Cancel",
+  "common.dismiss": "Dismiss",
+  "common.notifications": "Notifications",
 
   "search.loading": "Loading properties...",
   "search.error": "Failed to load properties.",

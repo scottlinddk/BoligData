@@ -33,6 +33,8 @@ export function resolveInitialTheme(): Theme {
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  // @scttlnd/ui switches palette on data-fds-mode; keep it in step with the app's `dark` class.
+  document.documentElement.dataset.fdsMode = theme;
   document.documentElement.style.colorScheme = theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#171917" : "#ffffff");
 }

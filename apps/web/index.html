@@ -39,6 +39,7 @@
               ? "dark"
               : "light";
         document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.dataset.fdsMode = theme;
         document.documentElement.style.colorScheme = theme;
         document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#171917" : "#ffffff";
         document.documentElement.lang =

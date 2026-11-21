@@ -10,6 +10,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@scttlnd/ui':
+        specifier: 0.8.0
+        version: 0.8.0(react@19.2.7)
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.110.2
@@ -629,6 +632,12 @@ packages:
     resolution: {integrity: sha512-BfzEnDJOt9T8M989/lA37EcJgat01wLRnoi5dQf3QzOH7jzpqTAzdDbVfRljVr5r+jzKqpbHeyOfAaXxAd0PAA==}
     cpu: [x64]
     os: [win32]
+
+  '@scttlnd/ui@0.8.0':
+    resolution: {integrity: sha512-Bkm3dfxhB6taQQ/WLnGj0nRaRZfpTKXJxIg9xkOXAKOIqukSJYC8Qc7Nl9Upwuuh+9AIOexaiIv3JfSN+hIC6g==}
+    engines: {node: '>=22.14.0'}
+    peerDependencies:
+      react: ^18.3.0 || ^19.0.0
 
   '@selderee/plugin-htmlparser2@0.11.0':
     resolution: {integrity: sha512-P33hHGdldxGabLFjPPpaTxVolMrzrcegejx+0GxjrIb9Zv48D8yAIA/QTDR2dFl7Uz7urX8aX6+5bCZslr+gWQ==}
@@ -1302,6 +1311,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -2892,6 +2902,10 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.62.2':
     optional: true
+
+  '@scttlnd/ui@0.8.0(react@19.2.7)':
+    dependencies:
+      react: 19.2.7
 
   '@selderee/plugin-htmlparser2@0.11.0':
     dependencies:

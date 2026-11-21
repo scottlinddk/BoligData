@@ -1,5 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Toast, ToastRegion } from "@scttlnd/ui";
+import { useI18n } from "@/i18n/i18n";
 
 export type ToastVariant = "success" | "error" | "info";
 
@@ -9,11 +11,7 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const VARIANT_STYLES: Record<ToastVariant, { border: string; icon: string; iconLabel: string }> = {
-  success: { border: "border-l-success", icon: "✓", iconLabel: "bg-success-soft text-success-text" },
-  error: { border: "border-l-danger", icon: "✕", iconLabel: "bg-danger-soft text-danger" },
-  info: { border: "border-l-brand", icon: "ℹ", iconLabel: "bg-brand-soft text-brand-text" },
-};
+const TONE = { success: "success", error: "danger", info: "info" } as const;
 
 interface ToastState {
   id: number;
@@ -21,44 +19,34 @@ interface ToastState {
   variant: ToastVariant;
 }
 
+/** One toast at a time. Presentation, timing, pause-on-hover and dismissal come from @scttlnd/ui. */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [toast, setToast] = useState<ToastState | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idRef = useRef(0);
 
-  useEffect(() => () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  }, []);
-
   const showToast = useCallback((message: string, variant: ToastVariant = "info") => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     idRef.current += 1;
     setToast({ id: idRef.current, message, variant });
-    timeoutRef.current = setTimeout(() => setToast(null), 3200);
   }, []);
-
-  const styles = toast ? VARIANT_STYLES[toast.variant] : null;
+  const dismiss = useCallback(() => setToast(null), []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {toast && styles && (
-        <div
-          key={toast.id}
-          role="status"
-          className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2"
-        >
-          <div className={`ui-enter flex items-center gap-3 rounded-full border border-border border-l-4 ${styles.border} bg-surface px-4 py-3 shadow-lift`}>
-            <span
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${styles.iconLabel}`}
-              aria-hidden="true"
-            >
-              {styles.icon}
-            </span>
-            <span className="text-sm font-semibold leading-snug text-ink">{toast.message}</span>
-          </div>
-        </div>
-      )}
+      <ToastRegion label={t("common.notifications")}>
+        {toast && (
+          <Toast
+            key={toast.id}
+            tone={TONE[toast.variant]}
+            duration={toast.variant === "error" ? undefined : 3200}
+            dismissLabel={t("common.dismiss")}
+            onDismiss={dismiss}
+          >
+            {toast.message}
+          </Toast>
+        )}
+      </ToastRegion>
     </ToastContext.Provider>
   );
 }
