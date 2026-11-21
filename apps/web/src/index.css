@@ -1,4 +1,12 @@
-@tailwind base;
+/*
+ * Cascade: package styles live in @layer fds, and unlayered CSS beats any layer. Tailwind's preflight
+ * (button/border resets) would therefore override .fds-button, so it is moved into a lower layer.
+ * Utilities stay unlayered and still override package styles.
+ */
+@layer reset, fds;
+@import "tailwindcss/base.css" layer(reset);
+@import "@scttlnd/ui/styles.css";
+@import "@scttlnd/ui/themes/boligdata.css";
 @tailwind components;
 @tailwind utilities;
 
@@ -43,89 +51,70 @@ canvas {
   }
 }
 
-/* A quiet, editorial palette shared by listings, research and account screens. */
+/*
+ * Palette: @scttlnd/ui's BoligData theme is the source of truth (--fds-*). The app's --color-* names
+ * stay as aliases so Tailwind utilities keep working. Tokens the theme does not define (soft
+ * tints, hover states, tertiary text) remain app-local below.
+ */
 :root {
-  color-scheme: light;
-
-  --color-bg: #ffffff;
+  --color-bg: var(--fds-background);
   --gradient-bg: none;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f5f6f4;
+  --color-surface: var(--fds-panel);
+  --color-surface-alt: var(--fds-panel-raised);
+  --color-border: var(--fds-line);
+  --color-text-primary: var(--fds-foreground);
+  --color-text-secondary: var(--fds-muted);
+  --color-cta: var(--fds-accent);
+  --color-cta-hover: var(--fds-accent-strong);
+  --color-cta-text: var(--fds-on-accent);
+  --color-brand: var(--fds-focus-ring);
+  --color-accent: var(--fds-brand-peach);
+  --color-accent-text: var(--fds-brand-ink);
+  --color-success: var(--fds-success);
+  --color-warning: var(--fds-warn);
+  --color-danger: var(--fds-danger);
+  --color-footer-bg: var(--fds-brand-footer);
+  --color-footer-border: var(--fds-brand-line);
+  --shadow-card: var(--fds-shadow-card);
+  --shadow-lift: var(--fds-shadow-popover);
+
   --color-surface-hover: #eceee9;
-  --color-border: #e6e8e2;
   --color-border-strong: #bfc5ba;
-  --color-text-primary: #20221f;
-  --color-text-secondary: #62685e;
   --color-text-tertiary: #686f63;
-  --color-cta: #20221f;
-  --color-cta-hover: #383d34;
-  --color-cta-text: #ffffff;
-  --color-brand: #97603a;
   --color-brand-hover: #794724;
   --color-brand-soft: #fff0e4;
   --color-brand-text: #85502c;
-  --color-accent: #f7bb8d;
   --color-accent-hover: #f2ac75;
-  --color-accent-text: #342417;
-  --color-success: #3f7a3b;
   --color-success-soft: #e4f1e1;
   --color-success-text: #2e5c2b;
-  --color-warning: #966012;
   --color-warning-soft: #fff4dc;
   --color-warning-text: #88530c;
-  --color-danger: #b4321f;
   --color-danger-soft: #fbe3de;
   --color-unknown: #686f63;
   --color-unknown-soft: #eceee9;
   --color-unknown-text: #62685e;
-  --color-footer-bg: #171916;
-  --color-footer-border: #383c34;
   --color-footer-text: #fafbf7;
   --color-footer-muted: #bfc5b8;
-  --shadow-card: 0 2px 8px rgba(32, 34, 31, 0.035);
-  --shadow-lift: 0 14px 36px rgba(32, 34, 31, 0.1);
 }
 
 :root.dark {
-  color-scheme: dark;
-
-  --color-bg: #171917;
-  --gradient-bg: none;
-  --color-surface: #20231f;
-  --color-surface-alt: #282c26;
   --color-surface-hover: #343930;
-  --color-border: #383e33;
   --color-border-strong: #65705d;
-  --color-text-primary: #f5f5ef;
-  --color-text-secondary: #c0c7b9;
   --color-text-tertiary: #a6af9e;
-  --color-cta: #f5f5ef;
-  --color-cta-hover: #e1e7d9;
-  --color-cta-text: #20231f;
-  --color-brand: #f2bd95;
   --color-brand-hover: #ffd6b6;
   --color-brand-soft: #3d3026;
   --color-brand-text: #f5c7a4;
-  --color-accent: #f7bb8d;
   --color-accent-hover: #ffd0ab;
-  --color-accent-text: #342417;
-  --color-success: #6fd68a;
   --color-success-soft: #142a1e;
   --color-success-text: #8fe3a4;
-  --color-warning: #e9be74;
   --color-warning-soft: #3c301b;
   --color-warning-text: #f3cd8e;
-  --color-danger: #ff9c90;
   --color-danger-soft: #3b2227;
   --color-unknown: #a6af9e;
   --color-unknown-soft: #343930;
   --color-unknown-text: #c0c7b9;
-  --color-footer-bg: #10120f;
-  --color-footer-border: #343930;
   --color-footer-text: #f5f5ef;
   --color-footer-muted: #b8c1b0;
-  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.2);
-  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 :root.dark body {

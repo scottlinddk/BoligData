@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Button, Notice } from "@scttlnd/ui";
 import { usePropertySearch } from "@/hooks/use-property-search";
 import { useSavedSearches } from "@/hooks/use-saved-searches";
 import { useAuth } from "@/hooks/use-auth";
@@ -155,7 +156,20 @@ export function SearchPage() {
           </div>
         {canRecommend && <p className="mb-5 rounded-xl bg-brand-soft p-3 text-sm text-brand-text">{t("recommend.selectHint")}</p>}
         {!authenticated && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl bg-brand-soft p-4 text-sm text-brand-text"><p className="flex-1">{t("search.signInForDetails")}</p><Link to="/auth/signin" className={primary}>{t("nav.signIn")}</Link></div>}
-        {isError && <div role="alert" className="ui-enter mb-5 rounded-xl border border-danger-soft bg-danger-soft p-5"><p className="font-medium text-danger">{t("search.error")}</p>{filters.polygon && <p className="mt-1 text-sm text-ink-soft">{error?.message}</p>}<button disabled={isFetching} onClick={() => refetch()} className={`${pill} mt-3 disabled:opacity-50`}>{isFetching && <span className="ui-spinner h-4 w-4" aria-hidden="true" />}{t("common.retry")}</button></div>}
+        {isError && (
+          <Notice
+            tone="danger"
+            className="ui-enter mb-5"
+            title={t("search.error")}
+            action={
+              <Button variant="secondary" disabled={isFetching} onClick={() => refetch()}>
+                {t("common.retry")}
+              </Button>
+            }
+          >
+            {filters.polygon && error?.message}
+          </Notice>
+        )}
         {showList && <div aria-busy={isFetching}>
           {isLoading && <div className={grid} aria-hidden="true">{Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)}</div>}
           {!isLoading && data && <div className={`transition-opacity duration-200 motion-reduce:transition-none ${isFetching ? "opacity-60" : "opacity-100"}`}>{authenticated ? properties.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-stagger`} data-testid="property-results">{properties.map(property => <PropertyCard key={property.id} property={property} compact={compactCards} selectable={canRecommend} selected={selectedIds.has(property.id)} onToggleSelect={toggleSelected} />)}</div> : <div className="ui-enter rounded-xl border border-dashed border-border-strong px-5 py-10 text-center"><p className="font-semibold">{t("search.noResults")}</p><p className="mt-2 text-sm text-ink-soft">{filters.polygon ? tx("Udvid området på kortet, eller justér dine filtre.", "Expand the map boundary or adjust your filters.") : t("search.noResultsHint")}</p></div> : summaries.length > 0 ? <div key={`${displayedOffset}-${limit}`} className={`${grid} ui-fade-in`}>{summaries.map(summary => <LockedPropertyCard key={summary.id} summary={summary} />)}</div> : <p className="ui-enter py-8 text-center text-ink-soft">{t("search.noResults")}</p>}</div>}

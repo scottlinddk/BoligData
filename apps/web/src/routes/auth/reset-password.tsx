@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { Button, Field, Input, Notice } from "@scttlnd/ui";
 import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/i18n/i18n";
 
@@ -21,24 +22,24 @@ export function ResetPasswordPage() {
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="mb-6 text-3xl font-bold tracking-tight text-ink">{t("auth.reset.title")}</h1>
       {sent ? (
-        <p className="font-medium text-ink-soft">{t("auth.reset.sent", { email })}</p>
+        <Notice tone="success">{t("auth.reset.sent", { email })}</Notice>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            type="email"
-            required
-            placeholder={t("auth.email")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-ink"
-          />
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-full bg-cta px-3 py-2 font-bold text-cta-text transition hover:bg-cta-hover disabled:opacity-50"
-          >
+          <Field label={t("auth.email")}>
+            {(control) => (
+              <Input
+                {...control}
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )}
+          </Field>
+          <Button type="submit" disabled={submitting}>
             {submitting ? t("auth.reset.submitting") : t("auth.reset.submit")}
-          </button>
+          </Button>
         </form>
       )}
     </div>
